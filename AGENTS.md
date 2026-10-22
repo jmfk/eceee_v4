@@ -22,6 +22,10 @@ The system centers on page management, publishing workflows, code-based layouts/
 - `docs/`, `manuals/`, `backend/README.md`, `frontend/README.md`: project documentation.
 - `.cursor/rules/`: source material for these agent instructions.
 
+## Application UI Design
+
+Use the repository's [eceee-v4-design skill](.agents/skills/eceee-v4-design/SKILL.md) when creating, changing or reviewing ECEEE application UI. Its established ECEEE visual contract takes precedence over generic design skills, including recommendations against cards, borders or the existing blue action styling. This applies to CMS application chrome and tools, not tenant website themes or public rendering.
+
 ## Core Conventions
 
 - Prefer existing project patterns over new abstractions.

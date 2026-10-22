@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import {
     Link,
-    NavLink,
     useLocation,
     useNavigate,
     useParams,
 } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Navbar from '../components/Navbar'
+import PrivatePlayer from '../components/support/PrivateVideoPlayer'
+import HelpGuideSelect from '../components/help/HelpGuideSelect'
+import StatusBar from '../components/StatusBar'
+import { Inbox, Search } from 'lucide-react'
+import '../components/user-tools.css'
 import {
     supportError,
     supportRequest,
@@ -64,63 +68,6 @@ function Pager({ result, page, setPage }) {
     ) : null
 }
 
-function PrivatePlayer({ id }) {
-    const tenant = useSupportTenant()
-    const identity = useSupportIdentity()
-    const [attempt, setAttempt] = useState(0)
-    const player = useRef(null)
-    const resume = useRef({ time: 0, playing: false })
-    const renew = () => {
-        if (player.current)
-            resume.current = {
-                time: player.current.currentTime,
-                playing: !player.current.paused,
-            }
-        setAttempt((n) => n + 1)
-    }
-    const video = useQuery({
-        queryKey: ['support', tenant, identity, 'playback', id, attempt],
-        queryFn: () => supportRequest(tenant, `videos/${id}/playback/`),
-        enabled: !!id,
-        staleTime: 0,
-        gcTime: 0,
-        retry: false,
-    })
-    if (!id) return null
-    return (
-        <section aria-label="Video">
-            <ErrorText error={video.error} />
-            {video.isPending ? (
-                <p role="status">Öppnar privat video…</p>
-            ) : (
-                video.data && (
-                    <video
-                        ref={player}
-                        key={video.data.url}
-                        src={video.data.url}
-                        onLoadedMetadata={() => {
-                            if (!player.current) return
-                            player.current.currentTime = resume.current.time
-                            if (resume.current.playing)
-                                player.current.play().catch(() => {})
-                        }}
-                        controls
-                        preload="metadata"
-                        onError={() => {
-                            if (attempt < 1) renew()
-                        }}
-                    />
-                )
-            )}
-            <button onClick={renew}>Förnya uppspelningen</button>
-            <p className="support-muted">
-                Om länken har löpt ut, förnya uppspelningen. Meddelandet är läst
-                när vyn öppnas; det bekräftar inte att filmen är sedd.
-            </p>
-        </section>
-    )
-}
-
 function InboxList({ link }) {
     const tenant = useSupportTenant()
     const identity = useSupportIdentity()
@@ -147,7 +94,7 @@ function InboxList({ link }) {
     })
     return (
         <>
-            <h1>Din inbox</h1>
+            <h2>Din inbox</h2>
             <p>
                 Senaste inkomna aktivitet först. Supporttrådar är privata mellan
                 dig och behörig support.
@@ -183,7 +130,7 @@ function InboxList({ link }) {
                                 : 'Support'}{' '}
                             {entry.status && `· ${statusText[entry.status]}`}
                         </p>
-                        <h2>
+                        <h3>
                             <Link
                                 to={link(
                                     entry.instructionId
@@ -194,7 +141,7 @@ function InboxList({ link }) {
                                 {!entry.readAt && <span>Oläst · </span>}
                                 {entry.title}
                             </Link>
-                        </h2>
+                        </h3>
                     </div>
                     <button
                         disabled={archive.isPending}
@@ -253,7 +200,7 @@ function Library({ link }) {
     })
     return (
         <>
-            <h1>Instruktionsfilmer</h1>
+            <h2>Instruktionsfilmer</h2>
             <p>
                 Senaste publiceringen först. Filmerna bevaras även när de inte
                 längre är aktuella.
@@ -279,11 +226,11 @@ function Library({ link }) {
                             {v.archived && ' · Arkiverad'}
                             {v.withdrawn && ' · Avpublicerad'}
                         </p>
-                        <h2>
+                        <h3>
                             <Link to={link(`instructions/${v.id}`)}>
                                 {v.title}
                             </Link>
-                        </h2>
+                        </h3>
                         <p>{v.description}</p>
                     </div>
                 </article>
@@ -322,8 +269,16 @@ function InstructionDetail({ id, context, link }) {
             <ErrorText error={query.error || change.error} />
             {v ? (
                 <>
-                    <h1>{v.title}</h1>
+                    <h2>{v.title}</h2>
                     <p>{v.description}</p>
+                    {v.helpGuideId && <Link to={`/help/how-to/${encodeURIComponent(v.helpGuideId)}`}>Öppna hjälpartikeln</Link>}
+                    {context.canPublish && (
+                        <HelpGuideSelect
+                            value={v.helpGuideId || ''}
+                            disabled={change.isPending}
+                            onChange={(helpGuideId) => change.mutate({ helpGuideId })}
+                        />
+                    )}
                     <p className="support-muted">
                         {dateText(v.publishedAt)}
                         {v.archived && ' · Arkiverad'}
@@ -332,7 +287,7 @@ function InstructionDetail({ id, context, link }) {
                     {!v.withdrawn && <PrivatePlayer id={v.videoId} />}
                     {v.transcript && (
                         <section>
-                            <h2>Text till filmen</h2>
+                            <h3>Text till filmen</h3>
                             <p className="support-body">{v.transcript}</p>
                         </section>
                     )}
@@ -481,6 +436,7 @@ function Compose({ context, link, publish = false }) {
     const [title, setTitle] = useState('')
     const [body, setBody] = useState('')
     const [transcript, setTranscript] = useState('')
+    const [helpGuideId, setHelpGuideId] = useState(() => new URLSearchParams(location.search).get('guide') || '')
     const [place, setPlace] = useState(() =>
         safeReportLocation(
             new URLSearchParams(location.search).get('from') || '',
@@ -532,6 +488,7 @@ function Compose({ context, link, publish = false }) {
                           title,
                           description: body,
                           transcript,
+                          helpGuideId,
                           videoId,
                           requestId: requestId.current,
                       }
@@ -559,16 +516,21 @@ function Compose({ context, link, publish = false }) {
     })
     return (
         <>
-            <h1>
+            <h2>
                 {publish
                     ? 'Publicera instruktion'
                     : 'Fråga eller rapportera fel'}
-            </h1>
+            </h2>
             <p>
                 {publish
                     ? `Mottagare: ${context.tenant.name} · ${context.recipientCount} andra aktiva medlemmar får en avisering.`
                     : `Privat mellan dig och behörig support i ${context.tenant.name}.`}
             </p>
+            {publish && context.storageConfigured === false && (
+                <p className="support-error" role="alert">
+                    Videolagring är inte konfigurerad för miljön. Lagringen behöver aktiveras innan du kan ladda upp filmer.
+                </p>
+            )}
             {!publish && !context.supportAvailable && (
                 <p className="support-error">
                     Support är inte konfigurerad för arbetsytan. Kontakta
@@ -659,6 +621,9 @@ function Compose({ context, link, publish = false }) {
                         />
                     )}
                     {publish && (
+                        <HelpGuideSelect value={helpGuideId} onChange={setHelpGuideId} />
+                    )}
+                    {publish && (
                         <label>
                             Text till filmen
                             <textarea
@@ -684,11 +649,11 @@ function Compose({ context, link, publish = false }) {
                     )}
                     <p role="status">{stage}</p>
                     <button
-                        className="support-primary"
+                        className="user-tools-primary"
                         disabled={
                             !valid ||
                             send.isPending ||
-                            (publish ? !file : !context.supportAvailable)
+                            (publish ? !file || context.storageConfigured === false : !context.supportAvailable)
                         }
                     >
                         {send.error?.response?.status === 409
@@ -746,7 +711,7 @@ function ThreadDetail({ id, context }) {
             <ErrorText error={query.error || state.error} />
             {t ? (
                 <>
-                    <h1>{t.title}</h1>
+                    <h2>{t.title}</h2>
                     <p>
                         {t.kind === 'bug' ? 'Felrapport' : 'Fråga'} ·{' '}
                         {statusText[t.status]} · Privat supporttråd
@@ -766,12 +731,12 @@ function ThreadDetail({ id, context }) {
                     {t.videoId && <PrivatePlayer id={t.videoId} />}
                     {t.messages.map((message) => (
                         <article className="support-message" key={message.id}>
-                            <h2>
+                            <h3>
                                 {message.senderName}{' '}
                                 <span className="support-muted">
                                     · {dateText(message.createdAt)}
                                 </span>
-                            </h2>
+                            </h3>
                             <p className="support-body">{message.body}</p>
                         </article>
                     ))}
@@ -796,7 +761,7 @@ function ThreadDetail({ id, context }) {
                         <ErrorText error={reply.error} />
                         <div className="support-actions">
                             <button
-                                className="support-primary"
+                                className="user-tools-primary"
                                 disabled={reply.isPending || !body.trim()}
                             >
                                 {reply.error?.response?.status === 409
@@ -855,7 +820,7 @@ function Manage({ context }) {
     })
     return (
         <>
-            <h1>Supportinställningar</h1>
+            <h2>Supportinställningar</h2>
             <p>
                 Arbetsyta: {context.tenant.name}. Roller gäller bara den här
                 tenanten.
@@ -918,7 +883,7 @@ function Manage({ context }) {
                         Får publicera och hantera instruktioner
                     </label>
                     <ErrorText error={roles.error} />
-                    <button disabled={!userId || roles.isPending}>
+                    <button className="user-tools-primary" disabled={!userId || roles.isPending}>
                         Spara behörigheter
                     </button>
                     {roles.isSuccess && (
@@ -928,7 +893,7 @@ function Manage({ context }) {
             )}
             {context.canSupport && (
                 <section>
-                    <h2>E-post som behöver åtgärdas</h2>
+                    <h3>E-post som behöver åtgärdas</h3>
                     <ErrorText error={failures.error} />
                     {failures.data?.results.length === 0 && (
                         <p>Inga kända leveransproblem.</p>
@@ -1042,77 +1007,95 @@ export default function InboxPage() {
         else content = <InboxList link={link} />
     }
     return (
-        <div className="support-shell">
+        <div className="user-tools-shell">
             <Navbar />
-            <nav className="support-tabs" aria-label="Inboxnavigation">
-                {tabs.map(([path, title]) => (
-                    <NavLink key={path} to={link(path)} end={path === ''}>
-                        {title}
-                        {!path && context.data?.unreadCount
-                            ? ` (${context.data.unreadCount} olästa)`
-                            : ''}
-                    </NavLink>
-                ))}
-                <button
-                    aria-expanded={commands}
-                    onClick={() => setCommands((v) => !v)}
-                >
-                    Sök handlingar · ⌘K / Ctrl+K
-                </button>
-            </nav>
-            <main className="support-main" key={`${tenant}:${identity}`}>
-                {context.data && (
-                    <p className="support-muted">
-                        Arbetsyta: {context.data.tenant.name}
-                    </p>
-                )}
-                {commands && (
-                    <section aria-label="Sök handlingar">
-                        <label>
-                            Sök innehåll och handlingar
-                            <input
-                                autoFocus
-                                value={commandSearch}
-                                onChange={(e) =>
-                                    setCommandSearch(e.target.value)
-                                }
-                                placeholder="Inbox, instruktionsfilmer, rapportera fel…"
-                            />
-                        </label>
-                        <div className="support-actions">
-                            {tabs
-                                .filter(([, title]) =>
-                                    title
-                                        .toLowerCase()
-                                        .includes(commandSearch.toLowerCase()),
-                                )
-                                .map(([path, title]) => (
-                                    <Link
-                                        key={path}
-                                        to={link(path)}
-                                        onClick={() => setCommands(false)}
-                                    >
-                                        {title}
-                                    </Link>
-                                ))}
+            <main className="user-tools-main user-tools-content" key={`${tenant}:${identity}`}>
+                <div className="support-container container mx-auto px-4 py-8">
+                    <header className="user-tools-header">
+                        <div>
+                            <div className="user-tools-title">
+                                <Inbox aria-hidden="true" />
+                                <h1>Inbox</h1>
+                            </div>
+                            <p className="user-tools-description">Meddelanden, instruktioner och support för din arbetsyta.</p>
+                            {context.data && <p className="support-workspace">Arbetsyta: {context.data.tenant.name}</p>}
                         </div>
-                        <ErrorText error={commandResults.error} />
-                        {commandResults.data?.map((result) => (
-                            <p key={result.id}>
+                        <Link to="/profile" className="user-tools-button">Till Profile</Link>
+                    </header>
+                    <div className="user-tools-panel support-panel">
+                        <nav className="support-tabs" aria-label="Inboxnavigation">
+                            {tabs.map(([path, title]) => (
                                 <Link
-                                    to={link(result.path)}
-                                    onClick={() => setCommands(false)}
+                                    key={path}
+                                    to={link(path)}
+                                    aria-current={(path === section || (!path && (!section || section === 'threads')) || (path === 'library' && section === 'instructions')) ? 'page' : undefined}
                                 >
-                                    {result.title}
+                                    {title}
+                                    {!path && context.data?.unreadCount
+                                        ? ` (${context.data.unreadCount} olästa)`
+                                        : ''}
                                 </Link>
-                            </p>
-                        ))}
-                    </section>
-                )}
-                <ErrorText error={context.error} />
-                {context.isPending && <p role="status">Hämtar din inbox…</p>}
-                {content}
+                            ))}
+                            <button
+                                aria-expanded={commands}
+                                onClick={() => setCommands((v) => !v)}
+                            >
+                                <Search aria-hidden="true" className="h-4 w-4" />
+                                Sök handlingar · ⌘K / Ctrl+K
+                            </button>
+                        </nav>
+                        <div className="support-content">
+                            {commands && (
+                                <section className="support-command-search" aria-label="Sök handlingar">
+                                    <label>
+                                        Sök innehåll och handlingar
+                                        <input
+                                            autoFocus
+                                            value={commandSearch}
+                                            onChange={(e) =>
+                                                setCommandSearch(e.target.value)
+                                            }
+                                            placeholder="Inbox, instruktionsfilmer, rapportera fel…"
+                                        />
+                                    </label>
+                                    <div className="support-actions">
+                                        {tabs
+                                            .filter(([, title]) =>
+                                                title
+                                                    .toLowerCase()
+                                                    .includes(commandSearch.toLowerCase()),
+                                            )
+                                            .map(([path, title]) => (
+                                                <Link
+                                                    key={path}
+                                                    to={link(path)}
+                                                    onClick={() => setCommands(false)}
+                                                >
+                                                    {title}
+                                                </Link>
+                                            ))}
+                                    </div>
+                                    <ErrorText error={commandResults.error} />
+                                    {commandResults.data?.map((result) => (
+                                        <p key={result.id}>
+                                            <Link
+                                                to={link(result.path)}
+                                                onClick={() => setCommands(false)}
+                                            >
+                                                {result.title}
+                                            </Link>
+                                        </p>
+                                    ))}
+                                </section>
+                            )}
+                            <ErrorText error={context.error} />
+                            {context.isPending && <p role="status">Hämtar din inbox…</p>}
+                            {content}
+                        </div>
+                    </div>
+                </div>
             </main>
+            <StatusBar customStatusContent={<span>Inbox</span>} />
         </div>
     )
 }

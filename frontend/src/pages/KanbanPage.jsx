@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Navbar from '../components/Navbar'
+import StatusBar from '../components/StatusBar'
+import { Columns3 } from 'lucide-react'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import '../components/user-tools.css'
 import { useAuth } from '../contexts/AuthContext'
 import GlobalWysiwygToolbar from '../components/wysiwyg/GlobalWysiwygToolbar'
 import MarkdownEditor, { MarkdownView } from '../components/kanban/MarkdownEditor'
@@ -265,8 +269,8 @@ function CardDetail({ card, workspace, run, busy, reload }) {
                     </select>
                 </label>
             </div>
-            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)] gap-10">
-                <div className="min-w-0">
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)] gap-6">
+                <div className="user-tools-panel">
                     {card.revision !== draft.revision && (
                         <div className="mb-4" role="status">
                             Kortet har uppdaterats. Din text är kvar i formuläret.{' '}
@@ -487,13 +491,13 @@ function CardDetail({ card, workspace, run, busy, reload }) {
                                 </button>
                             </div>
                         </section>
-                        <button className="kb-primary" disabled={busy}>
+                        <button className="user-tools-primary" disabled={busy}>
                             Spara kort
                         </button>
                     </form>
                     <Attachments card={card} workspace={workspace} run={run} />
                 </div>
-                <aside aria-label="Kommentarer och aktivitet" className="min-w-0">
+                <aside aria-label="Kommentarer och aktivitet" className="user-tools-panel">
                     <h2 className="text-xl font-semibold mb-3">Kommentarer och aktivitet</h2>
                     <div className="flex gap-2 mb-4">
                         <button
@@ -563,7 +567,7 @@ function CardDetail({ card, workspace, run, busy, reload }) {
                             onChange={setBody}
                             members={workspace.members}
                         />
-                        <button className="kb-primary mt-2" disabled={busy || !body.trim()}>
+                        <button className="user-tools-primary mt-2" disabled={busy || !body.trim()}>
                             {editingComment ? 'Spara kommentar' : 'Kommentera'}
                         </button>
                         {editingComment && (
@@ -590,6 +594,7 @@ const localDate = (value) => {
 }
 
 export default function KanbanPage() {
+    useDocumentTitle('Kanban')
     const { boardId, cardId } = useParams()
     const tenant = useTenant()
     const { user } = useAuth()
@@ -734,42 +739,57 @@ export default function KanbanPage() {
                 columnIds: ids,
             })
         })
-    if (workspaceQuery.isPending)
+    if (workspaceQuery.isPending || workspaceQuery.error) {
         return (
-            <div className="kb p-8" role="status">
-                Läser arbetsytan…
+            <div className="user-tools-shell">
+                <Navbar />
+                <main className="user-tools-main user-tools-content container mx-auto px-4 py-8">
+                    <header className="user-tools-header">
+                        <div className="user-tools-title"><Columns3 aria-hidden="true" /><h1>Kanban</h1></div>
+                    </header>
+                    <div className="user-tools-panel" role={workspaceQuery.error ? 'alert' : 'status'}>
+                        {workspaceQuery.error ? (
+                            <>
+                                <p className="mb-4">{kanbanError(workspaceQuery.error)}</p>
+                                <button onClick={() => workspaceQuery.refetch()}>Försök igen</button>
+                            </>
+                        ) : 'Läser arbetsytan…'}
+                    </div>
+                </main>
+                <StatusBar customStatusContent={<span>Kanban</span>} />
             </div>
         )
-    if (workspaceQuery.error)
-        return (
-            <div className="kb p-8" role="alert">
-                {kanbanError(workspaceQuery.error)}{' '}
-                <button onClick={() => workspaceQuery.refetch()}>Försök igen</button>
-            </div>
-        )
+    }
     return (
         <KanbanAccessContext.Provider value={ticket}>
-            <div className="h-screen flex flex-col">
+            <div className="user-tools-shell">
                 <Navbar />
                 <GlobalWysiwygToolbar />
-                <main className="kb flex-1 overflow-auto p-4 md:p-6">
-                    <header className="flex flex-wrap gap-4 items-center mb-5">
-                        <h1 className="text-2xl font-semibold">Kanban</h1>
-                        <Link to="/kanban">Alla kort</Link>
+                <main className="kb user-tools-main user-tools-content">
+                    <div className="kb-content container mx-auto px-4 py-8">
+                    <header className="user-tools-header">
+                        <div>
+                            <div className="user-tools-title"><Columns3 aria-hidden="true" /><h1>Kanban</h1></div>
+                            <p className="user-tools-description">Planera och följ upp uppgifter i din arbetsyta.</p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                        <Link to="/profile" className="user-tools-button">Till Profile</Link>
+                        <Link to="/kanban" className="user-tools-button">Alla kort</Link>
                         <button onClick={() => setShowNotices(!showNotices)} aria-expanded={showNotices}>
                             Aviseringar ({workspace.notifications.filter((item) => !item.read).length})
                         </button>
                         <button onClick={() => setShowActivity(!showActivity)} aria-expanded={showActivity}>
                             Aktivitet / Ångra
                         </button>
+                        </div>
                     </header>
                     {error && (
-                        <p role="alert" className="text-red-600 mb-4">
+                        <p role="alert" className="kb-error mb-4">
                             {error}
                         </p>
                     )}
                     {showNotices && (
-                        <section aria-label="Aviseringar" className="mb-6">
+                        <section aria-label="Aviseringar" className="user-tools-panel mb-6">
                             {!workspace.notifications.length && <p>Inga aviseringar.</p>}
                             {workspace.notifications.map((item) => (
                                 <div key={item.id} className="flex flex-wrap gap-3 mb-2">
@@ -793,7 +813,7 @@ export default function KanbanPage() {
                         </section>
                     )}
                     {showActivity && (
-                        <section aria-label="Aktivitet" className="mb-6 max-h-64 overflow-auto">
+                        <section aria-label="Aktivitet" className="user-tools-panel mb-6 max-h-64 overflow-auto">
                             {activities.data?.map((item) => (
                                 <div key={item.id} className="flex flex-wrap gap-2 mb-2">
                                     <span>
@@ -834,13 +854,13 @@ export default function KanbanPage() {
                         )
                     ) : (
                         <>
-                            <nav aria-label="Boards" className="flex flex-wrap gap-3 mb-5">
+                            <nav aria-label="Boards" className="kb-boards user-tools-panel" hidden={!workspace.boards.some((item) => archived !== 'false' || !item.archived)}>
                                 {workspace.boards
                                     .filter((item) => archived !== 'false' || !item.archived)
                                     .map((item) => (
                                         <Link
                                             key={item.id}
-                                            className={item.id === boardId ? 'font-bold' : ''}
+                                            aria-current={item.id === boardId ? 'page' : undefined}
                                             to={`/kanban/boards/${item.id}`}
                                             onDragOver={(e) => e.preventDefault()}
                                             onDrop={(e) => {
@@ -866,7 +886,7 @@ export default function KanbanPage() {
                                         navigate(`/kanban/boards/${created.id}`)
                                     })
                                 }}
-                                className="flex gap-2 mb-5"
+                                className="kb-toolbar user-tools-panel"
                             >
                                 <input
                                     aria-label="Nytt board"
@@ -876,10 +896,10 @@ export default function KanbanPage() {
                                     required
                                     maxLength={200}
                                 />
-                                <button disabled={busy}>Skapa board</button>
+                                <button className="user-tools-primary" disabled={busy}>Skapa board</button>
                             </form>
                             <form
-                                className="flex flex-wrap gap-3 mb-5"
+                                className="kb-toolbar user-tools-panel"
                                 onSubmit={(e) => {
                                     e.preventDefault()
                                     setSearch(query)
@@ -1224,8 +1244,8 @@ export default function KanbanPage() {
                                         </section>
                                     ))}
                                 </div>
-                            ) : (
-                                <ul className="space-y-3">
+                            ) : cards.length > 0 ? (
+                                <ul className="kb-list user-tools-panel">
                                     {cards.map((card) => (
                                         <li key={card.id}>
                                             <Link to={`/kanban/cards/${card.id}`}>
@@ -1234,15 +1254,17 @@ export default function KanbanPage() {
                                         </li>
                                     ))}
                                 </ul>
-                            )}
+                            ) : null}
                             {!cardsQuery.isFetching && !cards.length && (
-                                <p className="kb-muted mt-3">
+                                <p className="kb-empty user-tools-panel mt-3">
                                     Inga kort i den här vyn. Skapa ett kort i ett board eller ändra filtren.
                                 </p>
                             )}
                         </>
                     )}
+                    </div>
                 </main>
+                <StatusBar customStatusContent={<span>Kanban</span>} />
             </div>
         </KanbanAccessContext.Provider>
     )

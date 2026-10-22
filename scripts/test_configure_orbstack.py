@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -83,6 +84,46 @@ class DotenvHelpersTests(unittest.TestCase):
             )
         )
 
+    def test_support_storage_uses_registered_stable_namespace_and_checkout_scope(self):
+        with tempfile.TemporaryDirectory() as directory:
+            provider = Path(directory)
+            (provider / "consumers").mkdir()
+            record = provider / "consumers/eceee-v4.json"
+            record.write_text(
+                json.dumps(
+                    {
+                        "consumer": "eceee-v4",
+                        "services": {
+                            "minio": {
+                                "support_storage": {"bucket": "w8c4m2-dev-support"}
+                            }
+                        },
+                    }
+                )
+            )
+            self.assertEqual(
+                configure_orbstack.support_bucket_name(provider, 10100),
+                "w8c4m2-dev-support",
+            )
+            self.assertEqual(
+                configure_orbstack.support_bucket_name(provider, 12700),
+                "w8c4m2-dev-support-12700",
+            )
+            record.write_text(
+                json.dumps(
+                    {
+                        "consumer": "another-project",
+                        "services": {
+                            "minio": {
+                                "support_storage": {"bucket": "w8c4m2-dev-support"}
+                            }
+                        },
+                    }
+                )
+            )
+            with self.assertRaisesRegex(SystemExit, "invalid ECEEE"):
+                configure_orbstack.support_bucket_name(provider, 10100)
+
     def test_parse_dotenv_values_accepts_export_and_empty_values(self):
         values = configure_orbstack.parse_dotenv_values(
             "export PRESENT=value\nEMPTY=\n# COMMENTED=ignored\n"
@@ -129,7 +170,9 @@ class DotenvHelpersTests(unittest.TestCase):
 
         command = run.call_args.args[0]
         self.assertNotIn("not-printed", command)
-        self.assertEqual(command[:4], ["docker", "exec", "-i", "shared-local-infrastructure-minio-1"])
+        self.assertEqual(
+            command[:4], ["docker", "exec", "-i", "shared-local-infrastructure-minio-1"]
+        )
         self.assertEqual(
             run.call_args.kwargs["input"],
             "eceee-v4\nnot-printed\neceee-media-checkpoints\n",

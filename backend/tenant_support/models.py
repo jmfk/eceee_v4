@@ -41,6 +41,7 @@ class Instruction(TenantRecord):
     title = models.CharField(max_length=150)
     description = models.TextField(max_length=4000)
     transcript = models.TextField(blank=True, max_length=30000)
+    help_guide_id = models.CharField(max_length=150, blank=True, default="")
     video = models.OneToOneField(PrivateVideo, on_delete=models.PROTECT)
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     published_at = models.DateTimeField(auto_now_add=True)
@@ -53,7 +54,10 @@ class Instruction(TenantRecord):
         constraints = [
             models.UniqueConstraint(fields=["tenant", "author", "request_id"], name="support_publish_request")
         ]
-        indexes = [models.Index(fields=["tenant", "published_at"], name="support_instruction_idx")]
+        indexes = [
+            models.Index(fields=["tenant", "published_at"], name="support_instruction_idx"),
+            models.Index(fields=["tenant", "help_guide_id"], name="support_instruction_guide_idx"),
+        ]
 
 
 class SupportThread(TenantRecord):

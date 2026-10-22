@@ -1,20 +1,18 @@
-import { useSupportContext, useSupportTenant } from './support/useSupportContext'
+import { useSupportContext } from './support/useSupportContext'
 import { safeReportLocation } from '../api/support'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Menu, X, Settings, Grid3X3, FolderOpen, Database, Hash, User as UserIcon, BarChart2, Palette, Inbox } from 'lucide-react'
+import { Menu, X, Settings, Grid3X3, FolderOpen, Database, Hash, User as UserIcon, BarChart2, Palette } from 'lucide-react'
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 
 const navigation = [
   { name: 'Pages', href: '/pages', icon: Grid3X3 },
   { name: 'Objects', href: '/objects', icon: Database },
-  { name: 'Kanban', href: '/kanban', icon: Grid3X3 },
   { name: 'Media', href: '/media', icon: FolderOpen },
   { name: 'Statistics', href: '/statistics', icon: BarChart2 },
   { name: 'Tags', href: '/tags', icon: Hash },
   { name: 'Designer', href: '/designer/themes', icon: Palette },
   { name: 'Settings', href: '/settings', icon: Settings },
-  { name: 'Inbox', href: '/inbox', icon: Inbox },
   { name: 'Profile', href: '/profile', icon: UserIcon },
 ]
 
@@ -22,7 +20,6 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
   const location = useLocation()
-  const selectedTenant = useSupportTenant()
   const support = useSupportContext()
   const inboxCount = support.data?.unreadCount || 0
   const { logout } = useAuth()
@@ -33,6 +30,10 @@ const Navbar = () => {
   const isActive = (path) => {
     if (path === '/settings') {
       return location.pathname.startsWith('/settings') || location.pathname.startsWith('/schemas')
+    }
+    if (path === '/profile') {
+      return ['/profile', '/inbox', '/kanban'].some((section) =>
+        location.pathname === section || location.pathname.startsWith(section + '/'))
     }
     return location.pathname === path || location.pathname.startsWith(path + '/')
   }
@@ -88,20 +89,20 @@ const Navbar = () => {
             {navigation.map((item) => (
               <Link
                 key={item.name}
-                to={item.name === 'Inbox' && selectedTenant ? `${item.href}?tenant=${encodeURIComponent(selectedTenant)}` : item.href}
+                to={item.href}
+                state={item.name === 'Profile' ? { reportFrom: location.state?.reportFrom || safeReportLocation(window.location.href) } : undefined}
                 className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive(item.href)
                   ? 'text-primary-600 bg-primary-50'
                   : 'text-gray-600 hover:text-primary-600 hover:bg-gray-50'
                   }`}
               >
                 <item.icon className="w-4 h-4" />
-                <span>{item.name}{item.name === 'Inbox' && inboxCount > 0 ? ` (${inboxCount})` : ''}</span>
+                <span>{item.name}{item.name === 'Profile' && inboxCount > 0 ? ` (${inboxCount})` : ''}</span>
               </Link>
             ))}
 
             {/* Schemas dropdown moved to Settings second-level tabs */}
 
-            <Link to={`/inbox/new?tenant=${encodeURIComponent(selectedTenant || '')}&from=${encodeURIComponent(safeReportLocation(window.location.href))}`} className="px-3 py-2 text-sm text-gray-600">Rapportera fel</Link>
             {/* Logout button */}
             <button
               onClick={logout}
@@ -137,7 +138,8 @@ const Navbar = () => {
               {navigation.map((item) => (
                 <Link
                   key={item.name}
-                  to={item.name === 'Inbox' && selectedTenant ? `${item.href}?tenant=${encodeURIComponent(selectedTenant)}` : item.href}
+                  to={item.href}
+                  state={item.name === 'Profile' ? { reportFrom: location.state?.reportFrom || safeReportLocation(window.location.href) } : undefined}
                   onClick={() => setIsOpen(false)}
                   className={`flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium transition-colors ${isActive(item.href)
                     ? 'text-primary-600 bg-primary-50'
@@ -145,13 +147,12 @@ const Navbar = () => {
                     }`}
                 >
                   <item.icon className="w-5 h-5" />
-                  <span>{item.name}{item.name === 'Inbox' && inboxCount > 0 ? ` (${inboxCount})` : ''}</span>
+                  <span>{item.name}{item.name === 'Profile' && inboxCount > 0 ? ` (${inboxCount})` : ''}</span>
                 </Link>
               ))}
 
               {/* Schemas moved to Settings second-level menu */}
 
-              <Link to={`/inbox/new?tenant=${encodeURIComponent(selectedTenant || '')}&from=${encodeURIComponent(safeReportLocation(window.location.href))}`} onClick={() => setIsOpen(false)} className="block px-3 py-2 text-gray-600">Rapportera fel</Link>
               {/* Mobile logout button */}
               <button
                 onClick={() => {

@@ -22,7 +22,7 @@ The configuration helper reads provider-managed credentials without printing the
 |---|---|---|
 | PostgreSQL 17 | `127.0.0.1:10300` | database `eceee_v4`, role `local_eceee_v4` |
 | Redis 7.4 | `127.0.0.1:10301` | ACL user `eceee_v4`, keys/channels `eceee_v4:*` |
-| MinIO | `127.0.0.1:10302` (`10303` console) | canonical checkout: `eceee-v4` / `eceee-media`; additional checkouts: access key and public/private buckets scoped by their registered frontend port |
+| MinIO | `127.0.0.1:10302` (`10303` console) | canonical checkout: `eceee-v4` / `eceee-media`; additional checkouts: access key and public/private buckets scoped by their registered frontend port; private support video: `w8c4m2-dev-support` with the same checkout suffix convention |
 
 Do not run provider `down`, reset, or volume deletion commands from this project. `make infra-down` stops only ECEEE's imgproxy. `make clean` likewise leaves shared service containers and volumes untouched.
 

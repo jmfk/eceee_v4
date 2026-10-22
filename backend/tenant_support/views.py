@@ -193,6 +193,9 @@ class InstructionsView(SupportView):
         rows = Instruction.objects.filter(tenant=request.tenant)
         if not has_role(request.user, request.tenant, "can_publish"):
             rows = rows.filter(withdrawn=False)
+        help_guide_id = request.query_params.get("help_guide_id", "").strip()[:150]
+        if help_guide_id:
+            rows = rows.filter(help_guide_id=help_guide_id, withdrawn=False)
         search = request.query_params.get("search", "").strip()[:150]
         if search:
             rows = rows.filter(Q(title__icontains=search) | Q(description__icontains=search))

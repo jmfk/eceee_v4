@@ -7,6 +7,9 @@ import { supportRequest } from '../../api/support'
 
 vi.unmock('react-router-dom')
 
+vi.mock('../../components/StatusBar', () => ({
+    default: () => <footer aria-label="Status">Inbox</footer>,
+}))
 vi.mock('../../components/Navbar', () => ({
     default: () => <nav aria-label="CMS">CMS</nav>,
 }))
@@ -88,6 +91,18 @@ beforeEach(() => {
 })
 
 describe('tenant inbox journey', () => {
+    it('marks Inbox as selected on a direct URL without a trailing slash', async () => {
+        renderInbox('/inbox?tenant=a')
+        await screen.findByRole('heading', { name: 'Din inbox' })
+        expect(screen.getByRole('link', { name: 'Inbox (1 olästa)' })).toHaveAttribute('aria-current', 'page')
+    })
+
+    it('preselects a help article when publishing from its documentation page', async () => {
+        renderInbox('/inbox/publish?tenant=a&guide=pages-create')
+        await screen.findByRole('heading', { name: 'Publicera instruktion' })
+        expect(screen.getByRole('combobox', { name: /Koppla till hjälpartikel/ })).toHaveValue('pages-create')
+    })
+
     it('requires an explicit new submission after an edited retry conflicts', async () => {
         const original = supportRequest.getMockImplementation()
         const submissions = []
