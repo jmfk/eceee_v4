@@ -72,7 +72,7 @@ endef
 .PHONY: create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant
 .PHONY: test test-build test-parallel backend-test backend-news-test backend-test-parallel frontend-test
 .PHONY: prepare-test-infra test-infra-down refresh-db-collation prepare-frontend-e2e
-.PHONY: frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test
+.PHONY: frontend-e2e-test frontend-admin-e2e-test regression-test
 .PHONY: backend-lint frontend-lint lint
 .PHONY: howto-script-editor howto-auth-prod howto-voices howto-video-edit
 .PHONY: howto-video-demo howto-video-demo-both howto-video-demo-all howto-video-demo-all-both
@@ -179,9 +179,8 @@ help: ## Show this help message (use: make help-TARGET for one target)
 		echo "Testing & Quality:"; \
 		echo "  backend-test      Run backend tests"; \
 		echo "  backend-news-test Run focused News migration tests with PostgreSQL"; \
-		echo "  frontend-public-e2e-test Run public-site Playwright regression tests"; \
 		echo "  frontend-admin-e2e-test  Run admin Playwright regression tests"; \
-		echo "  frontend-e2e-test        Run public then admin Playwright regression tests"; \
+		echo "  frontend-e2e-test        Run admin Playwright regression tests"; \
 		echo "  regression-test          Run browser regression tests"; \
 		echo "  playwright-test   Test Playwright service endpoints"; \
 		echo "  lint              Lint frontend code"; \
