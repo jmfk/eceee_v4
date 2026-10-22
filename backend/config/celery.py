@@ -100,6 +100,7 @@ app.conf.beat_schedule = {
         "schedule": crontab(hour=9, minute=0),
         "kwargs": {"period": "day"},
     },
+    "kanban-maintenance": {"task": "kanban.tasks.maintain_kanban", "schedule": 60.0},
     # Health check every 5 minutes
     "health-check": {
         "task": "config.celery.debug_task",

@@ -1,0 +1,69 @@
+import { fireEvent, render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
+import MarkdownEditor, { MarkdownView } from './MarkdownEditor'
+import { htmlMarkdown, markdownHtml } from './markdown'
+
+vi.mock('../form-fields/RichTextInput', () => ({
+    default: ({ value, onChange }) => (
+        <textarea aria-label="Visual HTML" value={value} onChange={(e) => onChange(e.target.value)} />
+    ),
+}))
+
+describe('Kanban Markdown', () => {
+    it('keeps headings, lists, links, images, quotes and code across modes', () => {
+        const markdown =
+            '# Heading\n\n- One\n- Two\n\n**Bold** *italic* [link](https://example.org)\n\n> Quote\n\n```js\nconst n = 1\n```\n\n![image](/api/v1/kanban/attachments/id/download/)'
+        const result = htmlMarkdown(markdownHtml(markdown))
+        expect(result).toContain('# Heading')
+        expect(result).toContain('**Bold**')
+        expect(result).toContain('> Quote')
+        expect(result).toContain('const n = 1')
+        expect(result).toContain('![image](/api/v1/kanban/attachments/id/download/)')
+    })
+    it('removes executable HTML and unsafe URLs', () => {
+        const html = markdownHtml('<img src=x onerror=alert(1)><script>alert(1)</script>[bad](javascript:alert(1))')
+        expect(html).not.toContain('onerror')
+        expect(html).not.toContain('<script')
+        expect(html).not.toContain('href="javascript:')
+    })
+    it('preserves canonical member mentions', () => {
+        expect(htmlMarkdown(markdownHtml('[@Johan](#member-12)'))).toContain('[@Johan](#member-12)')
+    })
+    it('supports source editing and visual conversion', () => {
+        const onChange = vi.fn()
+        render(<MarkdownEditor label="Description" value="**Bold**" onChange={onChange} />)
+        expect(screen.getByLabelText('Visual HTML').value).toContain('<strong>Bold</strong>')
+        fireEvent.click(screen.getByRole('button', { name: 'Markdown' }))
+        fireEvent.change(screen.getByRole('textbox', { name: 'Description' }), {
+            target: { value: '# New' },
+        })
+        expect(onChange).toHaveBeenCalledWith('# New')
+    })
+    it('renders sanitized content', () => {
+        render(<MarkdownView value="**Safe**" />)
+        expect(screen.getByText('Safe').tagName).toBe('STRONG')
+    })
+})
+
+it('does not persist temporary attachment tickets from the visual editor', () => {
+    const id = '11111111-1111-1111-1111-111111111111'
+    const text = htmlMarkdown(`<img src="/api/v1/kanban/attachments/${id}/download/?ticket=temporary" alt="Draft">`)
+    expect(text).not.toContain('ticket=')
+    expect(text).toContain(`/attachments/${id}/download/`)
+})
+
+
+it('echoes local visual HTML but rehydrates genuine external Markdown changes', () => {
+    const onChange = vi.fn()
+    const view = render(<MarkdownEditor value="" onChange={onChange} />)
+    fireEvent.change(screen.getByLabelText('Visual HTML'), { target: { value: 'A' } })
+    expect(onChange).toHaveBeenCalledWith('A')
+    view.rerender(<MarkdownEditor value="A" onChange={onChange} />)
+    expect(screen.getByLabelText('Visual HTML')).toHaveValue('A')
+    view.rerender(<MarkdownEditor value="**External**" onChange={onChange} />)
+    expect(screen.getByLabelText('Visual HTML').value).toContain('<strong>External</strong>')
+    fireEvent.click(screen.getByRole('button', { name: 'Markdown' }))
+    view.rerender(<MarkdownEditor value="# Source" onChange={onChange} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Visuellt' }))
+    expect(screen.getByLabelText('Visual HTML').value).toContain('<h1>Source</h1>')
+})

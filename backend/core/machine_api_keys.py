@@ -17,6 +17,8 @@ THEME_TRANSFER = "theme.transfer"
 PAGE_READ = "page.read"
 PAGE_WRITE = "page.write"
 PAGE_PUBLISH = "page.publish"
+KANBAN_READ = "kanban.read"
+KANBAN_WRITE = "kanban.write"
 MEDIA_READ = "media.read"
 MEDIA_WRITE = "media.write"
 OBJECT_WRITE = "object.write"
@@ -29,6 +31,8 @@ SITE_TRANSFER = "site.transfer"
 OBJECT_READ = "object.read"
 OBJECT_TRANSFER = "object.transfer"
 ALLOWED_SCOPES = {
+    KANBAN_READ,
+    KANBAN_WRITE,
     SERVER_FULL_ACCESS,
     THEME_READ,
     THEME_WRITE,
@@ -155,6 +159,9 @@ def _required_scope(request):
         if request.method not in SAFE_METHODS and _path_has_action(request.path, PAGE_PUBLISH_ACTIONS):
             return PAGE_PUBLISH
         return _read_or_write_scope(request, PAGE_READ, PAGE_WRITE)
+
+    if request.path.startswith("/api/v1/kanban/"):
+        return _read_or_write_scope(request, KANBAN_READ, KANBAN_WRITE)
 
     if request.path.startswith("/api/v1/media/"):
         return _read_or_write_scope(request, MEDIA_READ, MEDIA_WRITE)

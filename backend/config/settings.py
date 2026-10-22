@@ -187,6 +187,7 @@ LOCAL_APPS = [
     # 'apps.core',
     # 'apps.users',
     # 'apps.api',
+    "kanban",  # Tenant-internal task boards
     "core",  # Core multi-tenancy support
     "tenant_support",  # Private tenant inbox, instructions and support
     "htmx",
@@ -735,6 +736,7 @@ AI_TRACKING = {
 
 # OpenAI Configuration for Content Import
 OPENAI_API_KEY = config("OPENAI_API_KEY", default=None)
+KANBAN_EMBEDDING_MODEL = config("KANBAN_EMBEDDING_MODEL", default="text-embedding-3-small")
 
 # Anthropic API Configuration (for AI tracking)
 ANTHROPIC_API_KEY = config("ANTHROPIC_API_KEY", default=None)
