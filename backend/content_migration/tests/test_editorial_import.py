@@ -1,5 +1,6 @@
 import hashlib
 import json
+from datetime import timedelta
 from io import StringIO
 from unittest.mock import Mock, patch
 
@@ -9,6 +10,7 @@ from django.core.management.base import CommandError
 from django.db import connection
 from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
+from rest_framework.exceptions import ValidationError
 
 from content.models import Namespace
 from content_migration.legacy_content.profile import CLASSIFICATIONS, initial_bundle
@@ -19,6 +21,7 @@ from content_migration.models import EditorialImportBinding
 from core.models import Tenant
 from object_storage.models import ObjectInstance, ObjectTypeDefinition
 from object_storage.serializers import ObjectTypeDefinitionSerializer
+from object_storage.services.version_workflow import ObjectVersionWorkflow
 from taxonomy.context import actor_context
 from taxonomy.models import ClassificationType
 from taxonomy.services import mutate
@@ -116,13 +119,14 @@ class EditorialImportTests(TestCase):
         for name, slug in [("Nyhet", "news"), ("Krönika", "column")]:
             mutate(self.user, self.facets["article_kind"], "create", payload={"name": name, "slug": slug})
 
-    def stage(self, rows):
+    def stage(self, rows, configuration=None):
         return stage(
             tenant=self.tenant,
             namespace=self.namespace,
             user=self.user,
             source_scope="legacy.example:site:2",
             records=rows,
+            configuration=configuration,
         )
 
     def _media_term(self, name):
@@ -249,6 +253,90 @@ class EditorialImportTests(TestCase):
             [EditorialImportBinding.objects.get(resource="columnists").object_instance_id],
         )
 
+    def test_column_import_requires_successful_columnist_in_current_run(self):
+        rows = [("columnists", record("columnists")), ("columns", record("columns"))]
+        self.assertEqual(apply_run(self.stage(rows), self.user), {"imported": 2})
+        column = EditorialImportBinding.objects.get(resource="columns").object_instance
+
+        missing = self.stage([rows[1]])
+        self.assertEqual(apply_run(missing, self.user), {"blocked": 1})
+        self.assertEqual(missing.items.get().error_category, "missing_columnist_dependency")
+
+        excluded = self.stage(rows, {"excludedSources": ["columnists:1"]})
+        self.assertEqual(apply_run(excluded, self.user), {"excluded": 1, "blocked": 1})
+        self.assertEqual(column.versions.count(), 1)
+
+        self.assertEqual(apply_run(self.stage(rows), self.user), {"unchanged": 2})
+
+    def test_column_publication_requires_live_columnist_at_publication_time(self):
+        rows = [("columnists", record("columnists")), ("columns", record("columns"))]
+        self.assertEqual(apply_run(self.stage(rows), self.user), {"imported": 2})
+        columnist = EditorialImportBinding.objects.get(resource="columnists").object_instance
+        column = EditorialImportBinding.objects.get(resource="columns").object_instance
+        author_version = columnist.current_version
+        column_version = column.current_version
+
+        with self.assertRaisesRegex(ValidationError, "Publish every referenced columnist"):
+            ObjectVersionWorkflow(column, self.user).publish(
+                version_id=column_version.pk, revision=column_version.edit_revision
+            )
+
+        ObjectVersionWorkflow(columnist, self.user).publish(
+            version_id=author_version.pk, revision=author_version.edit_revision
+        )
+        ObjectVersionWorkflow(column, self.user).publish(
+            version_id=column_version.pk, revision=column_version.edit_revision
+        )
+        self.assertIsNotNone(column.get_current_published_version())
+
+    def test_news_with_author_reference_requires_public_columnist(self):
+        rows = [("columnists", record("columnists")), ("news", record())]
+        self.assertEqual(apply_run(self.stage(rows), self.user), {"imported": 2})
+        columnist = EditorialImportBinding.objects.get(resource="columnists").object_instance
+        news = EditorialImportBinding.objects.get(resource="news").object_instance
+        version = news.current_version
+        version.data = {**version.data, "authors": [columnist.pk]}
+        version.save()
+
+        with self.assertRaisesRegex(ValidationError, "Publish every referenced columnist"):
+            ObjectVersionWorkflow(news, self.user).publish(version_id=version.pk, revision=version.edit_revision)
+
+    def test_scheduled_column_requires_columnist_live_at_effective_date(self):
+        rows = [("columnists", record("columnists")), ("columns", record("columns"))]
+        self.assertEqual(apply_run(self.stage(rows), self.user), {"imported": 2})
+        columnist = EditorialImportBinding.objects.get(resource="columnists").object_instance
+        column = EditorialImportBinding.objects.get(resource="columns").object_instance
+        author_version = columnist.current_version
+        column_version = column.current_version
+        author_start = timezone.now() + timedelta(days=1)
+        author_end = author_start + timedelta(days=2)
+        ObjectVersionWorkflow(columnist, self.user).schedule(
+            version_id=author_version.pk,
+            revision=author_version.edit_revision,
+            effective_date=author_start,
+            expiry_date=author_end,
+        )
+
+        with self.assertRaisesRegex(ValidationError, "Publish every referenced columnist"):
+            ObjectVersionWorkflow(column, self.user).schedule(
+                version_id=column_version.pk,
+                revision=column_version.edit_revision,
+                effective_date=author_start - timedelta(hours=1),
+            )
+        with self.assertRaisesRegex(ValidationError, "Publish every referenced columnist"):
+            ObjectVersionWorkflow(column, self.user).schedule(
+                version_id=column_version.pk,
+                revision=column_version.edit_revision,
+                effective_date=author_end + timedelta(hours=1),
+            )
+        ObjectVersionWorkflow(column, self.user).schedule(
+            version_id=column_version.pk,
+            revision=column_version.edit_revision,
+            effective_date=author_start + timedelta(hours=1),
+        )
+        column_version.refresh_from_db()
+        self.assertIsNotNone(column_version.effective_date)
+
     def test_manual_target_changes_block_reimport(self):
         first = self.stage([("news", record())])
         apply_run(first, self.user)
@@ -260,6 +348,50 @@ class EditorialImportTests(TestCase):
         self.assertEqual(apply_run(second, self.user), {"conflict": 1})
         v.refresh_from_db()
         self.assertEqual(v.title, "Manual edit")
+
+    def test_reviewed_exclusion_wins_over_unchanged_or_manually_edited_destination(self):
+        row = record()
+        self.assertEqual(apply_run(self.stage([("news", row)]), self.user), {"imported": 1})
+        binding = EditorialImportBinding.objects.get()
+        obj = binding.object_instance
+        obj.current_version.title = "Manual edit"
+        obj.current_version.save()
+
+        excluded = self.stage([("news", row)], {"excludedSources": ["news:1"]})
+        self.assertEqual(apply_run(excluded, self.user), {"excluded": 1})
+        self.assertEqual(excluded.items.get().error_category, "reviewed_exclusion")
+        self.assertEqual(obj.versions.count(), 1)
+        binding.refresh_from_db()
+        self.assertEqual(binding.object_instance_id, obj.pk)
+        obj.current_version.refresh_from_db()
+        self.assertEqual(obj.current_version.title, "Manual edit")
+
+    def test_taxonomy_merge_does_not_create_import_conflict(self):
+        from taxonomy.models import Tag
+
+        original = mutate(self.user, self.facets["news_category"], "create", payload={"name": "Original"})
+        replacement = mutate(self.user, self.facets["news_category"], "create", payload={"name": "Replacement"})
+        original_term = Tag.objects.get(pk=next(iter(original.after)))
+        replacement_term = Tag.objects.get(pk=next(iter(replacement.after)))
+        row = record(taxonomy={"categories": [{"model": "legacy.category", "id": 1, "name": "Original"}]})
+        config = {"approvedTermMap": {"legacy.category:1": str(original_term.pk)}}
+        self.assertEqual(apply_run(self.stage([("news", row)], config), self.user), {"imported": 1})
+        obj = EditorialImportBinding.objects.get().object_instance
+
+        mutate(
+            self.user,
+            self.facets["news_category"],
+            "merge",
+            term=original_term,
+            revision=original_term.revision,
+            payload={"target_id": str(replacement_term.pk), "target_revision": replacement_term.revision},
+        )
+        self.assertEqual(apply_run(self.stage([("news", row)], config), self.user), {"unchanged": 1})
+
+        changed = record(content="<p>Source changed after taxonomy merge</p>", taxonomy=row["taxonomy"])
+        mapped = {"approvedTermMap": {"legacy.category:1": str(replacement_term.pk)}}
+        self.assertEqual(apply_run(self.stage([("news", changed)], mapped), self.user), {"imported": 1})
+        self.assertEqual(obj.versions.count(), 2)
 
     def test_reimport_refetches_editor_changes_committed_while_waiting_for_the_object_lock(self):
         first = self.stage([("news", record())])
@@ -289,8 +421,10 @@ class EditorialImportTests(TestCase):
         self.assertEqual(obj.relationships[0]["type"], "authors")
         obj.relationships = []
         obj.save(update_fields=["relationships"])
-        changed = self.stage([("columns", record("columns", content="<p>Source changed</p>"))])
-        self.assertEqual(apply_run(changed, self.user), {"conflict": 1})
+        changed = self.stage(
+            [("columnists", record("columnists")), ("columns", record("columns", content="<p>Source changed</p>"))]
+        )
+        self.assertEqual(apply_run(changed, self.user), {"unchanged": 1, "conflict": 1})
         obj.refresh_from_db()
         self.assertEqual(obj.relationships, [])
         self.assertEqual(obj.versions.count(), 1)

@@ -238,7 +238,7 @@ class ObjectVersionWorkflow:
         self._validate_content(version)
         from content_migration.legacy_content.validation import assert_publishable
 
-        assert_publishable(version)
+        assert_publishable(version, at=self.now)
         self._assert_no_other_schedule(version)
         self._restore_predecessor(version)
         for previous in (
@@ -272,7 +272,7 @@ class ObjectVersionWorkflow:
         self._validate_content(version)
         from content_migration.legacy_content.validation import assert_publishable
 
-        assert_publishable(version)
+        assert_publishable(version, at=effective_date)
         self._assert_no_other_schedule(version)
         self._restore_predecessor(version)
         predecessors = []

@@ -483,6 +483,67 @@ class MachineAPIKeyAuthenticationTest(TestCase):
         self.assertEqual(parent.label, "Updated")
         self.assertEqual(list(parent.allowed_child_types.values_list("pk", flat=True)), [next_child.pk])
 
+    def test_owner_machine_key_installs_fresh_editorial_profile_without_superuser(self):
+        import importlib.util
+        import json
+
+        from content.models import Namespace
+        from content_migration.legacy_content.profile import initial_bundle
+        from taxonomy.models import ClassificationType, Tag
+
+        path = Path(__file__).resolve().parents[2] / "scripts" / "eceee_content_definitions.py"
+        spec = importlib.util.spec_from_file_location("profile_install_test", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        self.admin.is_superuser = False
+        self.admin.save(update_fields=["is_superuser"])
+        namespace = Namespace.objects.create(
+            name="Editorial profile", slug="editorial-profile", tenant=self.tenant, created_by=self.admin
+        )
+        raw_key, _ = self.create_key([OBJECT_DEFINITION_WRITE, OBJECT_READ, CONTENT_READ, CONTENT_WRITE])
+        self.authorize(raw_key)
+        test = self
+
+        class ClientAPI(module.Api):
+            def __init__(self):
+                pass
+
+            def request(self, path, method="GET", data=None):
+                response = getattr(test.client, method.lower())("/api/v1/" + path, data=data, format="json")
+                test.assertLess(response.status_code, 300, response.data)
+                return module.normalize_wire(json.loads(response.content))
+
+        api = ClientAPI()
+        module.apply_bundle(api, {"id": namespace.pk}, initial_bundle(), apply=True)
+        self.assertEqual(
+            ClassificationType.objects.filter(namespace=namespace).count(),
+            len(initial_bundle()["classification_types"]),
+        )
+        self.assertEqual(
+            set(Tag.objects.filter(namespace=namespace).values_list("slug", flat=True)),
+            {"news", "column", "press-release"},
+        )
+        self.assertEqual(module.apply_bundle(api, {"id": namespace.pk}, initial_bundle())["changes"], [])
+
+    def test_definition_writer_member_does_not_gain_taxonomy_owner_rights(self):
+        from content.models import Namespace
+
+        member = User.objects.create_user("profile-member", is_staff=True)
+        self.tenant.members.add(member)
+        namespace = Namespace.objects.create(
+            name="Member profile", slug="member-profile", tenant=self.tenant, created_by=self.admin
+        )
+        raw_key, key = self.create_key([OBJECT_DEFINITION_WRITE, CONTENT_WRITE])
+        key.principal = member
+        key.save(update_fields=["principal"])
+        self.authorize(raw_key)
+        response = self.client.post(
+            "/api/v1/taxonomy/types/",
+            {"namespace": namespace.pk, "key": "editorial", "name": "Editorial", "allowed_uses": ["pages"]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 403)
+
     def test_theme_read_key_can_reach_designer_theme_list(self):
         raw_key, _ = self.create_key([THEME_READ])
         self.authorize(raw_key)

@@ -124,6 +124,43 @@ def test_merge_deduplicates_read_without_rewriting_history(scope, resources):
     )
     assert classification_ids(version) == [str(target.pk)]
     assert version.canonical_tag_links.filter(tag_id=source.pk).exists()
+    replace_assignments(version, classification_ids(version), member)
+    assert list(version.canonical_tag_links.values_list("tag_id", flat=True)) == [source.pk, target.pk]
+    assert classification_ids(version) == [str(target.pk)]
+
+
+def test_merged_source_round_trip_keeps_archived_or_disabled_assignment(scope, resources):
+    owner, member, _, definition = scope
+    source, target = create(owner, definition, "Source"), create(owner, definition, "Target")
+    version = resources[0]
+    other = PageVersion.objects.create(page=version.page, version_number=2, created_by=owner)
+    replace_assignments(version, [str(source.pk)], member)
+    mutate(
+        owner,
+        definition,
+        "merge",
+        term=source,
+        revision=source.revision,
+        payload={"target_id": str(target.pk), "target_revision": target.revision},
+    )
+    assert classification_ids(version) == [str(target.pk)]
+
+    allowed_uses = definition.allowed_uses
+    definition.allowed_uses = []
+    definition.save(update_fields=["allowed_uses"])
+    replace_assignments(version, classification_ids(version), member)
+    assert list(version.canonical_tag_links.values_list("tag_id", flat=True)) == [source.pk]
+    with pytest.raises(ValidationError, match="unavailable"):
+        replace_assignments(other, [str(target.pk)], member)
+
+    definition.allowed_uses = allowed_uses
+    definition.save(update_fields=["allowed_uses"])
+    target.refresh_from_db()
+    mutate(owner, definition, "archive", term=target, revision=target.revision)
+    replace_assignments(version, classification_ids(version), member)
+    assert list(version.canonical_tag_links.values_list("tag_id", flat=True)) == [source.pk]
+    with pytest.raises(ValidationError, match="archived"):
+        replace_assignments(other, [str(target.pk)], member)
 
 
 def test_version_copy_keeps_independent_assignments(scope, resources):
