@@ -24,8 +24,16 @@ refresh-db-collation: prepare-test-infra
 		-c "UPDATE pg_database SET datcollversion = NULL WHERE datname IN ('template1', 'postgres', 'test_eceee_v4_test');" >/dev/null
 
 # Run backend tests
+# The real profile-install API regression also exercises the operator CLI, which
+# lives outside the backend image. Mount only its source dependencies read-only.
+DEFINITION_TEST_SOURCES = \
+	-v "$(CURDIR)/scripts:/definition-tooling/scripts:ro" \
+	-v "$(CURDIR)/skills/eceee-api-operations:/definition-tooling/skills/eceee-api-operations:ro" \
+	-v "$(CURDIR)/backend/content_migration/legacy_content/profile.py:/definition-tooling/backend/content_migration/legacy_content/profile.py:ro"
+
 backend-test: prepare-test-infra refresh-db-collation ## Run the backend test suite.
 	$(COMPOSE_DEV) run --rm --no-deps -T \
+		$(DEFINITION_TEST_SOURCES) \
 		-e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres \
 		-e POSTGRES_DB=eceee_v4_test -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=test-only \
 		-e POSTGRES_HOST=test-db -e POSTGRES_PORT=5432 \
@@ -33,7 +41,7 @@ backend-test: prepare-test-infra refresh-db-collation ## Run the backend test su
 		-e REDIS_URL=redis://test-redis:6379/0 \
 		-e AWS_ACCESS_KEY_ID=test-eceee -e AWS_SECRET_ACCESS_KEY=test-eceee-secret \
 		-e AWS_S3_INTERNAL_ENDPOINT_URL=http://test-minio:9000 \
-		backend python manage.py test --keepdb --verbosity=2 --failfast --noinput
+		backend sh -c 'python manage.py test --keepdb --verbosity=2 --failfast --noinput && pytest taxonomy/tests/test_governance.py taxonomy/tests/test_assignments.py --ds=config.settings --reuse-db -q'
 
 # Run the focused News migration suite against PostgreSQL. Historical migrations
 # contain PostgreSQL-native ArrayFields and therefore cannot be validated on SQLite.
@@ -65,6 +73,7 @@ backend-news-test: prepare-test-infra refresh-db-collation ## Run focused News m
 # Run backend tests in parallel once the suite is stable.
 backend-test-parallel: prepare-test-infra refresh-db-collation ## Run backend tests in parallel.
 	$(COMPOSE_DEV) run --rm --no-deps -T \
+		$(DEFINITION_TEST_SOURCES) \
 		-e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres \
 		-e POSTGRES_DB=eceee_v4_test -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=test-only \
 		-e POSTGRES_HOST=test-db -e POSTGRES_PORT=5432 \
@@ -72,7 +81,7 @@ backend-test-parallel: prepare-test-infra refresh-db-collation ## Run backend te
 		-e REDIS_URL=redis://test-redis:6379/0 \
 		-e AWS_ACCESS_KEY_ID=test-eceee -e AWS_SECRET_ACCESS_KEY=test-eceee-secret \
 		-e AWS_S3_INTERNAL_ENDPOINT_URL=http://test-minio:9000 \
-		backend python manage.py test --keepdb --parallel auto --verbosity=2 --failfast --noinput
+		backend sh -c 'python manage.py test --keepdb --parallel auto --verbosity=2 --failfast --noinput && pytest taxonomy/tests/test_governance.py taxonomy/tests/test_assignments.py --ds=config.settings --reuse-db -q'
 
 # Run frontend tests
 frontend-test: prepare-test-infra ## Run frontend unit tests.
