@@ -9,7 +9,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: full-ci-${{ github.event.pull_request.number }}
+  # Unrelated labels also trigger this workflow, before the job-level if is evaluated.
+  group: full-ci-${{ github.event.pull_request.number }}-${{ github.event.label.name }}
   cancel-in-progress: true
 
 jobs:
