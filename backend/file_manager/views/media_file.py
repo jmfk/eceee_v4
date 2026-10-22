@@ -256,7 +256,9 @@ class MediaFileViewSet(viewsets.ModelViewSet):
                 | Q(tags__name__icontains=text_search)
             ).distinct()
 
-        return queryset
+        from taxonomy.services import requested_classifications
+
+        return requested_classifications(self.request, queryset, "classification_links__tag_id")
 
     def perform_create(self, serializer):
         """Set user and perform security logging on create."""
@@ -595,7 +597,6 @@ class MediaFileViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def remove_tags(self, request, pk=None):
         """Remove tags from a media file."""
-        from ..models import MediaTag
 
         media_file = self.get_object()
         tag_ids = request.data.get("tag_ids", [])
@@ -606,26 +607,10 @@ class MediaFileViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        try:
-            # Get tags to remove (only those that belong to this file's namespace)
-            tags_to_remove = MediaTag.objects.filter(id__in=tag_ids, namespace=media_file.namespace)
+        from taxonomy.assignments import classification_ids, replace_assignments
+        from taxonomy.projections import legacy_media_ids
 
-            # Remove tags from media file
-            media_file.tags.remove(*tags_to_remove)
-
-            # Return updated media file
-            serializer = self.get_serializer(media_file)
-            return Response(
-                {
-                    "message": f"Removed {tags_to_remove.count()} tag(s) from media file",
-                    "media_file": serializer.data,
-                },
-                status=status.HTTP_200_OK,
-            )
-
-        except Exception as e:
-            logger.error(f"Failed to remove tags: {e}")
-            return Response(
-                {"error": f"Failed to remove tags: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        remove_ids = set(legacy_media_ids(media_file, tag_ids, request.user))
+        remaining = [pk for pk in classification_ids(media_file) if pk not in remove_ids]
+        replace_assignments(media_file, remaining, request.user)
+        return Response({"message": "Tags removed", "classification_ids": remaining})

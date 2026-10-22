@@ -1,0 +1,408 @@
+import json
+from io import StringIO
+from unittest.mock import patch
+
+from django.contrib.auth import get_user_model
+from django.core.management import call_command
+from django.core.management.base import CommandError
+from django.test import SimpleTestCase, TestCase
+from django.utils import timezone
+
+from content.models import Namespace
+from content_migration.legacy_content.profile import CLASSIFICATIONS, initial_bundle
+from content_migration.legacy_content.service import apply_item, apply_run, preflight, stage
+from content_migration.legacy_content.source import validate_record
+from content_migration.legacy_content.transform import BlockedRecord, normalize
+from content_migration.models import EditorialImportBinding
+from core.models import Tenant
+from object_storage.models import ObjectInstance, ObjectTypeDefinition
+from object_storage.serializers import ObjectTypeDefinitionSerializer
+from taxonomy.context import actor_context
+from taxonomy.models import ClassificationType
+from taxonomy.services import mutate
+
+
+def record(resource="news", pk=1, **updates):
+    models = {
+        "news": "eceeenews.eceeenews",
+        "columns": "eceeecolumnists.eceeecolumn",
+        "columnists": "eceeecolumnists.eceeecolumnist",
+        "events": "eceeecalendar.eceeecalenderevent",
+        "publications": "eceeelibrary.eceeelibraryitem",
+        "organizations": "eceeememberforum.eceeememberorganization",
+    }
+    data = (
+        {"firstName": "Test", "lastName": "Writer"}
+        if resource == "columnists"
+        else {"authorIds": [1]} if resource == "columns" else {}
+    )
+    return {
+        "legacyId": pk,
+        "sourceModel": models[resource],
+        "sourceSite": 2,
+        "sourceUrl": f"https://legacy.example/{resource}/{pk}/",
+        "title": "Public test title",
+        "slug": "same-slug",
+        "summary": "Summary",
+        "content": "<p>Public body</p>",
+        "status": 2,
+        "isPublic": True,
+        "publishDate": "2020-01-01T10:00:00Z",
+        "expiryDate": None,
+        "presentationalPublishingDate": "2020-01-02T10:00:00Z",
+        "data": data,
+        "taxonomy": {},
+        "attachments": [],
+        **updates,
+    }
+
+
+class EditorialTransformTests(SimpleTestCase):
+    def test_does_not_invent_precise_event_dates(self):
+        with self.assertRaisesRegex(BlockedRecord, "incomplete_event_date"):
+            normalize(record("events", data={"eventStartDate": "2020-01"}), "events")
+
+    def test_preserves_display_and_source_date_independently(self):
+        row = record(data={"sourceDate": "2019-12-31T12:15:00Z"})
+        result = normalize(row, "news")
+        self.assertEqual(result["data"]["sourceDate"], "2019-12-31T12:15:00Z")
+        self.assertTrue(result["data"]["presentationalPublishingDate"].startswith("2020-01-02"))
+
+    def test_columns_require_real_author_bindings(self):
+        with self.assertRaisesRegex(BlockedRecord, "missing_columnist_dependency"):
+            normalize(record("columns"), "columns")
+        self.assertEqual(normalize(record("columns"), "columns", author_ids={"1": 42})["data"]["authors"], [42])
+
+    def test_protected_or_wrong_model_records_fail_closed(self):
+        for changes in [{"isPublic": False}, {"sourceModel": "eceeeproceedings.proceedingpage"}, {"status": 1}]:
+            with self.assertRaises(ValueError):
+                validate_record(record(**changes), "news")
+
+    def test_internal_organization_name_is_not_a_fallback(self):
+        with self.assertRaisesRegex(BlockedRecord, "missing_public_organization_name"):
+            normalize(record("organizations", data={"organization": "INTERNAL"}), "organizations")
+
+
+class EditorialImportTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("editorial-owner")
+        self.tenant = Tenant.objects.create(identifier="editorial-tests", name="Editorial", created_by=self.user)
+        self.namespace = Namespace.objects.create(
+            tenant=self.tenant, name="Editorial", slug="default", created_by=self.user
+        )
+        self.types = {}
+        for item in initial_bundle()["definitions"]:
+            self.types[item["name"]] = ObjectTypeDefinition.objects.create(
+                name=item["name"],
+                label=item["label"],
+                plural_label=item["plural_label"],
+                namespace=self.namespace,
+                created_by=self.user,
+                schema=ObjectTypeDefinitionSerializer()._convert_schema_keys_to_snake(item["schema"]),
+                slot_configuration=item["slot_configuration"],
+                metadata=item["metadata"],
+            )
+        self.facets = {}
+        for key, (name, uses) in CLASSIFICATIONS.items():
+            self.facets[key] = ClassificationType.objects.create(
+                tenant=self.tenant,
+                namespace=self.namespace,
+                key=key,
+                name=name,
+                allowed_uses=[f"object:{self.types[use].pk}" for use in uses],
+            )
+        for name, slug in [("Nyhet", "news"), ("Krönika", "column")]:
+            mutate(self.user, self.facets["article_kind"], "create", payload={"name": name, "slug": slug})
+
+    def stage(self, rows):
+        return stage(
+            tenant=self.tenant,
+            namespace=self.namespace,
+            user=self.user,
+            source_scope="legacy.example:site:2",
+            records=rows,
+        )
+
+    def test_drafts_are_idempotent_and_resume_reuses_identity(self):
+        run = self.stage([("news", record())])
+        types, facets, _ = preflight(self.tenant, self.namespace, self.user)
+        with actor_context(self.user):
+            apply_item(run, run.items.get(), self.user, types, facets)
+        self.assertEqual(apply_run(run, self.user), {"imported": 1})
+        obj = EditorialImportBinding.objects.get().object_instance
+        self.assertIsNone(obj.current_version.effective_date)
+        apply_run(run, self.user)
+        self.assertEqual(obj.versions.count(), 1)
+        second = self.stage([("news", record())])
+        self.assertEqual(apply_run(second, self.user), {"unchanged": 1})
+        self.assertEqual(ObjectInstance.objects.filter(object_type=self.types["article"]).count(), 1)
+
+    def test_shared_numeric_ids_and_slugs_do_not_merge_news_and_columns(self):
+        run = self.stage([("columns", record("columns")), ("columnists", record("columnists")), ("news", record())])
+        self.assertEqual(apply_run(run, self.user), {"imported": 3})
+        news = EditorialImportBinding.objects.get(resource="news").object_instance
+        column = EditorialImportBinding.objects.get(resource="columns").object_instance
+        self.assertNotEqual(news.pk, column.pk)
+        self.assertNotEqual(news.slug, column.slug)
+        self.assertEqual(news.object_type_id, column.object_type_id)
+        self.assertEqual(
+            column.current_version.data["authors"],
+            [EditorialImportBinding.objects.get(resource="columnists").object_instance_id],
+        )
+
+    def test_manual_target_changes_block_reimport(self):
+        first = self.stage([("news", record())])
+        apply_run(first, self.user)
+        obj = EditorialImportBinding.objects.get().object_instance
+        v = obj.current_version
+        v.title = "Manual edit"
+        v.save()
+        second = self.stage([("news", record(content="<p>Source changed</p>"))])
+        self.assertEqual(apply_run(second, self.user), {"conflict": 1})
+        v.refresh_from_db()
+        self.assertEqual(v.title, "Manual edit")
+
+    def test_reimport_refetches_editor_changes_committed_while_waiting_for_the_object_lock(self):
+        first = self.stage([("news", record())])
+        apply_run(first, self.user)
+        obj = EditorialImportBinding.objects.get().object_instance
+        version = obj.current_version
+        second = self.stage([("news", record(content="<p>New source body</p>"))])
+        lock = ObjectInstance.objects.select_for_update
+
+        def editor_finishes_before_import_gets_lock(*args, **kwargs):
+            type(version).objects.filter(pk=version.pk).update(title="Editor committed while import waited")
+            return lock(*args, **kwargs)
+
+        with patch.object(
+            ObjectInstance.objects, "select_for_update", side_effect=editor_finishes_before_import_gets_lock
+        ):
+            self.assertEqual(apply_run(second, self.user), {"conflict": 1})
+        version.refresh_from_db()
+        self.assertEqual(version.title, "Editor committed while import waited")
+        self.assertEqual(obj.versions.count(), 1)
+
+    def test_manual_relationship_edits_are_not_overwritten_by_reimport(self):
+        rows = [("columnists", record("columnists")), ("columns", record("columns"))]
+        apply_run(self.stage(rows), self.user)
+        obj = EditorialImportBinding.objects.get(resource="columns").object_instance
+        self.assertEqual(len(obj.relationships), 1)
+        self.assertEqual(obj.relationships[0]["type"], "authors")
+        obj.relationships = []
+        obj.save(update_fields=["relationships"])
+        changed = self.stage([("columns", record("columns", content="<p>Source changed</p>"))])
+        self.assertEqual(apply_run(changed, self.user), {"conflict": 1})
+        obj.refresh_from_db()
+        self.assertEqual(obj.relationships, [])
+        self.assertEqual(obj.versions.count(), 1)
+
+    def test_import_blocks_unprepared_taxonomy_without_creating_approved_terms(self):
+        from taxonomy.models import Tag
+
+        row = record(taxonomy={"categories": [{"model": "legacy.category", "id": 1, "name": "Unreviewed"}]})
+        before = Tag.objects.count()
+        run = self.stage([("news", row)])
+        self.assertEqual(apply_run(run, self.user), {"blocked": 1})
+        self.assertEqual(run.items.get().error_category, "unprepared_taxonomy_term")
+        self.assertEqual(Tag.objects.count(), before)
+
+    def test_reviewed_mapping_must_preserve_its_classification_dimension(self):
+        from taxonomy.models import Tag
+
+        row = record(taxonomy={"categories": [{"model": "legacy.category", "id": 1, "name": "Category"}]})
+        for target_key, expected in [("news_source", {"blocked": 1}), ("news_category", {"imported": 1})]:
+            operation = mutate(self.user, self.facets[target_key], "create", payload={"name": "Mapped"})
+            term = Tag.objects.get(pk=next(iter(operation.after)))
+            run = stage(
+                tenant=self.tenant,
+                namespace=self.namespace,
+                user=self.user,
+                source_scope="legacy.example:site:2",
+                records=[("news", row)],
+                configuration={"approvedTermMap": {"legacy.category:1": str(term.pk)}},
+            )
+            self.assertEqual(apply_run(run, self.user), expected)
+
+    def test_changed_mapping_reimports_unchanged_source(self):
+        from taxonomy.assignments import classification_ids
+        from taxonomy.models import Tag
+
+        row = record(taxonomy={"categories": [{"model": "legacy.category", "id": 1, "name": "Category"}]})
+        for name in ["First", "Second"]:
+            operation = mutate(self.user, self.facets["news_category"], "create", payload={"name": name})
+            term = Tag.objects.get(pk=next(iter(operation.after)))
+            run = stage(
+                tenant=self.tenant,
+                namespace=self.namespace,
+                user=self.user,
+                source_scope="legacy.example:site:2",
+                records=[("news", row)],
+                configuration={"approvedTermMap": {"legacy.category:1": str(term.pk)}},
+            )
+            self.assertEqual(apply_run(run, self.user), {"imported": 1})
+            obj = EditorialImportBinding.objects.get().object_instance
+            self.assertIn(str(term.pk), classification_ids(obj.current_version))
+        self.assertEqual(obj.versions.count(), 2)
+        self.assertEqual(
+            apply_run(
+                stage(
+                    tenant=self.tenant,
+                    namespace=self.namespace,
+                    user=self.user,
+                    source_scope="legacy.example:site:2",
+                    records=[("news", row)],
+                    configuration=run.configuration,
+                ),
+                self.user,
+            ),
+            {"unchanged": 1},
+        )
+
+    def test_all_six_resources_share_article_storage_and_preserve_dependencies_and_attachments(self):
+        mutate(self.user, self.facets["event_type"], "create", payload={"name": "Conference", "slug": "conference"})
+        attachments = [
+            {"title": "First report", "externalUrl": "https://example.org/first"},
+            {"title": "Second report", "externalUrl": "https://example.org/second"},
+        ]
+        rows = [
+            ("news", record()),
+            ("columns", record("columns")),
+            ("columnists", record("columnists")),
+            ("events", record("events", data={"eventStartDate": "2020-05-10", "eventType": "Conference"})),
+            ("publications", record("publications", attachments=attachments)),
+            ("organizations", record("organizations", data={"fullName": "Public organization", "country": "SE"})),
+        ]
+        run = self.stage(rows)
+        self.assertEqual(apply_run(run, self.user), {"imported": 6})
+        self.assertEqual(ObjectInstance.objects.filter(object_type=self.types["article"]).count(), 2)
+        self.assertFalse(ObjectInstance.objects.filter(current_version__effective_date__isnull=False).exists())
+        library = EditorialImportBinding.objects.get(resource="publications").object_instance
+        self.assertEqual(library.current_version.workflow_metadata["legacy_editorial"]["attachments"], attachments)
+        self.assertEqual(apply_run(self.stage(rows), self.user), {"unchanged": 6})
+
+    @patch("content_migration.management.commands.migrate_legacy_editorial.NewsCommand._legacy_api_config")
+    @patch("content_migration.legacy_content.source.EditorialSource._request")
+    def test_preflight_inventory_is_read_only_and_reports_each_source_resource(self, request, config):
+        from content_migration.legacy_content.source import RESOURCES
+
+        config.return_value = {"base_url": "https://legacy.example/api/migration/v1/", "token": "test-only"}
+        request.side_effect = lambda path: (
+            {"contentContract": "1", "contentResources": list(RESOURCES), "resources": ["news"]}
+            if path == "health/"
+            else {
+                "contentContract": "1",
+                "sourceSite": 2,
+                "summary": {"total": 8, "published": 5, "excludedUnpublished": 3},
+            }
+        )
+        output = StringIO()
+        call_command(
+            "migrate_legacy_editorial",
+            "preflight",
+            tenant=self.tenant.identifier,
+            user=self.user.username,
+            inventory=True,
+            stdout=output,
+        )
+        result = json.loads(output.getvalue())
+        self.assertEqual(set(result["inventory"]), set(RESOURCES))
+        self.assertEqual(result["inventory"]["columns"]["excludedUnpublished"], 3)
+        self.assertEqual(request.call_count, 7)
+        self.assertFalse(EditorialImportBinding.objects.exists())
+        self.assertFalse(ObjectInstance.objects.exists())
+
+    def test_old_news_compatibility_sample_cannot_be_accepted_for_full_import(self):
+        run = stage(
+            tenant=self.tenant,
+            namespace=self.namespace,
+            user=self.user,
+            source_scope="legacy.example:site:2",
+            records=[("news", record())],
+            configuration={"compatibility": "legacy-news-v1", "sourceScopeVerified": False},
+        )
+        apply_run(run, self.user)
+        with self.assertRaisesRegex(CommandError, "compatibility sample"):
+            call_command(
+                "migrate_legacy_editorial",
+                "accept-sample",
+                tenant=self.tenant.identifier,
+                user=self.user.username,
+                run=str(run.pk),
+                confirm_manifest=run.manifest_hash,
+            )
+
+    def test_full_import_requires_a_current_completed_reviewed_sample(self):
+        config = {"resources": ["news"], "mappingHash": "reviewed-mapping"}
+        sample = stage(
+            tenant=self.tenant,
+            namespace=self.namespace,
+            user=self.user,
+            source_scope="legacy.example:site:2",
+            records=[("news", record())],
+            configuration=config,
+        )
+        apply_run(sample, self.user)
+        sample.refresh_from_db()
+        sample.reviewed_at = timezone.now()
+        sample.reviewed_by = self.user
+        sample.save()
+
+        def full_run():
+            return stage(
+                tenant=self.tenant,
+                namespace=self.namespace,
+                user=self.user,
+                source_scope="legacy.example:site:2",
+                records=[("news", record())],
+                preset="all",
+                configuration={**config, "acceptedSampleRun": str(sample.pk)},
+            )
+
+        self.assertEqual(apply_run(full_run(), self.user), {"unchanged": 1})
+        sample.status = "partial"
+        sample.save()
+        with self.assertRaisesRegex(BlockedRecord, "reviewed_sample_required"):
+            apply_run(full_run(), self.user)
+
+    def test_changed_frozen_manifest_fails_before_writing(self):
+        run = self.stage([("news", record())])
+        item = run.items.get()
+        item.record["title"] = "Changed"
+        item.save()
+        with self.assertRaisesRegex(BlockedRecord, "manifest_changed"):
+            apply_run(run, self.user)
+        self.assertFalse(EditorialImportBinding.objects.exists())
+
+    def test_destination_definition_changes_invalidate_run(self):
+        run = self.stage([("news", record())])
+        definition = self.types["article"]
+        definition.schema["required"] = ["summary"]
+        definition.save()
+        with self.assertRaisesRegex(BlockedRecord, "definitions_changed_since_staging"):
+            apply_run(run, self.user)
+
+    def test_incomplete_event_is_reported_without_losing_other_items(self):
+        run = self.stage([("news", record()), ("events", record("events", data={"eventStartDate": "2020"}))])
+        self.assertEqual(apply_run(run, self.user), {"imported": 1, "blocked": 1})
+        self.assertEqual(run.items.get(resource="events").error_category, "incomplete_event_date")
+
+    def test_an_interruption_after_first_committed_item_can_resume(self):
+        from content_migration.legacy_content import service
+
+        run = self.stage([("news", record(pk=1)), ("news", record(pk=2, slug="second"))])
+        original = service.apply_item
+        count = 0
+
+        def interrupt(*args, **kwargs):
+            nonlocal count
+            count += 1
+            if count == 2:
+                raise KeyboardInterrupt
+            return original(*args, **kwargs)
+
+        with patch.object(service, "apply_item", side_effect=interrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                apply_run(run, self.user)
+        self.assertEqual(EditorialImportBinding.objects.count(), 1)
+        self.assertEqual(apply_run(run, self.user), {"imported": 2})
+        self.assertEqual(EditorialImportBinding.objects.count(), 2)

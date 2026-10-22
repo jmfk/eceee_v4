@@ -34,4 +34,11 @@ describe('objectInstancesApi.saveWorkingCopy', () => {
             metadata: { nested: { a: 2 } }, expected_metadata: baseline.metadata,
         })
     })
+
+    it('sends classification IDs only when explicitly supplied, including a deliberate clear', async () => {
+        for (const ids of [['term-b', 'term-a'], []]) {
+            await objectInstancesApi.saveWorkingCopy(5, { ...content, classificationIds: ids }, version, baseline)
+            expect(postMock.mock.lastCall[1].classification_ids).toEqual(ids)
+        }
+    })
 })

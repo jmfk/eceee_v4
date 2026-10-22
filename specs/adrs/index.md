@@ -4,6 +4,9 @@
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
+| ADR-0047 | [Portable editorial definitions and checkpointed draft imports](active/0047-portable-editorial-definitions-and-draft-import.md) | accepted | PRD-0034, PRD-0031 |
+| ADR-0046 | [Gemensam Artikel och avgränsad legacyimport](active/0046-unified-articles-and-bounded-legacy-import.md) | accepted | PRD-0034, PRD-0012, PRD-0031 |
+| ADR-0043 | [Classification governance and staged cutover](active/0043-classification-governance.md) | accepted | PRD-0031 |
 | ADR-0045 | [Tenant Kanban workflow and private attachments](active/0045-tenant-kanban.md) | accepted | PRD-0033 |
 | ADR-0044 | [Tenant inbox and private support](active/0044-tenant-inbox-and-private-support.md) | accepted | PRD-0032 |
 | ADR-0042 | [Canonical Object editing and publishing workflow](active/0042-canonical-object-workflow.md) | accepted | PRD-0030 |

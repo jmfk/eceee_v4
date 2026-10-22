@@ -493,6 +493,16 @@ class KanbanTests(TestCase):
         self.card.refresh_from_db()
         self.assertEqual(self.card.revision, 1)
 
+        # Reusing accessible content needs no unused tag creation or owner-only register initialization.
+        namespace.is_active = True
+        namespace.save()
+        with patch("kanban.files.attachment_storage") as source:
+            source.client.get_object.return_value = {"Body": io.BytesIO(content)}
+            response = self.call(AttachmentViewSet, "import_file", data, pk=attachment.pk, user=self.other)
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["destination_id"], str(media.pk))
+        self.assertEqual(media.tags.count(), 0)
+
     def test_foreign_designer_import_is_not_found(self):
         attachment = self.attachment()
         attachment.size = len(b"image")

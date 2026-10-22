@@ -214,9 +214,10 @@ class BulkMediaOperationsView(APIView):
 
                 if operation == "add_tags":
                     tag_names = data.get("tag_names", [])
-                    for tag_name in tag_names:
-                        tag, created = MediaTag.objects.get_or_create(name=tag_name, namespace=file_obj.namespace)
-                        file_obj.tags.add(tag)
+                    from ..serializers import convert_tag_names_to_ids
+
+                    tag_ids = convert_tag_names_to_ids(tag_names, file_obj.namespace, request.user)
+                    file_obj.tags.add(*tag_ids)
 
                 elif operation == "remove_tags":
                     tag_names = data.get("tag_names", [])

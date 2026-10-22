@@ -13,7 +13,7 @@ from django.utils.text import slugify
 from content.models import Namespace
 from content.models import Tag as ContentTag
 from file_manager.models import MediaCollection, MediaFile, MediaTag
-from taxonomy.models import LegacyTagMapping, Tag, TagBackfillRun, TagBackfillUnit
+from taxonomy.models import ClassificationType, LegacyTagMapping, Tag, TagBackfillRun, TagBackfillUnit
 from webpages.models import PageVersion, PageVersionTag
 
 SCHEMA_VERSION = 1
@@ -184,7 +184,12 @@ class Command(BaseCommand):
                 return
             identities.setdefault(identity, {"name": comparable_name, "source": source_label})
 
-        for existing in Tag.objects.select_related("namespace").order_by("pk").iterator(chunk_size=self.batch_size):
+        for existing in (
+            Tag.objects.filter(tag_type=DEFAULT_TAG_TYPE)
+            .select_related("namespace")
+            .order_by("pk")
+            .iterator(chunk_size=self.batch_size)
+        ):
             register_identity(
                 name=existing.name,
                 namespace=existing.namespace,
@@ -192,7 +197,8 @@ class Command(BaseCommand):
             )
 
         for mapping in (
-            LegacyTagMapping.objects.select_related("canonical_tag__namespace")
+            LegacyTagMapping.objects.exclude(source_kind=LegacyTagMapping.SourceKind.OBJECT)
+            .select_related("canonical_tag__namespace")
             .order_by("pk")
             .iterator(chunk_size=self.batch_size)
         ):
@@ -435,12 +441,19 @@ class Command(BaseCommand):
         slug = slugify(name)
         if not slug:
             raise ValueError(f"Tag name {name!r} has no usable slug")
+        definition, _ = ClassificationType.objects.get_or_create(
+            tenant_id=namespace.tenant_id,
+            namespace=namespace,
+            key=DEFAULT_TAG_TYPE,
+            defaults={"name": "Allmänt", "allowed_uses": ["pages", "media_files", "media_collections"]},
+        )
         tag, created = Tag.objects.get_or_create(
             tenant_id=namespace.tenant_id,
             namespace=namespace,
             tag_type=DEFAULT_TAG_TYPE,
             slug=slug,
             defaults={
+                "classification_type": definition,
                 "name": name.strip(),
                 "color": color or "#3B82F6",
                 "description": description or "",
@@ -455,6 +468,9 @@ class Command(BaseCommand):
                     f"which conflicts with source name {normalized_name!r}"
                 )
             update_fields = []
+            if tag.classification_type_id is None:
+                tag.classification_type = definition
+                update_fields.append("classification_type")
             if tag.color == "#3B82F6" and color and color != tag.color:
                 tag.color = color
                 update_fields.append("color")

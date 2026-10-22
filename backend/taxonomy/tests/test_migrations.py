@@ -11,6 +11,7 @@ class TypedTagUpgradeMigrationTests(TransactionTestCase):
         super().setUp()
         executor = MigrationExecutor(connection)
         self.current_targets = executor.loader.graph.leaf_nodes()
+        self.addCleanup(self._restore_schema)
         migrate_from = []
         state_targets = []
         for app_label, migration_name in self.current_targets:
@@ -28,13 +29,15 @@ class TypedTagUpgradeMigrationTests(TransactionTestCase):
             state_targets.append(target)
 
         executor.migrate(migrate_from)
-        old_apps = executor.loader.project_state(state_targets).apps
+        # Downgrading one app can unapply dependent migrations in another app.
+        # Seed using the actual resulting schema, not incompatible requested leaves.
+        executor = MigrationExecutor(connection)
+        old_apps = executor.loader.project_state(list(executor.loader.applied_migrations)).apps
         self._seed_legacy_data(old_apps)
 
-    def tearDown(self):
+    def _restore_schema(self):
         executor = MigrationExecutor(connection)
         executor.migrate(self.current_targets)
-        super().tearDown()
 
     def _seed_legacy_data(self, apps):
         User = apps.get_model("auth", "User")

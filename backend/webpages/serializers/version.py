@@ -122,6 +122,8 @@ class PageVersionSerializer(serializers.ModelSerializer):
         help_text="Theme for this version (leave blank to inherit from parent)",
     )
 
+    classification_ids = serializers.ListField(child=serializers.UUIDField(), required=False)
+
     # Tags as array of strings
     tags = serializers.ListField(
         child=serializers.CharField(max_length=50),
@@ -147,6 +149,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "page_data",
             "widgets",
             "tags",
+            "classification_ids",
             # Styling/config fields previously only in detail serializer
             "theme",
             "effective_theme",
@@ -349,6 +352,10 @@ class PageVersionSerializer(serializers.ModelSerializer):
         """Convert widget configuration fields from snake_case to camelCase for frontend"""
         data = super().to_representation(instance)
 
+        from taxonomy.assignments import classification_ids
+
+        data["classification_ids"] = classification_ids(instance)
+
         # Convert widget configurations from snake_case to camelCase and inject active variants
         if "widgets" in data and isinstance(data["widgets"], dict):
             from ..utils.widget_serialization import serialize_widget_slots
@@ -377,6 +384,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         """Update with timestamp-based conflict detection"""
+        classification_ids = validated_data.pop("classification_ids", None)
         incoming_summary = validated_data.get("change_summary")
         existing_summary = normalize_change_summary(instance.change_summary)
         predecessor = existing_summary.get(SCHEDULE_PREDECESSOR_KEY)
@@ -421,6 +429,10 @@ class PageVersionSerializer(serializers.ModelSerializer):
                     )
 
         # No conflict - proceed with normal update
+        if classification_ids is not None:
+            from taxonomy.assignments import replace_assignments
+
+            replace_assignments(instance, classification_ids, self.context["request"].user)
         updated_instance = super().update(instance, validated_data)
 
         return updated_instance

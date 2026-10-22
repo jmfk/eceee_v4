@@ -807,8 +807,10 @@ class PublishingWorkflowIntegrationTests(APITestCase):
         from core.models import Tenant
 
         self.user = User.objects.create_user(username="testuser", email="test@example.com", password="testpass123")
+        # An ordinary editor must not need to initialize a classification register.
+        owner = User.objects.create_user(username="publishing-tenant-owner")
         self.tenant, _ = Tenant.objects.get_or_create(
-            identifier="default", defaults={"name": "Default Tenant", "created_by": self.user}
+            identifier="default", defaults={"name": "Default Tenant", "created_by": owner}
         )
         self.tenant.members.add(self.user)
         self.client.force_authenticate(user=self.user)
@@ -906,7 +908,7 @@ class PublishingWorkflowIntegrationTests(APITestCase):
         }
 
         response = self.client.post(bulk_url, bulk_data, format="json")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, getattr(response, "data", response.content))
 
         # Check updated status
         response = self.client.get(status_url)

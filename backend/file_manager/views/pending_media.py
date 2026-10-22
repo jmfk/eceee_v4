@@ -4,6 +4,7 @@ ViewSet for managing pending media files awaiting approval.
 
 import logging
 
+from django.db import transaction
 from django.db.models import Q
 from django.http import Http404, HttpResponse
 from rest_framework import permissions, status, viewsets
@@ -169,6 +170,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             )
 
     @action(detail=True, methods=["post"])
+    @transaction.atomic
     def approve(self, request, pk=None):
         """Approve a pending file and create a MediaFile."""
         try:
@@ -186,7 +188,11 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
 
         if existing_file:
             # Get new tags from the approval data
-            new_tag_ids = request.data.get("tag_ids", [])
+            from taxonomy.assignments import replace_assignments
+
+            if "classification_ids" in request.data:
+                replace_assignments(existing_file, request.data["classification_ids"], request.user)
+            new_tag_ids = request.data.get("tag_ids", []) if "classification_ids" not in request.data else []
             if new_tag_ids:
                 from ..serializers import convert_tag_names_to_ids
 
@@ -196,6 +202,10 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                     request.user,
                 )
                 existing_file.tags.add(*validated_tag_ids)
+
+            from taxonomy.assignments import classification_ids, validate_media_selection
+
+            validate_media_selection(existing_file.namespace, request.user, classification_ids(existing_file))
 
             # Handle annotation update if provided
             annotation = request.data.get("annotation")
@@ -216,6 +226,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                         collection_name,
                         pending_file.namespace,
                         request.user,
+                        media_file=existing_file,
                     )
                     if collection:
                         existing_file.collections.add(collection)
@@ -263,6 +274,8 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                 description=serializer.validated_data.get("description", ""),
                 annotation=serializer.validated_data.get("annotation", ""),
                 tags=serializer.validated_data.get("tag_ids", []),
+                classification_ids=serializer.validated_data.get("classification_ids"),
+                user=request.user,
                 access_level=serializer.validated_data.get("access_level", "public"),
             )
 
@@ -277,6 +290,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                         collection_name,
                         pending_file.namespace,
                         request.user,
+                        media_file=media_file,
                     )
                     if collection:
                         media_file.collections.add(collection)
@@ -297,7 +311,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-    def _get_or_create_collection(self, collection_id, collection_name, namespace, user):
+    def _get_or_create_collection(self, collection_id, collection_name, namespace, user, *, media_file):
         """Get existing collection or create new one."""
         if collection_id:
             try:
@@ -314,6 +328,10 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                     "access_level": "public",
                 },
             )
+            if created:
+                from taxonomy.assignments import classification_ids, replace_assignments
+
+                replace_assignments(collection, classification_ids(media_file), user)
             return collection
         return None
 
@@ -383,7 +401,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                 from ..serializers import convert_tag_names_to_ids
 
                 tag_ids = convert_tag_names_to_ids(
-                    approval_data.get("tag_ids", []),
+                    approval_data.get("tag_ids", []) if "classification_ids" not in approval_data else [],
                     pending_file.namespace,
                     request.user,
                 )
@@ -395,6 +413,8 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                     description=approval_data.get("description", ""),
                     annotation=approval_data.get("annotation", ""),
                     tags=tag_ids,
+                    classification_ids=approval_data.get("classification_ids"),
+                    user=request.user,
                     access_level=approval_data.get("access_level", "public"),
                 )
 

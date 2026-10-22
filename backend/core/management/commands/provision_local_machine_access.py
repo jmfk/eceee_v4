@@ -19,6 +19,7 @@ from core.machine_api_keys import (
     LAYOUT_READ,
     MEDIA_READ,
     MEDIA_WRITE,
+    OBJECT_DEFINITION_WRITE,
     OBJECT_PUBLISH,
     OBJECT_READ,
     OBJECT_TRANSFER,
@@ -120,6 +121,11 @@ class Command(BaseCommand):
         parser.add_argument("--env-file", type=Path, default=Path(".env.local"))
         parser.add_argument("--variable", default="ECEEE_API_KEY")
         parser.add_argument("--expires-days", type=int, default=30)
+        parser.add_argument(
+            "--object-definition-write",
+            action="store_true",
+            help="Grant tenant-scoped object definition updates; never deletion",
+        )
 
     @transaction.atomic
     def handle(self, *args, **options):
@@ -156,6 +162,9 @@ class Command(BaseCommand):
             raise CommandError("principal=existing_account_incompatible")
         tenant.members.add(principal)
 
+        scopes = sorted(
+            set(DEFAULT_SCOPES) | ({OBJECT_DEFINITION_WRITE} if options["object_definition_write"] else set())
+        )
         raw_key, key_hash, key_prefix = generate_machine_api_key()
         expires_at = timezone.now() + timedelta(days=options["expires_days"])
         api_key = (
@@ -172,7 +181,7 @@ class Command(BaseCommand):
                 raise CommandError("credential=principal_mismatch")
             api_key.key_hash = key_hash
             api_key.key_prefix = key_prefix
-            api_key.scopes = DEFAULT_SCOPES
+            api_key.scopes = scopes
             api_key.expires_at = expires_at
             api_key.is_active = True
             api_key.last_used_at = None
@@ -182,7 +191,7 @@ class Command(BaseCommand):
                 name=options["name"],
                 principal=principal,
                 environment=environment,
-                scopes=DEFAULT_SCOPES,
+                scopes=scopes,
                 key_hash=key_hash,
                 key_prefix=key_prefix,
                 expires_at=expires_at,

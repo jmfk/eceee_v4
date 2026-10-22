@@ -14,7 +14,7 @@ from rest_framework.test import APIClient
 
 from content.models import Namespace
 
-from ..models import MediaFile, PendingMediaFile
+from ..models import MediaFile, MediaTag, PendingMediaFile
 
 
 class MediaFileSoftDeleteTests(TestCase):
@@ -367,11 +367,13 @@ class AtomicFileHashHandlingTests(TestCase):
             expires_at=timezone.now() + timezone.timedelta(hours=24),
         )
 
-        # Approve pending file
+        # Approval requires a real, approved classification through the legacy adapter.
+        tag = MediaTag.objects.create(name="Approved upload", namespace=self.namespace, created_by=self.user)
         media_file = pending.approve_and_create_media_file(
             title="Approved File",
             description="Test description",
             access_level="public",
+            tags=[str(tag.pk)],
         )
 
         # Verify new MediaFile was created

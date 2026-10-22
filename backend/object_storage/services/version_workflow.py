@@ -137,6 +137,10 @@ class ObjectVersionWorkflow:
             version.save(sync_relationships=False)
         except ModelValidationError as error:
             raise ValidationError({"widgets": error.messages}) from error
+        if source:
+            from taxonomy.assignments import copy_assignments
+
+            copy_assignments(source, version)
         return version
 
     def _point_to(self, version):
@@ -202,6 +206,10 @@ class ObjectVersionWorkflow:
                 setattr(target, field, deepcopy(content[field]))
         self._validate_content(target)
         self._save(target, ["title", "data", "widgets", "is_featured", "change_description"])
+        if "classification_ids" in content:
+            from taxonomy.assignments import replace_assignments
+
+            replace_assignments(target, content["classification_ids"], self.user)
         self._point_to(target)
         return target
 
@@ -228,6 +236,9 @@ class ObjectVersionWorkflow:
                 return live
         version = self.require_editable(version_id, revision)
         self._validate_content(version)
+        from content_migration.legacy_content.validation import assert_publishable
+
+        assert_publishable(version)
         self._assert_no_other_schedule(version)
         self._restore_predecessor(version)
         for previous in (
@@ -259,6 +270,9 @@ class ObjectVersionWorkflow:
         if effective_date <= self.now or (expiry_date and expiry_date <= effective_date):
             raise ValidationError("Choose a future publication time and an expiry after publication.")
         self._validate_content(version)
+        from content_migration.legacy_content.validation import assert_publishable
+
+        assert_publishable(version)
         self._assert_no_other_schedule(version)
         self._restore_predecessor(version)
         predecessors = []

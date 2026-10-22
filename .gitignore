@@ -109,3 +109,9 @@ easy3e-serverless/
 
 
 themes
+
+# Local bounded legacy import run state and reports
+/artifacts/legacy-content-import/
+
+# Workspace-only operator and legacy-source credentials
+/backend/.env.*

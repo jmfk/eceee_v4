@@ -1662,7 +1662,7 @@ class ObjectVersion(models.Model):
         # Find object_reference fields
         for field_def in schema_fields:
             field_name = field_def.get("name")
-            field_type = field_def.get("type")
+            field_type = field_def.get("field_type", field_def.get("type"))
 
             if field_type == "object_reference":
                 # Get the value from data

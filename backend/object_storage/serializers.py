@@ -805,6 +805,7 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         """Read the canonical editor snapshot without creating a working copy."""
+        from taxonomy.assignments import classification_ids
         from webpages.utils.widget_serialization import serialize_widget_slots
 
         from .services.version_workflow import ObjectVersionWorkflow
@@ -821,6 +822,7 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
                 widgets=(
                     serialize_widget_slots(version.widgets) if isinstance(version.widgets, dict) else version.widgets
                 ),
+                classification_ids=classification_ids(version),
                 version=version.version_number,
                 version_id=version.id,
                 edit_revision=version.edit_revision,
@@ -1062,6 +1064,7 @@ class ObjectInstanceListSerializer(serializers.ModelSerializer):
 class ObjectVersionSerializer(serializers.ModelSerializer):
     """Serializer for Object Versions with enhanced publication support"""
 
+    classification_ids = serializers.SerializerMethodField()
     object_id = serializers.SerializerMethodField()
     version_id = serializers.SerializerMethodField()
     object_instance = ObjectInstanceListSerializer(read_only=True)
@@ -1076,6 +1079,7 @@ class ObjectVersionSerializer(serializers.ModelSerializer):
             "id",
             "object_id",
             "version_id",
+            "classification_ids",
             "object_instance",
             "version_number",
             "title",
@@ -1111,6 +1115,11 @@ class ObjectVersionSerializer(serializers.ModelSerializer):
             "is_current_published",
             "publication_status",
         ]
+
+    def get_classification_ids(self, obj):
+        from taxonomy.assignments import classification_ids
+
+        return classification_ids(obj)
 
     def get_object_id(self, obj):
         """Return publication status"""

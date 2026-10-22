@@ -187,3 +187,70 @@ class PluginImportJob(models.Model):
         self.completed_at = timezone.now()
         self.errors = [*(self.errors or []), str(error)[:1000]]
         self.save(update_fields=["status", "phase", "completed_at", "errors", "updated_at"])
+
+
+class EditorialImportRun(models.Model):
+    """Frozen public-source manifest, separate from content activation."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT)
+    namespace = models.ForeignKey("content.Namespace", on_delete=models.PROTECT)
+    source_scope = models.CharField(max_length=255)
+    preset = models.CharField(max_length=20)
+    configuration = models.JSONField(default=dict)
+    manifest_hash = models.CharField(max_length=64)
+    status = models.CharField(max_length=20, default="staged")
+    report = models.JSONField(default=dict)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT)
+    reviewed_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.PROTECT, related_name="reviewed_editorial_imports"
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class EditorialImportItem(models.Model):
+    """One durable, independently retryable manifest entry."""
+
+    run = models.ForeignKey(EditorialImportRun, on_delete=models.PROTECT, related_name="items")
+    resource = models.CharField(max_length=32)
+    source_id = models.CharField(max_length=64)
+    record = models.JSONField()
+    source_hash = models.CharField(max_length=64)
+    status = models.CharField(max_length=20, default="pending")
+    error_category = models.CharField(max_length=100, blank=True)
+    object_instance = models.ForeignKey(
+        "object_storage.ObjectInstance", null=True, blank=True, on_delete=models.PROTECT
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["run", "resource", "source_id"], name="editorial_run_source_uniq")
+        ]
+        indexes = [models.Index(fields=["run", "status"], name="editorial_run_status_idx")]
+
+
+class EditorialImportBinding(models.Model):
+    """Stable destination identity and last untouched imported content baseline."""
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT)
+    namespace = models.ForeignKey("content.Namespace", on_delete=models.PROTECT)
+    source_scope = models.CharField(max_length=255)
+    resource = models.CharField(max_length=32)
+    source_id = models.CharField(max_length=64)
+    object_instance = models.ForeignKey("object_storage.ObjectInstance", on_delete=models.PROTECT)
+    source_hash = models.CharField(max_length=64)
+    target_hash = models.CharField(max_length=64)
+    source_url = models.URLField(max_length=2000, blank=True)
+    last_run = models.ForeignKey(EditorialImportRun, on_delete=models.PROTECT)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tenant", "namespace", "source_scope", "resource", "source_id"],
+                name="editorial_binding_identity_uniq",
+            )
+        ]

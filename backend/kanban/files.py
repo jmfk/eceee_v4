@@ -117,15 +117,6 @@ def import_attachment(tenant, actor, attachment, data, prepared=None):
         namespace = get_object_or_404(Namespace, pk=data["namespace"], tenant=tenant, kind=Namespace.KIND_CONTENT)
         if not user_can_access_namespace(actor, namespace):
             raise PermissionDenied("Media namespace access is required.")
-        approval = MediaFileApprovalSerializer(
-            data={
-                "title": data.get("title") or attachment.filename,
-                "tag_ids": data.get("tag_ids", []),
-                "access_level": "members",
-            },
-            context={"namespace": namespace, "user": actor},
-        )
-        approval.is_valid(raise_exception=True)
         digest = validation["metadata"]["file_hash"]
         # The existing media schema has a globally unique content hash. Never
         # reuse or disclose a different tenant's record, or hard-delete a tombstone.
@@ -139,6 +130,15 @@ def import_attachment(tenant, actor, attachment, data, prepared=None):
                 raise Conflict("This content cannot be copied under the current media access rules.")
             media = existing
         else:
+            approval = MediaFileApprovalSerializer(
+                data={
+                    "title": data.get("title") or attachment.filename,
+                    "tag_ids": data.get("tag_ids", []),
+                    "access_level": "members",
+                },
+                context={"namespace": namespace, "user": actor},
+            )
+            approval.is_valid(raise_exception=True)
             media_id = uuid.uuid4()
             path = f"uploads/{tenant.pk}/kanban-imports/{media_id}/{attachment.filename}"
             saved = storage.save(path, upload)

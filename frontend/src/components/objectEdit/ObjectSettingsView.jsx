@@ -4,10 +4,12 @@ import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import ParentObjectSelector from '../ParentObjectSelector'
+import ClassificationPicker from '../classification/ClassificationPicker'
 
 const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onSave, onCancel, onUnsavedChanges, context }) => {
     const [formData, setFormData] = useState({
         parent: instance?.parent?.id || parentId || null,
+        classificationIds: instance?.classificationIds || [],
         metadata: instance?.metadata || {}
     })
     const [isDirty, setIsDirty] = useState(false)
@@ -24,6 +26,7 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onS
         if (objectData) {
             const newFormData = {
                 parent: objectData.parentId || null,
+                classificationIds: objectData.classificationIds || [],
                 metadata: objectData.metadata || {}
             };
 
@@ -49,6 +52,7 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onS
             const parentValue = instance.parent?.id || parentId || null
             setFormData({
                 parent: parentValue,
+                classificationIds: instance.classificationIds || [],
                 metadata: instance.metadata || {}
             })
         } else if (isNewInstance && parentId) {
@@ -98,6 +102,10 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onS
                     <div className="space-y-6">
 
                         <div className="space-y-6">
+                            <ClassificationPicker value={formData.classificationIds || []}
+                                onChange={(ids) => handleInputChange('classificationIds', ids)}
+                                namespace={objectType?.namespace?.id}
+                                use={`object:${objectType?.id}`} allowProposed />
                             {/* Parent Object */}
                             <ParentObjectSelector
                                 value={formData.parent}
