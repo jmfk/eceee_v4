@@ -368,6 +368,121 @@ class MachineAPIKeyAuthenticationTest(TestCase):
         definition.refresh_from_db()
         self.assertEqual(definition.namespace_id, own.pk)
 
+    def test_definition_write_create_rejects_foreign_and_global_child_types(self):
+        from content.models import Namespace
+        from object_storage.models import ObjectTypeDefinition
+
+        own = Namespace.objects.create(
+            name="Own definitions", slug="own-definitions", tenant=self.tenant, created_by=self.admin
+        )
+        foreign = Namespace.objects.create(
+            name="Foreign definitions", slug="foreign-definitions", tenant=self.other_tenant, created_by=self.admin
+        )
+        own_child = ObjectTypeDefinition.objects.create(
+            name="own_child", label="Own child", plural_label="Own children", namespace=own, created_by=self.admin
+        )
+        foreign_child = ObjectTypeDefinition.objects.create(
+            name="foreign_child",
+            label="Foreign child",
+            plural_label="Foreign children",
+            namespace=foreign,
+            created_by=self.admin,
+        )
+        global_child = ObjectTypeDefinition.objects.create(
+            name="global_child", label="Global child", plural_label="Global children", created_by=self.admin
+        )
+        raw_key, _ = self.create_key([OBJECT_DEFINITION_WRITE])
+        self.authorize(raw_key)
+
+        for child in (foreign_child, global_child):
+            with self.subTest(child=child.name):
+                name = f"parent_for_{child.name}"
+                response = self.client.post(
+                    "/api/v1/objects/object-types/",
+                    {
+                        "name": name,
+                        "label": "Parent",
+                        "plural_label": "Parents",
+                        "namespace_id": own.pk,
+                        "allowed_child_types_input": [child.name],
+                    },
+                    format="json",
+                )
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertIn("allowed_child_types_input", response.data)
+                self.assertFalse(ObjectTypeDefinition.objects.filter(name=name).exists())
+
+        accepted = self.client.post(
+            "/api/v1/objects/object-types/",
+            {
+                "name": "same_tenant_parent",
+                "label": "Parent",
+                "plural_label": "Parents",
+                "namespace_id": own.pk,
+                "allowed_child_types_input": [own_child.name],
+            },
+            format="json",
+        )
+        self.assertEqual(accepted.status_code, status.HTTP_201_CREATED)
+        parent = ObjectTypeDefinition.objects.get(name="same_tenant_parent")
+        self.assertEqual(list(parent.allowed_child_types.values_list("pk", flat=True)), [own_child.pk])
+
+    def test_definition_write_update_rejects_foreign_and_global_child_types_without_mutation(self):
+        from content.models import Namespace
+        from object_storage.models import ObjectTypeDefinition
+
+        own = Namespace.objects.create(
+            name="Own definitions", slug="own-definitions", tenant=self.tenant, created_by=self.admin
+        )
+        foreign = Namespace.objects.create(
+            name="Foreign definitions", slug="foreign-definitions", tenant=self.other_tenant, created_by=self.admin
+        )
+        parent = ObjectTypeDefinition.objects.create(
+            name="own_parent", label="Original", plural_label="Parents", namespace=own, created_by=self.admin
+        )
+        own_child = ObjectTypeDefinition.objects.create(
+            name="own_child", label="Own child", plural_label="Own children", namespace=own, created_by=self.admin
+        )
+        next_child = ObjectTypeDefinition.objects.create(
+            name="next_child", label="Next child", plural_label="Next children", namespace=own, created_by=self.admin
+        )
+        foreign_child = ObjectTypeDefinition.objects.create(
+            name="foreign_child",
+            label="Foreign child",
+            plural_label="Foreign children",
+            namespace=foreign,
+            created_by=self.admin,
+        )
+        global_child = ObjectTypeDefinition.objects.create(
+            name="global_child", label="Global child", plural_label="Global children", created_by=self.admin
+        )
+        parent.allowed_child_types.add(own_child)
+        raw_key, _ = self.create_key([OBJECT_DEFINITION_WRITE])
+        self.authorize(raw_key)
+
+        for child in (foreign_child, global_child):
+            with self.subTest(child=child.name):
+                response = self.client.patch(
+                    f"/api/v1/objects/object-types/{parent.pk}/",
+                    {"label": "Rejected", "allowed_child_types_input": [child.name]},
+                    format="json",
+                )
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertIn("allowed_child_types_input", response.data)
+                parent.refresh_from_db()
+                self.assertEqual(parent.label, "Original")
+                self.assertEqual(list(parent.allowed_child_types.values_list("pk", flat=True)), [own_child.pk])
+
+        accepted = self.client.patch(
+            f"/api/v1/objects/object-types/{parent.pk}/",
+            {"label": "Updated", "allowed_child_types_input": [next_child.name]},
+            format="json",
+        )
+        self.assertEqual(accepted.status_code, status.HTTP_200_OK)
+        parent.refresh_from_db()
+        self.assertEqual(parent.label, "Updated")
+        self.assertEqual(list(parent.allowed_child_types.values_list("pk", flat=True)), [next_child.pk])
+
     def test_theme_read_key_can_reach_designer_theme_list(self):
         raw_key, _ = self.create_key([THEME_READ])
         self.authorize(raw_key)

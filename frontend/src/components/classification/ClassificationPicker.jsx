@@ -26,7 +26,7 @@ export default function ClassificationPicker({ value = [], onChange, namespace, 
     })
     const choices = (terms.data?.results || []).filter(term =>
         !value.includes(term.id) && (term.status === 'approved' || (allowProposed && term.status === 'proposed')))
-    return <fieldset disabled={disabled} className="space-y-3 text-gray-900 dark:text-gray-100">
+    return <fieldset disabled={disabled} className="space-y-3 text-gray-900">
         <legend className="font-medium">Classification</legend>
         <ul className="space-y-2" aria-label="Selected classifications">
             {value.map(termId => {
@@ -43,7 +43,7 @@ export default function ClassificationPicker({ value = [], onChange, namespace, 
         {(terms.error || selected.error || defaultNamespace.error) && <p role="alert">{classificationError(terms.error || selected.error || defaultNamespace.error)}</p>}
         {!terms.isPending && !terms.error && choices.length === 0 && <p className="text-sm">No matching classifications.</p>}
         <ul className="max-h-56 overflow-auto space-y-1">
-            {choices.map(term => <li key={term.id}><button type="button" className="w-full px-2 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-800 focus-visible:outline" onClick={() => onChange([...value, term.id])}>
+            {choices.map(term => <li key={term.id}><button type="button" className="w-full px-2 py-2 text-left hover:bg-gray-100 focus-visible:outline" onClick={() => onChange([...value, term.id])}>
                 {term.path}{term.status === 'proposed' ? ' (pending approval)' : ''}
             </button></li>)}
         </ul>
