@@ -22,6 +22,7 @@ describe('ReleaseBadge', () => {
         render(<ReleaseBadge />)
         const badge = screen.getByRole('button', { name: 'v1.2.3 — copy commit hash' })
         expect(badge).toHaveTextContent(/^v1.2.3$/)
+        expect(badge).toHaveAccessibleDescription(`Commit hash: ${fullHash}`)
         fireEvent.focus(badge)
         expect(await screen.findByText(`Git commit ${fullHash}`)).toBeVisible()
         fireEvent.click(badge)
