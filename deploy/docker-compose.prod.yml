@@ -55,6 +55,8 @@ services:
         VITE_API_URL: https://${DOMAIN}/api
         VITE_IMGPROXY_URL: https://imgproxy.${DOMAIN}
         VITE_GIT_COMMIT_HASH: ${IMAGE_TAG:-unknown}
+        VITE_GIT_COMMIT_FULL_HASH: ${DEPLOY_COMMIT_HASH:-}
+        VITE_RELEASE_TAG: ${DEPLOY_RELEASE_TAG:-}
     image: eceee-frontend:${IMAGE_TAG:-latest}
     restart: unless-stopped
     networks: [eceee_prod]
