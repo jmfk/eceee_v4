@@ -2,7 +2,7 @@
 
 | ID | Title | Status | Related ADRs |
 | --- | --- | --- | --- |
-| PRD-0032 | [Tenantens instruktionsfilmer, inbox och support](0032-tenant-inbox-and-support.md) | draft | - |
+| PRD-0032 | [Tenantens instruktionsfilmer, inbox och support](0032-tenant-inbox-and-support.md) | in-progress | [ADR-0044](../adrs/active/0044-tenant-inbox-and-private-support.md) |
 | PRD-0030 | [Object publishing workflow](0030-object-publishing-workflow.md) | completed | [ADR-0042](../adrs/active/0042-canonical-object-workflow.md) |
 | PRD-0027 | [Theme text outline styles](0027-theme-text-outline-styles.md) | completed | [ADR-0036](../adrs/active/0036-theme-text-effects.md), [ADR-0037](../adrs/active/0037-preserve-stale-designer-draft-edits.md), [ADR-0038](../adrs/active/0038-outline-only-theme-publication.md) |
 | PRD-0028 | [Framework-independent render catalog and widget schema pilot](0028-framework-independent-content-contract.md) | in-progress; shared contract pilot | [ADR-0039](../adrs/active/0039-frozen-pilot-behavior-baseline.md), [ADR-0041](../adrs/active/0041-shared-widget-contract-source.md) |

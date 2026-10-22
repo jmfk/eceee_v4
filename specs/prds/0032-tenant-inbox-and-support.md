@@ -1,10 +1,11 @@
 ---
 id: PRD-0032
 title: Tenantens instruktionsfilmer, inbox och support
-status: draft
-locked: false
+status: in-progress
+locked: true
 created: 2026-10-22
-related_adrs: []
+related_adrs:
+  - ADR-0044
 ---
 
 # PRD-0032: Tenantens instruktionsfilmer, inbox och support
@@ -101,6 +102,11 @@ En operatör behöver dela en specifik instruktionsfilm med en tenant, behålla 
 
 ## Implementation Notes
 
+### Implementation started 2026-10-22
+
+- Owner requested implementation on the dedicated workspace/PR after reviewing the sketch. Requirements are now locked. Historical sketch-phase notes below describe the initial proposal.
+- Batch includes backend models/API, private video validation/storage, durable email queue, persistent inbox UI/navigation, targeted tests and operator setup documentation.
+
 ### Kartlagt lokalt 2026-10-22
 
 - `frontend/src/pages/HowToHelpPage.jsx`, `components/help/HelpVideoPlayer.jsx` och `utils/howToHelp.js`: befintlig hjälpsida och videospelare, inklusive statiska manuella/genererade filmer. Ingen tenantpublicering eller mottagarinbox hittad.
@@ -119,11 +125,24 @@ En operatör behöver dela en specifik instruktionsfilm med en tenant, behålla 
 
 ## Linked ADRs
 
-- Inga nya accepterade beslut; detta är ett diskussionsutkast. Befintlig [ADR-0003](../adrs/active/0003-tenant-membership-authorization.md) gäller som tenantgrund, med striktare deltagaråtkomst för privata supportärenden.
+- [ADR-0044: Tenant inbox and private support](../adrs/active/0044-tenant-inbox-and-private-support.md) — implementation decisions, limits and mail-delivery semantics.
+
+- Vid den första kartläggningen användes befintlig [ADR-0003](../adrs/active/0003-tenant-membership-authorization.md) gäller som tenantgrund, med striktare deltagaråtkomst för privata supportärenden.
 
 ## Completion Evidence
 
-- Kartläggning och lokal beteendeskiss; produktimplementation har inte startat.
+### Implementation batch
+
+- Backend: additiv migration för core/auth-kopplade supportmodeller; tenant- och deltagarstyrda API:er; request-id-deduplicering; privat videolagring och kortlivade uppspelningslänkar; serveravkodning av buggbilagor; bestående e-postkö och operatörsvy för leveransproblem.
+- Frontend: inkopplad CMS-navigation, bestående inboxflikar, bibliotek/publicering, frågor/felrapporter, trådsvar, rollhantering och tenantbevarande inloggningslänkar.
+- 23 riktade backendtester på PostgreSQL 16 och 11 frontendtester godkända. PostgreSQL-kontrollen omfattar uppgradering från befintlig core, upprepad migrationskörning utan nya operationer och två samtidiga e-postarbetare för samma utskick. Riktigt femsekundersmaterial godkänns och 5,01 sekunder avvisas; även avkodad längd som överskrider metadata avvisas.
+- Full Django-systemkontroll och migrationskontroll godkända. Frontendens produktionsbygge godkänt med befintliga chunk-/importvarningar.
+- Webbläsarkontroll av byggd produkt med mockade API:er: rapport med validerad video, svar, publicering, bibliotek, mobilflikar och ljus/mörk visning. Backendåtkomst testas separat med riktig isolerad testdatabas och mockade leverantörer.
+- Kvar före produktionsaktivering: separat privat bucket, faktisk e-postkonfiguration/leverans, byte-range-uppspelning mot objektlagringen, objektbackup/återställningsprov samt miljöspecifik verifiering på produktionsversionen av PostgreSQL. Inget produktionsarbete ingår i denna batch. Se [driftsguiden](../../docs/tenant-inbox-support.md).
+
+### Historical sketch evidence
+
+- Den ursprungliga leveransen var kartläggning och lokal beteendeskiss före implementation.
 - Lokal Playwright-kontroll (fristående Playwright-kontroll av HTML-filen): navigation, simulerat avslag för sexsekundersbilaga, rapport utan video, supportsvar, e-postexempel, publicering och senaste film först. Ingen backend- eller e-postverifiering.
 - Mobilbredd utan horisontell overflow; skärmbilder granskade i ljust och mörkt läge. Specs-validator och avgränsad `git diff --check` godkända. Ingen bred produkttestsvit behövdes för dokument/skiss.
-- Batch: denna PRD, dess indexrad och HTML-skissen. Samlas i separat workspace och branch `codex/tenant-inbox-support`. Inga produktfiler eller produktionsmiljöer ändras av denna batch. Nästa steg är att granska flödet och lösa de öppna besluten före implementation.
+- Skissbatchen omfattade denna PRD, dess indexrad och HTML-skissen i separat workspace/branch `codex/tenant-inbox-support`. Produktimplementationen har därefter lagts till på samma PR efter ägarens instruktion.
