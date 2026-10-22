@@ -31,3 +31,14 @@ EOF
 
 cmp "$TEST_DIR/expected-calls" "$TEST_DIR/compose-calls"
 echo "deploy image serialization test passed"
+
+# Release labels must identify the exact deployed commit, never its nearest tag.
+awk '/^resolve_release_tag\(\)/,/^}/' "$DEPLOY_SCRIPT" > "$TEST_DIR/release-tag-function.sh"
+source "$TEST_DIR/release-tag-function.sh"
+git init -q "$TEST_DIR/repo"
+git -C "$TEST_DIR/repo" -c user.name=Test -c user.email=test@example.invalid commit --allow-empty -qm tagged
+git -C "$TEST_DIR/repo" tag v1.2.3
+[ "$(resolve_release_tag "$TEST_DIR/repo" HEAD)" = v1.2.3 ]
+git -C "$TEST_DIR/repo" -c user.name=Test -c user.email=test@example.invalid commit --allow-empty -qm untagged
+[ -z "$(resolve_release_tag "$TEST_DIR/repo" HEAD)" ]
+echo "exact release tag metadata test passed"

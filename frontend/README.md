@@ -217,6 +217,12 @@ docker-compose exec frontend npm run build
 docker-compose exec frontend npm run preview
 ```
 
+### Release badge
+
+Production builds display `VITE_RELEASE_TAG` in the existing desktop status badge. Hover or focus shows the commit hash; clicking copies `VITE_GIT_COMMIT_FULL_HASH` (falling back to `VITE_GIT_COMMIT_HASH` for older/development builds). Clipboard success or failure is announced and shown in the tooltip.
+
+The deployment script derives the release label only from a tag pointing exactly at the deployed commit. Untagged builds continue to display their short Git hash. `VITE_GIT_COMMIT_HASH`, `APP_VERSION` and Docker image tags keep their existing short-commit identity for deployment reload checks and caching.
+
 ### Environment Configuration
 - Development: `http://localhost:10100`
 - Backend API: `http://localhost:10101`

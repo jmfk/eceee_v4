@@ -14,6 +14,7 @@ import { X } from 'lucide-react'
 import { useState, useEffect } from 'react'
 // import './utils/rerenderInvestigation' // Initialize render investigation - DISABLED
 import Navbar from '@components/Navbar'
+import ReleaseBadge from '@components/ReleaseBadge'
 import GlobalWysiwygToolbar from '@components/wysiwyg/GlobalWysiwygToolbar'
 import { useAutoPageTitle } from './hooks/useDocumentTitle'
 
@@ -171,19 +172,6 @@ const ContextMenuToggle = () => {
   )
 }
 
-const GitHashBadge = () => {
-  const commitHash = import.meta.env.VITE_GIT_COMMIT_HASH?.trim()
-
-  return (
-    <span
-      className="inline-flex items-center rounded border border-gray-200 bg-gray-50 px-2 py-0.5 font-mono text-xs text-gray-600"
-      title={commitHash ? `Git commit ${commitHash}` : 'Git commit hash unavailable'}
-    >
-      Git {commitHash || 'unknown'}
-    </span>
-  )
-}
-
 export const AppRoutes = () => {
   useAutoPageTitle()
   const { user } = useAuth()
@@ -242,7 +230,7 @@ export const AppRoutes = () => {
               </main>
               <StatusBar
                 customStatusContent={<span>Pages Management - Ready</span>}
-                stickyStatusContent={<GitHashBadge />}
+                stickyStatusContent={<ReleaseBadge />}
               />
             </div>
           </PrivateRoute>

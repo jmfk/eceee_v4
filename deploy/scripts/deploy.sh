@@ -36,6 +36,11 @@ build_images_serially() {
     done
 }
 
+resolve_release_tag() {
+    # Only an exact tag describes this build; never label it with an older release.
+    git -C "$1" describe --tags --exact-match --match 'v[0-9]*' "$2" 2>/dev/null || true
+}
+
 commit_installed_environment() {
     if [ -n "${ECEEE_ENV_COMMIT_MARKER:-}" ]; then
         : > "$ECEEE_ENV_COMMIT_MARKER"
@@ -69,7 +74,11 @@ fi
 TARGET_COMMIT=$(bash "$SCRIPT_DIR/validate-deploy-control-ref.sh" "$REPO" "$REF")
 # Resolve short SHA for Docker image tag (slashes are invalid in image tags)
 IMAGE_TAG=$(git -C "$REPO" rev-parse --short "$TARGET_COMMIT")
-info "Deploying: $TARGET_COMMIT (image tag: $IMAGE_TAG)"
+# Display metadata is separate from IMAGE_TAG / APP_VERSION, which remain the
+# short commit identity used by cache invalidation and version-mismatch checks.
+export DEPLOY_COMMIT_HASH="$TARGET_COMMIT"
+export DEPLOY_RELEASE_TAG="$(resolve_release_tag "$REPO" "$TARGET_COMMIT")"
+info "Deploying: $TARGET_COMMIT (image tag: $IMAGE_TAG, release: ${DEPLOY_RELEASE_TAG:-untagged})"
 
 # ── 3. Backup ─────────────────────────────────────────────────────────────────
 info "Running pre-deploy backup..."
