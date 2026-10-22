@@ -41,7 +41,7 @@ class Instruction(TenantRecord):
     title = models.CharField(max_length=150)
     description = models.TextField(max_length=4000)
     transcript = models.TextField(blank=True, max_length=30000)
-    help_guide_id = models.CharField(max_length=150, blank=True, default="")
+    help_guide_id = models.CharField(max_length=150, blank=True, default="", null=True)
     video = models.OneToOneField(PrivateVideo, on_delete=models.PROTECT)
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     published_at = models.DateTimeField(auto_now_add=True)

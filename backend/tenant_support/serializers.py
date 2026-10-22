@@ -4,6 +4,12 @@ from .models import Instruction, Message, SupportThread
 
 
 class InstructionSerializer(serializers.ModelSerializer):
+    help_guide_id = serializers.SerializerMethodField()
+
+    def get_help_guide_id(self, obj):
+        # A previous release can still insert NULL while the new schema is deployed.
+        return obj.help_guide_id or ""
+
     class Meta:
         model = Instruction
         fields = [

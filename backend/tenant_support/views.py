@@ -214,6 +214,8 @@ class InstructionsView(SupportView):
             tenant=request.tenant, author=request.user, request_id=data["request_id"]
         ).first()
         if previous:
+            # Match old-release rows without changing the public empty-string contract.
+            previous.help_guide_id = previous.help_guide_id or ""
             if any(getattr(previous, field) != value for field, value in data.items()):
                 return submission_conflict(previous.pk)
             return Response(InstructionSerializer(previous).data)
