@@ -490,6 +490,13 @@ function Compose({ context, link, publish = false }) {
     const [valid, setValid] = useState(true)
     const [stage, setStage] = useState('')
     const requestId = useRef(crypto.randomUUID())
+    const mounted = useRef(true)
+    useEffect(() => {
+        mounted.current = true
+        return () => {
+            mounted.current = false
+        }
+    }, [])
     const attachment = useRef(null)
     const instruction = new URLSearchParams(location.search).get('instruction')
     const send = useMutation({
@@ -541,9 +548,12 @@ function Compose({ context, link, publish = false }) {
         },
         onSuccess: (result) => {
             queryClient.invalidateQueries({ queryKey: ['support', tenant] })
-            navigate(
-                link(`${publish ? 'instructions' : 'threads'}/${result.id}`),
-            )
+            if (mounted.current)
+                navigate(
+                    link(
+                        `${publish ? 'instructions' : 'threads'}/${result.id}`,
+                    ),
+                )
         },
         onSettled: () => setStage(''),
     })
@@ -568,6 +578,10 @@ function Compose({ context, link, publish = false }) {
             <form
                 onSubmit={(e) => {
                     e.preventDefault()
+                    if (send.error?.response?.status === 409) {
+                        requestId.current = crypto.randomUUID()
+                        attachment.current = null
+                    }
                     send.mutate()
                 }}
                 aria-busy={send.isPending}
@@ -659,6 +673,15 @@ function Compose({ context, link, publish = false }) {
                         </label>
                     )}
                     <ErrorText error={send.error} />
+                    {send.error?.response?.data?.existingId && (
+                        <Link
+                            to={link(
+                                `${publish ? 'instructions' : 'threads'}/${send.error.response.data.existingId}`,
+                            )}
+                        >
+                            Öppna den sparade versionen
+                        </Link>
+                    )}
                     <p role="status">{stage}</p>
                     <button
                         className="support-primary"
@@ -668,9 +691,13 @@ function Compose({ context, link, publish = false }) {
                             (publish ? !file : !context.supportAvailable)
                         }
                     >
-                        {publish
-                            ? `Publicera till ${context.tenant.name}`
-                            : 'Skicka till support'}
+                        {send.error?.response?.status === 409
+                            ? publish
+                                ? 'Publicera som ny instruktion'
+                                : 'Skicka som nytt ärende'
+                            : publish
+                              ? `Publicera till ${context.tenant.name}`
+                              : 'Skicka till support'}
                     </button>
                 </fieldset>
             </form>
@@ -751,6 +778,8 @@ function ThreadDetail({ id, context }) {
                     <form
                         onSubmit={(e) => {
                             e.preventDefault()
+                            if (reply.error?.response?.status === 409)
+                                requestId.current = crypto.randomUUID()
                             reply.mutate()
                         }}
                     >
@@ -770,7 +799,9 @@ function ThreadDetail({ id, context }) {
                                 className="support-primary"
                                 disabled={reply.isPending || !body.trim()}
                             >
-                                Skicka svar
+                                {reply.error?.response?.status === 409
+                                    ? 'Skicka som nytt svar'
+                                    : 'Skicka svar'}
                             </button>
                             {context.canSupport && (
                                 <button

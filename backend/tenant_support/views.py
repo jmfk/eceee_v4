@@ -5,7 +5,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import Max, Q, Sum
+from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
@@ -32,7 +32,7 @@ from .serializers import (
     ThreadInput,
     ThreadSerializer,
 )
-from .services import notify_thread, receive, visible_entries
+from .services import notify_thread, receive, sync_support_inbox, visible_entries
 from .video import inspect_video
 
 
@@ -40,6 +40,19 @@ def validated(serializer_type, request):
     serializer = serializer_type(data=request.data)
     serializer.is_valid(raise_exception=True)
     return serializer.validated_data
+
+
+def submission_conflict(existing_id):
+    return Response(
+        {
+            "detail": (
+                "En tidigare sändning med annat innehåll har redan sparats. Din ändrade text finns kvar. "
+                "Öppna den sparade versionen eller skicka ändringen som en ny sändning."
+            ),
+            "existing_id": str(existing_id),
+        },
+        status=status.HTTP_409_CONFLICT,
+    )
 
 
 class SupportView(APIView):
@@ -127,16 +140,10 @@ class ContextView(SupportView):
             raise ValidationError({"user_id": "Användaren saknar åtkomst till arbetsytan."})
         # Serializes grants and publications against the same tenant boundary.
         Tenant.objects.select_for_update().get(pk=request.tenant.pk)
+        was_support = has_role(user, request.tenant, "can_support")
         role, _ = SupportRole.objects.update_or_create(tenant=request.tenant, user=user, defaults=data)
-        if role.can_support:
-            threads = SupportThread.objects.filter(tenant=request.tenant).annotate(latest=Max("messages__created_at"))
-            InboxEntry.objects.bulk_create(
-                [
-                    InboxEntry(tenant=request.tenant, user=user, thread=t, activity_at=t.latest or t.created_at)
-                    for t in threads
-                ],
-                ignore_conflicts=True,
-            )
+        if role.can_support and not was_support:
+            sync_support_inbox(request.tenant, user)
         return Response({"id": str(role.pk)})
 
 
@@ -198,10 +205,14 @@ class InstructionsView(SupportView):
         require_role(request.user, request.tenant, "can_publish")
         data = validated(PublishInput, request)
         Tenant.objects.select_for_update().get(pk=request.tenant.pk)
+        # A revocation may have committed while this request waited for the lock.
+        require_role(request.user, request.tenant, "can_publish")
         previous = Instruction.objects.filter(
             tenant=request.tenant, author=request.user, request_id=data["request_id"]
         ).first()
         if previous:
+            if any(getattr(previous, field) != value for field, value in data.items()):
+                return submission_conflict(previous.pk)
             return Response(InstructionSerializer(previous).data)
         video = video_for(request, data.pop("video_id"), "instruction")
         instruction = Instruction.objects.create(tenant=request.tenant, author=request.user, video=video, **data)
@@ -250,6 +261,10 @@ class ThreadsView(SupportView):
             tenant=request.tenant, creator=request.user, request_id=data["request_id"]
         ).first()
         if previous:
+            fields = ["title", "kind", "location", "instruction_id", "video_id"]
+            initial = previous.messages.get(sender=request.user, request_id=data["request_id"])
+            if initial.body != data["body"] or any(getattr(previous, field) != data.get(field) for field in fields):
+                return submission_conflict(previous.pk)
             return Response(ThreadSerializer(previous).data)
         if not support_users(request.tenant):
             raise ValidationError({"support": "Support är inte konfigurerad för arbetsytan. Kontakta systemägaren."})
@@ -288,10 +303,14 @@ class ThreadView(SupportView):
     @transaction.atomic
     def post(self, request, pk):
         thread = thread_for(request, pk, lock=True)
+        if thread.creator_id != request.user.pk:
+            require_role(request.user, request.tenant, "can_support")
         data = validated(ReplyInput, request)
         message, created = Message.objects.get_or_create(
             thread=thread, sender=request.user, request_id=data["request_id"], defaults={"body": data["body"]}
         )
+        if not created and message.body != data["body"]:
+            return submission_conflict(thread.pk)
         if created:
             if (
                 thread.messages.filter(sender=request.user, created_at__gte=timezone.now() - timedelta(days=1)).count()
@@ -303,9 +322,11 @@ class ThreadView(SupportView):
             notify_thread(thread, request.user, message)
         return Response(ThreadSerializer(thread).data)
 
+    @transaction.atomic
     def patch(self, request, pk):
         require_role(request.user, request.tenant, "can_support")
-        thread = thread_for(request, pk)
+        thread = thread_for(request, pk, lock=True)
+        require_role(request.user, request.tenant, "can_support")
         data = validated(StatusInput, request)
         thread.status = data["status"]
         thread.save(update_fields=["status"])
@@ -337,6 +358,8 @@ class VideoUploadView(SupportView):
             duration, content_type, extension = inspect_video(temp.name, purpose)
             with transaction.atomic():
                 Tenant.objects.select_for_update().get(pk=request.tenant.pk)
+                if purpose == "instruction":
+                    require_role(request.user, request.tenant, "can_publish")
                 recent = PrivateVideo.objects.filter(
                     tenant=request.tenant, created_at__gte=timezone.now() - timedelta(days=1)
                 )

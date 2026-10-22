@@ -346,6 +346,11 @@ export async function mockCmsApi(page, {
       })
     }
 
+    if (url.pathname === '/api/v1/support/context/' && method === 'GET') {
+      if (!isAuthenticated) return json(route, { detail: 'Authentication credentials were not provided.' }, 401)
+      return json(route, { userId: 1, tenant: { id: 'tenant-1', identifier: 'eceee', name: 'ECEEE' }, canSupport: false, canPublish: false, canManage: true, unreadCount: 0, recipientCount: 0, supportAvailable: false, storageConfigured: false, emailEnabled: false, members: [], roles: [], videoLimits: { bug: 26214400, instruction: 209715200 } })
+    }
+
     if (url.pathname === '/api/v1/utils/current-user/') {
       if (!isAuthenticated) {
         return json(route, { detail: 'Authentication credentials were not provided.' }, 401)
