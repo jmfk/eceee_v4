@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { kanbanApi, kanbanError } from '../../api/kanban'
 import { useAuth } from '../../contexts/AuthContext'
 import { getCurrentTenantId, subscribeToCurrentTenantId } from '../../utils/tenant'
+import ClassificationPicker from '../classification/ClassificationPicker'
 
 // Embedded destination panel; a file always stays attached to its source card.
 export default function KanbanImport({
@@ -24,7 +25,8 @@ export default function KanbanImport({
     const [query, setQuery] = useState('')
     const [search, setSearch] = useState('')
     const [assetKey, setAssetKey] = useState('')
-    const [tags, setTags] = useState('')
+    const [classificationIds, setClassificationIds] = useState([])
+    useEffect(() => { setClassificationIds([]) }, [tenant, principal, namespace, destination])
     const [error, setError] = useState('')
     const [busy, setBusy] = useState(false)
     const client = useQueryClient()
@@ -45,10 +47,7 @@ export default function KanbanImport({
                 ...(destination === 'media'
                     ? {
                           namespace,
-                          tagIds: tags
-                              .split(',')
-                              .map((tag) => tag.trim())
-                              .filter(Boolean),
+                          classificationIds,
                       }
                     : { themeId: Number(themeId), draftVersion, assetKey }),
             })
@@ -85,14 +84,8 @@ export default function KanbanImport({
                         <button disabled={isFetching}>Sök</button>
                     </form>
                     {destination === 'media' ? (
-                        <label>
-                            Medietaggar (kommaseparerade){' '}
-                            <input
-                                value={tags}
-                                onChange={(e) => setTags(e.target.value)}
-                                className="border border-gray-300 rounded-lg px-3 py-2"
-                            />
-                        </label>
+                        <ClassificationPicker value={classificationIds} onChange={setClassificationIds}
+                            namespace={namespace} use="media_files" disabled={busy || disabled} />
                     ) : (
                         <label>
                             Bild i temat{' '}
@@ -132,7 +125,7 @@ export default function KanbanImport({
                                         disabled ||
                                         busy ||
                                         !file.approvedAt ||
-                                        (destination === 'designer' ? !assetKey : !namespace || !tags.trim())
+                                        (destination === 'designer' ? !assetKey : !namespace || classificationIds.length === 0)
                                     }
                                     onClick={() => importFile(file)}
                                 >

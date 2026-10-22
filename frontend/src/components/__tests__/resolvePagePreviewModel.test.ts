@@ -105,7 +105,7 @@ describe('page preview model resolution', () => {
 
         expect(objectApi.getNewsList).toHaveBeenCalledWith(
             [4],
-            { limit: 10, sort_order: '-publish_date' },
+            { limit: 10, sort_order: '-publish_date', classification_ids: '', include_descendants: true },
             { headers: { 'X-Tenant-ID': 'tenant-b' } },
         )
     })

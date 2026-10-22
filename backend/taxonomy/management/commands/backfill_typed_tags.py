@@ -197,7 +197,9 @@ class Command(BaseCommand):
             )
 
         for mapping in (
-            LegacyTagMapping.objects.exclude(source_kind=LegacyTagMapping.SourceKind.OBJECT)
+            LegacyTagMapping.objects.exclude(
+                source_kind__in=[LegacyTagMapping.SourceKind.OBJECT, LegacyTagMapping.SourceKind.TRANSFER]
+            )
             .select_related("canonical_tag__namespace")
             .order_by("pk")
             .iterator(chunk_size=self.batch_size)

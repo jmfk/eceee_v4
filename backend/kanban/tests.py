@@ -443,11 +443,18 @@ class KanbanTests(TestCase):
 
         from content.models import Namespace
         from file_manager.models import MediaFile
+        from taxonomy.models import ClassificationType
+        from taxonomy.services import mutate
 
         from .models import AttachmentImport
 
         self.tenant.members.add(self.other)
         namespace = Namespace.objects.create(tenant=self.tenant, name="Content", slug="content", created_by=self.user)
+        definition = ClassificationType.objects.create(
+            tenant=self.tenant, namespace=namespace, key="topic", name="Topic", allowed_uses=["media_files"]
+        )
+        operation = mutate(self.user, definition, "create", payload={"name": "Reviewed"})
+        term_id = next(iter(operation.after))
         content = b"instructions"
         attachment = self.attachment()
         attachment.size = len(content)
@@ -471,7 +478,7 @@ class KanbanTests(TestCase):
             created_by=self.user,
             last_modified_by=self.user,
         )
-        data = {"revision": 1, "destination": "media", "namespace": namespace.pk, "tag_ids": ["Reviewed"]}
+        data = {"revision": 1, "destination": "media", "namespace": namespace.pk, "classification_ids": [term_id]}
         with patch("kanban.files.attachment_storage") as source:
             for level in ["private", "staff"]:
                 with self.subTest(access_level=level):
@@ -493,7 +500,7 @@ class KanbanTests(TestCase):
         self.card.refresh_from_db()
         self.assertEqual(self.card.revision, 1)
 
-        # Reusing accessible content needs no unused tag creation or owner-only register initialization.
+        # Accessible deduplication applies the selected classification and its legacy projection.
         namespace.is_active = True
         namespace.save()
         with patch("kanban.files.attachment_storage") as source:
@@ -501,7 +508,10 @@ class KanbanTests(TestCase):
             response = self.call(AttachmentViewSet, "import_file", data, pk=attachment.pk, user=self.other)
         self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(response.data["destination_id"], str(media.pk))
-        self.assertEqual(media.tags.count(), 0)
+        from taxonomy.assignments import classification_ids
+
+        self.assertEqual(classification_ids(media), [term_id])
+        self.assertEqual(media.tags.count(), 1)
 
     def test_foreign_designer_import_is_not_found(self):
         attachment = self.attachment()
@@ -684,6 +694,95 @@ class KanbanTests(TestCase):
         self.assertEqual(response.status_code, 201, response.data)
         self.assertTrue(stream.closed)
         self.assertTrue(lock.called)
+
+    def test_media_import_uses_typed_classifications_and_preserves_duplicate_tags(self):
+        import io
+
+        from content.models import Namespace
+        from file_manager.models import MediaFile
+        from taxonomy.assignments import classification_ids
+        from taxonomy.models import ClassificationRollout, ClassificationType, Tag
+        from taxonomy.services import mutate
+
+        namespace = Namespace.objects.create(tenant=self.tenant, name="Content", slug="content", created_by=self.user)
+        self.tenant.members.add(self.other)
+        terms = []
+        for key in ["topic", "location"]:
+            definition = ClassificationType.objects.create(
+                tenant=self.tenant, namespace=namespace, key=key, name=key, allowed_uses=["media_files"]
+            )
+            operation = mutate(self.user, definition, "create", payload={"name": "Same name"})
+            terms.append(Tag.objects.get(pk=next(iter(operation.after))))
+        ClassificationRollout.objects.create(namespace=namespace, phase="canonical")
+        attachment = self.attachment()
+        content = b"approved attachment"
+        attachment.size = len(content)
+        attachment.approved_at = timezone.now()
+        attachment.save()
+        with (
+            patch("kanban.files.attachment_storage") as source,
+            patch("kanban.files.storage") as target,
+            patch("kanban.files.validate_upload", return_value={"metadata": {}}),
+        ):
+            source.client.get_object.side_effect = lambda **kwargs: {"Body": io.BytesIO(content)}
+            target.save.return_value = "uploads/copy.png"
+            target.url.return_value = "https://media.example.org/copy.png"
+            target.get_file_type.return_value = "image"
+            for term in terms:
+                self.card.refresh_from_db()
+                response = self.call(
+                    AttachmentViewSet,
+                    "import_file",
+                    {
+                        "revision": self.card.revision,
+                        "destination": "media",
+                        "namespace": namespace.pk,
+                        "classification_ids": [str(term.pk)],
+                    },
+                    pk=attachment.pk,
+                    user=self.other,
+                )
+                self.assertEqual(response.status_code, 201, response.data)
+            self.assertEqual(target.save.call_count, 1)
+        self.assertEqual(MediaFile.objects.count(), 1)
+        self.assertEqual(classification_ids(MediaFile.objects.get()), [str(term.pk) for term in terms])
+
+    def test_media_import_rejects_empty_and_unapproved_classification(self):
+        import io
+
+        from content.models import Namespace
+        from file_manager.models import MediaFile
+        from taxonomy.models import ClassificationType
+        from taxonomy.services import propose
+
+        namespace = Namespace.objects.create(tenant=self.tenant, name="Content", slug="content", created_by=self.user)
+        self.tenant.members.add(self.other)
+        definition = ClassificationType.objects.create(
+            tenant=self.tenant, namespace=namespace, key="topic", name="Topic", allowed_uses=["media_files"]
+        )
+        proposal = propose(self.other, definition, "create", payload={"name": "Pending"})
+        attachment = self.attachment()
+        content = b"pending classification"
+        attachment.size = len(content)
+        attachment.approved_at = timezone.now()
+        attachment.save()
+        for ids in [[], [str(proposal.term_id)]]:
+            with (
+                patch("kanban.files.attachment_storage") as source,
+                patch("kanban.files.storage") as target,
+                patch("kanban.files.validate_upload", return_value={"metadata": {}}),
+            ):
+                source.client.get_object.return_value = {"Body": io.BytesIO(content)}
+                response = self.call(
+                    AttachmentViewSet,
+                    "import_file",
+                    {"revision": 1, "destination": "media", "namespace": namespace.pk, "classification_ids": ids},
+                    pk=attachment.pk,
+                    user=self.other,
+                )
+                self.assertEqual(response.status_code, 400, response.data)
+                target.save.assert_not_called()
+        self.assertFalse(MediaFile.objects.exists())
 
     def test_asgi_video_download_yields_first_chunk_without_buffering_the_rest(self):
         import io

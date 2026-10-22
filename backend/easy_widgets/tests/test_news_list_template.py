@@ -65,6 +65,8 @@ class NewsListTemplateTests(SimpleTestCase):
 
         config = SimpleNamespace(
             object_types=[1],
+            classification_ids=[],
+            include_descendants=True,
             limit=10,
             sort_order="-publish_date",
             show_excerpts=True,
@@ -84,4 +86,6 @@ class NewsListTemplateTests(SimpleTestCase):
             sort_order="-publish_date",
             prioritize_featured=True,
             tenant=tenant,
+            classification_ids=[],
+            include_descendants=True,
         )

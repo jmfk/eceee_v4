@@ -216,7 +216,9 @@ class PageVersionViewSet(
             except Http404:
                 queryset = queryset.none()
 
-        return queryset
+        from taxonomy.services import requested_classifications
+
+        return requested_classifications(self.request, queryset, "canonical_tag_links__tag_id")
 
     def _page_queryset(self):
         queryset = WebPage.objects.all()

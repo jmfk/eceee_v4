@@ -2,6 +2,7 @@
 
 | ID | Title | Status | Related ADRs |
 | --- | --- | --- | --- |
+| PRD-0035 | [Klassificeringens läsbyte och obligatorisk mediataggning](0035-classification-cutover-and-required-media.md) | in-progress | [ADR-0050](../adrs/active/0050-classification-cutover-and-media-integrity.md) |
 | PRD-0034 | [Förenklad innehållsmodell och legacyimport](0034-simplified-legacy-content-import.md) | in-progress | [ADR-0047](../adrs/active/0047-portable-editorial-definitions-and-draft-import.md), [ADR-0046](../adrs/active/0046-unified-articles-and-bounded-legacy-import.md), [ADR-0043](../adrs/active/0043-classification-governance.md), [ADR-0025](../adrs/active/0025-authenticated-legacy-migration-api.md)  [ADR-0049](../adrs/active/0049-transaction-safe-legacy-media-repairs.md) |
 | PRD-0031 | [Gemensamt klassificeringssystem](0031-shared-classification.md) | in-progress | [ADR-0043](../adrs/active/0043-classification-governance.md), [ADR-0046](../adrs/active/0046-unified-articles-and-bounded-legacy-import.md) |
 | PRD-0033 | [Tenant-internal Kanban](0033-tenant-kanban.md) | completed | [ADR-0045](../adrs/active/0045-tenant-kanban.md) |

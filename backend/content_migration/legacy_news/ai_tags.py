@@ -10,7 +10,7 @@ from django.conf import settings
 from django.utils.text import slugify
 from openai import OpenAI
 
-from file_manager.models import MediaFile, MediaTag
+from file_manager.models import MediaFile
 from file_manager.storage import storage
 
 PROMPT_VERSION = "legacy-news-image-tags-v1"
@@ -145,16 +145,10 @@ class LegacyNewsAITagger:
         return payload.get("tags", []), cost
 
     def _apply_tags(self, media, names):
-        tags = []
-        for name in self._normalize_tags(names)[:5]:
-            tag, _ = MediaTag.objects.get_or_create(
-                name=name,
-                namespace=media.namespace,
-                defaults={"slug": slugify(name)[:50], "created_by": self.user},
-            )
-            tags.append(tag)
-        if tags:
-            media.tags.add(*tags)
+        # Model output remains a suggestion until an editor explicitly assigns an
+        # approved term. It must never create an approved classification implicitly.
+        media.ai_generated_tags = self._normalize_tags(names)[:5]
+        media.save(update_fields=["ai_generated_tags"])
 
     @staticmethod
     def _normalize_tags(names):

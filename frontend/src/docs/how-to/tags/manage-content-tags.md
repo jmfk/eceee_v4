@@ -1,60 +1,26 @@
 ---
 id: tags-manage
-title: Manage content tags
-summary: Create and maintain the tag vocabulary used across the CMS.
+title: Manage classifications
+summary: Maintain shared classification types, terms and proposals.
 order: 1
 sectionId: tags
-sectionTitle: Tags
-sectionSummary: Manage tags used to organize pages, objects, and media.
+sectionTitle: Classification
+sectionSummary: Organize pages, objects and media with a shared vocabulary.
 sectionOrder: 5
 ---
 
-# Manage content tags
+# Manage classifications
 
-Create and maintain the tag vocabulary used across the CMS.
+Open **Classification** in the main navigation. Choose a type, then search or select a term in its hierarchy.
 
-<!-- narration: Search before creating a tag, keep names consistent, and use tags to help editors find related content. -->
+Select **New term** to enter a name, description and alternative names. Depending on your rights, **Apply change** saves directly or **Submit proposal** sends the change for approval. Members can use terms and submit proposals; only explicitly authorized users can change the structure.
 
-1. Open Tags from the main navigation.
-2. Search for an existing tag before creating a new one.
-3. Create or edit the tag name and related metadata.
-4. Use consistent naming so editors can find tags quickly.
+For a selected term, choose **Edit**, **Move**, **Merge** or **Archive**. Move keeps the subtree together. Merge keeps the old identity and directs existing assignments to the target. Archive preserves existing assignments and prevents new ones. Move or archive active children before archiving their parent. Archived terms can be reactivated by a user with restore permission.
 
-```video
-[
-  {
-    "type": "goto",
-    "path": "/tags",
-    "caption": "Start in Tags when you need to organize pages, objects, or media by shared labels.",
-    "holdMs": 450
-  },
-  {
-    "type": "fill",
-    "selector": "[data-testid='tags-search-input']",
-    "value": "venue",
-    "caption": "Search first so you do not create duplicate tags.",
-    "holdMs": 450
-  },
-  {
-    "type": "click",
-    "selector": "[data-testid='tags-create-button']",
-    "caption": "Click Create Tag when the tag does not already exist.",
-    "holdMs": 500
-  },
-  {
-    "type": "fill",
-    "placeholder": "Enter tag name",
-    "value": "venue",
-    "caption": "Enter the tag name that editors will recognize.",
-    "holdMs": 500
-  },
-  {
-    "type": "click",
-    "text": "Create Tag",
-    "exact": true,
-    "mockOnly": true,
-    "caption": "Save the tag in tutorial recordings. On real content, confirm naming rules before saving.",
-    "holdMs": 500
-  }
-]
-```
+Successful structure changes offer **Undo**. If later changes prevent restoration, review the current term and make a new change. **History** shows who changed the register and the before/after state.
+
+**Proposals** shows proposed changes and their decision status. Approval requires both approval rights and permission for the proposed action. A term proposed for a draft must be approved or removed before publication. Media assignments require an approved term.
+
+Administrators use **Types** to configure names and allowed content types, and **Rights** to assign named users a role template or specific permissions. Classification permissions do not grant access to edit the content itself.
+
+The new register is being introduced alongside the older tag fields. Complete the verified migration before switching the site's existing tag readers to the shared register.

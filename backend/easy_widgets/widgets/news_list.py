@@ -19,6 +19,13 @@ class NewsListConfig(BaseModel):
         populate_by_name=True,
     )
 
+    classification_ids: List[str] = Field(
+        default_factory=list,
+        description="Filter by taxonomy terms",
+        json_schema_extra={"component": "ClassificationSelectorInput"},
+    )
+    include_descendants: bool = Field(default=True, description="Include descendant terms")
+
     object_types: List[int] = Field(
         default=[],
         description="Select ObjectType(s) to display",
@@ -178,6 +185,8 @@ class NewsListWidget(BaseWidget):
                     sort_order=config.sort_order,
                     prioritize_featured=True,
                     tenant=tenant,
+                    classification_ids=config.classification_ids,
+                    include_descendants=config.include_descendants,
                 )
             )
 

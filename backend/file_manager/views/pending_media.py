@@ -9,6 +9,7 @@ from django.db.models import Q
 from django.http import Http404, HttpResponse
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
 from ..models import MediaCollection, MediaFile, PendingMediaFile
@@ -187,11 +188,23 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
         ).first()
 
         if existing_file:
-            # Get new tags from the approval data
-            from taxonomy.assignments import replace_assignments
+            from content.models import Namespace
+            from taxonomy.assignments import classification_ids, replace_assignments, validate_media_selection
 
+            from ..security import MediaFilePermission
+
+            Namespace.objects.select_for_update().get(pk=pending_file.namespace_id)
+            existing_file = MediaFile.objects.select_for_update().get(pk=existing_file.pk)
+            if not MediaFilePermission().has_object_permission(request, self, existing_file):
+                raise PermissionDenied("You cannot update this existing media file.")
+            # Get new tags from the approval data
             if "classification_ids" in request.data:
-                replace_assignments(existing_file, request.data["classification_ids"], request.user)
+                new_ids = validate_media_selection(
+                    existing_file.namespace, request.user, request.data["classification_ids"]
+                )
+                replace_assignments(
+                    existing_file, list(dict.fromkeys([*classification_ids(existing_file), *new_ids])), request.user
+                )
             new_tag_ids = request.data.get("tag_ids", []) if "classification_ids" not in request.data else []
             if new_tag_ids:
                 from ..serializers import convert_tag_names_to_ids
@@ -203,9 +216,8 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                 )
                 existing_file.tags.add(*validated_tag_ids)
 
-            from taxonomy.assignments import classification_ids, validate_media_selection
-
-            validate_media_selection(existing_file.namespace, request.user, classification_ids(existing_file))
+            if not classification_ids(existing_file):
+                raise ValidationError({"classification_ids": "At least one approved taxonomy term is required."})
 
             # Handle annotation update if provided
             annotation = request.data.get("annotation")
@@ -220,19 +232,14 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             collection_name = request.data.get("collection_name")
 
             if collection_id or collection_name:
-                try:
-                    collection = self._get_or_create_collection(
-                        collection_id,
-                        collection_name,
-                        pending_file.namespace,
-                        request.user,
-                        media_file=existing_file,
-                    )
-                    if collection:
-                        existing_file.collections.add(collection)
-                except Exception:
-                    # Don't fail if collection assignment fails
-                    pass
+                collection = self._get_or_create_collection(
+                    collection_id,
+                    collection_name,
+                    pending_file.namespace,
+                    request.user,
+                    classification_ids=classification_ids(existing_file),
+                )
+                existing_file.collections.add(collection)
 
             # Mark pending file as approved
             pending_file.status = "approved"
@@ -267,6 +274,26 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            # Validate/create the requested collection before hash cleanup or
+            # approval. A collection failure must leave the upload pending.
+            collection_id = serializer.validated_data.get("collection_id")
+            collection_name = serializer.validated_data.get("collection_name")
+            collection = None
+            if collection_id or collection_name:
+                from taxonomy.projections import legacy_media_ids
+
+                selected_ids = serializer.validated_data.get("classification_ids")
+                if selected_ids is None:
+                    selected_ids = legacy_media_ids(
+                        pending_file, serializer.validated_data.get("tag_ids", []), request.user
+                    )
+                collection = self._get_or_create_collection(
+                    collection_id,
+                    collection_name,
+                    pending_file.namespace,
+                    request.user,
+                    classification_ids=selected_ids,
+                )
             # Create the approved media file
             media_file = pending_file.approve_and_create_media_file(
                 title=serializer.validated_data["title"],
@@ -280,23 +307,8 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             )
 
             # Handle collection assignment
-            collection_id = serializer.validated_data.get("collection_id")
-            collection_name = serializer.validated_data.get("collection_name")
-
-            if collection_id or collection_name:
-                try:
-                    collection = self._get_or_create_collection(
-                        collection_id,
-                        collection_name,
-                        pending_file.namespace,
-                        request.user,
-                        media_file=media_file,
-                    )
-                    if collection:
-                        media_file.collections.add(collection)
-                except Exception:
-                    # Don't fail the approval if collection assignment fails
-                    pass
+            if collection:
+                media_file.collections.add(collection)
 
             # Return the created media file
             media_serializer = MediaFileDetailSerializer(media_file)
@@ -306,19 +318,20 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             )
 
         except Exception as e:
+            transaction.set_rollback(True)
             return Response(
                 {"error": f"Failed to approve file: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
     @transaction.atomic
-    def _get_or_create_collection(self, collection_id, collection_name, namespace, user, *, media_file):
+    def _get_or_create_collection(self, collection_id, collection_name, namespace, user, *, classification_ids):
         """Get existing collection or create new one."""
         if collection_id:
             try:
                 return MediaCollection.objects.get(id=collection_id, namespace=namespace)
             except MediaCollection.DoesNotExist:
-                return None
+                raise ValidationError({"collection_id": "Collection is unavailable in this namespace."})
         elif collection_name:
             # Approval treats collection assignment as optional. Roll back the whole
             # collection attempt if its classifications cannot be copied from the file.
@@ -332,9 +345,9 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                 },
             )
             if created:
-                from taxonomy.assignments import classification_ids, replace_assignments
+                from taxonomy.assignments import replace_assignments
 
-                replace_assignments(collection, classification_ids(media_file), user)
+                replace_assignments(collection, classification_ids, user)
             return collection
         return None
 

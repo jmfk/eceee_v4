@@ -205,12 +205,14 @@ class MediaFileViewSet(viewsets.ModelViewSet):
             except Namespace.DoesNotExist:
                 queryset = queryset.none()
 
+        from taxonomy.projections import media_term_query
+
         # Filter by tags if provided (Django-style repeated parameters)
         tag_names = self.request.query_params.getlist("tag_names")
         if tag_names:
             # Filter files that have ALL specified tags (AND logic)
             for tag_name in tag_names:
-                queryset = queryset.filter(tags__name=tag_name)
+                queryset = queryset.filter(media_term_query(tenant, tag_name, exact=True))
             # Remove duplicates that might occur from multiple tag joins
             queryset = queryset.distinct()
 
@@ -253,7 +255,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
                 | Q(description__icontains=text_search)
                 | Q(original_filename__icontains=text_search)
                 | Q(ai_extracted_text__icontains=text_search)
-                | Q(tags__name__icontains=text_search)
+                | media_term_query(tenant, text_search)
             ).distinct()
 
         from taxonomy.services import requested_classifications

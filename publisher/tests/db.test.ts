@@ -35,6 +35,20 @@ describe('database snapshot', () => {
     }
   });
 
+  it('filters the published version by scoped taxonomy before limiting results', async () => {
+    const term = '11111111-1111-4111-8111-111111111111';
+    await database.withSnapshot(reader => reader.publishedObjects({
+      objectTypeNames: ['news'], limit: 2, sortOrder: '-publish_date',
+      classificationIds: [term], includeDescendants: false,
+    }, '7', new Date('2026-10-22')));
+    const [sql, parameters] = mocks.query.mock.calls.find(([sql]) => sql.includes('WITH RECURSIVE resolved'))!;
+    expect(parameters.slice(11)).toEqual([[term], false]);
+    expect(sql).toContain('t.namespace_id=s.namespace_id AND t.tag_type=s.tag_type');
+    expect(sql).toContain('a.object_version_id=published.id');
+    expect(sql).toContain('a.tag_id IN (SELECT id FROM matching)');
+    expect(sql.indexOf('a.object_version_id=published.id')).toBeLessThan(sql.lastIndexOf('LIMIT $6'));
+  });
+
   it('selects exact hosts while fallback routing is denied by default', async () => {
     await database.withSnapshot(reader => reader.root('example.org'));
 

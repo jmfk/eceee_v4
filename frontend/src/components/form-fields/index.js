@@ -68,6 +68,7 @@ export { default as RichTextInput } from './RichTextInput'
 // Reference Components
 export { default as UserSelectorInput } from './UserSelectorInput'
 export { default as ObjectSelectorInput } from './ObjectSelectorInput'
+export { default as ClassificationSelectorInput } from './ClassificationSelectorInput'
 export { default as ObjectTypeSelectorInput } from './ObjectTypeSelectorInput'
 export { default as ObjectReferenceInput } from './ObjectReferenceInput'
 export { default as ReverseObjectReferenceDisplay } from './ReverseObjectReferenceDisplay'
@@ -139,6 +140,7 @@ export const FIELD_COMPONENTS = {
     // Reference Components
     UserSelectorInput: () => import('./UserSelectorInput'),
     ObjectSelectorInput: () => import('./ObjectSelectorInput'),
+    ClassificationSelectorInput: () => import('./ClassificationSelectorInput'),
     ObjectTypeSelectorInput: () => import('./ObjectTypeSelectorInput'),
     ObjectReferenceInput: () => import('./ObjectReferenceInput'),
     ReverseObjectReferenceDisplay: () => import('./ReverseObjectReferenceDisplay'),

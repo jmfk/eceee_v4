@@ -96,6 +96,7 @@ export interface LayoutSlot {
 }
 
 export interface VersionData {
+  classificationIds?: string[];
   id: string;
   pageId: string;
   number: number;
@@ -118,6 +119,7 @@ export interface VersionData {
  * Object Data and Versions
  */
 export interface ObjectData {
+  classificationIds?: string[];
   id: string;
   title?: string;
   data?: Record<string, any>;

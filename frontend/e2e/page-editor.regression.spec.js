@@ -193,6 +193,8 @@ test.describe('page editor regressions', () => {
     await page.getByRole('button', { name: 'Settings' }).click()
     await page.getByPlaceholder('Page Title').fill('Unpublished draft title')
     await page.getByPlaceholder('page-url-slug').fill('unpublished-draft-slug')
+    await page.getByLabel('Find a classification').fill('Energy')
+    await page.getByRole('button', { name: 'Energy efficiency', exact: true }).click()
     await saveCurrentVersion(page)
 
     expect(editorState.savedPages).toHaveLength(0)
@@ -200,6 +202,9 @@ test.describe('page editor regressions', () => {
       title: 'Unpublished draft title',
       slug: 'unpublished-draft-slug',
     })
+    expect(getSavedVersion(editorState).classificationIds).toEqual(['7d38dd31-d831-43d2-a931-d0a06224f42e'])
+    await page.reload()
+    await expect(page.getByRole('list', { name: 'Selected classifications' })).toContainText('Energy efficiency')
   })
 
   test('theme selection lives in Settings and legacy theme links redirect', async ({ page }) => {

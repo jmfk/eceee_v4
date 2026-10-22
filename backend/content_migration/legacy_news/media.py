@@ -13,12 +13,14 @@ from typing import Mapping, Optional
 from urllib.parse import urlparse
 
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import transaction
 from django.db.models import Q
 from django.utils.text import slugify
 from PIL import Image, ImageDraw, UnidentifiedImageError
 
 from file_manager.models import MediaFile, MediaTag
 from file_manager.storage import storage
+from taxonomy.context import import_actor
 
 from .remote import get_public_url, validate_public_http_url
 
@@ -68,6 +70,8 @@ class LegacyMediaImporter:
         self.local_assets = dict(local_assets or {})
         self.classification_ids = classification_ids
 
+    @transaction.atomic
+    @import_actor
     def import_image(
         self,
         source_url: str,
@@ -148,6 +152,8 @@ class LegacyMediaImporter:
             self._apply_tags(duplicate, placeholder=placeholder)
             return duplicate
 
+        # Check taxonomy approval and permissions before writing a new binary.
+        self._required_tag_ids(placeholder)
         result = storage.overwrite_file(self._storage_path(source_url), uploaded)
 
         try:
@@ -239,26 +245,49 @@ class LegacyMediaImporter:
     def _validate_remote_url(url: str) -> None:
         validate_public_http_url(url, subject="image")
 
-    def _apply_tags(self, media: MediaFile, *, placeholder: bool) -> None:
-        if self.classification_ids is not None:
-            from taxonomy.assignments import classification_ids, replace_assignments
+    def _required_tag_ids(self, placeholder):
+        from taxonomy.assignments import validate_media_selection
+        from taxonomy.legacy import canonical_for, definition_for
+        from taxonomy.services import require
 
-            # Reused media may already have editorial classifications; retain them.
-            ids = list(dict.fromkeys(classification_ids(media) + self.classification_ids))
-            replace_assignments(media, ids, self.user)
-            return
+        if self.classification_ids is not None:
+            return validate_media_selection(self.namespace, self.user, self.classification_ids)
+
         names = ["legacy", "news"] + (["migration-placeholder"] if placeholder else [])
-        tags = []
+        ids = []
         for name in names:
-            tag, _ = MediaTag.objects.get_or_create(
-                name=name,
-                namespace=self.namespace,
-                defaults={"slug": slugify(name), "created_by": self.user},
-            )
-            tags.append(tag)
-        media.tags.add(*tags)
+            tag = MediaTag.objects.filter(name=name, namespace=self.namespace).first()
+            if tag is None:
+                require(self.user, definition_for(self.namespace, self.user), "create")
+                tag = MediaTag.objects.create(
+                    name=name, namespace=self.namespace, slug=slugify(name), created_by=self.user
+                )
+            ids.append(str(canonical_for(tag, self.user).pk))
+        return validate_media_selection(self.namespace, self.user, ids)
+
+    def _apply_tags(self, media: MediaFile, *, placeholder: bool) -> None:
+        from taxonomy.assignments import classification_ids, replace_assignments
+        from taxonomy.models import LegacyTagMapping
+
+        ids = classification_ids(media)
+        if self.classification_ids is not None:
+            replace_assignments(media, list(dict.fromkeys(ids + self._required_tag_ids(placeholder))), self.user)
+            return
         if not placeholder:
-            media.tags.remove(*MediaTag.objects.filter(namespace=self.namespace, slug="migration-placeholder"))
+            source_ids = [
+                str(pk)
+                for pk in MediaTag.objects.filter(namespace=self.namespace, slug="migration-placeholder").values_list(
+                    "pk", flat=True
+                )
+            ]
+            removed = {
+                str(pk)
+                for pk in LegacyTagMapping.objects.filter(source_kind="media", source_id__in=source_ids).values_list(
+                    "canonical_tag_id", flat=True
+                )
+            }
+            ids = [pk for pk in ids if pk not in removed]
+        replace_assignments(media, list(dict.fromkeys([*ids, *self._required_tag_ids(placeholder)])), self.user)
 
     def _unique_slug(self, filename: str) -> str:
         base = slugify(Path(filename).stem)[:220] or "legacy-image"

@@ -34,30 +34,10 @@ const MediaItemTagEditor = ({
 
         setIsSaving(true)
         try {
-            // Determine which tags to add and which to remove
-            const existingTagIds = new Set((mediaFile.tags || []).map(tag => tag.id))
-            const newTagIds = new Set(localTags.map(tag => tag.id))
-
-            // Tags to add (in newTags but not in existing)
-            const tagsToAdd = localTags.filter(tag => !existingTagIds.has(tag.id))
-            
-            // Tags to remove (in existing but not in newTags)
-            const tagsToRemove = (mediaFile.tags || []).filter(tag => !newTagIds.has(tag.id))
-
-            // Add new tags
-            if (tagsToAdd.length > 0) {
-                const tagNames = tagsToAdd.map(tag => tag.name)
-                await mediaApi.files.addTags(mediaFile.id, tagNames)()
-            }
-
-            // Remove tags
-            if (tagsToRemove.length > 0) {
-                const tagIds = tagsToRemove.map(tag => tag.id)
-                await mediaApi.files.removeTags(mediaFile.id, tagIds)()
-            }
-
-            // Fetch updated media file to get the latest data
-            const updatedFile = await mediaApi.files.get(mediaFile.id)()
+            // Persist the canonical selection atomically, preserving typed identities.
+            const updatedFile = await mediaApi.files.update(mediaFile.id, {
+                classification_ids: localTags.map(tag => tag.classificationId || tag.id),
+            })()
 
             // Notify parent component
             if (onTagsChanged) {

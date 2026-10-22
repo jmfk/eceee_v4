@@ -143,3 +143,7 @@ Gamla tabeller och de fem nyhetsklassificeringarnas definitioner tas inte bort i
 ## Import integration evidence — 2026-10-22
 
 The isolated editorial-import workspace includes the classification service, ordered object assignments, publication checks and compatibility adapters needed by PRD-0034. See [ADR-0047](../adrs/active/0047-portable-editorial-definitions-and-draft-import.md) and [dev operator guide](../../docs/legacy-editorial-import.md). Focused assignment, governance and legacy-adapter tests pass. This is not evidence that production taxonomy backfill or the complete media/page UI rollout has been accepted.
+
+### Remaining classification rollout
+
+[PRD-0035](0035-classification-cutover-and-required-media.md) and [ADR-0050](../adrs/active/0050-classification-cutover-and-media-integrity.md) cover the remaining media/page UI, compatibility, historical transfer and guarded activation. The merged editorial importer remains under PRD-0034 / ADR-0047. Production activation and release acceptance remain separate.

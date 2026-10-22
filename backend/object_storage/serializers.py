@@ -731,6 +731,7 @@ class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
 class ObjectInstanceSerializer(serializers.ModelSerializer):
     """Serializer for Object Instances"""
 
+    classification_ids = serializers.ListField(child=serializers.UUIDField(), required=False, write_only=True)
     object_id = serializers.SerializerMethodField()
     object_type = ObjectTypeDefinitionSerializer(read_only=True)
     object_type_id = serializers.IntegerField(write_only=True)
@@ -748,6 +749,7 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = ObjectInstance
         fields = [
+            "classification_ids",
             "id",
             "object_id",
             "object_type",
@@ -971,6 +973,7 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
         user = self.context["request"].user
 
         # Extract data and widgets from validated_data
+        classification_ids = validated_data.pop("classification_ids", None)
         data = validated_data.pop("data", {})
         widgets = validated_data.pop("widgets", {})
 
@@ -983,6 +986,11 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
             )
         except ValidationError as exc:
             raise serializers.ValidationError({"widgets": exc.messages}) from exc
+
+        if classification_ids is not None:
+            from taxonomy.assignments import replace_assignments
+
+            replace_assignments(instance.current_version, classification_ids, user)
 
         return instance
 
@@ -1024,6 +1032,13 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
 class ObjectInstanceListSerializer(serializers.ModelSerializer):
     """Simplified serializer for object instance lists"""
 
+    classification_ids = serializers.SerializerMethodField()
+
+    def get_classification_ids(self, obj):
+        from taxonomy.assignments import classification_ids
+
+        return classification_ids(obj.current_version) if obj.current_version else []
+
     object_type_name = serializers.CharField(source="object_type.name", read_only=True)
     object_type_label = serializers.CharField(source="object_type.label", read_only=True)
     created_by_name = serializers.CharField(source="created_by.username", read_only=True)
@@ -1034,6 +1049,7 @@ class ObjectInstanceListSerializer(serializers.ModelSerializer):
     class Meta:
         model = ObjectInstance
         fields = [
+            "classification_ids",
             "id",
             "object_type_name",
             "object_type_label",
@@ -1065,6 +1081,12 @@ class ObjectVersionSerializer(serializers.ModelSerializer):
     """Serializer for Object Versions with enhanced publication support"""
 
     classification_ids = serializers.SerializerMethodField()
+
+    def get_classification_ids(self, obj):
+        from taxonomy.assignments import classification_ids
+
+        return classification_ids(obj)
+
     object_id = serializers.SerializerMethodField()
     version_id = serializers.SerializerMethodField()
     object_instance = ObjectInstanceListSerializer(read_only=True)
@@ -1115,11 +1137,6 @@ class ObjectVersionSerializer(serializers.ModelSerializer):
             "is_current_published",
             "publication_status",
         ]
-
-    def get_classification_ids(self, obj):
-        from taxonomy.assignments import classification_ids
-
-        return classification_ids(obj)
 
     def get_object_id(self, obj):
         """Return publication status"""

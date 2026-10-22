@@ -1,3 +1,4 @@
+import ClassificationPicker from '../classification/ClassificationPicker'
 /**
  * MediaCollectionManager Component
  * 
@@ -50,297 +51,10 @@ import {
 } from 'lucide-react';
 import { mediaCollectionsApi, mediaTagsApi, mediaApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
-import MediaTagWidget from './MediaTagWidget';
 import MediaSearchWidget from './MediaSearchWidget';
 import { extractErrorMessage } from '../../utils/errorHandling';
 
 // Compact Tag Input Component for inline forms
-const CompactTagInput = ({ namespace, selectedTagIds = [], onTagsChange, availableTags = [], onTagCreated }) => {
-    const [inputValue, setInputValue] = useState('');
-    const [showSuggestions, setShowSuggestions] = useState(false);
-    const [isCreatingTag, setIsCreatingTag] = useState(false);
-    const inputRef = useRef(null);
-    const dropdownRef = useRef(null);
-    const { addNotification } = useGlobalNotifications();
-
-    // Get selected tag objects from IDs
-    const selectedTags = selectedTagIds.map(id =>
-        availableTags.find(tag => tag.id === id)
-    ).filter(Boolean);
-
-    // Filter available tags for suggestions
-    const suggestions = availableTags.filter(tag =>
-        !selectedTagIds.includes(tag.id) &&
-        tag.name.toLowerCase().includes(inputValue.toLowerCase())
-    ).slice(0, 5); // Limit to 5 suggestions
-
-    // Check if we should show "Create new tag" option
-    const hasCreateOption = inputValue.trim() && 
-        !suggestions.some(tag => tag.name.toLowerCase() === inputValue.trim().toLowerCase()) &&
-        !availableTags.some(tag => tag.name.toLowerCase() === inputValue.trim().toLowerCase());
-
-    const addTag = (tag) => {
-        if (!selectedTagIds.includes(tag.id)) {
-            onTagsChange([...selectedTagIds, tag.id]);
-        }
-        setInputValue('');
-        setShowSuggestions(false);
-    };
-
-    const removeTag = (tagId) => {
-        onTagsChange(selectedTagIds.filter(id => id !== tagId));
-    };
-
-    const handleCreateTag = async (tagName) => {
-        console.log('[CompactTagInput] handleCreateTag called with:', tagName);
-        if (!tagName || !tagName.trim()) {
-            console.log('[CompactTagInput] handleCreateTag: tagName is empty, returning');
-            return;
-        }
-
-        const normalizedTagName = tagName.trim();
-        console.log('[CompactTagInput] handleCreateTag: normalized tag name:', normalizedTagName);
-
-        // Check for duplicates (case-insensitive) in available tags
-        const isDuplicate = availableTags.some(tag =>
-            tag.name.toLowerCase() === normalizedTagName.toLowerCase()
-        );
-        if (isDuplicate) {
-            console.log('[CompactTagInput] handleCreateTag: tag already exists in availableTags');
-            addNotification('Tag already exists', 'error');
-            return;
-        }
-
-        // Before creating, do a server-side lookup to check if tag exists
-        // This handles cases where the tag exists but wasn't in search results
-        try {
-            console.log('[CompactTagInput] handleCreateTag: searching for tag with namespace:', namespace, 'search term:', normalizedTagName);
-            const searchResult = await await await await await await await await await await await mediaTagsApi.list({
-                namespace,
-                search: normalizedTagName,
-                page_size: 50 // Get enough results to find exact match
-            })();
-            
-            console.log('[CompactTagInput] handleCreateTag: search result:', searchResult);
-            const searchTags = searchResult.results || searchResult || [];
-            console.log('[CompactTagInput] handleCreateTag: searchTags array:', searchTags);
-            const exactMatch = searchTags.find(tag =>
-                tag?.name?.toLowerCase() === normalizedTagName.toLowerCase()
-            );
-
-            if (exactMatch) {
-                console.log('[CompactTagInput] handleCreateTag: found exact match in search results:', exactMatch);
-                // Tag exists in database, use it
-                if (onTagCreated) {
-                    onTagCreated(exactMatch);
-                }
-                addTag(exactMatch);
-                addNotification(`Tag "${normalizedTagName}" added`, 'success');
-                return;
-            }
-            console.log('[CompactTagInput] handleCreateTag: no exact match found in search results');
-        } catch (error) {
-            console.error('[CompactTagInput] handleCreateTag: Failed to search for existing tag:', error);
-            console.error('[CompactTagInput] handleCreateTag: Error details:', error.response?.data || error.message);
-            // Continue to create new tag
-        }
-
-        console.log('[CompactTagInput] handleCreateTag: creating new tag...');
-        setIsCreatingTag(true);
-        try {
-            const slug = normalizedTagName.toLowerCase()
-                .replace(/[^a-z0-9]+/g, '-')
-                .replace(/^-+|-+$/g, '');
-            console.log('[CompactTagInput] handleCreateTag: generated slug:', slug);
-
-            const tagData = {
-                name: normalizedTagName,
-                slug: slug,
-                namespace: namespace,
-                description: `User-created tag: ${normalizedTagName}`
-            };
-            console.log('[CompactTagInput] handleCreateTag: creating tag with data:', tagData);
-
-            const newTag = await await await await await await await await await await await mediaTagsApi.create(tagData)();
-            console.log('[CompactTagInput] handleCreateTag: tag created successfully:', newTag);
-
-            // Notify parent to update available tags list
-            if (onTagCreated) {
-                onTagCreated(newTag);
-            }
-
-            // Add the newly created tag to selection
-            addTag(newTag);
-            addNotification(`Tag "${normalizedTagName}" created successfully`, 'success');
-        } catch (error) {
-            console.error('[CompactTagInput] handleCreateTag: Failed to create tag:', error);
-            console.error('[CompactTagInput] handleCreateTag: Error response:', error.response?.data || error.message);
-            console.error('[CompactTagInput] handleCreateTag: Full error object:', error);
-            addNotification(
-                error.message || `Failed to create tag "${normalizedTagName}"`,
-                'error'
-            );
-        } finally {
-            setIsCreatingTag(false);
-        }
-    };
-
-    const handleInputChange = (e) => {
-        const value = e.target.value;
-        setInputValue(value);
-        setShowSuggestions(value.trim().length > 0);
-    };
-
-    const handleKeyDown = (e) => {
-        if (e.key === 'Escape') {
-            setShowSuggestions(false);
-            setInputValue('');
-        } else if (e.key === 'Enter' && inputValue.trim() && !isCreatingTag) {
-            e.preventDefault();
-            if (suggestions.length > 0) {
-                addTag(suggestions[0]); // Add first suggestion on Enter
-            } else if (hasCreateOption) {
-                // Create new tag if no suggestions exist
-                handleCreateTag(inputValue.trim());
-            }
-        }
-    };
-
-    // Handle click outside to close suggestions
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (
-                dropdownRef.current &&
-                !dropdownRef.current.contains(event.target) &&
-                inputRef.current &&
-                !inputRef.current.contains(event.target)
-            ) {
-                setShowSuggestions(false);
-            }
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    return (
-        <div className="space-y-2">
-            {/* Selected Tags */}
-            {selectedTags.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                    {selectedTags.map((tag) => (
-                        <span
-                            key={tag.id}
-                            className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800"
-                        >
-                            {tag.name}
-                            <button
-                                type="button"
-                                onClick={() => removeTag(tag.id)}
-                                className="ml-1 text-blue-600 hover:text-blue-800"
-                            >
-                                <X className="w-3 h-3" />
-                            </button>
-                        </span>
-                    ))}
-                </div>
-            )}
-
-            {/* Tag Input */}
-            <div className="relative">
-                <input
-                    ref={inputRef}
-                    type="text"
-                    value={inputValue}
-                    onChange={handleInputChange}
-                    onKeyDown={handleKeyDown}
-                    onFocus={() => inputValue.trim() && setShowSuggestions(true)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Type to search existing tags..."
-                />
-
-                {/* Suggestions Dropdown */}
-                {showSuggestions && inputValue.trim() && (
-                    <div
-                        ref={dropdownRef}
-                        className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto"
-                    >
-                        {suggestions.length > 0 && (
-                            <>
-                                {suggestions.map((tag) => (
-                                    <button
-                                        key={tag.id}
-                                        type="button"
-                                        onClick={() => addTag(tag)}
-                                        className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center"
-                                    >
-                                        <Tag className="w-3 h-3 mr-2 text-gray-400" />
-                                        <span>{tag.name}</span>
-                                        {tag.usageCount > 0 && (
-                                            <span className="ml-auto text-xs text-gray-500">
-                                                {tag.usageCount}
-                                            </span>
-                                        )}
-                                    </button>
-                                ))}
-                                {hasCreateOption && (
-                                    <div className="border-t border-gray-200">
-                                        <button
-                                            type="button"
-                                            onClick={() => handleCreateTag(inputValue.trim())}
-                                            disabled={isCreatingTag}
-                                            className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            {isCreatingTag ? (
-                                                <>
-                                                    <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                                                    <span>Creating tag...</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Plus className="w-3 h-3 mr-2" />
-                                                    <span>Create new tag: <strong>"{inputValue.trim()}"</strong></span>
-                                                </>
-                                            )}
-                                        </button>
-                                    </div>
-                                )}
-                            </>
-                        )}
-                        {suggestions.length === 0 && hasCreateOption && (
-                            <button
-                                type="button"
-                                onClick={() => handleCreateTag(inputValue.trim())}
-                                disabled={isCreatingTag}
-                                className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {isCreatingTag ? (
-                                    <>
-                                        <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                                        <span>Creating tag...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Plus className="w-3 h-3 mr-2" />
-                                        <span>Create new tag: <strong>"{inputValue.trim()}"</strong></span>
-                                    </>
-                                )}
-                            </button>
-                        )}
-                        {suggestions.length === 0 && !hasCreateOption && (
-                            <div className="px-3 py-2 text-sm text-gray-500 text-center">
-                                No existing tags found
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
-
-
-
 // Unified Collection Editor View Component (metadata + upload + files)
 const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
     // Form data for metadata
@@ -348,6 +62,7 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
         title: collection.title,
         description: collection.description || '',
         accessLevel: 'public',
+        classificationIds: collection.classificationIds || [],
         tagIds: collection.tags?.map(tag => tag.id) || []
     });
     const [availableTags, setAvailableTags] = useState([]);
@@ -420,7 +135,7 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
             const updateData = {
                 title: formData.title.trim(),
                 description: formData.description.trim(),
-                tag_ids: formData.tagIds
+                classification_ids: formData.classificationIds || [],
             };
 
             await await await await await await await await await await await mediaCollectionsApi.update(collection.id, updateData)();
@@ -579,24 +294,9 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
                                     />
                                 </div>
 
-                                {/* Tags Field */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Tags * <span className="text-xs text-gray-500">(Required for uploads)</span>
-                                    </label>
-                                    <MediaTagWidget
-                                        tags={formData.tagIds
-                                            .map(id => availableTags.find(tag => tag.id === id))
-                                            .filter(Boolean)
-                                        }
-                                        onChange={(tagObjects) => {
-                                            const tagIds = tagObjects.map(tag => tag.id);
-                                            setFormData(prev => ({ ...prev, tagIds }));
-                                        }}
-                                        namespace={namespace}
-                                    />
-                                </div>
-
+                                <ClassificationPicker value={formData.classificationIds || []}
+                                    onChange={(ids) => setFormData(prev => ({ ...prev, classificationIds: ids }))}
+                                    namespace={namespace} use="media_collections" />
                                 {/* Form Actions */}
                                 <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
                                     <button
@@ -1334,6 +1034,7 @@ const EditCollectionView = ({ collection, namespace, onBack, onSave }) => {
         title: collection.title,
         description: collection.description || '',
         accessLevel: 'public',
+        classificationIds: collection.classificationIds || [],
         tagIds: collection.tags?.map(tag => tag.id) || []
     });
     const [availableTags, setAvailableTags] = useState([]);
@@ -1368,7 +1069,7 @@ const EditCollectionView = ({ collection, namespace, onBack, onSave }) => {
             const updateData = {
                 title: formData.title.trim(),
                 description: formData.description.trim(),
-                tag_ids: formData.tagIds
+                classification_ids: formData.classificationIds || [],
             };
 
             await await await await await await await await await await await mediaCollectionsApi.update(collection.id, updateData)();
@@ -1445,17 +1146,9 @@ const EditCollectionView = ({ collection, namespace, onBack, onSave }) => {
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Tags
                                 </label>
-                                <MediaTagWidget
-                                    tags={formData.tagIds
-                                        .map(id => availableTags.find(tag => tag.id === id))
-                                        .filter(Boolean)
-                                    }
-                                    onChange={(tagObjects) => {
-                                        const tagIds = tagObjects.map(tag => tag.id);
-                                        setFormData(prev => ({ ...prev, tagIds }));
-                                    }}
-                                    namespace={namespace}
-                                />
+                                <ClassificationPicker value={formData.classificationIds || []}
+                                    onChange={(ids) => setFormData(prev => ({ ...prev, classificationIds: ids }))}
+                                    namespace={namespace} use="media_collections" />
                             </div>
 
                             {/* Form Actions */}
@@ -1527,6 +1220,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
         title: '',
         description: '',
         accessLevel: 'public',
+        classificationIds: [],
         tagIds: []
     });
 
@@ -1631,7 +1325,8 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
             title: '',
             description: '',
             accessLevel: 'public',
-            tagIds: []
+            classificationIds: [],
+        tagIds: []
         });
     };
 
@@ -1648,7 +1343,8 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
             title: collection.title,
             description: collection.description || '',
             accessLevel: 'public', // Keep default for backend compatibility
-            tagIds: collection.tags?.map(tag => tag.id) || []
+            classificationIds: collection.classificationIds || [],
+        tagIds: collection.tags?.map(tag => tag.id) || []
         });
         setCurrentView('edit');
     };
@@ -1699,7 +1395,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
             return;
         }
 
-        if (!formData.tagIds || formData.tagIds.length === 0) {
+        if (!formData.classificationIds || formData.classificationIds.length === 0) {
             addNotification('At least one tag is required to create a collection', 'error');
             return;
         }
@@ -1713,14 +1409,14 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                 collectionData = {
                     ...formData,
                     namespace: namespace,
-                    tagIds: formData.tagIds
+                    classificationIds: formData.classificationIds || [],
                 };
             } else {
                 // For creating, only send essential fields (let backend generate slug)
                 collectionData = {
                     title: formData.title,
                     namespace: namespace,
-                    tagIds: formData.tagIds
+                    classificationIds: formData.classificationIds || [],
                 };
             }
 
@@ -1840,24 +1536,9 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                             />
                         </div>
 
-                        {/* Tags */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Tags * <span className="text-xs text-gray-500">(Required)</span>
-                            </label>
-                            <CompactTagInput
-                                namespace={namespace}
-                                selectedTagIds={formData.tagIds}
-                                onTagsChange={(tagIds) => setFormData(prev => ({ ...prev, tagIds }))}
-                                availableTags={availableTags}
-                                onTagCreated={handleTagCreated}
-                            />
-                            {formData.tagIds.length === 0 && (
-                                <div className="text-xs text-amber-600 mt-1">
-                                    At least one tag is required to enable file uploads
-                                </div>
-                            )}
-                        </div>
+                        <ClassificationPicker value={formData.classificationIds || []}
+                            onChange={(ids) => setFormData(prev => ({ ...prev, classificationIds: ids }))}
+                            namespace={namespace} use="media_collections" />
                     </div>
 
                     {/* Actions */}
@@ -2413,17 +2094,9 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                                         Tags
                                     </label>
                                     <div className="border border-gray-300 rounded-lg p-3">
-                                        <MediaTagWidget
-                                            tags={formData.tagIds
-                                                .map(id => availableTags.find(tag => tag.id === id))
-                                                .filter(Boolean)
-                                            }
-                                            onChange={(tagObjects) => {
-                                                const tagIds = tagObjects.map(tag => tag.id);
-                                                setFormData(prev => ({ ...prev, tagIds }));
-                                            }}
-                                            namespace={namespace}
-                                        />
+                                        <ClassificationPicker value={formData.classificationIds || []}
+                                    onChange={(ids) => setFormData(prev => ({ ...prev, classificationIds: ids }))}
+                                    namespace={namespace} use="media_collections" />
                                     </div>
                                 </div>
                             </form>

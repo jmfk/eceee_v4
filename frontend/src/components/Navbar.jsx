@@ -10,7 +10,7 @@ const navigation = [
   { name: 'Objects', href: '/objects', icon: Database },
   { name: 'Media', href: '/media', icon: FolderOpen },
   { name: 'Statistics', href: '/statistics', icon: BarChart2 },
-  { name: 'Tags', href: '/tags', icon: Hash },
+  { name: 'Classification', href: '/tags', icon: Hash },
   { name: 'Designer', href: '/designer/themes', icon: Palette },
   { name: 'Settings', href: '/settings', icon: Settings },
   { name: 'Profile', href: '/profile', icon: UserIcon },

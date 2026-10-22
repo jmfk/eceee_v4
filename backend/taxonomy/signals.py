@@ -42,6 +42,12 @@ def reverse_clear(sender, instance, action, reverse, **kwargs):
 def version_saved(sender, instance, raw=False, **kwargs):
     if raw or projecting():
         return
+    if (
+        instance._meta.label_lower == "webpages.pageversion"
+        and not instance.tags
+        and not instance.canonical_tag_links.exists()
+    ):
+        return
     user = current_actor()
     if user and user.is_authenticated:
         from .projections import sync_legacy_version

@@ -1,6 +1,6 @@
 import React, { forwardRef, useImperativeHandle, useState, useEffect, useCallback } from 'react'
 import LayoutSelector from './LayoutSelector'
-import PageTagWidget from './PageTagWidget'
+import ClassificationPicker from './classification/ClassificationPicker'
 import PathPatternSelector from './PathPatternSelector'
 import PathPreviewInput from './PathPreviewInput'
 import HostnameListEditor from './HostnameListEditor'
@@ -62,6 +62,7 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
         metaTitle: pageVersionData?.metaTitle || '',
         metaDescription: pageVersionData?.metaDescription || '',
         codeLayout: pageVersionData?.codeLayout || '',
+        classificationIds: pageVersionData?.classificationIds || [],
         tags: pageVersionData?.tags || []
     })
 
@@ -86,6 +87,7 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                     metaTitle: updatedVersionData.metaTitle || prev.metaTitle,
                     metaDescription: updatedVersionData.metaDescription || prev.metaDescription,
                     codeLayout: updatedVersionData.codeLayout || prev.codeLayout,
+                    classificationIds: updatedVersionData.classificationIds || prev.classificationIds,
                     tags: updatedVersionData.tags || prev.tags,
                 })
             }))
@@ -284,14 +286,10 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                             })()}
                         </div>
 
-                        {/* Page Tags */}
-                        <div>
-                            <PageTagWidget
-                                tags={localValues.tags}
-                                onChange={(tags) => handleVersionFieldChange('tags', tags)}
-                                disabled={false}
-                            />
-                        </div>
+                        <ClassificationPicker value={localValues.classificationIds}
+                            onChange={(ids) => handleVersionFieldChange('classificationIds', ids)}
+                            use="pages" allowProposed />
+
                     </div>
                 </div>
 

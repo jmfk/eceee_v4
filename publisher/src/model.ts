@@ -97,6 +97,8 @@ export interface PublishedObjectLink {
 }
 
 export interface PublishedObjectQuery {
+  classificationIds?: string[];
+  includeDescendants?: boolean;
   objectIds?: DbId[];
   objectTypeIds?: DbId[];
   objectTypeNames?: string[];
@@ -766,6 +768,8 @@ async function resolvePublishedData(
         allActiveTypes: configuredTypes === undefined || (Array.isArray(configuredTypes) && configuredTypes.length === 0),
         limit: positiveLimit(config.limit, 10),
         sortOrder: String(config.sortOrder ?? config.sort_order ?? '-publish_date'),
+        classificationIds: stringList(config.classificationIds ?? config.classification_ids),
+        includeDescendants: (config.includeDescendants ?? config.include_descendants) !== false,
         featuredFirst: true,
         activeTypeOnly: true,
       }, tenantId, at);
@@ -793,6 +797,8 @@ async function resolvePublishedData(
           ? topNewsLimit(config.layout)
           : positiveLimit(config.limit ?? config.maxItems ?? config.max_items, 5),
         sortOrder: String(config.sortOrder ?? config.sort_order ?? '-publish_date'),
+        classificationIds: stringList(config.classificationIds ?? config.classification_ids),
+        includeDescendants: (config.includeDescendants ?? config.include_descendants) !== false,
         pinnedFirst: true,
         activeTypeOnly: true,
       }, tenantId, at);

@@ -62,6 +62,8 @@ class MediaSearchView(APIView):
             .prefetch_related("tags", "collections")
         )
 
+        from taxonomy.projections import media_term_query
+
         # Apply filters
         # Handle legacy search (q parameter) - for backward compatibility
         if filters.get("q"):
@@ -71,28 +73,26 @@ class MediaSearchView(APIView):
                 | Q(description__icontains=query)
                 | Q(original_filename__icontains=query)
                 | Q(ai_extracted_text__icontains=query)
-                | Q(tags__name__icontains=query)
+                | media_term_query(tenant, query)
             ).distinct()
 
         # Handle new structured search
         # Text search - searches in title and tag names for better discoverability
         if filters.get("text_search"):
             text_query = filters["text_search"]
-            queryset = queryset.filter(Q(title__icontains=text_query) | Q(tags__name__icontains=text_query)).distinct()
+            queryset = queryset.filter(Q(title__icontains=text_query) | media_term_query(tenant, text_query)).distinct()
 
         # Tag search - must match ALL provided tags (AND logic)
         if filters.get("tag_names"):
             tag_names = filters["tag_names"]
             for tag_name in tag_names:
-                queryset = queryset.filter(tags__name__iexact=tag_name)
+                queryset = queryset.filter(media_term_query(tenant, tag_name, exact=True))
 
         # Text-based tag search - match against tag names and slugs
         if filters.get("text_tags"):
             text_tags = filters["text_tags"]
             for text_tag in text_tags:
-                queryset = queryset.filter(
-                    Q(tags__name__icontains=text_tag) | Q(tags__slug__icontains=text_tag)
-                ).distinct()
+                queryset = queryset.filter(media_term_query(tenant, text_tag)).distinct()
 
         # Handle file type filtering (multiple types supported)
         if filters.get("file_types"):
@@ -139,6 +139,10 @@ class MediaSearchView(APIView):
 
         if filters.get("max_size"):
             queryset = queryset.filter(file_size__lte=filters["max_size"])
+
+        from taxonomy.services import requested_classifications
+
+        queryset = requested_classifications(request, queryset, "classification_links__tag_id").distinct()
 
         # Pagination
         from django.core.paginator import Paginator

@@ -17,6 +17,14 @@ vi.mock('../../api/kanban', () => ({
     kanbanError: () => 'Import failed',
 }))
 
+vi.mock('../../api/taxonomy', () => ({
+    taxonomyApi: {
+        terms: vi.fn().mockResolvedValue({ results: [{ id: 'term-id', name: 'Approved', path: 'Approved', status: 'approved' }] }),
+        term: vi.fn().mockResolvedValue({ id: 'term-id', name: 'Approved', path: 'Approved', status: 'approved' }),
+    },
+    classificationError: () => 'Classification failed',
+}))
+
 it('shows provenance and only imports approved attachments with current revision', async () => {
     kanbanApi.get.mockImplementation((path) =>
         Promise.resolve(
@@ -58,9 +66,8 @@ it('shows provenance and only imports approved attachments with current revision
     fireEvent.click(screen.getByRole('button', { name: 'Importera från Kanban' }))
     await screen.findByText('hero.png · Godkänd')
     expect(screen.getByText('Importerad till media: Hero')).toBeInTheDocument()
-    fireEvent.change(screen.getByRole('textbox', { name: /Medietaggar/ }), {
-        target: { value: 'Approved' },
-    })
+    expect(screen.getAllByRole('button', { name: 'Importera kopia' })[0]).toBeDisabled()
+    fireEvent.click(await screen.findByRole('button', { name: 'Approved', exact: true }))
     const buttons = screen.getAllByRole('button', { name: 'Importera kopia' })
     expect(buttons[1]).toBeDisabled()
     fireEvent.click(buttons[0])
@@ -69,7 +76,7 @@ it('shows provenance and only imports approved attachments with current revision
             destination: 'media',
             revision: 7,
             namespace: 1,
-            tagIds: ['Approved'],
+            classificationIds: ['term-id'],
         }),
     )
 })

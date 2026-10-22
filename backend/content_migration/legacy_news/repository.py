@@ -12,6 +12,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from object_storage.models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
+from taxonomy.context import import_actor
 
 from .transformer import LegacyNewsPayload
 
@@ -133,6 +134,7 @@ class LegacyNewsRepository:
             errors.append("news must define a main widget slot")
 
     @transaction.atomic
+    @import_actor
     def upsert(
         self,
         payload: LegacyNewsPayload,

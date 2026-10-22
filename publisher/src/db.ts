@@ -166,6 +166,8 @@ function reader(client: PoolClient): PageReader {
         /^\d{1,19}$/.test(value) && BigInt(value) <= 9_223_372_036_854_775_807n
       ));
       const typeNames = (query.objectTypeNames ?? []).filter(value => /^[a-z0-9_-]+$/i.test(value));
+      const classificationIds = query.classificationIds ?? [];
+      if (classificationIds.some(value => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value))) return [];
       const status = query.status === 'draft' || query.status === 'archived' ? query.status : null;
       if (!objectIds.length && !typeIds.length && !typeNames.length && !query.allActiveTypes) return [];
       const sortOrders: Record<string, string> = {
@@ -183,6 +185,26 @@ function reader(client: PoolClient): PageReader {
         ? `(object.metadata @> '{"pinned": true}'::jsonb OR object.metadata @> '{"featured": true}'::jsonb) DESC, `
         : query.featuredFirst ? 'published.is_featured DESC, ' : '';
       const result = await client.query<PublishedObject>(`
+        WITH RECURSIVE resolved AS (
+          SELECT id, parent_id, merged_into_id, tenant_id, namespace_id, tag_type, status FROM taxonomy_tag
+          WHERE tenant_id=$1 AND id=ANY($12::uuid[])
+          UNION
+          SELECT t.id,t.parent_id,t.merged_into_id,t.tenant_id,t.namespace_id,t.tag_type,t.status
+          FROM taxonomy_tag t JOIN resolved s ON t.id=s.merged_into_id
+          WHERE t.tenant_id=$1 AND t.namespace_id=s.namespace_id AND t.tag_type=s.tag_type
+        ), subtree AS (
+          SELECT * FROM resolved WHERE status<>'merged'
+          UNION
+          SELECT t.id,t.parent_id,t.merged_into_id,t.tenant_id,t.namespace_id,t.tag_type,t.status
+          FROM taxonomy_tag t JOIN subtree s ON t.parent_id=s.id
+          WHERE $13::boolean AND t.tenant_id=$1 AND t.namespace_id=s.namespace_id AND t.tag_type=s.tag_type
+        ), matching AS (
+          SELECT * FROM subtree
+          UNION
+          SELECT t.id,t.parent_id,t.merged_into_id,t.tenant_id,t.namespace_id,t.tag_type,t.status
+          FROM taxonomy_tag t JOIN matching s ON t.merged_into_id=s.id
+          WHERE t.tenant_id=$1 AND t.namespace_id=s.namespace_id AND t.tag_type=s.tag_type
+        )
         SELECT object.id::text, COALESCE(NULLIF(published.title, ''), object.title) AS title, object.slug,
           jsonb_build_object('id', type.id::text, 'name', type.name, 'label', type.label, 'pluralLabel', type.plural_label) AS "objectType",
           published.data, published.widgets, object.metadata,
@@ -263,7 +285,7 @@ function reader(client: PoolClient): PageReader {
         JOIN object_storage_objecttypedefinition AS type ON type.id = object.object_type_id
         LEFT JOIN content_namespace AS type_namespace ON type_namespace.id = type.namespace_id
         JOIN LATERAL (
-          SELECT version.title, version.data, version.widgets, version.effective_date, version.is_featured
+          SELECT version.id, version.title, version.data, version.widgets, version.effective_date, version.is_featured
           FROM object_storage_objectversion AS version
           WHERE version.object_instance_id = object.id
             AND version.effective_date <= $4
@@ -283,6 +305,10 @@ function reader(client: PoolClient): PageReader {
             type.is_active = true
             AND (type.namespace_id IS NULL OR type_namespace.tenant_id = $1)
           ))
+          AND (cardinality($12::uuid[])=0 OR EXISTS (
+            SELECT 1 FROM taxonomy_objectversiontag a WHERE a.object_version_id=published.id
+              AND a.tag_id IN (SELECT id FROM matching)
+          ))
         ORDER BY ${priority}${order}
         LIMIT $6`, [
           tenantId,
@@ -296,6 +322,8 @@ function reader(client: PoolClient): PageReader {
           status,
           Boolean(query.activeTypeOnly),
           Boolean(query.allActiveTypes),
+          classificationIds,
+          query.includeDescendants !== false,
         ]);
       return result.rows;
     },

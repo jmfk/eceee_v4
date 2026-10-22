@@ -5,6 +5,7 @@ from contextvars import ContextVar
 from functools import wraps
 
 _actor = ContextVar("classification_actor", default=None)
+_recorder = ContextVar("classification_created_recorder", default=None)
 _syncing = ContextVar("classification_projection", default=False)
 
 
@@ -39,8 +40,17 @@ def import_actor(method):
     @wraps(method)
     def execute(self, *args, **kwargs):
         actor = getattr(self, "user", None) or self.job.created_by
-        with actor_context(actor):
-            return method(self, *args, **kwargs)
+        token = _recorder.set(getattr(self, "_record_created", None))
+        try:
+            with actor_context(actor):
+                result = method(self, *args, **kwargs)
+                if self.__class__.__name__ == "SitePackageImporter":
+                    from .transfer import finish_transfer
+
+                    finish_transfer(self)
+                return result
+        finally:
+            _recorder.reset(token)
 
     return execute
 
@@ -54,3 +64,9 @@ class ClassificationActorMiddleware:
         # not an early anonymous user, and resolve it at the actual write.
         with actor_context(request):
             return self.get_response(request)
+
+
+def record_creation(kind, instance):
+    recorder = _recorder.get()
+    if recorder:
+        recorder(kind, instance)

@@ -196,16 +196,25 @@ def bulk_archive_legacy(view, request):
 
 def validate_media_tag_ids(ids, namespace, user, *, existing_ids=()):
     """Legacy assignment paths cannot reactivate archived or proposed terms."""
-    from file_manager.models import MediaTag
 
     definition = definition_for(namespace, user)
     require(user, definition, "use")
-    sources = list(MediaTag.objects.filter(pk__in=ids, namespace=namespace))
-    if len(sources) != len(set(str(pk) for pk in ids)):
-        raise ValidationError("One or more tags are unavailable in this namespace.")
+    from types import SimpleNamespace
+
+    from .context import projection_context
+    from .projections import legacy_media_ids, media_alias
+    from .services import resolve_term
+
+    canonical_ids = legacy_media_ids(SimpleNamespace(namespace=namespace), ids, user)
+    sources = []
     existing = {str(pk) for pk in existing_ids}
-    for source in sources:
-        term = canonical_for(source, user)
-        if term.status != "approved" and not (term.status == "archived" and str(source.pk) in existing):
-            raise ValidationError(f"{term.name} is unavailable for new assignments. Choose an approved classification.")
+    for term in Tag.objects.filter(pk__in=canonical_ids):
+        with projection_context():
+            source = media_alias(term, user)
+        resolved = resolve_term(term)
+        if resolved.status != "approved" and not (resolved.status == "archived" and str(source.pk) in existing):
+            raise ValidationError(
+                f"{resolved.name} is unavailable for new assignments. Choose an approved classification."
+            )
+        sources.append(source)
     return sources

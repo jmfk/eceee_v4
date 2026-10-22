@@ -263,6 +263,8 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
             const response: any = await objectInstancesApi.getNewsList(objectTypes, {
                 limit: widget.config.limit || 10,
                 sort_order: widget.config.sortOrder || widget.config.sort_order || '-publish_date',
+                classification_ids: (widget.config.classificationIds || widget.config.classification_ids || []).join(','),
+                include_descendants: (widget.config.includeDescendants ?? widget.config.include_descendants) !== false,
             }, tenantRequestConfig)
             const items = response?.results || response?.data?.results || []
             widget.data = { status: items.length ? 'ready' : 'empty', items }

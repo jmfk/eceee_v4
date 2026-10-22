@@ -367,13 +367,19 @@ class AtomicFileHashHandlingTests(TestCase):
             expires_at=timezone.now() + timezone.timedelta(hours=24),
         )
 
-        # Approval requires a real, approved classification through the legacy adapter.
-        tag = MediaTag.objects.create(name="Approved upload", namespace=self.namespace, created_by=self.user)
+        # Approval still requires an approved taxonomy term after hash replacement.
+        from taxonomy.legacy import canonical_for
+
+        term = canonical_for(
+            MediaTag.objects.create(namespace=self.namespace, name="Approved", slug="approved", created_by=self.user),
+            self.user,
+        )
         media_file = pending.approve_and_create_media_file(
             title="Approved File",
             description="Test description",
             access_level="public",
-            tags=[str(tag.pk)],
+            classification_ids=[str(term.pk)],
+            user=self.user,
         )
 
         # Verify new MediaFile was created
@@ -381,6 +387,7 @@ class AtomicFileHashHandlingTests(TestCase):
         self.assertEqual(media_file.title, "Approved File")
         self.assertEqual(media_file.file_hash, self.test_hash)
         self.assertFalse(media_file.is_deleted)
+        self.assertEqual(list(media_file.classification_links.values_list("tag_id", flat=True)), [term.pk])
 
         # Verify old file was hard deleted
         self.assertFalse(MediaFile.objects.with_deleted().filter(id=file1_id).exists())

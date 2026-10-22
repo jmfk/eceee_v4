@@ -487,6 +487,19 @@ export async function mockCmsApi(page, {
       return json(route, { count: 0, next: null, previous: null, results: [] })
     }
 
+    if (pageEditor && url.pathname.startsWith('/api/v1/taxonomy/terms/') && method === 'GET') {
+      const term = {
+        id: '7d38dd31-d831-43d2-a931-d0a06224f42e', namespace: 1,
+        name: 'Energy efficiency', path: 'Energy efficiency', status: 'approved', tagType: 'general',
+      }
+      if (url.pathname === `/api/v1/taxonomy/terms/${term.id}/`) return json(route, term)
+      if (url.pathname === '/api/v1/taxonomy/terms/') {
+        const search = (url.searchParams.get('search') || '').toLowerCase()
+        const results = term.name.toLowerCase().includes(search) ? [term] : []
+        return json(route, { count: results.length, next: null, previous: null, results })
+      }
+    }
+
     if (pageEditor && url.pathname === '/api/v1/webpages/pages/101/' && method === 'PATCH') {
       const body = request.postDataJSON()
       editorState.page = {

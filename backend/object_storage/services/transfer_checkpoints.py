@@ -20,6 +20,8 @@ from file_manager.storage import checkpoint_storage
 from file_manager.storage import storage as media_storage
 from file_manager.storage import system_storage
 from object_storage.models import ObjectInstance, ObjectTypeDefinition, ObjectVersion, TransferCheckpoint
+from taxonomy.assignments import links_for, restore_assignment_snapshot
+from taxonomy.context import projection_context
 from taxonomy.models import Tag as TaxonomyTag
 
 logger = logging.getLogger(__name__)
@@ -164,6 +166,7 @@ def _object_snapshot(obj):
         "created_by_id": obj.created_by_id,
         "versions": [
             {
+                "classification_ids": [str(link.tag_id) for link in links_for(version)],
                 "id": version.id,
                 "version_number": version.version_number,
                 "data": version.data,
@@ -214,6 +217,7 @@ def _media_snapshot(media):
         "is_deleted": media.is_deleted,
         "deleted_at": _datetime(media.deleted_at),
         "deleted_by_id": media.deleted_by_id,
+        "classification_ids": [str(link.tag_id) for link in links_for(media)],
         "tag_ids": _string_ids(media.tags.all()),
         "canonical_tag_ids": _string_ids(media.canonical_tags.all()),
         "collection_ids": _string_ids(media.collections.all()),
@@ -230,6 +234,7 @@ def _collection_snapshot(collection):
         "access_level": collection.access_level,
         "created_by_id": collection.created_by_id,
         "last_modified_by_id": collection.last_modified_by_id,
+        "classification_ids": [str(link.tag_id) for link in links_for(collection)],
         "tag_ids": _string_ids(collection.tags.all()),
         "canonical_tag_ids": _string_ids(collection.canonical_tags.all()),
     }
@@ -489,6 +494,12 @@ def _taxonomy_tag_snapshot(tag):
         "color": tag.color,
         "description": tag.description,
         "created_by_id": tag.created_by_id,
+        "classification_type_id": str(tag.classification_type_id) if tag.classification_type_id else None,
+        "parent_id": str(tag.parent_id) if tag.parent_id else None,
+        "merged_into_id": str(tag.merged_into_id) if tag.merged_into_id else None,
+        "status": tag.status,
+        "alternative_names": tag.alternative_names,
+        "revision": tag.revision,
     }
 
 
@@ -1043,6 +1054,14 @@ def _assert_current_state_matches(
 ):
     """Verify the exact affected state while restore table locks are held."""
 
+    # Join the classification namespace gate before locking any media rows.
+    namespace_ids = {item["id"] for item in expected_snapshot.get("namespaces", [])}
+    namespace_ids.update(expected_absent.get("namespace_ids", []))
+    namespace_ids.update(
+        item["namespace_id"] for key in ("media", "collections") for item in expected_snapshot.get(key, [])
+    )
+    list(Namespace.objects.select_for_update().filter(tenant=checkpoint.tenant, pk__in=namespace_ids).order_by("pk"))
+
     def assert_items(key, queryset, serializer, absent_key):
         expected = _sorted_snapshot_items(expected_snapshot.get(key, []))
         ids = {item["id"] for item in expected} | set(expected_absent.get(absent_key, []))
@@ -1208,9 +1227,22 @@ def assert_import_checkpoint_current(checkpoint, live_storage, system_storage_ba
 
 def _has_external_dependents(instance, scope_ids):
     """Return whether a created resource gained a relation outside the import scope."""
+    if isinstance(instance, TaxonomyTag):
+        return (
+            instance.object_version_links.exclude(
+                object_version__object_instance_id__in=scope_ids[ObjectInstance]
+            ).exists()
+            or instance.media_file_classification_links.exclude(media_file_id__in=scope_ids[MediaFile]).exists()
+            or instance.collection_classification_links.exclude(collection_id__in=scope_ids[MediaCollection]).exists()
+            or instance.page_version_links.exists()
+            or instance.children.exclude(pk__in=scope_ids[TaxonomyTag]).exists()
+            or instance.merged_sources.exclude(pk__in=scope_ids[TaxonomyTag]).exists()
+        )
     for relation in instance._meta.related_objects:
         related = getattr(instance, relation.get_accessor_name(), None)
         if related is None or not hasattr(related, "all"):
+            continue
+        if relation.related_model._meta.app_label == "taxonomy":
             continue
         queryset = related.all()
         owned = scope_ids.get(relation.related_model, set())
@@ -1591,6 +1623,7 @@ def _finish_restored_binary_cleanup(checkpoint, live_storage, system_storage_bac
     checkpoint.save(update_fields=["source_details", "errors", "updated_at"])
 
 
+@projection_context()
 def _restore_object_import_checkpoint(
     checkpoint,
     user,
@@ -1709,7 +1742,7 @@ def _restore_object_import_checkpoint(
         obj.save(update_fields=["current_version", "updated_at"])
         obj.versions.exclude(id__in=item["version_ids"]).delete()
         for version in item.get("versions", []):
-            ObjectVersion.objects.update_or_create(
+            restored_version, _ = ObjectVersion.objects.update_or_create(
                 id=version["id"],
                 defaults={
                     "object_instance": obj,
@@ -1723,6 +1756,8 @@ def _restore_object_import_checkpoint(
                     "is_featured": version["is_featured"],
                 },
             )
+            if "classification_ids" in version:
+                restore_assignment_snapshot(restored_version, version["classification_ids"], user)
         ObjectInstance.objects.filter(pk=obj.pk).update(
             title=item["title"],
             status=item["status"],
@@ -1767,6 +1802,18 @@ def _restore_object_import_checkpoint(
                 "color": item["color"],
                 "description": item["description"],
                 "created_by_id": item["created_by_id"],
+                **{
+                    key: item[key]
+                    for key in (
+                        "classification_type_id",
+                        "parent_id",
+                        "merged_into_id",
+                        "status",
+                        "alternative_names",
+                        "revision",
+                    )
+                    if key in item
+                },
             },
         )
     for item in snapshot.get("collections", []):
@@ -1819,6 +1866,8 @@ def _restore_object_import_checkpoint(
                 "deleted_by_id": item["deleted_by_id"],
             },
         )
+        if "classification_ids" in item:
+            restore_assignment_snapshot(media, item["classification_ids"], user)
         media.tags.set(item["tag_ids"])
         media.canonical_tags.set(item["canonical_tag_ids"])
         media.collections.set(item["collection_ids"])
@@ -1829,15 +1878,29 @@ def _restore_object_import_checkpoint(
 
     for item in snapshot.get("collections", []):
         collection = MediaCollection.objects.select_for_update().get(id=item["id"], namespace__tenant=checkpoint.tenant)
+        if "classification_ids" in item:
+            restore_assignment_snapshot(collection, item["classification_ids"], user)
         collection.tags.set(item["tag_ids"])
         collection.canonical_tags.set(item["canonical_tag_ids"])
 
     MediaCollection.objects.filter(id__in=created.get("collection_ids", [])).delete()
-    MediaTag.objects.filter(id__in=created.get("media_tag_ids", [])).delete()
-    TaxonomyTag.objects.filter(id__in=created.get("taxonomy_tag_ids", [])).delete()
+    # Classification identities and their legacy aliases remain traceable after
+    # restoration. Only their active assignments are restored to the snapshot.
+
+    for tag in TaxonomyTag.objects.filter(id__in=created.get("taxonomy_tag_ids", [])):
+        alias_ids = list(tag.legacy_mappings.filter(source_kind="media").values_list("source_id", flat=True))
+        used_legacy_alias = (
+            MediaTag.objects.filter(pk__in=alias_ids)
+            .filter(models.Q(mediafile__isnull=False) | models.Q(mediacollection__isnull=False))
+            .exists()
+        )
+        if not used_legacy_alias:
+            tag.status = "archived"
+            tag.revision += 1
+            tag.save(update_fields=["status", "revision"])
 
     ObjectTypeDefinition.objects.filter(id__in=created.get("type_ids", [])).delete()
-    Namespace.objects.filter(id__in=created.get("namespace_ids", [])).delete()
+    Namespace.objects.filter(id__in=created.get("namespace_ids", [])).update(is_active=False, is_default=False)
     checkpoint.source_details.pop("binary_recovery_failed", None)
     checkpoint.source_details["binary_cleanup_pending"] = True
     checkpoint.save(update_fields=["source_details", "updated_at"])

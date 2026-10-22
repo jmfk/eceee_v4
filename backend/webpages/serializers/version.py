@@ -432,6 +432,8 @@ class PageVersionSerializer(serializers.ModelSerializer):
         if classification_ids is not None:
             from taxonomy.assignments import replace_assignments
 
+            # The canonical selection owns this write; legacy tags are its projection.
+            validated_data.pop("tags", None)
             replace_assignments(instance, classification_ids, self.context["request"].user)
         updated_instance = super().update(instance, validated_data)
 
