@@ -221,12 +221,18 @@ class BulkMediaOperationsView(APIView):
 
                 elif operation == "remove_tags":
                     tag_names = data.get("tag_names", [])
-                    for tag_name in tag_names:
-                        try:
-                            tag = MediaTag.objects.get(name=tag_name, namespace=file_obj.namespace)
-                            file_obj.tags.remove(tag)
-                        except MediaTag.DoesNotExist:
-                            pass
+                    from taxonomy.assignments import classification_ids, replace_assignments
+                    from taxonomy.projections import legacy_media_ids
+
+                    source_ids = list(
+                        MediaTag.objects.filter(namespace=file_obj.namespace, name__in=tag_names).values_list(
+                            "pk", flat=True
+                        )
+                    )
+                    remove_ids = set(legacy_media_ids(file_obj, source_ids, request.user))
+                    replace_assignments(
+                        file_obj, [pk for pk in classification_ids(file_obj) if pk not in remove_ids], request.user
+                    )
 
                 elif operation == "set_access_level":
                     access_level = data.get("access_level")

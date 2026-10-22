@@ -5,7 +5,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 import ClassificationPicker from './ClassificationPicker'
 import { taxonomyApi } from '../../api/taxonomy'
 
-vi.mock('../../api/taxonomy', () => ({ taxonomyApi: { terms: vi.fn(), term: vi.fn(), defaultNamespace: vi.fn() }, classificationError: error => error.message }))
+vi.mock('../../api/taxonomy', () => ({ taxonomyApi: { terms: vi.fn(), term: vi.fn(), defaultNamespace: vi.fn(), types: vi.fn(), propose: vi.fn() }, classificationError: error => error.message }))
 vi.mock('../../utils/tenant', () => ({ getCurrentTenantId: () => 'tenant' }))
 
 function renderPicker(props = {}) {
@@ -45,6 +45,18 @@ describe('classification picker', () => {
         taxonomyApi.terms.mockRejectedValue(new Error('Could not load classifications. Retry.'))
         renderPicker()
         expect(await screen.findByRole('alert')).toHaveTextContent('Could not load classifications. Retry.')
+    })
+    it('submits a media proposal without treating it as approved tagging', async () => {
+        taxonomyApi.types.mockResolvedValue({ results: [{ id: 'type', name: 'Subjects', allowedUses: ['media_files'], permissions: ['use', 'propose'] }] })
+        taxonomyApi.propose.mockResolvedValue({ term: { id: 'proposed' } })
+        const changed = renderPicker({ use: 'media_files' })
+        fireEvent.click(screen.getByRole('button', { name: 'Suggest a term' }))
+        fireEvent.change(await screen.findByLabelText('Suggested term name'), { target: { value: 'A new subject' } })
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Submit proposal' })).not.toBeDisabled())
+        fireEvent.click(screen.getByRole('button', { name: 'Submit proposal' }))
+        await waitFor(() => expect(taxonomyApi.propose).toHaveBeenCalledWith('type', 'create', { name: 'A new subject' }))
+        expect(changed).not.toHaveBeenCalled()
+        expect(await screen.findByText(/does not satisfy mandatory media tagging/)).toBeTruthy()
     })
     it('searches and pages within the content scope', async () => {
         taxonomyApi.terms.mockResolvedValue({ results: [], next: 'page2' })

@@ -28,6 +28,7 @@ class PendingCollectionClassificationTests(TestCase):
             tenant=self.tenant,
             namespace=self.namespace,
             classification_type=self.definition,
+            tag_type=self.definition.key,
             name="Image",
             slug="image",
         )
@@ -48,12 +49,12 @@ class PendingCollectionClassificationTests(TestCase):
 
     def attempt_collection(self):
         return PendingMediaFileViewSet()._get_or_create_collection(
-            None, "Optional collection", self.namespace, self.user, media_file=self.media
+            None, "Optional collection", self.namespace, self.user, classification_ids=classification_ids(self.media)
         )
 
     def assert_failed_collection_is_rolled_back(self, phase):
         ClassificationRollout.objects.create(namespace=self.namespace, phase=phase)
-        # The approval action catches this error and continues approving the file.
+        # The requested collection is validated before the upload is approved.
         with self.assertRaises(ValidationError):
             self.attempt_collection()
         self.assertFalse(MediaCollection.objects.filter(namespace=self.namespace).exists())

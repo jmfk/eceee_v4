@@ -19,7 +19,8 @@ from content.models import Namespace
 from file_manager.models import MediaCollection, MediaFile, MediaTag
 from file_manager.storage import S3MediaStorage, checkpoint_storage, system_storage
 from object_storage.models import ObjectInstance, ObjectTypeDefinition, ObjectVersion, TransferCheckpoint
-from taxonomy.models import Tag as TaxonomyTag
+from taxonomy.context import import_actor
+from taxonomy.transfer import assignment_payload_matches, export_assignments, finish_transfer, import_assignments
 
 PACKAGE_VERSION = "object-transfer/1"
 MAX_CANDIDATES_PER_TYPE = 500
@@ -386,16 +387,7 @@ def serialize_media(media):
             {"name": tag.name, "slug": tag.slug, "color": tag.color, "description": tag.description}
             for tag in media.tags.all()
         ],
-        "canonical_tags": [
-            {
-                "name": tag.name,
-                "slug": tag.slug,
-                "tag_type": tag.tag_type,
-                "color": tag.color,
-                "description": tag.description,
-            }
-            for tag in media.canonical_tags.all()
-        ],
+        "canonical_tags": export_assignments(media),
         "collections": [
             {
                 "title": collection.title,
@@ -406,16 +398,7 @@ def serialize_media(media):
                     {"name": tag.name, "slug": tag.slug, "color": tag.color, "description": tag.description}
                     for tag in collection.tags.all()
                 ],
-                "canonical_tags": [
-                    {
-                        "name": tag.name,
-                        "slug": tag.slug,
-                        "tag_type": tag.tag_type,
-                        "color": tag.color,
-                        "description": tag.description,
-                    }
-                    for tag in collection.canonical_tags.all()
-                ],
+                "canonical_tags": export_assignments(collection),
             }
             for collection in media.collections.all()
         ],
@@ -445,6 +428,7 @@ def _build_payload(objects, media_files, type_map):
                 "versions": [
                     {
                         "source_id": version.id,
+                        "canonical_tags": export_assignments(version),
                         "version_number": version.version_number,
                         "data": version.data,
                         "widgets": version.widgets,
@@ -889,6 +873,7 @@ class ObjectPackageImporter:
         self.job.mark_completed(phase="completed", **result)
         return result
 
+    @import_actor
     def import_package(self, package):
         manifest, payload = validate_package(package)
         from object_storage.services.transfer_checkpoints import (
@@ -1182,6 +1167,15 @@ class ObjectPackageImporter:
                         version
                         for version in reversed(existing_versions)
                         if all(getattr(version, key) == value for key, value in version_payload.items())
+                        and (
+                            "canonical_tags" not in version_data
+                            or assignment_payload_matches(
+                                version,
+                                version_data["canonical_tags"],
+                                version.object_instance.object_type.namespace or Namespace.get_default(tenant=tenant),
+                                user,
+                            )
+                        )
                     ),
                     None,
                 )
@@ -1197,6 +1191,12 @@ class ObjectPackageImporter:
                     change_description="Remote object import",
                     **version_payload,
                 )
+                if "canonical_tags" in version_data:
+                    from taxonomy.assignments import assignment_context
+
+                    import_assignments(
+                        self, selected_version, version_data["canonical_tags"], assignment_context(selected_version)[2]
+                    )
                 existing_versions.append(selected_version)
                 selected_version_created = True
                 created_versions += 1
@@ -1212,6 +1212,7 @@ class ObjectPackageImporter:
             )
         )
         rebuild_imported_reverse_relationships(tenant, [*imported_objects, *affected_targets])
+        finish_transfer(self)
         return {"object_map": object_map, "media_map": media_map, "created_versions": created_versions}
 
     def _import_media(self, package, media_payload):
@@ -1293,24 +1294,12 @@ class ObjectPackageImporter:
                 )
                 self._record_created("media_ids", existing)
             media_tags = [
-                self._get_or_create_media_tag(item, existing.namespace) for item in data.get("media_tags", [])
+                self._get_or_create_media_tag(item, existing.namespace)
+                for item in (data.get("media_tags", []) if not data.get("canonical_tags") else [])
             ]
-            canonical = []
-            for item in data.get("canonical_tags", []):
-                tag, tag_created = TaxonomyTag.objects.get_or_create(
-                    tenant=self.job.tenant,
-                    namespace=existing.namespace,
-                    tag_type=item.get("tag_type", "general"),
-                    slug=item["slug"],
-                    defaults={**item, "created_by": self.job.created_by},
-                )
-                if tag_created:
-                    self._record_created("taxonomy_tag_ids", tag)
-                canonical.append(tag)
             if media_tags:
                 existing.tags.add(*media_tags)
-            if canonical:
-                existing.canonical_tags.add(*canonical)
+            import_assignments(self, existing, data.get("canonical_tags", []), existing.namespace)
             collections = []
             for item in data.get("collections", []):
                 collection, _created = MediaCollection.objects.get_or_create(
@@ -1327,24 +1316,12 @@ class ObjectPackageImporter:
                 if _created:
                     self._record_created("collection_ids", collection)
                 collection_tags = [
-                    self._get_or_create_media_tag(tag, existing.namespace) for tag in item.get("media_tags", [])
+                    self._get_or_create_media_tag(tag, existing.namespace)
+                    for tag in (item.get("media_tags", []) if not item.get("canonical_tags") else [])
                 ]
                 if collection_tags:
                     collection.tags.add(*collection_tags)
-                collection_canonical_tags = []
-                for tag_data in item.get("canonical_tags", []):
-                    tag, tag_created = TaxonomyTag.objects.get_or_create(
-                        tenant=self.job.tenant,
-                        namespace=existing.namespace,
-                        tag_type=tag_data.get("tag_type", "general"),
-                        slug=tag_data["slug"],
-                        defaults={**tag_data, "created_by": self.job.created_by},
-                    )
-                    if tag_created:
-                        self._record_created("taxonomy_tag_ids", tag)
-                    collection_canonical_tags.append(tag)
-                if collection_canonical_tags:
-                    collection.canonical_tags.add(*collection_canonical_tags)
+                import_assignments(self, collection, item.get("canonical_tags", []), existing.namespace)
                 collections.append(collection)
             if collections:
                 existing.collections.add(*collections)
@@ -1369,6 +1346,10 @@ class ObjectPackageImporter:
         if tag is None:
             tag = MediaTag.objects.filter(namespace=namespace, name=name).first()
         if tag is None:
+            from taxonomy.legacy import definition_for
+            from taxonomy.services import require
+
+            require(self.job.created_by, definition_for(namespace, self.job.created_by), "create")
             tag = MediaTag.objects.create(
                 namespace=namespace,
                 name=name,

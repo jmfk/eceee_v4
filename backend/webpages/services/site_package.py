@@ -29,8 +29,10 @@ from content.models import Namespace
 from core.models import Tenant
 from file_manager.models import MediaCollection, MediaFile, MediaTag
 from file_manager.storage import S3MediaStorage
+from taxonomy.context import import_actor
 from taxonomy.models import Tag as TaxonomyTag
-from webpages.models import PageTheme, PageVersion, PageVersionTag, RemoteSiteBinding, SitePackageJob, WebPage
+from taxonomy.transfer import export_assignments, export_term, import_assignments, import_term
+from webpages.models import PageTheme, PageVersion, RemoteSiteBinding, SitePackageJob, WebPage
 from webpages.services.theme_preview_content import (
     EMBEDDED_IMAGE_PATTERN,
     normalize_theme_preview_namespaces,
@@ -564,17 +566,7 @@ def _serialize_version(version: PageVersion) -> Dict[str, Any]:
         "effective_date": version.effective_date,
         "expiry_date": version.expiry_date,
         "tags": version.tags,
-        "canonical_tags": [
-            {
-                "name": link.tag.name,
-                "slug": link.tag.slug,
-                "tag_type": link.tag.tag_type,
-                "color": link.tag.color,
-                "description": link.tag.description,
-                "position": link.position,
-            }
-            for link in version.canonical_tag_links.select_related("tag").order_by("position")
-        ],
+        "canonical_tags": export_assignments(version),
         "created_at": version.created_at,
     }
     payload["content_fingerprint"] = _version_fingerprint(payload)
@@ -634,7 +626,7 @@ def _serialize_media(media: MediaFile, storage=None) -> Dict[str, Any]:
         "ai_confidence_score": media.ai_confidence_score,
         "access_level": media.access_level,
         "tags": [_serialize_media_tag(tag) for tag in media.tags.all()],
-        "canonical_tags": [_serialize_taxonomy_tag(tag) for tag in media.canonical_tags.all()],
+        "canonical_tags": export_assignments(media),
         "collections": [_serialize_collection(collection) for collection in media.collections.all()],
         "created_at": media.created_at,
     }
@@ -650,13 +642,7 @@ def _serialize_media_tag(tag: MediaTag) -> Dict[str, Any]:
 
 
 def _serialize_taxonomy_tag(tag: TaxonomyTag) -> Dict[str, Any]:
-    return {
-        "name": tag.name,
-        "slug": tag.slug,
-        "tag_type": tag.tag_type,
-        "color": tag.color,
-        "description": tag.description,
-    }
+    return export_term(tag)
 
 
 def _serialize_collection(collection: MediaCollection) -> Dict[str, Any]:
@@ -667,7 +653,7 @@ def _serialize_collection(collection: MediaCollection) -> Dict[str, Any]:
         "description": collection.description,
         "access_level": collection.access_level,
         "tags": [_serialize_media_tag(tag) for tag in collection.tags.all()],
-        "canonical_tags": [_serialize_taxonomy_tag(tag) for tag in collection.canonical_tags.all()],
+        "canonical_tags": export_assignments(collection),
     }
 
 
@@ -1588,6 +1574,7 @@ class SitePackageImporter:
         validate_layout_widgets(theme, layout_key, version.widgets)
 
     @transaction.atomic
+    @import_actor
     def import_package(self, package: zipfile.ZipFile) -> WebPage:
         _validate_site_package_members(package)
         manifest = json.loads(package.read("manifest.json").decode("utf-8"))
@@ -1755,31 +1742,14 @@ class SitePackageImporter:
         return imported_root
 
     def _restore_page_tags(self, version: PageVersion, data: Dict[str, Any]):
-        namespace = self._destination_namespace()
-        for position, tag_data in enumerate(data.get("canonical_tags", [])):
-            tag = self._get_or_create_taxonomy_tag(tag_data, namespace)
-            PageVersionTag.objects.create(
-                page_version=version,
-                tag=tag,
-                position=tag_data.get("position", position),
-            )
+        from taxonomy.assignments import assignment_context
+
+        namespace = assignment_context(version)[2]
+        if "canonical_tags" in data:
+            import_assignments(self, version, data["canonical_tags"], namespace)
 
     def _get_or_create_taxonomy_tag(self, data: Dict[str, Any], namespace: Namespace):
-        slug = slugify(data.get("slug") or data.get("name")) or "tag"
-        tag_type = slugify(data.get("tag_type") or "general") or "general"
-        tag, _ = TaxonomyTag.objects.get_or_create(
-            tenant=namespace.tenant,
-            namespace=namespace,
-            tag_type=tag_type,
-            slug=slug,
-            defaults={
-                "name": data.get("name") or slug,
-                "color": data.get("color") or "#3B82F6",
-                "description": data.get("description", ""),
-                "created_by": self.job.created_by,
-            },
-        )
-        return tag
+        return import_term(data, namespace, self.job.created_by)
 
     def _create_remote_binding(self, manifest, pages_payload, page_map, version_map):
         options = self.job.options or {}
@@ -2659,13 +2629,14 @@ class SitePackageImporter:
             raise
 
     def _restore_media_relations(self, media: MediaFile, data: Dict[str, Any], namespace: Namespace):
-        legacy_tags = [self._get_or_create_media_tag(item, namespace) for item in data.get("tags", [])]
+        legacy_tags = [
+            self._get_or_create_media_tag(item, namespace)
+            for item in (data.get("tags", []) if not data.get("canonical_tags") else [])
+        ]
         if legacy_tags:
             media.tags.add(*legacy_tags)
 
-        canonical_tags = [self._get_or_create_taxonomy_tag(item, namespace) for item in data.get("canonical_tags", [])]
-        if canonical_tags:
-            media.canonical_tags.add(*canonical_tags)
+        import_assignments(self, media, data.get("canonical_tags", []), namespace)
 
         for collection_data in data.get("collections", []):
             base_slug = slugify(collection_data.get("slug") or collection_data.get("title")) or "collection"
@@ -2682,15 +2653,11 @@ class SitePackageImporter:
             )
             media.collections.add(collection)
             collection_legacy_tags = []
-            for item in collection_data.get("tags", []):
+            for item in (collection_data.get("tags", []) if not collection_data.get("canonical_tags") else []):
                 collection_legacy_tags.append(self._get_or_create_media_tag(item, namespace))
             if collection_legacy_tags:
                 collection.tags.add(*collection_legacy_tags)
-            collection_canonical = [
-                self._get_or_create_taxonomy_tag(item, namespace) for item in collection_data.get("canonical_tags", [])
-            ]
-            if collection_canonical:
-                collection.canonical_tags.add(*collection_canonical)
+            import_assignments(self, collection, collection_data.get("canonical_tags", []), namespace)
 
     def _get_or_create_media_tag(self, data: Dict[str, Any], namespace: Namespace):
         slug = slugify(data.get("slug") or data.get("name")) or "tag"
@@ -2699,6 +2666,10 @@ class SitePackageImporter:
         if tag is None:
             tag = MediaTag.objects.filter(namespace=namespace, name=name).first()
         if tag is None:
+            from taxonomy.legacy import definition_for
+            from taxonomy.services import require
+
+            require(self.job.created_by, definition_for(namespace, self.job.created_by), "create")
             tag = MediaTag.objects.create(
                 namespace=namespace,
                 name=name,

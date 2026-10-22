@@ -117,6 +117,30 @@ def import_attachment(tenant, actor, attachment, data, prepared=None):
         namespace = get_object_or_404(Namespace, pk=data["namespace"], tenant=tenant, kind=Namespace.KIND_CONTENT)
         if not user_can_access_namespace(actor, namespace):
             raise PermissionDenied("Media namespace access is required.")
+        approval_data = {
+            "title": data.get("title") or attachment.filename,
+            "access_level": "members",
+        }
+        if "classification_ids" in data:
+            approval_data["classification_ids"] = data["classification_ids"]
+        else:
+            approval_data["tag_ids"] = data.get("tag_ids", [])
+        approval = MediaFileApprovalSerializer(
+            data=approval_data,
+            context={"namespace": namespace, "user": actor},
+        )
+        approval.is_valid(raise_exception=True)
+        from types import SimpleNamespace
+
+        from taxonomy.assignments import classification_ids, replace_assignments
+        from taxonomy.projections import legacy_media_ids
+
+        selected_ids = approval.validated_data.get("classification_ids")
+        if selected_ids is None:
+            selected_ids = legacy_media_ids(
+                SimpleNamespace(namespace=namespace), approval.validated_data["tag_ids"], actor
+            )
+        Namespace.objects.select_for_update().get(pk=namespace.pk)
         digest = validation["metadata"]["file_hash"]
         # The existing media schema has a globally unique content hash. Never
         # reuse or disclose a different tenant's record, or hard-delete a tombstone.
@@ -129,16 +153,8 @@ def import_attachment(tenant, actor, attachment, data, prepared=None):
             if not filter_media_files_for_user(MediaFile.objects.filter(pk=existing.pk), actor, tenant=tenant).exists():
                 raise Conflict("This content cannot be copied under the current media access rules.")
             media = existing
+            replace_assignments(media, list(dict.fromkeys([*classification_ids(media), *selected_ids])), actor)
         else:
-            approval = MediaFileApprovalSerializer(
-                data={
-                    "title": data.get("title") or attachment.filename,
-                    "tag_ids": data.get("tag_ids", []),
-                    "access_level": "members",
-                },
-                context={"namespace": namespace, "user": actor},
-            )
-            approval.is_valid(raise_exception=True)
             media_id = uuid.uuid4()
             path = f"uploads/{tenant.pk}/kanban-imports/{media_id}/{attachment.filename}"
             saved = storage.save(path, upload)
@@ -165,7 +181,7 @@ def import_attachment(tenant, actor, attachment, data, prepared=None):
                     access_level="members",
                     metadata=metadata,
                 )
-                media.tags.set(approval.validated_data["tag_ids"])
+                replace_assignments(media, selected_ids, actor)
             except Exception:
                 storage.delete(saved)
                 raise

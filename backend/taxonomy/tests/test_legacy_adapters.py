@@ -3,10 +3,6 @@ from rest_framework.test import APIClient
 
 from taxonomy.models import LegacyTagMapping
 
-from .test_governance import scope
-
-__all__ = ["scope"]  # Imported pytest fixture shared by these tests.
-
 pytestmark = pytest.mark.django_db
 
 

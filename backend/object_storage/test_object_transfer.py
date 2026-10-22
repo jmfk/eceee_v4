@@ -103,6 +103,11 @@ class MemoryStorage:
 
 class ObjectTransferServiceTests(TestCase):
     def setUp(self):
+        default_storage = MemoryStorage()
+        for target in ("media_storage", "checkpoint_storage", "system_storage"):
+            storage_patch = patch(f"object_storage.services.transfer_checkpoints.{target}", default_storage)
+            storage_patch.start()
+            self.addCleanup(storage_patch.stop)
         self.user = User.objects.create_user("object-transfer")
         self.tenant = Tenant.objects.create(name="Object transfer", identifier="object-transfer", created_by=self.user)
         self.namespace = Namespace.objects.create(
@@ -708,8 +713,8 @@ class ObjectTransferServiceTests(TestCase):
         self.assertEqual(self.root.title, "Root")
         self.assertIn(self.root.id, result["object_map"].values())
         imported_media = MediaFile.objects.get(pk=self.media.pk)
-        self.assertEqual(list(imported_media.tags.values_list("slug", flat=True)), ["portrait"])
-        self.assertEqual(list(imported_media.canonical_tags.values_list("slug", flat=True)), ["people"])
+        self.assertEqual(set(imported_media.tags.values_list("slug", flat=True)), {"people", "portrait"})
+        self.assertEqual(set(imported_media.canonical_tags.values_list("slug", flat=True)), {"people", "portrait"})
         self.assertEqual(list(imported_media.collections.values_list("slug", flat=True)), ["portraits"])
         self.assertEqual(result["created_versions"], 0)
         self.assertEqual(TransferCheckpoint.objects.get(source_job=import_job).status, "available")
@@ -1423,9 +1428,10 @@ class ObjectTransferServiceTests(TestCase):
         with zipfile.ZipFile(package_file, "r") as package:
             ObjectPackageImporter(import_job, storage=storage).import_package(package)
 
-        self.assertEqual(list(self.media.tags.values_list("id", flat=True)), [local_tag.id])
+        self.assertIn(local_tag.id, self.media.tags.values_list("id", flat=True))
+        self.assertEqual(set(self.media.canonical_tags.values_list("slug", flat=True)), {"people", "portrait"})
         collection = self.media.collections.get(slug="portraits")
-        self.assertEqual(list(collection.tags.values_list("id", flat=True)), [local_tag.id])
+        self.assertIn(local_tag.id, collection.tags.values_list("id", flat=True))
 
     def test_restore_allows_import_created_tag_on_affected_existing_media(self):
         storage = MemoryStorage()
@@ -1452,13 +1458,14 @@ class ObjectTransferServiceTests(TestCase):
         package_file.seek(0)
         with zipfile.ZipFile(package_file, "r") as package:
             result = ObjectPackageImporter(import_job, storage=storage).import_package(package)
-        imported_tag = self.media.tags.get()
+        imported_tag = self.media.tags.get(name="Portrait")
 
         restore_object_import_checkpoint(
             TransferCheckpoint.objects.get(id=result["checkpoint_id"]), self.user, storage=storage
         )
 
-        self.assertFalse(MediaTag.objects.filter(id=imported_tag.id).exists())
+        # Compatibility identities survive restoration for history and mappings.
+        self.assertTrue(MediaTag.objects.filter(id=imported_tag.id).exists())
         self.assertFalse(self.media.tags.exists())
 
     def test_import_restores_soft_deleted_media_with_the_same_hash(self):

@@ -1036,6 +1036,8 @@ class ObjectInstance(MPTTModel):
         now=None,
         prioritize_featured=False,
         tenant=None,
+        classification_ids=None,
+        include_descendants=True,
     ):
         """
         Get published objects with flexible filtering and sorting.
@@ -1075,9 +1077,18 @@ class ObjectInstance(MPTTModel):
             .order_by("-version_number")
         )
         queryset = queryset.annotate(
+            live_version_id=Subquery(live_versions.values("pk")[:1]),
             is_featured=Subquery(live_versions.values("is_featured")[:1]),
             live_effective_date=Subquery(live_versions.values("effective_date")[:1]),
         )
+        if classification_ids:
+            from taxonomy.models import ObjectVersionTag
+            from taxonomy.services import matching_term_ids
+
+            selected = matching_term_ids(classification_ids, tenant=tenant, include_descendants=include_descendants)
+            queryset = queryset.filter(
+                live_version_id__in=ObjectVersionTag.objects.filter(tag_id__in=selected).values("object_version_id")
+            )
         sort_field = sort_order.replace("publish_date", "live_effective_date")
 
         # Apply sorting

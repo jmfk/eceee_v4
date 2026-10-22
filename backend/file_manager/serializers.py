@@ -332,6 +332,7 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def update(self, instance, validated_data):
         """Update collection with tags."""
+        Namespace.objects.select_for_update().get(pk=instance.namespace_id)
         classification_ids = validated_data.pop("classification_ids", None)
         tag_ids = validated_data.pop("tag_ids", None)
         validated_data["last_modified_by"] = self.context["request"].user
@@ -608,6 +609,7 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def update(self, instance, validated_data):
         """Update media file with tags and collections."""
+        Namespace.objects.select_for_update().get(pk=instance.namespace_id)
         classification_ids = validated_data.pop("classification_ids", None)
         tag_ids = validated_data.pop("tag_ids", None)
         collection_ids = validated_data.pop("collection_ids", None)

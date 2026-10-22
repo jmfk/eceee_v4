@@ -1,5 +1,5 @@
-import React, { useId, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import React, { useId, useState, useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { taxonomyApi, classificationError } from '../../api/taxonomy'
 import { getCurrentTenantId } from '../../utils/tenant'
 
@@ -8,7 +8,15 @@ export default function ClassificationPicker({ value = [], onChange, namespace, 
     const id = useId()
     const [search, setSearch] = useState('')
     const [page, setPage] = useState(1)
+    const [suggesting, setSuggesting] = useState(false)
+    const [proposalName, setProposalName] = useState('')
+    const [proposalType, setProposalType] = useState('')
+    const [proposalBusy, setProposalBusy] = useState(false)
+    const [proposalError, setProposalError] = useState('')
+    const [proposalMessage, setProposalMessage] = useState('')
+    const queryClient = useQueryClient()
     const tenant = getCurrentTenantId()
+    useEffect(() => { setSearch(''); setPage(1); setSuggesting(false); setProposalType(''); setProposalName(''); setProposalError(''); setProposalMessage('') }, [tenant, namespace, use])
     const defaultNamespace = useQuery({
         queryKey: ['classification', tenant, 'defaultNamespace'],
         queryFn: async () => await taxonomyApi.defaultNamespace(),
@@ -24,6 +32,23 @@ export default function ClassificationPicker({ value = [], onChange, namespace, 
         queryKey: ['classification', tenant, 'selected', value],
         queryFn: () => Promise.all(value.map(async termId => await taxonomyApi.term(termId))),
     })
+    const definitions = useQuery({
+        queryKey: ['classification', tenant, 'proposalTypes', effectiveNamespace, use],
+        queryFn: async () => await taxonomyApi.types({ namespace: effectiveNamespace, page_size: 200 }),
+        enabled: suggesting && !!effectiveNamespace,
+    })
+    const proposalTypes = (definitions.data?.results || []).filter(type => type.permissions?.includes('propose') && (!use || type.allowedUses?.includes(use)))
+    const submitProposal = async () => {
+        setProposalBusy(true); setProposalError('')
+        try {
+            const result = await taxonomyApi.propose(proposalType || proposalTypes[0]?.id, 'create', { name: proposalName.trim() })
+            if (allowProposed && result.term?.id) onChange([...value, result.term.id])
+            setProposalMessage(allowProposed ? 'Proposal submitted. Approval is required before publishing.' : 'Proposal submitted. Select the term after approval; this proposal does not satisfy mandatory media tagging.')
+            setSuggesting(false); setProposalName('')
+            await queryClient.invalidateQueries({ queryKey: ['classification', tenant] })
+        } catch (error) { setProposalError(classificationError(error)) }
+        finally { setProposalBusy(false) }
+    }
     const choices = (terms.data?.results || []).filter(term =>
         !value.includes(term.id) && (term.status === 'approved' || (allowProposed && term.status === 'proposed')))
     return <fieldset disabled={disabled} className="space-y-3 text-gray-900">
@@ -47,6 +72,21 @@ export default function ClassificationPicker({ value = [], onChange, namespace, 
                 {term.path}{term.status === 'proposed' ? ' (pending approval)' : ''}
             </button></li>)}
         </ul>
+        {!suggesting && <button type="button" className="underline text-sm" onClick={() => { setSuggesting(true); setProposalName(search) }}>Suggest a term</button>}
+        {suggesting && <div className="space-y-2 rounded border p-3">
+            <label htmlFor={`${id}-type`} className="block text-sm">Classification type</label>
+            <select id={`${id}-type`} className="w-full rounded border-gray-300 bg-transparent" value={proposalType || proposalTypes[0]?.id || ''} onChange={event => setProposalType(event.target.value)}>
+                {proposalTypes.map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
+            </select>
+            <label htmlFor={`${id}-proposal`} className="block text-sm">Suggested term name</label>
+            <input id={`${id}-proposal`} className="w-full rounded border-gray-300 bg-transparent" value={proposalName} onChange={event => setProposalName(event.target.value)} />
+            {definitions.isPending && <p role="status">Loading classification types…</p>}
+            {definitions.error && <p role="alert">{classificationError(definitions.error)}</p>}
+            {!definitions.isPending && !definitions.error && proposalTypes.length === 0 && <p>No classification types available for proposals in this scope.</p>}
+            <div className="flex gap-4"><button type="button" disabled={proposalBusy || !proposalName.trim() || proposalTypes.length === 0} onClick={submitProposal}>Submit proposal</button><button type="button" onClick={() => setSuggesting(false)}>Cancel</button></div>
+        </div>}
+        {proposalError && <p role="alert">{proposalError}</p>}
+        {proposalMessage && <p role="status">{proposalMessage}</p>}
         <div className="flex gap-4 text-sm">
             {page > 1 && <button type="button" onClick={() => setPage(page - 1)}>Previous</button>}
             {terms.data?.next && <button type="button" onClick={() => setPage(page + 1)}>Next</button>}

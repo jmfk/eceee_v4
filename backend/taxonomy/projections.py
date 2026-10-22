@@ -4,7 +4,7 @@ from rest_framework.exceptions import ValidationError
 
 from .context import projection_context
 from .models import LegacyTagMapping, Tag
-from .services import mutate, resolved_terms
+from .services import mutate, require, resolve_term, resolved_terms
 
 NEWS_FIELDS = {
     "news_type": "types",
@@ -23,6 +23,17 @@ def media_alias(term, user):
         source = MediaTag.objects.filter(pk=mapping.source_id, namespace=term.namespace).first()
         if source:
             return source
+    # Reuse a historical general tag only when its identity is unclaimed.
+    source = (
+        MediaTag.objects.filter(namespace=term.namespace, name=term.name).first()
+        if term.tag_type == "general"
+        else None
+    )
+    if source and not LegacyTagMapping.objects.filter(source_kind="media", source_id=str(source.pk)).exists():
+        LegacyTagMapping.objects.create(
+            source_kind="media", source_id=str(source.pk), canonical_tag=term, source_name=source.name
+        )
+        return source
     # A legacy name is only an adapter identifier. Distinct types with equal
     # labels must never be semantically merged by the old unique-name index.
     name = term.name[:50]
@@ -35,6 +46,9 @@ def media_alias(term, user):
     source = MediaTag.objects.create(
         namespace=term.namespace, name=name, slug=slug, color=term.color, description=term.description, created_by=user
     )
+    from .context import record_creation
+
+    record_creation("media_tag_ids", source)
     LegacyTagMapping.objects.create(
         source_kind="media", source_id=str(source.pk), canonical_tag=term, source_name=term.name
     )
@@ -80,7 +94,7 @@ def mirror_assignments(instance, terms, user):
         elif label == "webpages.pageversion":
             # Page legacy tags are a flat display adapter; UUID assignments
             # retain full labels, types and paths without ambiguity.
-            instance.tags = list(dict.fromkeys(term.name[:50] for term in terms))
+            instance.tags = list(dict.fromkeys(term.name[:50] for term in terms if term.tag_type == "general"))
             type(instance).objects.filter(pk=instance.pk).update(tags=instance.tags)
         elif label == "object_storage.objectversion" and instance.object_instance.object_type.name == "news":
             data = dict(instance.data)
@@ -95,10 +109,17 @@ def legacy_media_ids(instance, ids, user):
 
     from .legacy import canonical_for
 
-    sources = list(MediaTag.objects.filter(namespace=instance.namespace, pk__in=ids))
-    if len(sources) != len(set(map(str, ids))):
-        raise ValidationError("One or more media tags are unavailable in this namespace.")
-    return list(dict.fromkeys(str(canonical_for(source, user).pk) for source in sources))
+    result = []
+    for pk in ids:
+        term = Tag.objects.filter(pk=pk, namespace=instance.namespace, tenant=instance.namespace.tenant).first()
+        if term is None:
+            source = MediaTag.objects.filter(pk=pk, namespace=instance.namespace).first()
+            if source is None:
+                raise ValidationError("A selected media classification is unavailable in this namespace.")
+            term = canonical_for(source, user)
+        require(user, term.classification_type, "use")
+        result.append(str(resolve_term(term).pk))
+    return list(dict.fromkeys(result))
 
 
 def sync_legacy_media(instance, user, *, canonical=False):
@@ -112,6 +133,26 @@ def sync_legacy_media(instance, user, *, canonical=False):
     replace_assignments(instance, [str(pk) for pk in ids], user, allow_empty_transition=True)
 
 
+def historical_page_labels(instance):
+    """Recognize legacy labels after an audited canonical rename, by UUID."""
+    from .assignments import links_for
+    from .models import ClassificationOperation
+
+    terms = {str(link.tag_id): link.tag for link in links_for(instance) if link.tag.tag_type == "general"}
+    labels = {term.name[:50]: term for term in terms.values()}
+    if not terms:
+        return labels
+    for mapping in LegacyTagMapping.objects.filter(canonical_tag_id__in=terms):
+        labels[mapping.source_name[:50]] = terms[str(mapping.canonical_tag_id)]
+    for before in ClassificationOperation.objects.filter(before__has_any_keys=list(terms)).values_list(
+        "before", flat=True
+    ):
+        for key, state in before.items():
+            if key in terms and state.get("name"):
+                labels[state["name"][:50]] = terms[key]
+    return labels
+
+
 def sync_legacy_version(instance, user):
     from content.models import Namespace
 
@@ -123,10 +164,14 @@ def sync_legacy_version(instance, user):
         namespace = Namespace.get_default(tenant=instance.page.tenant)
         definition = None
         ids = []
+        historical = historical_page_labels(instance)
         for name in instance.tags or []:
-            tag = Tag.objects.filter(
-                tenant=namespace.tenant, namespace=namespace, tag_type="general", name=name
-            ).first()
+            tag = (
+                historical.get(name)
+                or Tag.objects.filter(
+                    tenant=namespace.tenant, namespace=namespace, tag_type="general", name=name
+                ).first()
+            )
             if not tag:
                 if definition is None:
                     definition = definition_for(namespace, user)
@@ -152,3 +197,19 @@ def sync_legacy_version(instance, user):
     else:
         return
     replace_assignments(instance, ids, user)
+
+
+def media_term_query(tenant, text, *, exact=False):
+    """Search resolved taxonomy labels and aliases, retaining pre-cutover rows."""
+    from django.db.models import Q
+
+    from .services import matching_term_ids
+
+    lookup = "iexact" if exact else "icontains"
+    terms = Tag.objects.filter(tenant=tenant).filter(
+        Q(**{f"name__{lookup}": text}) | Q(**{f"slug__{lookup}": text}) | Q(alternative_names__contains=[text])
+    )
+    ids = matching_term_ids(list(terms.values_list("pk", flat=True)), tenant=tenant, include_descendants=False)
+    return Q(classification_links__tag_id__in=ids) | (
+        Q(classification_links__isnull=True) & Q(**{f"tags__name__{lookup}": text})
+    )

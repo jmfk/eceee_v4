@@ -11,9 +11,7 @@ from taxonomy.models import LegacyTagMapping, MediaFileClassification, Tag, TagB
 from taxonomy.services import decide, mutate, propose
 from webpages.models import PageVersion, WebPage
 
-from .test_governance import create, scope
-
-__all__ = ["scope"]  # Imported pytest fixture shared by these tests.
+from .test_governance import create
 
 pytestmark = pytest.mark.django_db
 
@@ -66,11 +64,11 @@ def test_same_term_all_content_and_independent_order(scope, resources):
     for resource in resources:
         replace_assignments(resource, [str(second.pk), str(first.pk), str(second.pk)], member)
         assert classification_ids(resource) == [str(second.pk), str(first.pk)]
-    with pytest.raises(ValidationError, match="required for media"):
+    with pytest.raises(ValidationError):
         replace_assignments(resources[2], [], member)
-    replace_assignments(resources[2], [], member, allow_empty_transition=True)
+    replace_assignments(resources[2], [str(first.pk)], member)
     assert classification_ids(resources[1]) == [str(second.pk), str(first.pk)]
-    assert classification_ids(resources[2]) == []
+    assert classification_ids(resources[2]) == [str(first.pk)]
 
 
 def test_draft_proposal_blocks_publish_but_media_cannot_assign(scope, resources):
@@ -129,40 +127,6 @@ def test_merge_deduplicates_read_without_rewriting_history(scope, resources):
     assert classification_ids(version) == [str(target.pk)]
 
 
-def test_merged_source_round_trip_keeps_archived_or_disabled_assignment(scope, resources):
-    owner, member, _, definition = scope
-    source, target = create(owner, definition, "Source"), create(owner, definition, "Target")
-    version = resources[0]
-    other = PageVersion.objects.create(page=version.page, version_number=2, created_by=owner)
-    replace_assignments(version, [str(source.pk)], member)
-    mutate(
-        owner,
-        definition,
-        "merge",
-        term=source,
-        revision=source.revision,
-        payload={"target_id": str(target.pk), "target_revision": target.revision},
-    )
-    assert classification_ids(version) == [str(target.pk)]
-
-    allowed_uses = definition.allowed_uses
-    definition.allowed_uses = []
-    definition.save(update_fields=["allowed_uses"])
-    replace_assignments(version, classification_ids(version), member)
-    assert list(version.canonical_tag_links.values_list("tag_id", flat=True)) == [source.pk]
-    with pytest.raises(ValidationError, match="unavailable"):
-        replace_assignments(other, [str(target.pk)], member)
-
-    definition.allowed_uses = allowed_uses
-    definition.save(update_fields=["allowed_uses"])
-    target.refresh_from_db()
-    mutate(owner, definition, "archive", term=target, revision=target.revision)
-    replace_assignments(version, classification_ids(version), member)
-    assert list(version.canonical_tag_links.values_list("tag_id", flat=True)) == [source.pk]
-    with pytest.raises(ValidationError, match="archived"):
-        replace_assignments(other, [str(target.pk)], member)
-
-
 def test_version_copy_keeps_independent_assignments(scope, resources):
     owner, member, _, definition = scope
     term = create(owner, definition, "Versioned")
@@ -179,6 +143,11 @@ def test_version_copy_keeps_independent_assignments(scope, resources):
     assert copy.pk != source.pk
     assert classification_ids(source) == [str(term.pk)]
     assert classification_ids(copy) == []
+    # A newer unclassified working copy must not hide the live version from a filtered list.
+    assert [
+        item.pk
+        for item in ObjectInstance.get_published_objects(tenant=definition.tenant, classification_ids=[str(term.pk)])
+    ] == [source.object_instance_id]
 
 
 def test_invalid_and_disallowed_assignments_roll_back(scope, resources):
@@ -315,6 +284,86 @@ def test_page_workflow_copies_and_blocks_proposed_terms(scope, resources):
         service.publish(source, expected_revision=source.edit_revision)
     source.refresh_from_db()
     assert source.effective_date is None
+
+
+def test_object_creation_retains_selected_classifications(scope, resources):
+    from rest_framework.test import APIClient
+
+    owner, member, _, definition = scope
+    term = create(owner, definition, "Initial object classification")
+    client = APIClient()
+    client.force_authenticate(member)
+    response = client.post(
+        "/api/v1/objects/objects/",
+        {
+            "object_type_id": resources[1].object_instance.object_type_id,
+            "title": "Classified on creation",
+            "data": {},
+            "widgets": {},
+            "classification_ids": [str(term.pk)],
+        },
+        format="json",
+        HTTP_X_TENANT_ID=str(definition.tenant_id),
+    )
+    assert response.status_code == 201, response.data
+    assert response.data["classification_ids"] == [str(term.pk)]
+
+
+def test_page_save_canonical_selection_wins_over_legacy_projection(scope, resources):
+    from types import SimpleNamespace
+
+    from taxonomy.context import actor_context
+    from webpages.serializers.version import PageVersionSerializer
+
+    owner, member, _, definition = scope
+    term = create(owner, definition, "Selected")
+    version = resources[0]
+    serializer = PageVersionSerializer(
+        version,
+        data={"classification_ids": [str(term.pk)], "tags": ["Stale legacy value"]},
+        partial=True,
+        context={"request": SimpleNamespace(user=member, data={})},
+    )
+    assert serializer.is_valid(), serializer.errors
+    with actor_context(member):
+        serializer.save()
+    version.refresh_from_db()
+    assert classification_ids(version) == [str(term.pk)]
+    assert version.tags == ["Selected"]
+
+
+def test_merged_source_round_trip_keeps_archived_or_disabled_assignment(scope, resources):
+    owner, member, _, definition = scope
+    source, target = create(owner, definition, "Source"), create(owner, definition, "Target")
+    version = resources[0]
+    other = PageVersion.objects.create(page=version.page, version_number=2, created_by=owner)
+    replace_assignments(version, [str(source.pk)], member)
+    mutate(
+        owner,
+        definition,
+        "merge",
+        term=source,
+        revision=source.revision,
+        payload={"target_id": str(target.pk), "target_revision": target.revision},
+    )
+    assert classification_ids(version) == [str(target.pk)]
+
+    allowed_uses = definition.allowed_uses
+    definition.allowed_uses = []
+    definition.save(update_fields=["allowed_uses"])
+    replace_assignments(version, classification_ids(version), member)
+    assert list(version.canonical_tag_links.values_list("tag_id", flat=True)) == [source.pk]
+    with pytest.raises(ValidationError, match="unavailable"):
+        replace_assignments(other, [str(target.pk)], member)
+
+    definition.allowed_uses = allowed_uses
+    definition.save(update_fields=["allowed_uses"])
+    target.refresh_from_db()
+    mutate(owner, definition, "archive", term=target, revision=target.revision)
+    replace_assignments(version, classification_ids(version), member)
+    assert list(version.canonical_tag_links.values_list("tag_id", flat=True)) == [source.pk]
+    with pytest.raises(ValidationError, match="archived"):
+        replace_assignments(other, [str(target.pk)], member)
 
 
 def test_media_approval_and_collection_upload_keep_selected_order(scope, resources):

@@ -73,6 +73,9 @@ class MemoryStorage:
 
 class SitePackageServiceTests(TestCase):
     def setUp(self):
+        library_patch = patch.object(PageTheme, "list_library_images", return_value=[])
+        library_patch.start()
+        self.addCleanup(library_patch.stop)
         self.user = User.objects.create_user("sitepkg", password="pass")
         self.tenant = Tenant.objects.create(
             name="Site Package Tenant",
@@ -106,6 +109,13 @@ class SitePackageServiceTests(TestCase):
             last_modified_by=self.user,
             uploaded_by=self.user,
         )
+        # Approved imported media must carry a taxonomy classification.
+        from taxonomy.assignments import replace_assignments
+        from taxonomy.legacy import canonical_for
+
+        source = MediaTag.objects.create(namespace=self.namespace, name="Hero", slug="hero", created_by=self.user)
+        term = canonical_for(source, self.user)
+        replace_assignments(self.media, [str(term.pk)], self.user)
         self.root = WebPage.objects.create(
             title="Root",
             slug="root",
@@ -220,6 +230,7 @@ class SitePackageServiceTests(TestCase):
         )
         self.media.tags.add(legacy_tag)
         self.media.canonical_tags.add(canonical_tag)
+        collection.tags.add(legacy_tag)
         self.media.collections.add(collection)
         version = PageVersion.objects.create(
             page=self.root,
@@ -272,7 +283,7 @@ class SitePackageServiceTests(TestCase):
 
         imported_version = imported_root.versions.get()
         self.assertEqual(imported_version.tags, ["Editorial"])
-        self.assertEqual(imported_version.canonical_tags.get().slug, "people")
+        self.assertEqual(set(imported_version.canonical_tags.values_list("slug", flat=True)), {"people", "editorial"})
         imported_media = MediaFile.objects.get(tenant=destination_tenant)
         imported_media_url = storage.url(imported_media.file_path)
         self.assertEqual(imported_version.page_data["hero"]["fileUrl"], storage.url(imported_media.file_path))
@@ -280,8 +291,10 @@ class SitePackageServiceTests(TestCase):
         self.assertIn(imported_media_url, imported_root.page_custom_css)
         self.assertEqual(imported_version.page_css_variables["heroImage"], imported_media_url)
         self.assertIn(imported_media_url, imported_version.page_custom_css)
-        self.assertEqual(imported_media.tags.get().slug, "portrait")
-        self.assertEqual(imported_media.canonical_tags.get().slug, "people")
+        self.assertEqual(set(imported_media.tags.values_list("slug", flat=True)), {"hero", "people", "portrait"})
+        self.assertEqual(
+            set(imported_media.canonical_tags.values_list("slug", flat=True)), {"hero", "people", "portrait"}
+        )
         self.assertEqual(imported_media.collections.get().slug, "team")
 
         second_import_job = SitePackageJob.objects.create(
@@ -935,6 +948,40 @@ class SitePackageServiceTests(TestCase):
         self.assertEqual(imported_root.hostnames, [])
         self.assertTrue(imported_version.effective_date)
         self.assertIn("/media/", json.dumps(imported_version.widgets))
+
+    def test_clone_page_classifications_use_default_namespace_with_named_media_namespace(self):
+        from taxonomy.assignments import links_for, replace_assignments
+
+        version = PageVersion.objects.create(
+            page=self.root, version_number=1, page_data={}, widgets={}, created_by=self.user
+        )
+        term = self.media.classification_links.get().tag
+        replace_assignments(version, [str(term.pk)], self.user)
+        export_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_EXPORT, root_page=self.root, created_by=self.user
+        )
+        storage = MemoryStorage()
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+            SitePackageExporter(export_job, storage=storage).write_package(
+                package, self.root, include_media=False, include_themes=False
+            )
+        import_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={
+                "tenant_id": str(self.tenant.pk),
+                "mode": "clone",
+                "media_namespace_name": "Cloned media",
+                "source_root_key": str(self.root.stable_key),
+            },
+        )
+        buffer.seek(0)
+        with zipfile.ZipFile(buffer, "r") as package:
+            imported = SitePackageImporter(import_job, storage=storage).import_package(package)
+        links = list(links_for(imported.versions.get(version_number=1)))
+        self.assertEqual([link.tag.name for link in links], [term.name])
+        self.assertEqual([link.tag.namespace_id for link in links], [self.namespace.pk])
 
     def test_clone_import_names_the_new_root_and_reuses_soft_deleted_media(self):
         PageVersion.objects.create(
@@ -1808,6 +1855,7 @@ class SitePackageServiceTests(TestCase):
                         "files": [
                             {
                                 "source_id": "new-media",
+                                "tags": [{"name": "Stream", "slug": "stream"}],
                                 "file_hash": hashlib.sha256(b"x" * 1024).hexdigest(),
                                 "original_filename": "streamed.bin",
                                 "file_size": 1024,
@@ -1930,6 +1978,7 @@ class SitePackageServiceTests(TestCase):
                                     "source_id": media_source_id,
                                     "file_hash": file_hash,
                                     "original_filename": "dependency.bin",
+                                    "tags": [{"name": "Dependency", "slug": "dependency"}],
                                 }
                             ]
                         }

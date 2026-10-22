@@ -35,10 +35,8 @@ describe('objectInstancesApi.saveWorkingCopy', () => {
         })
     })
 
-    it('sends classification IDs only when explicitly supplied, including a deliberate clear', async () => {
-        for (const ids of [['term-b', 'term-a'], []]) {
-            await objectInstancesApi.saveWorkingCopy(5, { ...content, classificationIds: ids }, version, baseline)
-            expect(postMock.mock.lastCall[1].classification_ids).toEqual(ids)
-        }
+    it.each([{ classificationIds: ['term-id'] }, { classificationIds: [] }])('sends an explicit classification selection $classificationIds', async ({ classificationIds }) => {
+        await objectInstancesApi.saveWorkingCopy(5, { ...content, classificationIds }, version, baseline)
+        expect(postMock.mock.calls[0][1].classification_ids).toEqual(classificationIds)
     })
 })

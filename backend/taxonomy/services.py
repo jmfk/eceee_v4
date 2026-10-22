@@ -131,6 +131,11 @@ def validate_and_save(term):
 
 
 def locked_definition(definition):
+    from content.models import Namespace
+
+    # Assignment writes take namespace -> media -> definition locks. Taxonomy
+    # edits must enter through the same namespace gate before locking the type.
+    Namespace.objects.select_for_update().get(pk=definition.namespace_id)
     return ClassificationType.objects.select_for_update().get(pk=definition.pk)
 
 
@@ -225,6 +230,10 @@ def _apply(user, definition, action, term, payload, *, proposal=None):
     for item in changed:
         item.revision += 1
         validate_and_save(item)
+        if action == "create":
+            from .context import record_creation
+
+            record_creation("taxonomy_tag_ids", item)
     definition.revision += 1
     definition.save(update_fields=["revision"])
     return ClassificationOperation.objects.create(
@@ -391,8 +400,7 @@ def restore(user, operation):
     )
 
 
-def filter_classifications(queryset, relation, term_ids, *, tenant, include_descendants=True):
-    """Filter any explicit assignment relation, including historical merge aliases."""
+def matching_term_ids(term_ids, *, tenant, include_descendants=True):
     terms = Tag.objects.filter(tenant=tenant, pk__in=term_ids)
     selected = set()
     for term in terms:
@@ -404,6 +412,11 @@ def filter_classifications(queryset, relation, term_ids, *, tenant, include_desc
             set(Tag.objects.filter(tenant=tenant, merged_into_id__in=frontier).values_list("pk", flat=True)) - selected
         )
         selected.update(frontier)
+    return selected
+
+
+def filter_classifications(queryset, relation, term_ids, *, tenant, include_descendants=True):
+    selected = matching_term_ids(term_ids, tenant=tenant, include_descendants=include_descendants)
     return queryset.filter(**{f"{relation}__in": selected}).distinct()
 
 

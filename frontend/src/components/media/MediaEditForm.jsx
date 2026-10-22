@@ -77,6 +77,7 @@ const MediaEditForm = ({
                 title: file.title || file.originalFilename?.replace(/\.[^/.]+$/, '') || '',
                 description: file.description || '',
                 annotation: file.annotation || '',
+                classificationIds: file.classificationIds || [],
                 tags: tagsArray,
                 accessLevel: file.accessLevel || 'public',
                 slug: file.slug || ''
@@ -188,6 +189,7 @@ const MediaEditForm = ({
     // Tag change handler for MediaTagWidget
     const handleTagsChange = (newTags) => {
         updateFormData('tags', newTags);
+        updateFormData('classificationIds', newTags.map(tag => tag.classificationId || tag.id));
     };
 
     // Handle replace file button click
@@ -254,52 +256,6 @@ const MediaEditForm = ({
 
         setSaving(true);
         try {
-            // Convert tags to tag IDs
-            const tags = formData.tags || [];
-            const tagIds = [];
-            const safeAvailableTags = Array.isArray(availableTags) ? availableTags : [];
-
-            for (const tagItem of tags) {
-                let tag;
-
-                if (typeof tagItem === 'object' && tagItem.id) {
-                    // Tag object with ID - use it directly
-                    tag = tagItem;
-                } else {
-                    // Tag name or object without ID - find or create
-                    const tagName = typeof tagItem === 'string' ? tagItem : tagItem?.name;
-                    if (!tagName) continue;
-
-                    tag = safeAvailableTags.find(t => t?.name?.toLowerCase() === tagName.toLowerCase());
-                    if (!tag) {
-                        // Create new tag
-                        try {
-                            // Generate slug from tag name
-                            const tagSlug = tagName.toLowerCase()
-                                .replace(/[^a-z0-9]+/g, '-')
-                                .replace(/^-+|-+$/g, '');
-
-                            tag = await await await await await await await await await await await mediaTagsApi.create({
-                                name: tagName,
-                                slug: tagSlug,
-                                namespace: namespace
-                            })();
-                            setAvailableTags(prev => {
-                                const safePrev = Array.isArray(prev) ? prev : [];
-                                return [...safePrev, tag];
-                            });
-                        } catch (error) {
-                            console.error(`Failed to create tag ${tagName}:`, error);
-                            continue;
-                        }
-                    }
-                }
-
-                if (tag?.id) {
-                    tagIds.push(tag.id);
-                }
-            }
-
             let result;
             if (mode === 'approve') {
                 // Approve pending file
@@ -308,7 +264,7 @@ const MediaEditForm = ({
                     description: formData.description,
                     annotation: formData.annotation,
                     slug: formData.slug,
-                    tag_ids: tagIds,
+                    classification_ids: formData.classificationIds || [],
                     access_level: formData.accessLevel
                 })();
             } else {
@@ -318,7 +274,7 @@ const MediaEditForm = ({
                     description: formData.description,
                     annotation: formData.annotation,
                     slug: formData.slug,
-                    tag_ids: tagIds,
+                    classification_ids: formData.classificationIds || [],
                     access_level: formData.accessLevel
                 })();
             }
@@ -503,7 +459,7 @@ const MediaEditForm = ({
                         </div>
                     </div>
 
-                    {/* Tags */}
+                    {/* Tags: legacy source during expansion */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             Tags <span className="text-red-500">*</span>

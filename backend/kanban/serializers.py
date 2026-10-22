@@ -161,6 +161,7 @@ class ImportInput(RevisionInput):
     namespace = serializers.IntegerField(required=False)
     title = serializers.CharField(max_length=255, required=False)
     tag_ids = serializers.ListField(child=serializers.CharField(max_length=100), required=False)
+    classification_ids = serializers.ListField(child=serializers.UUIDField(), required=False, allow_empty=False)
     theme_id = serializers.IntegerField(required=False)
     asset_key = serializers.CharField(max_length=500, required=False)
     draft_version = serializers.IntegerField(min_value=1, required=False)

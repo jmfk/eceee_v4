@@ -282,6 +282,26 @@ class Command(BaseCommand):
             cursor.execute(
                 sql.SQL("GRANT SELECT (id, tenant_id) ON content_namespace TO {}").format(sql.Identifier(READ_ROLE))
             )
+            for relation, columns in (
+                ("taxonomy_tag", "id, tenant_id, namespace_id, tag_type, parent_id, merged_into_id, status"),
+                ("taxonomy_objectversiontag", "object_version_id, tag_id"),
+                (
+                    "object_storage_objectversion",
+                    "id, object_instance_id, version_number, title, data, widgets, effective_date, "
+                    "expiry_date, is_featured",
+                ),
+                (
+                    "object_storage_objectinstance",
+                    "id, tenant_id, object_type_id, current_version_id, title, slug, metadata, created_at, "
+                    "updated_at, level, parent_id, tree_id, lft, rght, status",
+                ),
+                ("object_storage_objecttypedefinition", "id, name, label, plural_label, is_active, namespace_id"),
+            ):
+                cursor.execute(
+                    sql.SQL("GRANT SELECT ({}) ON {} TO {}").format(
+                        sql.SQL(columns), sql.Identifier(relation), sql.Identifier(READ_ROLE)
+                    )
+                )
             cursor.execute(
                 sql.SQL("GRANT SELECT ON file_manager_mediafile_collections TO {}").format(sql.Identifier(READ_ROLE))
             )

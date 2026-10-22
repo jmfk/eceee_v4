@@ -45,6 +45,12 @@ prod-backfill-typed-tags: ## Run maintenance-window typed-tag backfill (optional
 	@case "$$CANARY_SIZE" in ""|0*|*[!0-9]*) echo "CANARY_SIZE must be a positive integer without leading zeros" >&2; exit 2;; esac
 	ssh $(PROD_HOST) "cd $(PROD_DIR) && bash deploy/scripts/backfill-typed-tags.sh '$$RUN_ID' '$$CANARY_SIZE'"
 
+prod-reconcile-classifications: ## Reconcile classifications in a backed-up maintenance window (RUN_ID and CANARY_SIZE required)
+	@case "$$RUN_ID" in ""|*[!A-Za-z0-9_-]*) echo "RUN_ID must contain only letters, numbers, underscores, and hyphens" >&2; exit 2;; esac
+	@[ "$${#RUN_ID}" -le 100 ] || (echo "RUN_ID must be at most 100 characters" >&2; exit 2)
+	@case "$$CANARY_SIZE" in ""|0*|*[!0-9]*) echo "CANARY_SIZE must be a positive integer without leading zeros" >&2; exit 2;; esac
+	ssh $(PROD_HOST) "cd $(PROD_DIR) && bash deploy/scripts/reconcile-classifications.sh '$$RUN_ID' '$$CANARY_SIZE'"
+
 validate-typed-tags-backup: ## Restore and validate a local production backup (BACKUP_FILE=/absolute/path.sql.gz)
 	@test -n "$(BACKUP_FILE)" || (echo "BACKUP_FILE is required" >&2; exit 2)
 	bash deploy/scripts/validate-typed-tags-backup.sh "$(BACKUP_FILE)"

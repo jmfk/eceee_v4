@@ -504,9 +504,9 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
 class ObjectWorkflowInput(serializers.Serializer):
     expected_version_id = serializers.IntegerField(min_value=1)
     expected_revision = serializers.IntegerField(min_value=1)
-    classification_ids = serializers.ListField(child=serializers.UUIDField(), required=False)
     expected_parent_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
     expected_metadata = serializers.DictField(required=False)
+    classification_ids = serializers.ListField(child=serializers.UUIDField(), required=False)
     source_version_id = serializers.IntegerField(min_value=1, required=False)
     effective_date = serializers.DateTimeField(required=False)
     expiry_date = serializers.DateTimeField(required=False, allow_null=True)
@@ -565,9 +565,16 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         serializer.save(created_by=self.request.user, tenant=tenant)
 
     def update(self, request, *args, **kwargs):
-        if {"data", "widgets", "title", "status", "publish_date", "unpublish_date", "object_type_id"}.intersection(
-            request.data
-        ):
+        if {
+            "data",
+            "widgets",
+            "title",
+            "status",
+            "publish_date",
+            "unpublish_date",
+            "object_type_id",
+            "classification_ids",
+        }.intersection(request.data):
             return object_workflow_required()
         return super().update(request, *args, **kwargs)
 
@@ -1272,6 +1279,14 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         if sort_order not in valid_sort_fields:
             sort_order = "-publish_date"
 
+        selected_ids = serializers.ListField(child=serializers.UUIDField()).run_validation(
+            [
+                value
+                for group in request.query_params.getlist("classification_ids")
+                for value in group.split(",")
+                if value
+            ]
+        )
         # Use the model method to get published news items
         # This handles version-based publishing and featured status from ObjectVersion.is_featured
         instances = ObjectInstance.get_published_objects(
@@ -1280,6 +1295,8 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
             sort_order=sort_order,
             prioritize_featured=True,
             tenant=request.tenant,
+            classification_ids=selected_ids,
+            include_descendants=request.query_params.get("include_descendants", "true").lower() != "false",
         )
 
         # Serialize and return

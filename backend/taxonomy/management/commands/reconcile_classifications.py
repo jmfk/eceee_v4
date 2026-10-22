@@ -39,6 +39,37 @@ class Command(BackfillCommand):
         super().add_arguments(parser)
         parser.set_defaults(run_id="classification-expansion-v1")
 
+    def handle(self, *args, **options):
+        self._assert_legacy_coverage()
+        return super().handle(*args, **options)
+
+    def _assert_legacy_coverage(self):
+        """Do not activate an expansion that skipped the first legacy backfill."""
+        from content.models import Tag as ContentTag
+        from file_manager.models import MediaTag
+        from webpages.models import PageVersion
+
+        errors = []
+        for kind, model in (("content", ContentTag), ("media", MediaTag)):
+            mapped = set(LegacyTagMapping.objects.filter(source_kind=kind).values_list("source_id", flat=True))
+            for pk in model.objects.values_list("pk", flat=True).iterator(chunk_size=500):
+                if str(pk) not in mapped:
+                    errors.append(f"unmapped {kind} tag {pk}")
+                    if len(errors) >= 20:
+                        break
+        for version in (
+            PageVersion.objects.exclude(tags=[]).prefetch_related("canonical_tag_links__tag").iterator(chunk_size=500)
+        ):
+            from taxonomy.projections import historical_page_labels
+
+            covered = set(historical_page_labels(version))
+            if not set(version.tags or []).issubset(covered):
+                errors.append(f"unmigrated page tags on version {version.pk}")
+                if len(errors) >= 20:
+                    break
+        if errors:
+            raise CommandError("Legacy coverage failed; complete backfill_typed_tags first: " + "; ".join(errors))
+
     def _config_fingerprint(self):
         return _sha256(
             Path(__file__).read_bytes()
@@ -129,6 +160,9 @@ class Command(BackfillCommand):
                 key=key,
                 defaults={"name": name, "allowed_uses": ["pages", "media_files", "media_collections", *object_uses]},
             )
+            if definition.revision == 1:
+                definition.allowed_uses = list(dict.fromkeys([*definition.allowed_uses, *object_uses]))
+                definition.save(update_fields=["allowed_uses"])
             definitions.append(str(definition.pk))
         return {"definition_ids": definitions}
 
@@ -165,6 +199,9 @@ class Command(BackfillCommand):
             raise ValueError("Classification assignments changed; do not overwrite editorial work")
         for position, tag_id in enumerate(ids):
             model.objects.get_or_create(**{field: obj, "tag_id": tag_id}, defaults={"position": position})
+        from taxonomy.projections import mirror_assignments
+
+        mirror_assignments(obj, list(Tag.objects.filter(pk__in=ids).order_by("pk")), obj.namespace.tenant.created_by)
         return {"ids": [str(pk) for pk in ids]}
 
     def _file(self, obj):

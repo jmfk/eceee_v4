@@ -43,9 +43,10 @@ def classification_ids(instance):
 def replace_assignments(instance, ids, user, *, allow_empty_transition=False):
     if not isinstance(ids, list):
         raise ValidationError({"classification_ids": "Use an ordered list of term IDs."})
-    # Serialize assignment writes against the content's publication/copy lock.
-    type(instance).objects.select_for_update().get(pk=instance.pk)
     model, field, namespace, use, versioned = assignment_context(instance)
+    Namespace.objects.select_for_update().get(pk=namespace.pk)
+    # Serialize assignment writes against the content's publication/copy lock.
+    type(instance)._base_manager.select_for_update().get(pk=instance.pk)
     if not versioned and not ids and not allow_empty_transition:
         raise ValidationError({"classification_ids": "At least one approved classification is required for media."})
     previous_links = list(links_for(instance))
@@ -107,14 +108,31 @@ def replace_assignments(instance, ids, user, *, allow_empty_transition=False):
                     {"classification_ids": "Reconcile existing legacy classifications before editing them."}
                 )
             require(user, locked[link.tag.classification_type_id], "use")
-    model.objects.filter(**{field: instance}).delete()
-    model.objects.bulk_create(
-        [model(**{field: instance, "tag": term, "position": index}) for index, term in enumerate(normalized)]
-    )
+    _replace_links(instance, model, field, normalized)
 
     from .projections import mirror_assignments
 
     mirror_assignments(instance, normalized, user)
+
+
+def _replace_links(instance, model, field, terms):
+    # Keep historical rows when allowed uses have since been restricted. The
+    # database checks new links independently; reordering must not recreate them.
+    existing = {link.tag_id: link for link in links_for(instance)}
+    model.objects.filter(**{field: instance}).exclude(tag_id__in=[term.pk for term in terms]).delete()
+    retained = [existing[term.pk] for term in terms if term.pk in existing]
+    if retained:
+        offset = max(link.position for link in existing.values()) + len(terms) + 1
+        for index, link in enumerate(retained):
+            link.position = offset + index
+        model.objects.bulk_update(retained, ["position"])
+    for index, term in enumerate(terms):
+        if term.pk in existing:
+            link = existing[term.pk]
+            link.position = index
+            link.save(update_fields=["position"])
+        else:
+            model.objects.create(**{field: instance, "tag": term, "position": index})
 
 
 def assert_publishable(instance):
@@ -166,12 +184,41 @@ def validate_media_selection(namespace, user, ids, *, use="media_files"):
     return list(dict.fromkeys(str(resolve_term(by_id[pk]).pk) for pk in ordered_ids))
 
 
-def collection_upload_ids(collection, user):
-    """Reuse the collection's ordered classifications only when valid for files too."""
-    ids = classification_ids(collection)
-    if not ids:
-        from .projections import legacy_media_ids
+@transaction.atomic
+def restore_assignment_snapshot(instance, ids, user):
+    """Restore reviewed historical relations, including archived references."""
+    model, field, namespace, use, versioned = assignment_context(instance)
+    Namespace.objects.select_for_update().get(pk=namespace.pk)
+    type(instance)._base_manager.select_for_update().get(pk=instance.pk)
+    terms = {
+        str(term.pk): term for term in Tag.objects.filter(pk__in=ids, namespace=namespace, tenant=namespace.tenant)
+    }
+    if len(terms) != len(set(map(str, ids))):
+        raise ValidationError("A checkpoint classification is missing or outside the destination scope.")
+    for term in terms.values():
+        if term.classification_type_id:
+            require(user, term.classification_type, "restore")
+        else:
+            from .signals import canonical_phase
 
+            if canonical_phase(namespace.pk):
+                raise ValidationError("An untyped legacy checkpoint cannot replace canonical media classifications.")
+    _replace_links(instance, model, field, [terms[str(pk)] for pk in ids])
+
+
+def collection_upload_ids(collection, user):
+    """Inherit approved terms allowed on files; preserve the collection's history."""
+    from .projections import legacy_media_ids
+    from .services import resolved_terms
+
+    terms = resolved_terms(link.tag for link in links_for(collection))
+    ids = [
+        str(term.pk)
+        for term in terms
+        if term.status == "approved"
+        and term.classification_type_id
+        and "media_files" in term.classification_type.allowed_uses
+    ]
+    if not terms:
         ids = legacy_media_ids(collection, list(collection.tags.values_list("pk", flat=True)), user)
-    ids = validate_media_selection(collection.namespace, user, ids, use="media_collections")
-    return validate_media_selection(collection.namespace, user, ids, use="media_files")
+    return validate_media_selection(collection.namespace, user, ids)

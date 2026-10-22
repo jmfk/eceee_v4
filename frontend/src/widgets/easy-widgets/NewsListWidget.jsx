@@ -24,7 +24,7 @@ const NewsListWidget = ({
         if (mode === 'display' && config.objectTypes && config.objectTypes.length > 0) {
             fetchNewsItems();
         }
-    }, [mode, config.objectTypes, config.limit, config.sortOrder]);
+    }, [mode, config.objectTypes, config.limit, config.sortOrder, config.classificationIds, config.includeDescendants]);
 
     const fetchNewsItems = async () => {
         try {
@@ -33,7 +33,9 @@ const NewsListWidget = ({
 
             const params = {
                 limit: config.limit || 10,
-                sort_order: config.sortOrder || '-publish_date'
+                sort_order: config.sortOrder || '-publish_date',
+                classification_ids: (config.classificationIds || []).join(','),
+                include_descendants: config.includeDescendants !== false
             };
 
             const response = await objectInstancesApi.getNewsList(config.objectTypes, params);
