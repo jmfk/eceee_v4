@@ -17,6 +17,7 @@ export const supportError = (error) => {
     const data = error.response?.data
     if (typeof data === 'string')
         return 'Begäran kunde inte slutföras. Försök igen.'
+    if (typeof data?.detail === 'string') return data.detail
     if (data)
         return (
             Object.values(data)

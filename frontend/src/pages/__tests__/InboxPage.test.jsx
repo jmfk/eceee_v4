@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -88,6 +88,99 @@ beforeEach(() => {
 })
 
 describe('tenant inbox journey', () => {
+    it('requires an explicit new submission after an edited retry conflicts', async () => {
+        const original = supportRequest.getMockImplementation()
+        const submissions = []
+        supportRequest.mockImplementation(
+            async (tenant, path, method, data) => {
+                if (path === 'threads/' && method === 'post') {
+                    submissions.push(data)
+                    if (submissions.length === 1)
+                        throw {
+                            response: {
+                                status: 409,
+                                data: {
+                                    detail: 'En tidigare sändning finns.',
+                                    existingId: 'thread-1',
+                                },
+                            },
+                        }
+                    return thread
+                }
+                return original(tenant, path, method, data)
+            },
+        )
+        renderInbox('/inbox/new?tenant=a')
+        await screen.findByRole('heading', {
+            name: 'Fråga eller rapportera fel',
+        })
+        fireEvent.change(screen.getByLabelText('Typ'), {
+            target: { value: 'question' },
+        })
+        fireEvent.change(screen.getByLabelText('Titel'), {
+            target: { value: 'Fråga' },
+        })
+        fireEvent.change(screen.getByLabelText('Beskrivning'), {
+            target: { value: 'Min ändrade text' },
+        })
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Skicka till support' }),
+        )
+        await screen.findByRole('alert')
+        expect(screen.getByLabelText('Beskrivning')).toHaveValue(
+            'Min ändrade text',
+        )
+        expect(
+            screen.getByRole('link', { name: /Öppna den sparade/ }),
+        ).toHaveAttribute('href', '/inbox/threads/thread-1?tenant=a')
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Skicka som nytt ärende' }),
+        )
+        await screen.findByRole('heading', { name: thread.title })
+        expect(submissions[1].requestId).not.toBe(submissions[0].requestId)
+        expect(submissions[1].body).toBe('Min ändrade text')
+    })
+
+    it('does not redirect away when a submission completes after leaving the form', async () => {
+        let finish
+        supportRequest.mockImplementation(async (_tenant, path, method) => {
+            if (path === 'context/') return context
+            if (path.startsWith('instructions/?'))
+                return { results: [], count: 0 }
+            if (path === 'threads/' && method === 'post')
+                return new Promise((resolve) => {
+                    finish = resolve
+                })
+            if (path === 'threads/thread-1/') return thread
+            throw new Error(`Unexpected ${path}`)
+        })
+        renderInbox('/inbox/new?tenant=a')
+        await screen.findByRole('heading', {
+            name: 'Fråga eller rapportera fel',
+        })
+        fireEvent.change(screen.getByLabelText('Typ'), {
+            target: { value: 'question' },
+        })
+        fireEvent.change(screen.getByLabelText('Titel'), {
+            target: { value: 'Fråga' },
+        })
+        fireEvent.change(screen.getByLabelText('Beskrivning'), {
+            target: { value: 'Behöver hjälp' },
+        })
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Skicka till support' }),
+        )
+        await waitFor(() => expect(finish).toBeTypeOf('function'))
+        fireEvent.click(
+            screen.getByRole('link', { name: 'Instruktionsfilmer' }),
+        )
+        await screen.findByRole('heading', { name: 'Instruktionsfilmer' })
+        await act(async () => finish(thread))
+        expect(
+            screen.getByRole('heading', { name: 'Instruktionsfilmer' }),
+        ).toBeInTheDocument()
+    })
+
     it('keeps tabs visible on the report form, captures a safe location, and creates a text report', async () => {
         renderInbox(
             '/inbox/new?tenant=a&from=https%3A%2F%2Fcms.example.invalid%2Fpages%2F4%3Ftoken%3Dhidden%23secret',

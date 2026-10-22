@@ -1,8 +1,8 @@
-from django.db.models import Q
+from django.db.models import Max, Q
 from django.utils import timezone
 
 from .access import has_role, support_users
-from .models import EmailDelivery, InboxEntry
+from .models import EmailDelivery, InboxEntry, SupportThread
 
 
 def visible_entries(user, tenant):
@@ -56,3 +56,24 @@ def notify_thread(thread, sender, message):
         thread=thread,
         defaults={"activity_at": message.created_at, "read_at": timezone.now()},
     )
+
+
+def sync_support_inbox(tenant, user):
+    """Restore current activity when support is granted, without historical mail."""
+    # Serialize catch-up with replies so activity cannot move backwards.
+    list(SupportThread.objects.select_for_update().filter(tenant=tenant).values_list("pk", flat=True))
+    threads = SupportThread.objects.filter(tenant=tenant).annotate(latest=Max("messages__created_at"))
+    existing = {
+        entry.thread_id: entry for entry in InboxEntry.objects.filter(tenant=tenant, user=user, thread__isnull=False)
+    }
+    create, update = [], []
+    for thread in threads:
+        activity = thread.latest or thread.created_at
+        entry = existing.get(thread.pk)
+        if entry is None:
+            create.append(InboxEntry(tenant=tenant, user=user, thread=thread, activity_at=activity))
+        elif entry.activity_at < activity:
+            entry.activity_at, entry.read_at, entry.archived = activity, None, False
+            update.append(entry)
+    InboxEntry.objects.bulk_create(create, ignore_conflicts=True)
+    InboxEntry.objects.bulk_update(update, ["activity_at", "read_at", "archived"])

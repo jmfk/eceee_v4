@@ -36,7 +36,11 @@ test.describe('CMS auth and page management regressions', () => {
 
     await openCmsPage(page, '/pages')
 
-    await expect(page.getByRole('link', { name: 'Pages' })).toBeVisible()
+    const menu = page.getByRole('button', { name: 'Open navigation menu', exact: true })
+    const pagesLink = page.getByRole('link', { name: 'Pages', exact: true })
+    await expect.poll(async () => await menu.isVisible() || await pagesLink.isVisible()).toBe(true)
+    if (await menu.isVisible()) await menu.click()
+    await expect(page.getByRole('link', { name: 'Pages', exact: true })).toBeVisible()
     await expect(page.getByPlaceholder('Search pages...')).toBeVisible()
     await expect(page.getByText('Summer Study')).toBeVisible()
     await expect(page.getByText('Live', { exact: true })).toBeVisible()

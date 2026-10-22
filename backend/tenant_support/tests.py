@@ -296,6 +296,40 @@ class SupportAPITests(TestCase):
         self.assertEqual(EmailDelivery.objects.get().state, "pending")
         self.assertEqual(len(mail.outbox), 0)
 
+    def test_regranted_support_role_catches_up_unread_existing_threads(self):
+        result, _ = self.create_thread()
+        role = {"userId": self.bob.pk, "canSupport": True, "canPublish": False}
+        self.call(views.ContextView, "post", role, user=self.owner)
+        self.call(views.ThreadView, user=self.bob, pk=result.data["id"])
+        self.call(views.ContextView, "post", {**role, "canSupport": False}, user=self.owner)
+        self.call(
+            views.ThreadView, "post", {"body": "Fler detaljer", "requestId": str(uuid.uuid4())}, pk=result.data["id"]
+        )
+        count = EmailDelivery.objects.count()
+        self.call(views.ContextView, "post", role, user=self.owner)
+        entry = InboxEntry.objects.get(user=self.bob)
+        self.assertIsNone(entry.read_at)
+        self.assertEqual(entry.activity_at, Message.objects.latest("created_at").created_at)
+        self.assertEqual(EmailDelivery.objects.count(), count)
+
+    def test_changed_idempotent_submissions_do_not_silently_discard_new_content(self):
+        published, publication = self.publish()
+        changed = self.call(
+            views.InstructionsView, "post", {**publication, "title": "Ändrad instruktion"}, user=self.support
+        )
+        self.assertEqual(changed.status_code, 409)
+        self.assertEqual(changed.data["existing_id"], published.data["id"])
+        created, report = self.create_thread()
+        self.assertEqual(self.call(views.ThreadsView, "post", {**report, "body": "Ändrad rapport"}).status_code, 409)
+        payload = {"body": "Ett svar", "requestId": str(uuid.uuid4())}
+        self.call(views.ThreadView, "post", payload, pk=created.data["id"], user=self.support)
+        self.assertEqual(
+            self.call(
+                views.ThreadView, "post", {**payload, "body": "Ändrat svar"}, pk=created.data["id"], user=self.support
+            ).status_code,
+            409,
+        )
+
     def test_json_contract_uses_camel_case(self):
         response = self.call(views.ContextView)
         response.render()
@@ -449,3 +483,120 @@ class DeliveryConcurrencyTests(TransactionTestCase):
             self.assertEqual(mocked.call_count, 1)
         job.refresh_from_db()
         self.assertEqual(job.state, "sent")
+
+    @skipUnlessDBFeature("has_select_for_update")
+    def test_revoked_publisher_cannot_publish_after_waiting_for_tenant_lock(self):
+        import threading
+
+        from django.db import connections
+
+        owner = get_user_model().objects.create_user("publisher-race")
+        tenant = Tenant.objects.create(name="Publish race", identifier="publish-race", created_by=owner)
+        role = SupportRole.objects.create(tenant=tenant, user=owner, can_publish=True)
+        video = PrivateVideo.objects.create(
+            tenant=tenant,
+            owner=owner,
+            purpose="instruction",
+            storage_key="race",
+            content_type="video/mp4",
+            byte_size=100,
+            duration=10,
+        )
+        entered = threading.Event()
+        results, failures = [], []
+        original = views.require_role
+
+        def checked(*args):
+            original(*args)
+            entered.set()
+
+        def worker():
+            try:
+                request = APIRequestFactory().post(
+                    "/",
+                    {"title": "Film", "description": "Test", "videoId": str(video.pk), "requestId": str(uuid.uuid4())},
+                    format="json",
+                )
+                request.tenant = tenant
+                force_authenticate(request, user=owner)
+                results.append(views.InstructionsView.as_view()(request).status_code)
+            except Exception as exc:
+                failures.append(type(exc).__name__)
+            finally:
+                connections.close_all()
+
+        with patch("tenant_support.views.require_role", side_effect=checked):
+            with transaction.atomic():
+                Tenant.objects.select_for_update().get(pk=tenant.pk)
+                role.can_publish = False
+                role.save(update_fields=["can_publish"])
+                pending = threading.Thread(target=worker)
+                pending.start()
+                self.assertTrue(entered.wait(5))
+            pending.join(10)
+        self.assertFalse(pending.is_alive())
+        self.assertEqual(failures, [])
+        self.assertEqual(results, [403])
+        self.assertEqual(Instruction.objects.count(), 0)
+
+    @skipUnlessDBFeature("has_select_for_update")
+    def test_user_reply_reopens_thread_after_concurrent_resolve(self):
+        import threading
+
+        from django.db import connections
+
+        owner = get_user_model().objects.create_user("status-owner")
+        support = get_user_model().objects.create_user("status-support")
+        tenant = Tenant.objects.create(name="Status race", identifier="status-race", created_by=owner)
+        tenant.members.add(support)
+        SupportRole.objects.create(tenant=tenant, user=support, can_support=True)
+        thread = SupportThread.objects.create(
+            tenant=tenant, creator=owner, title="Test", kind="question", request_id=uuid.uuid4()
+        )
+        entered, release, replied = threading.Event(), threading.Event(), threading.Event()
+        failures, results = [], []
+        original = views.validated
+
+        def validate(serializer, request):
+            data = original(serializer, request)
+            if serializer is views.StatusInput:
+                entered.set()
+                if not release.wait(5):
+                    raise TimeoutError
+            return data
+
+        def worker(method, user, data):
+            try:
+                request = getattr(APIRequestFactory(), method)("/", data, format="json")
+                request.tenant = tenant
+                force_authenticate(request, user=user)
+                results.append(views.ThreadView.as_view()(request, pk=thread.pk).status_code)
+                if method == "post":
+                    replied.set()
+            except Exception as exc:
+                failures.append(type(exc).__name__)
+            finally:
+                connections.close_all()
+
+        with patch("tenant_support.views.validated", side_effect=validate):
+            status_worker = threading.Thread(target=worker, args=("patch", support, {"status": "resolved"}))
+            reply_worker = threading.Thread(
+                target=worker, args=("post", owner, {"body": "Still broken", "requestId": str(uuid.uuid4())})
+            )
+            status_worker.start()
+            try:
+                self.assertTrue(entered.wait(5))
+                reply_worker.start()
+                # A reply can finish here only if the status writer failed to lock its thread.
+                replied.wait(0.5)
+            finally:
+                release.set()
+                status_worker.join(10)
+                if reply_worker.ident is not None:
+                    reply_worker.join(10)
+        self.assertFalse(status_worker.is_alive())
+        self.assertFalse(reply_worker.is_alive())
+        self.assertEqual(failures, [])
+        self.assertEqual(sorted(results), [200, 200])
+        thread.refresh_from_db()
+        self.assertEqual(thread.status, "open")
