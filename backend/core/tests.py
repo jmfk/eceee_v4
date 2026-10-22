@@ -492,6 +492,8 @@ class MachineAPIKeyAuthenticationTest(TestCase):
         from taxonomy.models import ClassificationType, Tag
 
         path = Path(__file__).resolve().parents[2] / "scripts" / "eceee_content_definitions.py"
+        if not path.exists():
+            path = Path("/definition-tooling/scripts/eceee_content_definitions.py")
         spec = importlib.util.spec_from_file_location("profile_install_test", path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)

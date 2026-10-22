@@ -342,7 +342,13 @@ def apply_item(run, item, user, types, facets):
     )
     mapping = {key: config.get(key) for key in mapping_keys}
     previous_mapping = {key: binding.last_run.configuration.get(key) for key in mapping_keys} if binding else None
-    if binding and binding.source_hash == item.source_hash and mapping == previous_mapping:
+    source_unchanged = binding and binding.source_hash == item.source_hash and mapping == previous_mapping
+    previous_placeholders = (
+        obj.current_version.workflow_metadata.get("legacy_editorial", {}).get("placeholder_images", [])
+        if source_unchanged and obj.current_version
+        else []
+    )
+    if source_unchanged and not previous_placeholders:
         item.status = "unchanged"
         item.object_instance = obj
         item.error_category = ""
@@ -367,6 +373,15 @@ def apply_item(run, item, user, types, facets):
         url: importer.import_image(url, article_identity=f"{item.resource}:{item.source_id}", resume=True)
         for url in payload["images"]
     }
+    if previous_placeholders and all(
+        url in media and media[url].metadata.get("migration_placeholder") for url in previous_placeholders
+    ):
+        # Retrying unavailable images is useful; another identical draft version is not.
+        item.status = "unchanged"
+        item.object_instance = obj
+        item.error_category = ""
+        item.save()
+        return item.status
     working_row = deepcopy(row)
     working_row["attachments"] = _attachments(row, importer)
     payload = normalize(working_row, item.resource, author_ids=author_ids, media_by_url=media)

@@ -97,6 +97,13 @@ class LegacyMediaImporter:
             content_type = "image/png"
             placeholder = True
 
+        if existing and is_placeholder and placeholder:
+            # A failed retry must keep the same record and referenced placeholder bytes,
+            # even if this attempt failed for a different reason.
+            self._record_article(existing, article_identity)
+            self._apply_tags(existing, placeholder=True)
+            return existing
+
         filename = Path(urlparse(source_url).path).name or "legacy-image"
         if placeholder:
             filename = f"unavailable-{hashlib.sha256(source_url.encode()).hexdigest()[:12]}.png"

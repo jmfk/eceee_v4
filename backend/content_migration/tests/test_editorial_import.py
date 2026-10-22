@@ -208,6 +208,60 @@ class EditorialImportTests(TestCase):
             self.assertEqual(storage.overwrite_file.call_count, 2)
             connection.check_constraints()
 
+    def test_identical_source_retries_placeholder_without_duplicate_versions_until_recovered(self):
+        from file_manager.models import MediaFile
+        from taxonomy.models import ClassificationRollout
+
+        term = self._media_term("Imported")
+        ClassificationRollout.objects.create(namespace=self.namespace, phase="canonical")
+        row = record("publications", content='<p><img src="https://legacy.example/recover.png"></p>')
+        config = {"mediaClassificationIds": [str(term.pk)]}
+        objects = {}
+
+        def upload(path, file):
+            content = file.read()
+            objects[path] = content
+            return {
+                "file_path": path,
+                "file_size": len(content),
+                "content_type": file.content_type,
+                "file_hash": hashlib.sha256(content).hexdigest(),
+                "width": 10,
+                "height": 10,
+            }
+
+        with (
+            patch("content_migration.legacy_news.media.storage") as storage,
+            patch(
+                "content_migration.legacy_news.media.LegacyMediaImporter._read_image",
+                side_effect=[ValueError("http-404"), ValueError("http-503"), (b"recovered-image", "image/png")],
+            ) as read,
+        ):
+            storage.overwrite_file.side_effect = upload
+            storage.get_public_url.side_effect = lambda path: "https://media.example/" + path
+            self.assertEqual(apply_run(self._media_run(row, config), self.user), {"imported": 1})
+            media = MediaFile.objects.get()
+            old_path, old_bytes = media.file_path, objects[media.file_path]
+            obj = EditorialImportBinding.objects.get().object_instance
+            self.assertEqual(apply_run(self._media_run(row, config), self.user), {"unchanged": 1})
+            self.assertEqual(obj.versions.count(), 1)
+            self.assertEqual(MediaFile.objects.get().pk, media.pk)
+            self.assertEqual(objects, {old_path: old_bytes})
+            self.assertEqual(apply_run(self._media_run(row, config), self.user), {"imported": 1})
+            media.refresh_from_db()
+            obj.refresh_from_db()
+            self.assertEqual(MediaFile.objects.count(), 1)
+            self.assertFalse(media.metadata["migration_placeholder"])
+            self.assertNotEqual(media.file_path, old_path)
+            self.assertEqual(objects[old_path], old_bytes)
+            self.assertEqual(obj.versions.count(), 2)
+            self.assertIn(media.file_url, json.dumps(obj.current_version.widgets))
+            self.assertEqual(obj.current_version.workflow_metadata["legacy_editorial"]["placeholder_images"], [])
+            self.assertEqual(apply_run(self._media_run(row, config), self.user), {"unchanged": 1})
+            self.assertEqual(read.call_count, 3)
+            self.assertEqual(obj.versions.count(), 2)
+        connection.check_constraints()
+
     def test_canonical_media_without_reviewed_classification_blocks_before_io(self):
         from file_manager.models import MediaFile
         from taxonomy.models import ClassificationRollout
