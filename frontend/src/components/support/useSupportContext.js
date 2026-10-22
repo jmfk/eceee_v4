@@ -1,0 +1,39 @@
+import { useSyncExternalStore } from 'react'
+import { useLocation } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import {
+    getCurrentTenantId,
+    subscribeToCurrentTenantId,
+} from '../../utils/tenant'
+import { useAuth } from '../../contexts/AuthContext'
+import { supportRequest } from '../../api/support'
+
+export const useSupportTenant = () => {
+    const location = useLocation()
+    const current = useSyncExternalStore(
+        subscribeToCurrentTenantId,
+        getCurrentTenantId,
+    )
+    // Email deep links scope only this screen; the server verifies membership.
+    return (
+        (location.pathname.startsWith('/inbox') &&
+            new URLSearchParams(location.search).get('tenant')) ||
+        current
+    )
+}
+
+export const useSupportIdentity = () => {
+    const { user } = useAuth()
+    return user?.id || user?.username || 'anonymous'
+}
+
+export const useSupportContext = () => {
+    const identity = useSupportIdentity()
+    const tenant = useSupportTenant()
+    return useQuery({
+        queryKey: ['support', tenant, identity, 'context'],
+        queryFn: () => supportRequest(tenant, 'context/'),
+        refetchInterval: 60000,
+        retry: false,
+    })
+}

@@ -188,6 +188,7 @@ LOCAL_APPS = [
     # 'apps.users',
     # 'apps.api',
     "core",  # Core multi-tenancy support
+    "tenant_support",  # Private tenant inbox, instructions and support
     "htmx",
     "webpages",  # Core CMS system (required)
     "content",
@@ -633,6 +634,7 @@ CELERY_TIMEZONE = TIME_ZONE
 
 # Celery Beat Schedule for periodic tasks
 CELERY_BEAT_SCHEDULE = {
+    "deliver-support-inbox-email": {"task": "tenant_support.tasks.deliver_pending", "schedule": 60.0},
     "refresh-scheduled-publication-caches": {
         "task": "webpages.tasks.refresh_scheduled_publication_caches",
         "schedule": 60.0,  # Every minute
@@ -752,3 +754,13 @@ FM_PASSWORD = config("FM_PASSWORD", default="")
 
 # EMAIL_BACKEND = "email_log.backends.EmailBackend"
 # EMAIL_LOG_BACKEND = "postmark.django_backend.EmailBackend"
+
+# Private inbox media must never share the public media/checkpoint bucket.
+SUPPORT_STORAGE_BUCKET_NAME = config("SUPPORT_STORAGE_BUCKET_NAME", default="")
+SUPPORT_APP_URL = config("SUPPORT_APP_URL", default="")
+SUPPORT_EMAIL_ENABLED = config("SUPPORT_EMAIL_ENABLED", default=False, cast=bool)
+SUPPORT_BUG_MAX_BYTES = 25 * 1024 * 1024
+SUPPORT_INSTRUCTION_MAX_BYTES = 200 * 1024 * 1024
+SUPPORT_DAILY_MAX_BYTES = 1024 * 1024 * 1024
+SUPPORT_FFPROBE = "ffprobe"
+SUPPORT_FFMPEG = "ffmpeg"

@@ -7,6 +7,7 @@
  * as published by MongoDB, Inc. See the LICENSE file for details.
  */
 
+import InboxPage from './pages/InboxPage'
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster, toast } from 'react-hot-toast'
@@ -275,6 +276,7 @@ export const AppRoutes = () => {
             </div>
           </PrivateRoute>
         } />
+        <Route path="/inbox/*" element={<PrivateRoute><InboxPage /></PrivateRoute>} />
         <Route path="/help/*" element={
           <PrivateRoute>
             <HowToHelpPage />

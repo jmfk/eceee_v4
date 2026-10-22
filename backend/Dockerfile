@@ -22,6 +22,7 @@ RUN apt-get update \
         tesseract-ocr-eng \
         libmagic1 \
         libmagic-dev \
+        ffmpeg \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*

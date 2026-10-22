@@ -1,0 +1,179 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import InboxPage from '../InboxPage'
+import { supportRequest } from '../../api/support'
+
+vi.unmock('react-router-dom')
+
+vi.mock('../../components/Navbar', () => ({
+    default: () => <nav aria-label="CMS">CMS</nav>,
+}))
+vi.mock('../../contexts/AuthContext', () => ({
+    useAuth: () => ({ user: { id: 42, username: 'anna' } }),
+}))
+vi.mock('../../api/support', async (importOriginal) => ({
+    ...(await importOriginal()),
+    supportRequest: vi.fn(),
+}))
+
+const context = {
+    userId: 42,
+    tenant: { name: 'Tenant A', identifier: 'a' },
+    canPublish: true,
+    canSupport: false,
+    canManage: false,
+    unreadCount: 1,
+    recipientCount: 2,
+    supportAvailable: true,
+    videoLimits: { bug: 26214400, instruction: 209715200 },
+}
+const thread = {
+    id: 'thread-1',
+    title: 'Rubriken sparas inte',
+    kind: 'bug',
+    location: 'https://cms.example.invalid/pages/4',
+    status: 'open',
+    messages: [
+        {
+            id: 'm1',
+            senderName: 'Anna',
+            body: 'Rubriken försvinner.',
+            createdAt: '2026-10-22T12:00:00Z',
+        },
+    ],
+}
+const renderInbox = (route = '/inbox/?tenant=a') => {
+    const client = new QueryClient({
+        defaultOptions: {
+            queries: { retry: false },
+            mutations: { retry: false },
+        },
+    })
+    return render(
+        <QueryClientProvider client={client}>
+            <MemoryRouter initialEntries={[route]}>
+                <Routes>
+                    <Route path="/inbox/*" element={<InboxPage />} />
+                </Routes>
+            </MemoryRouter>
+        </QueryClientProvider>,
+    )
+}
+
+beforeEach(() => {
+    vi.clearAllMocks()
+    supportRequest.mockImplementation(async (_tenant, path, method) => {
+        if (path === 'context/') return context
+        if (path.startsWith('inbox/?'))
+            return {
+                results: [
+                    {
+                        id: 'entry-1',
+                        threadId: 'thread-1',
+                        title: thread.title,
+                        kind: 'bug',
+                        activityAt: '2026-10-22T12:00:00Z',
+                        readAt: null,
+                    },
+                ],
+                count: 1,
+            }
+        if (path === 'threads/' && method === 'post') return thread
+        if (path === 'threads/thread-1/') return thread
+        if (path.startsWith('instructions/?')) return { results: [], count: 0 }
+        throw new Error(`Unexpected ${path}`)
+    })
+})
+
+describe('tenant inbox journey', () => {
+    it('keeps tabs visible on the report form, captures a safe location, and creates a text report', async () => {
+        renderInbox(
+            '/inbox/new?tenant=a&from=https%3A%2F%2Fcms.example.invalid%2Fpages%2F4%3Ftoken%3Dhidden%23secret',
+        )
+        await screen.findByRole('heading', {
+            name: 'Fråga eller rapportera fel',
+        })
+        expect(
+            screen.getByRole('navigation', { name: 'Inboxnavigation' }),
+        ).toBeInTheDocument()
+        expect(
+            screen.queryByRole('button', { name: 'Till inbox' }),
+        ).not.toBeInTheDocument()
+        expect(screen.getByLabelText('Länk till platsen')).toHaveValue(
+            'https://cms.example.invalid/pages/4',
+        )
+        fireEvent.change(screen.getByLabelText('Titel'), {
+            target: { value: thread.title },
+        })
+        fireEvent.change(screen.getByLabelText('Beskrivning'), {
+            target: { value: 'Rubriken försvinner.' },
+        })
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Skicka till support' }),
+        )
+        await screen.findByRole('heading', { name: thread.title })
+        expect(supportRequest).toHaveBeenCalledWith(
+            'a',
+            'threads/',
+            'post',
+            expect.objectContaining({
+                kind: 'bug',
+                videoId: null,
+                requestId: expect.any(String),
+                location: 'https://cms.example.invalid/pages/4',
+            }),
+        )
+    })
+
+    it('preserves tenant selection when navigating from an email deep link and replying', async () => {
+        renderInbox('/inbox/threads/thread-1?tenant=a')
+        await screen.findByRole('heading', { name: thread.title })
+        fireEvent.change(screen.getByLabelText('Ditt svar'), {
+            target: { value: 'Nu fungerar det.' },
+        })
+        fireEvent.click(screen.getByRole('button', { name: 'Skicka svar' }))
+        await waitFor(() =>
+            expect(supportRequest).toHaveBeenCalledWith(
+                'a',
+                'threads/thread-1/',
+                'post',
+                expect.objectContaining({ body: 'Nu fungerar det.' }),
+            ),
+        )
+        expect(
+            screen.getByRole('link', { name: /Instruktionsfilmer/ }),
+        ).toHaveAttribute('href', '/inbox/library?tenant=a')
+        expect(
+            screen.queryByRole('button', { name: 'Till inbox' }),
+        ).not.toBeInTheDocument()
+    })
+
+    it('retains the composed description when submission fails', async () => {
+        supportRequest.mockImplementation(async (_tenant, path) => {
+            if (path === 'context/') return context
+            throw new Error('offline')
+        })
+        renderInbox('/inbox/new?tenant=a')
+        await screen.findByRole('heading', {
+            name: 'Fråga eller rapportera fel',
+        })
+        fireEvent.change(screen.getByLabelText('Titel'), {
+            target: { value: 'Ett fel' },
+        })
+        fireEvent.change(screen.getByLabelText('Beskrivning'), {
+            target: { value: 'Min text finns kvar.' },
+        })
+        fireEvent.change(screen.getByLabelText('Länk till platsen'), {
+            target: { value: 'https://cms.example.invalid/pages/4' },
+        })
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Skicka till support' }),
+        )
+        await screen.findByRole('alert')
+        expect(screen.getByLabelText('Beskrivning')).toHaveValue(
+            'Min text finns kvar.',
+        )
+    })
+})

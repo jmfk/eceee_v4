@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import Navbar from '../Navbar'
 
+vi.mock('../support/useSupportContext', () => ({ useSupportContext: () => ({ data: { unreadCount: 0 } }), useSupportTenant: () => 'a' }))
+
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ logout: vi.fn(), user: { username: 'editor' } }),
 }))
@@ -60,6 +62,8 @@ describe('Navbar', () => {
     expect(screen.queryByRole('link', { name: 'A/B Tests' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Designer' })).toHaveAttribute('href', '/designer/themes')
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
+    expect(screen.getByRole('link', { name: 'Inbox' })).toHaveAttribute('href', '/inbox?tenant=a')
+    expect(screen.getByRole('link', { name: 'Rapportera fel' }).getAttribute('href')).toContain('tenant=a&from=')
     expect(screen.queryByText('EASY v4')).not.toBeInTheDocument()
     expect(screen.queryByText('›')).not.toBeInTheDocument()
   })
