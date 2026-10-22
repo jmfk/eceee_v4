@@ -1,0 +1,22 @@
+name: Full CI
+
+on:
+  pull_request:
+    # Reapply full-ci after a new push; a retained label is not a request.
+    types: [labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: full-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Full CI
+    # A skipped CALL does not create the protected job in the reusable workflow.
+    if: github.event.label.name == 'full-ci'
+    uses: ./.github/workflows/ci-checks.yml
+    with:
+      full: true

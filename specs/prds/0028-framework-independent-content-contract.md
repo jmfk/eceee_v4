@@ -95,3 +95,11 @@ Den befintliga Next-publishern renderar utan Django vid förfrågningar, men reg
 - Inför merge uppdaterades referensen uttryckligen till `e80248dc4588ef90bcb6c7ef5b2d84759de9d16a` för redan mergade Banner-outline-kontrakt. Fixture-README dokumenterar skillnaderna. Dokumentidentiteterna blev PRD-0028 / ADR-0039 för att undvika kollision med mains PRD-0027 / ADR-0036; kravtexten är i övrigt oförändrad.
 
 - 2026-10-21: Shared contract pilot verified: Node reproduced all 25 manifest entries byte-for-byte and matched 51 frozen API cases plus catalog with zero differences. Django consumes the same model declarations; the expanded 129-test PostgreSQL/widget/theme/error-page gate, 714 direct Node/Pydantic configurations, 11 React tests, 6 Chromium tests and 9 Node / 9 runner tests passed without mandatory skips. See [package evidence and boundaries](../../backend/widget_contracts/README.md). Node remains comparison-only; no replacement backend, authoritative validator cutover or production deployment is claimed.
+
+
+## CI cadence follow-up
+
+[ADR-0048](../adrs/active/0048-fast-ci-and-full-merge-gate.md) moves complete pilot
+verification to the explicit full CI merge gate while retaining lightweight helper
+and affected package unit tests on ordinary pushes. Pilot requirements and reference
+provenance remain unchanged. Repository enforcement needs post-merge activation.
