@@ -3,6 +3,7 @@ import socket
 from unittest.mock import MagicMock, call, patch
 
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.test import TestCase
 
 from content.models import Namespace
@@ -74,8 +75,9 @@ class LegacyNewsMediaImporterTests(TestCase):
     def test_resume_replaces_placeholder_without_changing_media_id(self, mocked_storage):
         source_url = "https://legacy.example/retry.jpg"
         stable_path = self.importer._storage_path(source_url)
+        repair_path = f"{stable_path}/repair-{hashlib.sha256(b'real-image').hexdigest()}"
         placeholder_result = self._upload_result(b"placeholder", stable_path)
-        real_result = self._upload_result(b"real-image", stable_path)
+        real_result = self._upload_result(b"real-image", repair_path)
         mocked_storage.overwrite_file.side_effect = [placeholder_result, real_result]
         mocked_storage.get_public_url.return_value = "https://media.example/placeholder.png"
 
@@ -93,8 +95,49 @@ class LegacyNewsMediaImporterTests(TestCase):
         self.assertEqual(mocked_storage.overwrite_file.call_count, 2)
         first_path = mocked_storage.overwrite_file.call_args_list[0].args[0]
         second_path = mocked_storage.overwrite_file.call_args_list[1].args[0]
-        self.assertEqual(first_path, second_path)
+        self.assertEqual(first_path, stable_path)
+        self.assertEqual(second_path, repair_path)
+        self.assertEqual(resumed.file_path, repair_path)
         self.assertFalse(resumed.tags.filter(slug="migration-placeholder").exists())
+
+    @patch("content_migration.legacy_news.media.storage")
+    def test_placeholder_repair_rollback_preserves_original_bytes_and_retries_same_new_key(self, mocked_storage):
+        objects = {}
+
+        def upload(path, file):
+            objects[path] = file.read()
+            return self._upload_result(objects[path], path)
+
+        mocked_storage.overwrite_file.side_effect = upload
+        mocked_storage.get_public_url.side_effect = lambda path: "https://media.example/" + path
+        source_url = "https://legacy.example/transactional-retry.jpg"
+        with patch.object(self.importer, "_read_image", side_effect=ValueError("not-an-image")):
+            placeholder = self.importer.import_image(source_url)
+        old_path, old_url, old_hash = placeholder.file_path, placeholder.file_url, placeholder.file_hash
+        old_bytes = objects[old_path]
+        with patch.object(self.importer, "_read_image", return_value=(b"repaired-image", "image/jpeg")):
+            with self.assertRaisesRegex(RuntimeError, "later attachment failed"):
+                with transaction.atomic():
+                    repaired = self.importer.import_image(source_url, resume=True)
+                    attempted_path = repaired.file_path
+                    raise RuntimeError("later attachment failed")
+            placeholder.refresh_from_db()
+            self.assertEqual(placeholder.file_path, old_path)
+            self.assertEqual(placeholder.file_url, old_url)
+            self.assertEqual(placeholder.file_hash, old_hash)
+            self.assertTrue(placeholder.metadata["migration_placeholder"])
+            self.assertTrue(placeholder.tags.filter(slug="migration-placeholder").exists())
+            self.assertEqual(objects[old_path], old_bytes)
+            self.assertNotEqual(attempted_path, old_path)
+            resumed = self.importer.import_image(source_url, resume=True)
+        self.assertEqual(resumed.pk, placeholder.pk)
+        self.assertEqual(resumed.file_path, attempted_path)
+        self.assertEqual(resumed.file_url, "https://media.example/" + attempted_path)
+        self.assertFalse(resumed.metadata["migration_placeholder"])
+        self.assertEqual(objects[old_path], old_bytes)
+        self.assertEqual(objects[attempted_path], b"repaired-image")
+        self.assertEqual(len(objects), 2)
+        self.assertEqual(MediaFile.objects.count(), 1)
 
     @patch("content_migration.legacy_news.media.MediaFile.objects.create")
     @patch("content_migration.legacy_news.media.storage")

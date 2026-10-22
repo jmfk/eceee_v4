@@ -5,6 +5,7 @@ status: in-progress
 locked: true
 created: 2026-10-22
 related_adrs:
+  - ADR-0049
   - ADR-0047
   - ADR-0046
   - ADR-0043
@@ -122,3 +123,7 @@ Status remains in-progress: the deployed source exposes only the old News API. T
 ### Source-contract preparation
 
 The v4 preflight now supports read-only inventory counts (`--inventory`) for all declared source resources. The adapter rejects duplicate/out-of-order IDs, site drift and unrequested columnist dependencies. A focused isolated database test covers all six source resources mapping to the five destination types, ordered external attachments and idempotent reimport. Old News compatibility samples cannot approve a full import. These are fixture-based checks; real multi-type acceptance still depends on the separately owned legacy extension and deployment.
+
+## Additional implementation decision
+
+[ADR-0049](../adrs/active/0049-transaction-safe-legacy-media-repairs.md) supersedes ADR-0022: repaired placeholders retain their media ID and adopt a content-addressed file path, preserving old bytes if the import transaction rolls back. Existing literal URLs require explicit refresh; old blobs are retained.

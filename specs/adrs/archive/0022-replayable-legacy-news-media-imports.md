@@ -1,12 +1,13 @@
 ---
 id: ADR-0022
 title: Serialize legacy News imports and use replayable media keys
-status: accepted
+status: superseded
 date: 2026-10-12
 related_prds:
   - PRD-0012
 supersedes: []
-superseded_by: []
+superseded_by:
+  - ADR-0049
 ---
 
 # ADR-0022: Serialize Legacy News Imports and Use Replayable Media Keys
