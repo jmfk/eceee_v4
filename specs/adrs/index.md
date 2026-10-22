@@ -4,6 +4,7 @@
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
+| ADR-0045 | [Tenant Kanban workflow and private attachments](active/0045-tenant-kanban.md) | accepted | PRD-0033 |
 | ADR-0044 | [Tenant inbox and private support](active/0044-tenant-inbox-and-private-support.md) | accepted | PRD-0032 |
 | ADR-0042 | [Canonical Object editing and publishing workflow](active/0042-canonical-object-workflow.md) | accepted | PRD-0030 |
 | ADR-0041 | [Shared declarative built-in widget contracts](active/0041-shared-widget-contract-source.md) | accepted | PRD-0028 |

@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
     createExport: vi.fn(), getExport: vi.fn(), getExportDownload: vi.fn(), navigate: vi.fn(),
 }))
 
+// The embedded import panel consumes the authenticated principal just as it does in the app.
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 1 } }) }))
 vi.mock('../../api/designerThemes', () => ({ designerThemesApi: mocks }))
 vi.mock('../../rendering/directRender', () => ({ buildResolvedRenderModel: mocks.buildResolvedRenderModel }))
 vi.mock('../../components/DesignerNavbar', () => ({ default: () => <div>Designer navigation</div> }))

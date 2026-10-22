@@ -1,0 +1,125 @@
+.kb {
+    --kb-bg: #f9fafb;
+    --kb-surface: #fff;
+    --kb-text: #111827;
+    --kb-muted: #6b7280;
+    --kb-line: #d1d5db;
+    background: var(--kb-bg);
+    color: var(--kb-text);
+    min-height: 100%;
+}
+.dark .kb {
+    --kb-bg: #111827;
+    --kb-surface: #1f2937;
+    --kb-text: #f3f4f6;
+    --kb-muted: #9ca3af;
+    --kb-line: #4b5563;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not(.light):not([data-theme='light']) .kb {
+        --kb-bg: #111827;
+        --kb-surface: #1f2937;
+        --kb-text: #f3f4f6;
+        --kb-muted: #9ca3af;
+        --kb-line: #4b5563;
+    }
+}
+.kb input:not([type='checkbox']),
+.kb textarea,
+.kb select {
+    background: var(--kb-surface);
+    color: var(--kb-text);
+    border: 1px solid var(--kb-line);
+    border-radius: 4px;
+    padding: 8px;
+    max-width: 100%;
+}
+.kb textarea {
+    width: 100%;
+}
+.kb button {
+    padding: 8px 12px;
+    min-height: 36px;
+    border-radius: 4px;
+}
+.kb button:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--kb-muted) 12%, transparent);
+}
+.kb button:disabled {
+    opacity: 0.5;
+}
+.kb :focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+}
+.kb a {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+.kb-muted {
+    color: var(--kb-muted);
+}
+.kb-column {
+    background: var(--kb-surface);
+    min-width: 290px;
+    width: 320px;
+    flex-shrink: 0;
+    padding: 16px;
+}
+.kb-card {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--kb-line);
+}
+.kb-editor [contenteditable] {
+    background: var(--kb-surface) !important;
+    color: var(--kb-text) !important;
+    min-height: 120px;
+}
+.kb [aria-pressed='true'] {
+    background: color-mix(in srgb, var(--kb-muted) 18%, transparent);
+}
+.kb-primary {
+    background: #2563eb !important;
+    color: white;
+}
+@media (prefers-reduced-motion: reduce) {
+    .kb * {
+        scroll-behavior: auto !important;
+        transition: none !important;
+    }
+}
+
+.kb-editor [contenteditable] h1 {
+    font-size: 1.75em;
+    font-weight: 600;
+    margin: 0.75em 0 0.4em;
+}
+.kb-editor [contenteditable] h2 {
+    font-size: 1.45em;
+    font-weight: 600;
+    margin: 0.75em 0 0.4em;
+}
+.kb-editor [contenteditable] h3 {
+    font-size: 1.2em;
+    font-weight: 600;
+    margin: 0.75em 0 0.4em;
+}
+.kb-editor [contenteditable] ul {
+    list-style: disc;
+    padding-left: 1.5em;
+}
+.kb-editor [contenteditable] ol {
+    list-style: decimal;
+    padding-left: 1.5em;
+}
+.kb-editor [contenteditable] blockquote {
+    border-left: 2px solid var(--kb-line);
+    padding-left: 1em;
+}
+.kb-editor [contenteditable] pre {
+    white-space: pre-wrap;
+    font-family: monospace;
+}
+.kb {
+    overflow-wrap: anywhere;
+}

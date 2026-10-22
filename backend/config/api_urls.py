@@ -37,6 +37,7 @@ urlpatterns = [
     path("webpages/", include("webpages.api_urls")),
     path("content/", include("content.urls")),
     path("content-import/", include("content_import.urls")),
+    path("kanban/", include("kanban.urls")),
     path("media/", include("file_manager.urls")),
     path("objects/", include("object_storage.urls")),
     path("data-connections/", include("data_connections.urls")),

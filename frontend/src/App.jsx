@@ -24,6 +24,7 @@ import SystemSchemaPage from '@pages/SystemSchemaPage'
 import LayoutSchemaPage from '@pages/LayoutSchemaPage'
 import LayoutSchemaEditorPage from '@pages/LayoutSchemaEditorPage'
 import MediaManagerPage from '@pages/MediaManagerPage'
+import KanbanPage from './pages/KanbanPage'
 import TagsPage from '@pages/TagsPage'
 import ProfilePage from '@pages/ProfilePage'
 import UserManagementPage from '@pages/UserManagementPage'
@@ -236,6 +237,9 @@ export const AppRoutes = () => {
             </div>
           </PrivateRoute>
         } />
+        <Route path="/kanban" element={<PrivateRoute><KanbanPage /></PrivateRoute>} />
+        <Route path="/kanban/boards/:boardId" element={<PrivateRoute><KanbanPage /></PrivateRoute>} />
+        <Route path="/kanban/cards/:cardId" element={<PrivateRoute><KanbanPage /></PrivateRoute>} />
         <Route path="/media" element={
           <PrivateRoute>
             <div className="fixed inset-0 bg-gray-50 flex flex-col">
