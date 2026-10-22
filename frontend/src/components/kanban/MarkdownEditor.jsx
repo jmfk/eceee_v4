@@ -8,7 +8,7 @@ export function MarkdownView({ value }) {
     const html = useMemo(() => withAttachmentTickets(markdownHtml(value), ticket), [value, ticket])
     return (
         <div
-            className="prose prose-sm dark:prose-invert max-w-none break-words"
+            className="prose prose-sm max-w-none break-words"
             dangerouslySetInnerHTML={{ __html: html }}
         />
     )

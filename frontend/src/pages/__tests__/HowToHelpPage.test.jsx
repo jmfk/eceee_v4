@@ -1,14 +1,23 @@
-import { describe, expect, it } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import HowToHelpPage from '../HowToHelpPage'
 
+vi.mock('../../components/support/useSupportContext', () => ({
+    useSupportTenant: () => '',
+    useSupportIdentity: () => 'editor',
+    useSupportContext: () => ({ data: { canPublish: false } }),
+}))
+
 const renderPage = (initialPath = '/help/how-to') => render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
     <MemoryRouter initialEntries={[initialPath]}>
         <Routes>
             <Route path="/help/*" element={<HowToHelpPage />} />
         </Routes>
     </MemoryRouter>
+    </QueryClientProvider>
 )
 
 describe('HowToHelpPage', () => {

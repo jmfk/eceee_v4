@@ -159,6 +159,30 @@ def provision_checkout_minio(provider: Path, frontend_port: int) -> None:
         raise SystemExit("shared MinIO checkout admission failed")
 
 
+def support_bucket_name(provider: Path, frontend_port: int) -> str:
+    record = json.loads((provider / "consumers" / "eceee-v4.json").read_text())
+    base = record["services"]["minio"]["support_storage"]["bucket"]
+    if record["consumer"] != "eceee-v4" or not re.fullmatch(
+        r"[a-z0-9]+-dev-support", base
+    ):
+        raise SystemExit("invalid ECEEE private support storage registration")
+    return base if frontend_port == 10100 else f"{base}-{frontend_port}"
+
+
+def provision_support_minio(provider: Path, frontend_port: int) -> None:
+    script = provider / "scripts" / "admit_eceee_support_minio.py"
+    if not script.is_file():
+        raise SystemExit("shared provider is missing ECEEE support MinIO admission")
+    result = subprocess.run(
+        [sys.executable, str(script), "--frontend-port", str(frontend_port)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if result.returncode:
+        raise SystemExit("shared private support MinIO admission failed")
+
+
 def has_isolated_postgres_config(
     present: dict[str, str], project_root: Path = ROOT
 ) -> bool:
@@ -296,9 +320,14 @@ def main() -> int:
     else:
         original = ""
     present = parse_dotenv_values(original)
-    minio_access_key, media_bucket, checkpoint_bucket, minio_secret_filename = checkout_minio_identity(
-        frontend_port
-    )
+    (
+        minio_access_key,
+        media_bucket,
+        checkpoint_bucket,
+        minio_secret_filename,
+    ) = checkout_minio_identity(frontend_port)
+
+    support_bucket = support_bucket_name(provider, frontend_port)
 
     if args.runtime_check:
         if not ENV_FILE.exists() or ENV_FILE.stat().st_mode & 0o077:
@@ -308,6 +337,7 @@ def main() -> int:
             "AWS_SECRET_ACCESS_KEY",
             "AWS_STORAGE_BUCKET_NAME",
             "AWS_CHECKPOINT_STORAGE_BUCKET_NAME",
+            "SUPPORT_STORAGE_BUCKET_NAME",
             "DATABASE_URL",
             "IMGPROXY_KEY",
             "IMGPROXY_SALT",
@@ -328,12 +358,11 @@ def main() -> int:
             "FRONTEND_PORT": str(frontend_port),
             "BACKEND_PORT": str(backend_port),
             "ECEEE_IMGPROXY_PORT": str(registered_ports["imgproxy"]),
-            "ECEEE_PLAYWRIGHT_PORT": str(
-                registered_ports["playwright-renderer"]
-            ),
+            "ECEEE_PLAYWRIGHT_PORT": str(registered_ports["playwright-renderer"]),
             "AWS_ACCESS_KEY_ID": minio_access_key,
             "AWS_STORAGE_BUCKET_NAME": media_bucket,
             "AWS_CHECKPOINT_STORAGE_BUCKET_NAME": checkpoint_bucket,
+            "SUPPORT_STORAGE_BUCKET_NAME": support_bucket,
         }
         mismatched_keys = sorted(
             key
@@ -355,6 +384,11 @@ def main() -> int:
             present["AWS_SECRET_ACCESS_KEY"],
             present["AWS_CHECKPOINT_STORAGE_BUCKET_NAME"],
         )
+        check_minio_bucket(
+            present["AWS_ACCESS_KEY_ID"],
+            present["AWS_SECRET_ACCESS_KEY"],
+            support_bucket,
+        )
         print("eceee-local-runtime=orbstack")
         print("eceee-shared-services=postgres,redis,minio:reachable")
         print("eceee-env=runtime-ready:mode-0600")
@@ -363,6 +397,8 @@ def main() -> int:
     password_root = provider / "secrets" / "projects"
     if ROOT.name != "eceee_v4" and not args.check_only:
         provision_checkout_minio(provider, frontend_port)
+    if not args.check_only:
+        provision_support_minio(provider, frontend_port)
     redis_password = read_secret(password_root / "eceee-v4.redis.password")
     minio_secret = read_secret(password_root / minio_secret_filename)
 
@@ -374,9 +410,7 @@ def main() -> int:
         )
 
     checkout_database, checkout_user = checkout_postgres_identity()
-    preserve_isolated_database = not args.demo and has_isolated_postgres_config(
-        present
-    )
+    preserve_isolated_database = not args.demo and has_isolated_postgres_config(present)
     if preserve_isolated_database:
         postgres_database = checkout_database
         postgres_user = checkout_user
@@ -412,6 +446,7 @@ def main() -> int:
         "AWS_SECRET_ACCESS_KEY": minio_secret,
         "AWS_STORAGE_BUCKET_NAME": media_bucket,
         "AWS_CHECKPOINT_STORAGE_BUCKET_NAME": checkpoint_bucket,
+        "SUPPORT_STORAGE_BUCKET_NAME": support_bucket,
         "AWS_S3_ENDPOINT_URL": "http://localhost:10302",
         "AWS_S3_INTERNAL_ENDPOINT_URL": "http://host.docker.internal:10302",
         "IMGPROXY_KEY": present.get("IMGPROXY_KEY") or secrets.token_hex(32),
@@ -426,6 +461,10 @@ def main() -> int:
         updates["AWS_ACCESS_KEY_ID"],
         updates["AWS_SECRET_ACCESS_KEY"],
         updates["AWS_CHECKPOINT_STORAGE_BUCKET_NAME"],
+    )
+
+    check_minio_bucket(
+        updates["AWS_ACCESS_KEY_ID"], updates["AWS_SECRET_ACCESS_KEY"], support_bucket
     )
 
     if args.check_only:

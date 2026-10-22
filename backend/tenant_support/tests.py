@@ -82,6 +82,47 @@ class SupportAPITests(TestCase):
         data.update(kwargs)
         return self.call(views.ThreadsView, "post", data), data
 
+    def test_help_guide_link_can_be_published_changed_and_cleared(self):
+        result, data = self.publish(helpGuideId="pages-create")
+        self.assertEqual(result.status_code, 201, result.data)
+        instruction = Instruction.objects.get(pk=result.data["id"])
+        self.assertEqual(instruction.help_guide_id, "pages-create")
+        self.assertEqual(result.data["help_guide_id"], "pages-create")
+        retry = self.call(views.InstructionsView, "post", data, user=self.support)
+        self.assertEqual(retry.status_code, 200)
+        denied = self.call(views.InstructionView, "patch", {"helpGuideId": "tags"}, pk=instruction.pk)
+        self.assertEqual(denied.status_code, 403)
+        for guide_id in ("tags", ""):
+            changed = self.call(
+                views.InstructionView, "patch", {"helpGuideId": guide_id}, user=self.support, pk=instruction.pk
+            )
+            self.assertEqual(changed.status_code, 200, changed.data)
+            instruction.refresh_from_db()
+            self.assertEqual(instruction.help_guide_id, guide_id)
+        invalid, _ = self.publish(helpGuideId="https://example.invalid")
+        self.assertEqual(invalid.status_code, 400)
+
+    def test_help_guide_filter_only_returns_active_instructions_in_current_tenant(self):
+        active, _ = self.publish(helpGuideId="pages-create")
+        self.publish(helpGuideId="other-guide")
+        archived, _ = self.publish(helpGuideId="pages-create")
+        withdrawn, _ = self.publish(helpGuideId="pages-create")
+        Instruction.objects.filter(pk=archived.data["id"]).update(archived=True)
+        Instruction.objects.filter(pk=withdrawn.data["id"]).update(withdrawn=True)
+        Instruction.objects.create(
+            tenant=self.other,
+            author=self.support,
+            video=self.video(tenant=self.other),
+            title="Other tenant",
+            description="Private",
+            help_guide_id="pages-create",
+            request_id=uuid.uuid4(),
+        )
+        for user in (self.anna, self.support):
+            result = self.call(views.InstructionsView, query="?help_guide_id=pages-create", user=user)
+            self.assertEqual(result.status_code, 200, result.data)
+            self.assertEqual([str(row["id"]) for row in result.data["results"]], [str(active.data["id"])])
+
     def test_publication_snapshots_recipients_and_retries_without_duplicate_events(self):
         result, data = self.publish()
         self.assertEqual(result.status_code, 201, result.data)

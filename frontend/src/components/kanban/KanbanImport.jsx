@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import '../user-tools.css'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { kanbanApi, kanbanError } from '../../api/kanban'
@@ -60,7 +61,7 @@ export default function KanbanImport({
         }
     }
     return (
-        <section className="p-4 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+        <section className="user-tools-content user-tools-panel">
             <button type="button" onClick={() => setOpen(!open)} aria-expanded={open}>
                 Importera från Kanban
             </button>
@@ -79,7 +80,7 @@ export default function KanbanImport({
                             placeholder="Sök kort och bilagor"
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
-                            className="border rounded px-3 py-2 dark:bg-gray-800"
+                            className="border border-gray-300 rounded-lg px-3 py-2"
                         />
                         <button disabled={isFetching}>Sök</button>
                     </form>
@@ -89,7 +90,7 @@ export default function KanbanImport({
                             <input
                                 value={tags}
                                 onChange={(e) => setTags(e.target.value)}
-                                className="border rounded px-3 py-2 dark:bg-gray-800"
+                                className="border border-gray-300 rounded-lg px-3 py-2"
                             />
                         </label>
                     ) : (
@@ -98,7 +99,7 @@ export default function KanbanImport({
                             <select
                                 value={assetKey}
                                 onChange={(e) => setAssetKey(e.target.value)}
-                                className="border rounded px-3 py-2 dark:bg-gray-800"
+                                className="border border-gray-300 rounded-lg px-3 py-2"
                             >
                                 <option value="">Välj bildplats</option>
                                 {assets.map((asset) => (

@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { useSupportContext, useSupportTenant } from '../components/support/useSupportContext';
+import { safeReportLocation } from '../api/support';
 import { useAuth } from '../contexts/AuthContext';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 import { changePassword, switchCurrentWorkspace } from '../api/users';
-import { Lock, User, Mail, Shield, AlertCircle, CheckCircle, Building2 } from 'lucide-react';
+import { Lock, User, Mail, Shield, AlertCircle, CheckCircle, Building2, Inbox, Grid3X3, Flag } from 'lucide-react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { getCurrentTenantId, setCurrentTenantId } from '../utils/tenant';
 
@@ -11,6 +14,16 @@ const ProfilePage = () => {
     useDocumentTitle('Profile');
 
     const { user } = useAuth();
+    const location = useLocation();
+    const tenant = useSupportTenant();
+    const support = useSupportContext();
+    const unreadCount = support.data?.unreadCount || 0;
+    const reportFrom = safeReportLocation(location.state?.reportFrom || window.location.href);
+    const profileLinks = [
+        { name: 'Inbox', href: tenant ? `/inbox?tenant=${encodeURIComponent(tenant)}` : '/inbox', icon: Inbox, count: unreadCount },
+        { name: 'Kanban', href: '/kanban', icon: Grid3X3 },
+        { name: 'Rapportera fel', href: `/inbox/new?tenant=${encodeURIComponent(tenant || '')}&from=${encodeURIComponent(reportFrom)}`, icon: Flag },
+    ];
     const { addNotification } = useGlobalNotifications();
 
     const [passwordData, setPasswordData] = useState({
@@ -149,9 +162,25 @@ const ProfilePage = () => {
     return (
         <div className="max-w-4xl mx-auto py-8 px-4">
             <div className="mb-8">
-                <div className="text-3xl font-bold text-gray-900" role="heading" aria-level="1">Profile</div>
+                <div className="flex items-center gap-3">
+                    <User aria-hidden="true" className="h-8 w-8 text-primary-600" />
+                    <h1 className="text-3xl font-bold text-gray-900">Profile</h1>
+                </div>
                 <div className="text-gray-600 mt-2">Manage your account settings</div>
             </div>
+
+            <nav aria-label="Profile" className="mb-6 flex flex-wrap gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                {profileLinks.map(({ name, href, icon: Icon, count }) => (
+                    <Link
+                        key={name}
+                        to={href}
+                        className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-primary-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
+                    >
+                        <Icon aria-hidden="true" className="h-4 w-4" />
+                        <span>{name}{count > 0 ? ` (${count})` : ''}</span>
+                    </Link>
+                ))}
+            </nav>
 
             {/* User Information */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">

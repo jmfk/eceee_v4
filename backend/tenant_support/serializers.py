@@ -6,7 +6,17 @@ from .models import Instruction, Message, SupportThread
 class InstructionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Instruction
-        fields = ["id", "title", "description", "transcript", "published_at", "archived", "withdrawn", "video_id"]
+        fields = [
+            "id",
+            "title",
+            "description",
+            "transcript",
+            "published_at",
+            "archived",
+            "withdrawn",
+            "video_id",
+            "help_guide_id",
+        ]
 
 
 class MessageSerializer(serializers.ModelSerializer):
@@ -43,9 +53,14 @@ class ThreadSerializer(serializers.ModelSerializer):
         ]
 
 
+def help_guide_field(**kwargs):
+    return serializers.RegexField(r"^[a-z0-9][a-z0-9-]*$", max_length=150, allow_blank=True, **kwargs)
+
+
 class PublishInput(serializers.Serializer):
     title = serializers.CharField(max_length=150)
     description = serializers.CharField(max_length=4000)
+    help_guide_id = help_guide_field(default="")
     transcript = serializers.CharField(max_length=30000, allow_blank=True, default="")
     video_id = serializers.UUIDField()
     request_id = serializers.UUIDField()
@@ -91,6 +106,7 @@ class ArchiveInput(serializers.Serializer):
 
 
 class InstructionStateInput(serializers.Serializer):
+    help_guide_id = help_guide_field(required=False)
     archived = serializers.BooleanField(required=False)
     withdrawn = serializers.BooleanField(required=False)
 

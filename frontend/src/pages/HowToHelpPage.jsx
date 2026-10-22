@@ -2,6 +2,7 @@ import { Link, Navigate, Route, Routes, useParams, useSearchParams } from 'react
 import { BookOpen, ChevronLeft, ChevronRight, ListChecks, Menu } from 'lucide-react'
 import { useState } from 'react'
 import HelpVideoPlayer from '../components/help/HelpVideoPlayer'
+import HelpInstructionVideos from '../components/help/HelpInstructionVideos'
 import { howToDocs } from '../data/howToDocs'
 import { getHelpGuidePath, getHelpIndexPath, getHelpSectionPath, getHelpVideoConfig } from '../utils/howToHelp'
 import {
@@ -235,15 +236,17 @@ const HelpGuidePage = ({ language }) => {
                     <span>{localizedGuide.title}</span>
                 </div>
 
-                <HelpVideoPlayer
-                    videoUrl={videoConfig.videoUrl}
-                    captionsUrl={videoConfig.captionsUrl}
-                    videoSources={videoConfig.videoSources}
-                    language={videoConfig.language}
-                    youtubeId={guide.youtubeId}
-                    youtubeUrl={guide.youtubeUrl}
-                    title={`${localizedGuide.title} video`}
-                />
+                <HelpInstructionVideos guideId={guide.id}>
+                    <HelpVideoPlayer
+                        videoUrl={videoConfig.videoUrl}
+                        captionsUrl={videoConfig.captionsUrl}
+                        videoSources={videoConfig.videoSources}
+                        language={videoConfig.language}
+                        youtubeId={guide.youtubeId}
+                        youtubeUrl={guide.youtubeUrl}
+                        title={`${localizedGuide.title} video`}
+                    />
+                </HelpInstructionVideos>
 
                 <ol className="mt-6 space-y-3 text-sm text-gray-700">
                     {localizedGuide.steps.map((step, index) => (
