@@ -117,7 +117,6 @@ const ObjectDataForm = forwardRef(({
                     id: String(instance.id),
                     type: instance?.objectType?.name || 'unknown',
                     parentId: instance.parent?.id ?? instance.parent ?? null,
-                    currentVersionId: instance.versionId ? String(instance.versionId) : undefined,
                     availableVersions: instance.versionId ? [String(instance.versionId)] : [],
                     status: instance?.status || 'draft',
                     metadata: instance?.metadata || {},

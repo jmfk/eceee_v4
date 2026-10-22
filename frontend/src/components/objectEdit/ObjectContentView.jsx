@@ -147,27 +147,23 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
             {/* Scrollable Content Area */}
             <div className={`flex-1 min-h-0 overflow-y-auto bg-white transition-all duration-300 ${isWidgetEditorOpen ? 'mr-0' : ''}`}>
                 <div className="h-full">
-                    {objectType?.slotConfiguration?.slots && objectType.slotConfiguration.slots.length > 0 ? (
-                        <div className="flex h-full min-w-[600px]">
-                            {/* Left Column - Widget Slots */}
-                            <div className="min-w-[280px] flex-1 space-y-6 overflow-auto p-6">
-                                <div>
-                                    <ObjectContentEditor
-                                        ref={contentEditorRef}
-                                        objectType={objectType}
-                                        widgets={localWidgets}
-                                        onWidgetChange={handleWidgetChange}
-                                        onWidgetEditorStateChange={handleWidgetEditorStateChange}
-                                        mode="object"
-                                        context={{ ...context, instanceId }}
-                                        namespace={namespace}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Right Column - Object Data */}
-                            <ObjectEditorPanel side="right" title="Object data" initialWidth={420}>
-                                <div className="space-y-6 p-6">
+                    <div className="flex h-full min-w-[600px]">
+                        <div className="min-w-[280px] flex-1 space-y-6 overflow-auto p-6">
+                            {objectType?.slotConfiguration?.slots?.length > 0 && (
+                                <ObjectContentEditor
+                                    ref={contentEditorRef}
+                                    objectType={objectType}
+                                    widgets={localWidgets}
+                                    onWidgetChange={handleWidgetChange}
+                                    onWidgetEditorStateChange={handleWidgetEditorStateChange}
+                                    mode="object"
+                                    context={{ ...context, instanceId }}
+                                    namespace={namespace}
+                                />
+                            )}
+                        </div>
+                        <ObjectEditorPanel side="right" title="Object data" initialWidth={420}>
+                            <div className="space-y-6 p-6">
                                 <ObjectDataForm
                                     ref={formRef}
                                     objectType={objectType}
@@ -178,30 +174,9 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                                     onValidationChange={handleValidationChange}
                                     context={{ ...context, instanceId }}
                                 />
-                                </div>
-                            </ObjectEditorPanel>
-                        </div>
-                    ) : (
-                        /* Single Column - Object Data Only */
-                        <div className="space-y-6 p-6">
-                            <div>
-                                <div className="text-lg font-medium text-gray-900 mb-4 flex items-center" role="heading" aria-level="3">
-                                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                                    Object Data
-                                </div>
                             </div>
-                            <ObjectDataForm
-                                ref={formRef}
-                                objectType={objectType}
-                                instance={instance}
-                                initializeObject={false}
-                                isNewInstance={isNewInstance}
-                                onFormChange={handleFormChange}
-                                onValidationChange={handleValidationChange}
-                                context={{ ...context, instanceId }}
-                            />
-                        </div>
-                    )}
+                        </ObjectEditorPanel>
+                    </div>
                 </div>
             </div>
 

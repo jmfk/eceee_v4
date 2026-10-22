@@ -11,7 +11,7 @@ export default function ObjectEditorPanel({ side, title, initialWidth = 260, chi
 
     return (
         <aside aria-label={title} className="relative flex shrink-0 flex-col border-gray-200 bg-white"
-            style={{ width: collapsed ? 40 : width, maxWidth: collapsed ? 40 : '45vw', borderRightWidth: side === 'left' ? 1 : 0, borderLeftWidth: side === 'right' ? 1 : 0 }}>
+            style={{ width: collapsed ? 40 : width, borderRightWidth: side === 'left' ? 1 : 0, borderLeftWidth: side === 'right' ? 1 : 0 }}>
             <div className={`flex min-h-10 items-center ${collapsed ? 'justify-center' : 'justify-between px-3'}`}>
                 {!collapsed && <span className="text-sm font-medium text-gray-700">{title}</span>}
                 <button type="button" aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${title}`} aria-expanded={!collapsed}

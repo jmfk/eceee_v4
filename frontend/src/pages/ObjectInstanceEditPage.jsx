@@ -42,6 +42,8 @@ const ObjectInstanceEditPage = () => {
     const contentTabRef = useRef(null)
     const initializedObjectId = useRef(null)
     const activeInstanceId = useRef(null)
+    const activeLocation = useRef(location)
+    useEffect(() => { activeLocation.current = location }, [location])
 
     useEffect(() => {
         activeInstanceId.current = instanceId
@@ -59,6 +61,12 @@ const ObjectInstanceEditPage = () => {
     const parentIdFromUrl = urlParams.get('parent')
     const isNewInstance = !instanceId && objectTypeId
     const isEditingInstance = !!instanceId
+    const publishingPath = (showHistory = false) => {
+        const search = new URLSearchParams(location.search)
+        if (showHistory) search.set('panel', 'history')
+        else search.delete('panel')
+        return `/objects/${instanceId}/edit/publishing${search.size ? `?${search}` : ''}`
+    }
 
     // Query hooks
     const { data: instanceResponse, isLoading: instanceLoading } = useQuery({
@@ -186,6 +194,7 @@ const ObjectInstanceEditPage = () => {
                 editRevision: objectData.editRevision,
             }, instance)
             const saved = response.data.object
+            const parentChanged = String(saved.parent?.id ?? saved.parent ?? '') !== String(instance.parent?.id ?? instance.parent ?? '')
             const unchanged = JSON.stringify(getState().objects[String(instanceId)]) === submitted
             const isActive = activeInstanceId.current === instanceId
                 && String(getState().metadata.currentObjectId) === String(instanceId)
@@ -204,7 +213,16 @@ const ObjectInstanceEditPage = () => {
                 queryClient.invalidateQueries({ queryKey: ['objectWorkflow', instanceId] }),
                 queryClient.invalidateQueries({ queryKey: ['objectInstance', instanceId, 'versions'] }),
                 queryClient.invalidateQueries({ queryKey: ['objectInstances'] }),
+                ...(parentChanged ? [queryClient.invalidateQueries({ queryKey: ['objectInstance', instanceId, 'pathToRoot'] })] : []),
             ])
+            if (parentChanged && activeInstanceId.current === instanceId) {
+                const currentLocation = activeLocation.current
+                const search = new URLSearchParams(currentLocation.search)
+                if (search.has('root')) {
+                    search.delete('root')
+                    navigate({ pathname: currentLocation.pathname, search: search.toString() }, { replace: true })
+                }
+            }
             addNotification('Working copy saved', 'success')
             if (!unchanged) throw new Error('More changes were made while saving. Save them before publishing.')
             return response.data.version
@@ -214,7 +232,7 @@ const ObjectInstanceEditPage = () => {
         } finally {
             setIsSaving(false)
         }
-    }, [instanceId, instance, getState, setIsDirty, queryClient, addNotification, publishUpdate, componentId])
+    }, [instanceId, instance, getState, setIsDirty, queryClient, addNotification, publishUpdate, componentId, navigate])
 
     const handlePublish = async () => {
         try {
@@ -405,7 +423,7 @@ const ObjectInstanceEditPage = () => {
     ]
 
     if (tab === 'versions' && instanceId) {
-        return <Navigate to={`/objects/${instanceId}/edit/publishing?panel=history`} replace />
+        return <Navigate to={publishingPath(true)} replace />
     }
 
     if (!tabs.find(t => t.id === tab)) {
@@ -481,6 +499,15 @@ const ObjectInstanceEditPage = () => {
                             setNavigationError(null)
                             try {
                                 if (getState().metadata.isDirty) await handleSave()
+                                if (activeInstanceId.current !== instanceId || activeLocation.current.key !== location.key) return
+                                if (contentTabRef.current?.hasOpenWidgetEditor()) {
+                                    setNavigationError('Save or close the widget editor before switching objects.')
+                                    return
+                                }
+                                if (getState().metadata.isDirty) {
+                                    setNavigationError('More changes were made while saving. Save them before switching objects.')
+                                    return
+                                }
                                 navigate(`/objects/${id}/edit/content?root=${rootId}`)
                             } catch { /* handleSave reports errors; keep the current object open. */ }
                         }} />
@@ -513,8 +540,8 @@ const ObjectInstanceEditPage = () => {
             <StatusBar
                 isDirty={hasUnsavedChanges}
                 onSaveClick={() => { handleSave().catch(() => {}) }}
-                onHistoryClick={() => navigate(`/objects/${instanceId}/edit/publishing?panel=history`)}
-                onScheduleClick={() => navigate(`/objects/${instanceId}/edit/publishing`)}
+                onHistoryClick={() => navigate(publishingPath(true))}
+                onScheduleClick={() => navigate(publishingPath())}
                 onUndoChanges={handleUndoChanges}
                 onPublishClick={handlePublish}
                 canPublish={hasUnsavedChanges || Boolean(instance?.isWorkingCopy)}
