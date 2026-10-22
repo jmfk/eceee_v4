@@ -1,6 +1,8 @@
+from io import StringIO
 from types import SimpleNamespace
 
-from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.core.management import call_command
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from webpages.public_views import HostnamePageView, custom_404_handler
@@ -67,3 +69,31 @@ class RenderingDeprecationTests(SimpleTestCase):
                 self.assertEqual(response.status_code, 410)
                 self.assertEqual(response["X-ECEEE-Renderer"], "django-disabled")
                 self.assertEqual(response.data, {"detail": "The legacy Django rendering API is disabled."})
+
+
+@override_settings(
+    DEBUG=False,
+    ROOT_URLCONF="config.urls",
+    DJANGO_PUBLIC_RENDERER_ENABLED=False,
+    SECURE_SSL_REDIRECT=False,
+    ALLOWED_HOSTS=["public-regression.test"],
+    STATIC_ALLOWED_HOSTS=["public-regression.test"],
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
+)
+class PublicRenderingRoutingTests(TestCase):
+    """Exercise real URLs and middleware without installing a browser or starting a server."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_public_regression_site", hostname="public-regression.test", stdout=StringIO())
+
+    def test_published_and_missing_public_routes_keep_django_rendering_disabled(self):
+        for path in ("/", "/about/", "/missing-public-regression-page/"):
+            with self.subTest(path=path):
+                response = self.client.get(path, HTTP_HOST="public-regression.test")
+
+                self.assertEqual(response.status_code, 410)
+                self.assertEqual(response["X-ECEEE-Renderer"], "django-disabled")
+                self.assertEqual(response["Cache-Control"], "no-store")
+                self.assertEqual(response["Content-Type"], "text/plain")
+                self.assertEqual(response.content, b"Public rendering is provided by Next.js.\n")

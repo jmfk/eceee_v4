@@ -29,7 +29,6 @@ jobs:
       backend: ${{ steps.select.outputs.backend }}
       frontend: ${{ steps.select.outputs.frontend }}
       publisher: ${{ steps.select.outputs.publisher }}
-      public_e2e: ${{ steps.select.outputs.public_e2e }}
       base: ${{ steps.select.outputs.base }}
     steps:
       - uses: actions/checkout@v4
@@ -47,13 +46,11 @@ jobs:
             backend=true
             frontend=true
             publisher=true
-            public_e2e=true
           else
             BASE_SHA=$(git rev-parse HEAD^1)
             backend=false
             frontend=false
             publisher=false
-            public_e2e=false
             while IFS= read -r path; do
               case "$path" in
                 backend/widget_contracts/*) backend=true; frontend=true; publisher=true ;;
@@ -63,7 +60,7 @@ jobs:
                 frontend/*) frontend=true ;;
                 publisher/*|deploy/scripts/tests/*|deploy/scripts/*health*|deploy/scripts/*deploy*) publisher=true ;;
                 docs/*|manuals/*|*.md|ToDo/*) ;;
-                *) backend=true; frontend=true; publisher=true; public_e2e=true ;;
+                *) backend=true; frontend=true; publisher=true ;;
               esac
             done < <(git diff --name-only --no-renames "$BASE_SHA" HEAD)
           fi
@@ -74,7 +71,6 @@ jobs:
             echo "backend=$backend"
             echo "frontend=$frontend"
             echo "publisher=$publisher"
-            echo "public_e2e=$public_e2e"
             echo "base=$BASE_SHA"
           } >> "$GITHUB_OUTPUT"
 
@@ -336,93 +332,11 @@ jobs:
             frontend/test-results/pilot/
           if-no-files-found: ignore
 
-  frontend-public-e2e:
-    name: Django public renderer disabled
-    runs-on: ubuntu-latest
-    needs: detect
-    if: needs.detect.outputs.public_e2e == 'true'
-    env:
-      COMPOSE_PROJECT_NAME: eceeev4ci-${{ github.run_id }}-${{ github.run_attempt }}-publice2e
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Build cached backend image
-        uses: docker/build-push-action@v6
-        with:
-          context: backend
-          load: true
-          tags: eceee-v4-backend:latest
-          build-args: REQUIREMENTS_FILE=dev.txt
-          cache-from: type=gha,scope=backend-ci
-          cache-to: type=gha,mode=max,scope=backend-ci
-
-      - name: Prepare CI environment
-        run: |
-          cp .env.template .env
-          cat >> .env <<'EOF'
-          AWS_S3_ENDPOINT_URL=http://test-minio:9000
-          AWS_S3_INTERNAL_ENDPOINT_URL=http://test-minio:9000
-          DATABASE_URL=postgresql://postgres:test-only@test-db:5432/eceee_v4_test
-          POSTGRES_DB=eceee_v4_test
-          POSTGRES_USER=postgres
-          POSTGRES_PASSWORD=test-only
-          POSTGRES_HOST=test-db
-          POSTGRES_PORT=5432
-          REDIS_URL=redis://test-redis:6379/0
-          AWS_ACCESS_KEY_ID=test-eceee
-          AWS_SECRET_ACCESS_KEY=test-eceee-secret
-          IMGPROXY_URL=http://imgproxy:8080
-          IMGPROXY_PUBLIC_URL=http://localhost:8080
-          IMGPROXY_KEY=0000000000000000000000000000000000000000000000000000000000000000
-          IMGPROXY_SALT=1111111111111111111111111111111111111111111111111111111111111111
-          EOF
-
-      - name: Install frontend dependencies and Chromium
-        working-directory: frontend
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium
-
-      - name: Prepare retired-renderer regression backend
-        run: make prepare-public-e2e-backend TEST_UP_FLAGS=--no-build
-
-      - name: Resolve public regression hostname
-        run: echo '127.0.0.1 public-regression.test' | sudo tee -a /etc/hosts > /dev/null
-
-      - name: Verify Django public rendering stays disabled
-        working-directory: frontend
-        env:
-          PLAYWRIGHT_PUBLIC_BASE_URL: http://public-regression.test:10101
-        run: npm run test:e2e:public
-
-      - name: Upload Playwright report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-public-playwright-report
-          path: frontend/playwright-report/
-          if-no-files-found: ignore
-
-      - name: Clean up Docker resources
-        if: always()
-        run: |
-          docker compose -f docker-compose.dev.yml down -v --remove-orphans
-          docker compose -f docker-compose.infra.yml -f docker-compose.ci.yml down -v --remove-orphans
-          docker compose -f docker-compose.test-infra.yml down -v --remove-orphans
-
   ci-gate:
     name: CI gate
     runs-on: ubuntu-latest
     if: always()
-    needs: [detect, backend-lint, backend-tests, frontend-lint, frontend-tests, frontend-admin-e2e, frontend-public-e2e, publisher-checks]
+    needs: [detect, backend-lint, backend-tests, frontend-lint, frontend-tests, frontend-admin-e2e, publisher-checks]
     steps:
       - name: Verify selected checks
         env:

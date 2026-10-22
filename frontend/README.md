@@ -264,3 +264,14 @@ The deployment script derives the release label only from a tag pointing exactly
 **Achievement**: 100% Test Success Rate (128/128 tests)  
 **Status**: Production Ready  
 **Documentation**: Comprehensive and Current
+
+
+## CI browser tests
+
+`npm run test:e2e` runs the admin Playwright regression suite. GitHub Actions uses
+an image with Chromium and its system dependencies preinstalled; the same job also
+runs the desktop/mobile pilot baseline. The retired Django public renderer is
+covered by backend HTTP routing tests in
+`webpages.tests.test_rendering_deprecation` (published home/child pages and a
+missing page). These checks run as part of `make backend-test` and do not need
+Chromium, a separate web server, or a second backend image build.
