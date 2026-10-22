@@ -83,6 +83,7 @@ Mappningsfilen är JSON med:
 
 - `excludedSources`: granskade identiteter som `"publications:123"`. Exkludera proceedings även inne i biblioteket. Importen kan inte avgöra detta säkert från rubriken. Bilagor som innehåller undantaget material kräver uttrycklig manuell bedömning innan deras ägarpost importeras.
 - `approvedTermMap`: `"legacy_app.model:ID"` till en godkänd term-UUID i **målmiljön**, i samma avsedda klassificeringstyp. Förbered och godkänn termerna separat i klassificeringsgränssnittet/API:t innan importen körs. Hierarkiska källtermer kräver uttrycklig mappning; etiketter slås inte ihop automatiskt. Befintliga identitetsbundna termer kan återanvändas utan ny mappning. Importen skapar aldrig nya godkända termer; saknad taxonomi ger `unprepared_taxonomy_term`. Evenemangstyp/-kategori kräver förberedda termer med motsvarande slug.
+- `mediaClassificationIds`: ordnad lista av godkända term-UUID:n i målmiljön, tillåtna för `media_files`. Krävs för poster med bilder eller hämtade bilagor när namespace har aktiverat canonical-läget. Förbered termerna separat före import; valet valideras före hämtning och används för både bilder och bilagor. Befintliga klassificeringar på återanvända filer behålls. En ändrad lista gör att samma källpost behandlas igen.
 - `pressReleaseSourceTerms`: ursprungliga NewsType-ID:n som bestyrkt betyder pressmeddelande. Ingen textbaserad gissning görs.
 
 Tom/okänd mappning är inte bevis för en granskad inventering. Ansvarig behöver dokumentera täckning, undantag och återstående manuella åtgärder i importunderlaget.
@@ -128,3 +129,7 @@ Full CI upptäckte att de nya interna mediafunktionerna ärvde PostgreSQLs stand
 Den breda backendkörningen identifierade även att publicering av en sida utan taggar försökte initiera klassificeringsregistret och därmed nekade vanliga redaktörer. Legacy-synkroniseringen initierar nu en definition först när en verklig saknad term behöver skapas. Integrationstesterna använder uttryckligen en medlem som inte är tenantägare. Rättigheter för nya termer och borttagning av befintliga tilldelningar behålls.
 
 Integrationen med Kanban kontrollerar nu deduplicering och åtkomst före taggvalidering. Återanvändning av en befintlig fil ska inte initiera en oanvänd klassificering; en otillgänglig dubblett returnerar fortsatt en generell konflikt. Vid skapande av en ny mediafil krävs samma granskade klassificering och behörigheter som tidigare.
+
+### Ytterligare regressionskontroll inför merge
+
+36 fokuserade PostgreSQL-tester passerar för redaktionell import, äldre bildimport, maskinnyckelns definitionsscope och frivilliga mediasamlingar. Proven inkluderar canonical-klassificering av hämtad PDF och bild, bevarande av manuella medieklassificeringar, stopp före filhämtning vid saknat granskat val samt POST/PATCH som avvisar främmande eller globala undertyper utan mutation. Nio klassificeringstester och frontendbuild passerar efter att isolerade OS-styrda mörka färger tagits bort. Visuell webbläsarkontroll av dessa färgändringar har inte körts.

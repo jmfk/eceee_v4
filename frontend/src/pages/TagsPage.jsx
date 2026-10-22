@@ -20,7 +20,7 @@ const TagsPage = () => {
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-900 p-6">
+            <div className="bg-white p-6">
                 <ClassificationManager />
             </div>
         </div>

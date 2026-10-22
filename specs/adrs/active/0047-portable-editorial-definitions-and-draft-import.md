@@ -44,3 +44,5 @@ The v4 preflight can retrieve reconciled source-status counts without fetching u
 ### Review hardening
 
 Import application is lookup-only for taxonomy: missing approved source terms block the record; mapped IDs must belong to the expected facet. Prepare/govern the destination taxonomy separately as required by PRD-0034. Reimport conflict snapshots now cover relationships, metadata and slug, with destination reread after the authoring locks. Earlier experimental fingerprints fail closed as conflicts and must not be silently rebased. Definition bundles still contain the three article-kind core terms; legacy subject taxonomy is a separate reviewed preparation.
+
+Canonical media imports use the reviewed mapping’s ordered `mediaClassificationIds`, validated against approved terms usable for media in the destination namespace before remote reads. Both images and fetched attachments receive those assignments; reused files retain existing classifications. Import does not create or approve terms. The media selection participates in the mapping fingerprint, so a revised reviewed selection is not skipped merely because source content is unchanged.

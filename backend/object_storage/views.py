@@ -96,10 +96,16 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
             related = serializer.validated_data.get(field)
             if related and (not related.namespace_id or related.namespace.tenant_id != self.request.tenant.pk):
                 raise serializers.ValidationError({field: "Related definition belongs to another tenant."})
-        for related in serializer.validated_data.get("allowed_child_types", []):
-            if not related.namespace_id or related.namespace.tenant_id != self.request.tenant.pk:
+        child_names = serializer.validated_data.get("allowed_child_types_input")
+        if child_names is not None:
+            allowed_names = set(
+                ObjectTypeDefinition.objects.filter(
+                    name__in=child_names, is_active=True, namespace__tenant=self.request.tenant
+                ).values_list("name", flat=True)
+            )
+            if set(child_names) != allowed_names:
                 raise serializers.ValidationError(
-                    {"allowed_child_types": "Related definition belongs to another tenant."}
+                    {"allowed_child_types_input": "Related definitions must belong to the selected tenant."}
                 )
 
     def perform_update(self, serializer):

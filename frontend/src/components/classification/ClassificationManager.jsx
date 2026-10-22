@@ -5,12 +5,12 @@ import { taxonomyApi, classificationError } from '../../api/taxonomy'
 import { getCurrentTenantId } from '../../utils/tenant'
 
 const inputClass = 'block w-full rounded border-gray-300 bg-transparent mt-1'
-const buttonClass = 'px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 focus-visible:outline'
+const buttonClass = 'px-3 py-2 rounded hover:bg-gray-100 focus-visible:outline'
 
 function TermTree({ terms, selectedId, onSelect, parent = null, seen = [] }) {
     return <ul className={parent ? 'ml-5' : ''}>
         {terms.filter(term => term.parent === parent || (!parent && term.parent && !terms.some(item => item.id === term.parent))).filter(term => !seen.includes(term.id)).map(term => <li key={term.id}>
-            <button type="button" aria-current={term.id === selectedId ? 'true' : undefined} onClick={() => onSelect(term)} className={`${buttonClass} w-full text-left ${term.id === selectedId ? 'font-semibold bg-gray-100 dark:bg-gray-800' : ''}`}>
+            <button type="button" aria-current={term.id === selectedId ? 'true' : undefined} onClick={() => onSelect(term)} className={`${buttonClass} w-full text-left ${term.id === selectedId ? 'font-semibold bg-gray-100' : ''}`}>
                 {term.name}{term.status !== 'approved' && <span className="text-xs ml-2">{term.status}</span>}
             </button>
             <TermTree terms={terms} selectedId={selectedId} onSelect={onSelect} parent={term.id} seen={[...seen, term.id]} />
@@ -84,7 +84,7 @@ export default function ClassificationManager() {
         steward: ['use', 'propose', 'create', 'edit', 'move', 'merge', 'archive', 'restore', 'approve'],
         administrator: ['administer'],
     }
-    return <div className="space-y-6 text-gray-900 dark:text-gray-100" aria-busy={busy}>
+    return <div className="space-y-6 text-gray-900" aria-busy={busy}>
         <nav aria-label="Classification views" className="flex flex-wrap gap-3">
             {['terms', 'types', 'proposals', 'history', ...(permissions.includes('administer') ? ['rights'] : [])].map(item => <button type="button" key={item} className={buttonClass} aria-current={view === item ? 'page' : undefined} onClick={() => { setView(item); setError('') }}>{({ terms: 'Terms', types: 'Types', proposals: 'Proposals', history: 'History', rights: 'Rights' })[item]}</button>)}
         </nav>
@@ -95,7 +95,7 @@ export default function ClassificationManager() {
         </select></label>
         {types.data?.count === 0 && <p>No classification types are configured. Complete the classification reconciliation before starting editorial work.</p>}
         {notice && <p role="status">{notice} {undoId && <button type="button" disabled={busy} className="underline px-2 py-1" onClick={() => run(async () => { await taxonomyApi.undo(undoId); setUndoId(null); setNotice('Change undone.'); setSelected(null) })}>Undo</button>}</p>}
-        {error && <p role="alert" className="text-red-700 dark:text-red-400">{error}</p>}
+        {error && <p role="alert" className="text-red-700">{error}</p>}
         {view === 'types' && <>
             {definition && !permissions.includes('administer') ? <p>Type administration requires administrator rights.</p> :
                 <ClassificationTypeForm key={typeId || 'new'} definition={definition} tenant={tenant} busy={busy}

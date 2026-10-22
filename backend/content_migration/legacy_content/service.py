@@ -12,9 +12,9 @@ from rest_framework.exceptions import PermissionDenied
 from content_migration.legacy_news.media import LegacyMediaImporter
 from content_migration.models import EditorialImportBinding, EditorialImportItem, EditorialImportRun
 from object_storage.models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
-from taxonomy.assignments import classification_ids, replace_assignments
+from taxonomy.assignments import classification_ids, replace_assignments, validate_media_selection
 from taxonomy.context import actor_context
-from taxonomy.models import ClassificationType, Tag
+from taxonomy.models import ClassificationRollout, ClassificationType, Tag
 from taxonomy.services import require
 
 from .profile import OBJECT_TYPES, PROFILE
@@ -265,6 +265,8 @@ def _attachments(row, media_importer):
                     last_modified_by=media_importer.user,
                     metadata={"legacy_attachment_url": url},
                 )
+        if media_importer.classification_ids is not None:
+            media_importer._apply_tags(existing, placeholder=False)
         results.append({**attachment, "sourceUrl": url, "url": existing.file_url, "mediaId": str(existing.pk)})
     return results
 
@@ -309,7 +311,13 @@ def apply_item(run, item, user, types, facets):
         item.save()
         return item.status
     # Raw source equality is insufficient when a reviewed mapping or profile changes.
-    mapping_keys = ("approvedTermMap", "pressReleaseSourceTerms", "pipeline", "definitionHash")
+    mapping_keys = (
+        "approvedTermMap",
+        "pressReleaseSourceTerms",
+        "mediaClassificationIds",
+        "pipeline",
+        "definitionHash",
+    )
     mapping = {key: config.get(key) for key in mapping_keys}
     previous_mapping = {key: binding.last_run.configuration.get(key) for key in mapping_keys} if binding else None
     if binding and binding.source_hash == item.source_hash and mapping == previous_mapping:
@@ -332,7 +340,19 @@ def apply_item(run, item, user, types, facets):
     }
     payload = normalize(row, item.resource, author_ids=author_ids)
     tags = terms_for(row, item.resource, facets, user, config)
-    importer = LegacyMediaImporter(namespace=run.namespace, tenant=run.tenant, user=user)
+    media_ids = config.get("mediaClassificationIds")
+    has_media = payload["images"] or any(a.get("url") for a in row.get("attachments", []))
+    if has_media:
+        if (
+            media_ids is None
+            and ClassificationRollout.objects.filter(namespace=run.namespace, phase="canonical").exists()
+        ):
+            raise BlockedRecord("media_classification_required")
+        if media_ids is not None:
+            if not isinstance(media_ids, list):
+                raise BlockedRecord("media_classification_must_be_list")
+            media_ids = validate_media_selection(run.namespace, user, media_ids)
+    importer = LegacyMediaImporter(namespace=run.namespace, tenant=run.tenant, user=user, classification_ids=media_ids)
     media = {
         url: importer.import_image(url, article_identity=f"{item.resource}:{item.source_id}", resume=True)
         for url in payload["images"]

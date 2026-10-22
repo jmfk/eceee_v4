@@ -60,11 +60,13 @@ class LegacyMediaImporter:
         tenant,
         user,
         local_assets: Optional[Mapping[str, Path]] = None,
+        classification_ids=None,
     ):
         self.namespace = namespace
         self.tenant = tenant
         self.user = user
         self.local_assets = dict(local_assets or {})
+        self.classification_ids = classification_ids
 
     def import_image(
         self,
@@ -226,6 +228,13 @@ class LegacyMediaImporter:
         validate_public_http_url(url, subject="image")
 
     def _apply_tags(self, media: MediaFile, *, placeholder: bool) -> None:
+        if self.classification_ids is not None:
+            from taxonomy.assignments import classification_ids, replace_assignments
+
+            # Reused media may already have editorial classifications; retain them.
+            ids = list(dict.fromkeys(classification_ids(media) + self.classification_ids))
+            replace_assignments(media, ids, self.user)
+            return
         names = ["legacy", "news"] + (["migration-placeholder"] if placeholder else [])
         tags = []
         for name in names:

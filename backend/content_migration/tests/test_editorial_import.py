@@ -1,10 +1,12 @@
+import hashlib
 import json
 from io import StringIO
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import connection
 from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
@@ -122,6 +124,103 @@ class EditorialImportTests(TestCase):
             source_scope="legacy.example:site:2",
             records=rows,
         )
+
+    def _media_term(self, name):
+        from taxonomy.models import Tag
+
+        definition = self.facets["general"]
+        if "media_files" not in definition.allowed_uses:
+            definition.allowed_uses.append("media_files")
+            definition.save()
+        return Tag.objects.create(
+            tenant=self.tenant, namespace=self.namespace, classification_type=definition, name=name, slug=name.lower()
+        )
+
+    def _media_run(self, row, configuration):
+        return stage(
+            tenant=self.tenant,
+            namespace=self.namespace,
+            user=self.user,
+            source_scope="legacy.example:site:2",
+            records=[("publications", row)],
+            configuration=configuration,
+        )
+
+    def test_canonical_images_and_attachments_use_reviewed_terms_and_preserve_existing_assignments(self):
+        from file_manager.models import MediaFile
+        from taxonomy.assignments import classification_ids, replace_assignments
+        from taxonomy.models import ClassificationRollout
+
+        first_term = self._media_term("Imported")
+        manual_term = self._media_term("Manual")
+        next_term = self._media_term("Reviewed")
+        ClassificationRollout.objects.create(namespace=self.namespace, phase="canonical")
+        row = record(
+            "publications",
+            content='<p>Report <img src="https://legacy.example/cover.png"></p>',
+            attachments=[{"title": "Report", "url": "https://legacy.example/report.pdf"}],
+        )
+
+        def uploaded(path, file):
+            content = file.read()
+            return {
+                "file_path": path,
+                "file_size": len(content),
+                "content_type": file.content_type,
+                "file_hash": hashlib.sha256(content).hexdigest(),
+                "width": 10,
+                "height": 10,
+            }
+
+        response = Mock(status_code=200, content=b"%PDF-1.4 test", headers={"content-type": "application/pdf"})
+        with (
+            patch("content_migration.legacy_news.media.storage") as storage,
+            patch("file_manager.storage.storage", storage),
+            patch(
+                "content_migration.legacy_news.media.LegacyMediaImporter._read_image",
+                return_value=(b"image", "image/png"),
+            ),
+            patch("content_migration.legacy_news.remote.get_public_url", return_value=response) as download,
+        ):
+            storage.overwrite_file.side_effect = uploaded
+            storage.get_public_url.side_effect = lambda path: "https://media.example/" + path
+            first = self._media_run(row, {"mediaClassificationIds": [str(first_term.pk)]})
+            self.assertEqual(apply_run(first, self.user), {"imported": 1})
+            self.assertEqual(MediaFile.objects.count(), 2)
+            for media in MediaFile.objects.all():
+                self.assertEqual(classification_ids(media), [str(first_term.pk)])
+                with actor_context(self.user):
+                    replace_assignments(media, [str(first_term.pk), str(manual_term.pk)], self.user)
+            connection.check_constraints()
+            second = self._media_run(row, {"mediaClassificationIds": [str(next_term.pk)]})
+            self.assertEqual(apply_run(second, self.user), {"imported": 1})
+            self.assertEqual(MediaFile.objects.count(), 2)
+            for media in MediaFile.objects.all():
+                self.assertEqual(
+                    classification_ids(media), [str(first_term.pk), str(manual_term.pk), str(next_term.pk)]
+                )
+            self.assertEqual(EditorialImportBinding.objects.get().object_instance.versions.count(), 2)
+            self.assertEqual(download.call_count, 1)
+            self.assertEqual(storage.overwrite_file.call_count, 2)
+            connection.check_constraints()
+
+    def test_canonical_media_without_reviewed_classification_blocks_before_io(self):
+        from file_manager.models import MediaFile
+        from taxonomy.models import ClassificationRollout
+
+        ClassificationRollout.objects.create(namespace=self.namespace, phase="canonical")
+        row = record("publications", attachments=[{"title": "Report", "url": "https://legacy.example/report.pdf"}])
+        with (
+            patch("content_migration.legacy_news.remote.get_public_url") as download,
+            patch("file_manager.storage.storage") as storage,
+        ):
+            run = self._media_run(row, {})
+            self.assertEqual(apply_run(run, self.user), {"blocked": 1})
+            self.assertEqual(run.items.get().error_category, "media_classification_required")
+            download.assert_not_called()
+            storage.overwrite_file.assert_not_called()
+        self.assertFalse(MediaFile.objects.exists())
+        connection.check_constraints()
 
     def test_drafts_are_idempotent_and_resume_reuses_identity(self):
         run = self.stage([("news", record())])
