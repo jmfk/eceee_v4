@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="instruction",
             name="help_guide_id",
-            field=models.CharField(blank=True, default="", max_length=150),
+            field=models.CharField(blank=True, default="", max_length=150, null=True),
         ),
         migrations.AddIndex(
             model_name="instruction",

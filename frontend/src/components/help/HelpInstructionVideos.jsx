@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { supportRequest, supportError } from '../../api/support'
 import { useSupportContext, useSupportIdentity, useSupportTenant } from '../support/useSupportContext'
@@ -8,13 +8,15 @@ export default function HelpInstructionVideos({ guideId, children }) {
     const tenant = useSupportTenant()
     const identity = useSupportIdentity()
     const context = useSupportContext()
-    const query = useQuery({
+    const query = useInfiniteQuery({
         queryKey: ['support', tenant, identity, 'help-instructions', guideId],
-        queryFn: () => supportRequest(tenant, `instructions/?help_guide_id=${encodeURIComponent(guideId)}`),
+        initialPageParam: 1,
+        queryFn: ({ pageParam }) => supportRequest(tenant, `instructions/?help_guide_id=${encodeURIComponent(guideId)}&page=${pageParam}`),
+        getNextPageParam: (lastPage, _pages, lastPageParam) => lastPage.next ? lastPageParam + 1 : undefined,
         enabled: !!tenant,
         retry: false,
     })
-    const instructions = query.data?.results || []
+    const instructions = query.data?.pages.flatMap((page) => page.results) || []
     const tenantQuery = encodeURIComponent(tenant || '')
     return (
         <section aria-label="Instruktionsfilmer för hjälpartikeln">
@@ -40,6 +42,16 @@ export default function HelpInstructionVideos({ guideId, children }) {
                     ))}
                 </div>
             ) : children}
+            {query.hasNextPage && (
+                <button
+                    type="button"
+                    disabled={query.isFetchingNextPage}
+                    onClick={() => query.fetchNextPage()}
+                    className="mt-4 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                    {query.isFetchingNextPage ? 'Hämtar fler filmer…' : 'Visa fler instruktionsfilmer'}
+                </button>
+            )}
             {context.data?.canPublish && (
                 <Link
                     className="mt-4 inline-flex rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"

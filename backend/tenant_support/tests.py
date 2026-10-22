@@ -9,7 +9,8 @@ from unittest.mock import Mock, patch
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
+from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase, TransactionTestCase, override_settings, skipUnlessDBFeature
 from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate
@@ -81,6 +82,34 @@ class SupportAPITests(TestCase):
         }
         data.update(kwargs)
         return self.call(views.ThreadsView, "post", data), data
+
+    def test_previous_release_can_publish_during_schema_upgrade_and_retry(self):
+        old_apps = MigrationExecutor(connection).loader.project_state([("tenant_support", "0001_initial")]).apps
+        OldInstruction = old_apps.get_model("tenant_support", "Instruction")
+        video = self.video()
+        request_id = uuid.uuid4()
+        previous = OldInstruction.objects.create(
+            tenant_id=self.tenant.pk,
+            author_id=self.support.pk,
+            video_id=video.pk,
+            title="Published by previous release",
+            description="No help guide field in the old INSERT",
+            request_id=request_id,
+        )
+        retry = self.call(
+            views.InstructionsView,
+            "post",
+            {
+                "title": previous.title,
+                "description": previous.description,
+                "videoId": str(video.pk),
+                "requestId": str(request_id),
+            },
+            user=self.support,
+        )
+        self.assertEqual(retry.status_code, 200, retry.data)
+        self.assertEqual(retry.data["help_guide_id"], "")
+        self.assertEqual(Instruction.objects.count(), 1)
 
     def test_help_guide_link_can_be_published_changed_and_cleared(self):
         result, data = self.publish(helpGuideId="pages-create")

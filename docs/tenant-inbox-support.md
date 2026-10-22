@@ -78,9 +78,9 @@ Publish through Profile → Inbox → Publicera instruktion. Choose an optional 
 
 The API persists `help_guide_id` (frontend `helpGuideId`), a stable guide ID from `frontend/src/docs/how-to/`, independent of the translated title. POST `instructions/` and PATCH `instructions/<id>/` accept it. GET `instructions/?help_guide_id=<id>` filters within the current tenant and excludes withdrawn films; the normal default also excludes archived films. Permission and private-video checks remain the same as the instruction library. This association does not make media public or store signed playback URLs in documentation.
 
-A help article plays its workspace's active linked films through the existing short-lived private player. If none are linked, its existing static/generated video remains available. Written documentation always remains visible; an instruction-fetch error preserves the existing video and shows an inline error. The existing contextual help icons already lead to these articles.
+A help article plays its workspace's active linked films through the existing short-lived private player. If none are linked, its existing static/generated video remains available. Use **Visa fler instruktionsfilmer** to load older linked films beyond the first API page. Written documentation always remains visible; an instruction-fetch error preserves the existing video and shows an inline error. The existing contextual help icons already lead to these articles.
 
-Migration `tenant_support.0002_instruction_help_guide` adds a blank guide ID to existing films and a tenant/guide index. It does not rewrite video objects or publish notifications. Apply it before using this version's instruction APIs. Existing films remain unlinked until a publisher selects an article.
+Migration `tenant_support.0002_instruction_help_guide` adds an optional guide ID and a tenant/guide index. The database column accepts NULL so the previous backend can still publish during migrate-before-restart deployment; API output and idempotent retries normalize it to an empty string. It does not rewrite video objects or publish notifications. Apply it before using this version's instruction APIs. Existing films remain unlinked until a publisher selects an article.
 
 ## Local MinIO setup
 

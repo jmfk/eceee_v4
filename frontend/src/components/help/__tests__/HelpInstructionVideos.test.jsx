@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -35,7 +35,7 @@ describe('instruction films in help articles', () => {
         renderVideos()
         expect(screen.getByText('Existing help video')).toBeInTheDocument()
         expect(await screen.findByText('Existing help video')).toBeInTheDocument()
-        expect(supportRequest).toHaveBeenCalledWith('workspace-a', 'instructions/?help_guide_id=pages-create')
+        expect(supportRequest).toHaveBeenCalledWith('workspace-a', 'instructions/?help_guide_id=pages-create&page=1')
     })
 
     it('shows workspace films with private playback and a stable instruction link', async () => {
@@ -47,6 +47,20 @@ describe('instruction films in help articles', () => {
         expect(screen.queryByText('Existing help video')).not.toBeInTheDocument()
         expect(screen.getByRole('link', { name: 'Öppna filmen i Inbox' })).toHaveAttribute('href', '/inbox/instructions/film-1?tenant=workspace-a')
         expect(screen.getByRole('link', { name: 'Lägg till instruktionsfilm här' })).toHaveAttribute('href', '/inbox/publish?tenant=workspace-a&guide=pages-create')
+    })
+
+    it('loads linked films beyond the first API page without losing earlier films', async () => {
+        const firstPage = Array.from({ length: 30 }, (_, index) => ({
+            id: `film-${index}`, title: `Film ${index}`, videoId: `video-${index}`,
+        }))
+        supportRequest.mockResolvedValueOnce({ results: firstPage, next: '/api/v1/support/instructions/?page=2' })
+            .mockResolvedValueOnce({ results: [{ id: 'film-30', title: 'Äldre länkad film', videoId: 'video-30' }], next: null })
+        renderVideos()
+        fireEvent.click(await screen.findByRole('button', { name: 'Visa fler instruktionsfilmer' }))
+        expect(await screen.findByRole('heading', { name: 'Äldre länkad film' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Film 0' })).toBeInTheDocument()
+        expect(supportRequest).toHaveBeenLastCalledWith('workspace-a', 'instructions/?help_guide_id=pages-create&page=2')
+        await waitFor(() => expect(screen.queryByRole('button', { name: 'Visa fler instruktionsfilmer' })).not.toBeInTheDocument())
     })
 
     it('keeps written-help video fallback on API failure', async () => {
