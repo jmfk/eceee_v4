@@ -1,0 +1,340 @@
+name: CI checks
+
+on:
+  workflow_call:
+    inputs:
+      full:
+        type: boolean
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  DOCKER_COMPOSE: docker compose
+  COMPOSE_DEV_FILES: -f docker-compose.dev.yml -f docker-compose.ci.dev.yml
+  COMPOSE_INFRA_FILES: -f docker-compose.infra.yml -f docker-compose.ci.yml
+
+jobs:
+  detect:
+    name: Select CI checks
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.select.outputs.backend }}
+      frontend: ${{ steps.select.outputs.frontend }}
+      publisher: ${{ steps.select.outputs.publisher }}
+      base: ${{ steps.select.outputs.base }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select checks for changed files
+        id: select
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          python3 scripts/ci_policy.py select --base "$BASE_SHA" --head HEAD \
+            --mode "${{ inputs.full && 'full' || 'fast' }}" --github-output "$GITHUB_OUTPUT"
+
+  backend-lint:
+    name: Backend lint
+    runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.backend == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements/dev.txt
+
+      - name: Install lint tools
+        run: python -m pip install black==25.11.0 'isort>=5.12.0' 'flake8>=6.0.0'
+
+      - name: Run backend lint
+        env:
+          BASE_SHA: ${{ needs.detect.outputs.base }}
+        run: |
+          mapfile -t files < <(git diff --name-only --diff-filter=ACMRT "$BASE_SHA" HEAD -- backend scripts | sed -n '/\.py$/p' | sed '/\/migrations\//d')
+          if (( ${#files[@]} == 0 )); then
+            echo 'No changed Python files to lint.'
+            exit 0
+          fi
+          black --check --config backend/pyproject.toml "${files[@]}"
+          isort --check-only "${files[@]}"
+          flake8 --config backend/.flake8 "${files[@]}"
+
+  frontend-lint:
+    name: Frontend lint
+    runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.frontend == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run frontend lint
+        working-directory: frontend
+        run: npm run lint
+
+  publisher-checks:
+    name: Publisher checks
+    runs-on: ubuntu-latest
+    needs: detect
+    if: inputs.full && needs.detect.outputs.publisher == 'true'
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: eceee_publisher_sqltest
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d eceee_publisher_sqltest"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      PUBLISHER_SQL_TEST_DATABASE_URL: postgresql://postgres:test-only@127.0.0.1:5432/eceee_publisher_sqltest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: publisher/package-lock.json
+
+      - name: Install publisher dependencies
+        working-directory: publisher
+        run: npm ci
+
+      - name: Verify framework-independent widget contracts
+        run: |
+          node --test backend/widget_contracts/tests/*.test.mjs
+          node backend/widget_contracts/manifest.mjs --check
+          node backend/widget_contracts/observe.mjs backend/webpages/tests/fixtures/pilot_baseline/cases.json /tmp/widget-contract-observations.json
+          python3 scripts/pilot_baseline.py compare /tmp/widget-contract-observations.json --output /tmp/widget-contract-comparison.json
+
+      - name: Audit publisher production dependencies
+        working-directory: publisher
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Test, lint, typecheck, and build publisher
+        working-directory: publisher
+        run: npm test && npm run lint && npm run typecheck && npm run build
+
+      - name: Smoke-test publisher production image
+        run: |
+          docker build -f publisher/Dockerfile -t eceee-publisher-ci .
+          docker run --rm -d --name eceee-publisher-ci eceee-publisher-ci
+          trap 'docker rm -f eceee-publisher-ci >/dev/null 2>&1 || true' EXIT
+          for _ in {1..30}; do
+            response=$(docker exec eceee-publisher-ci node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.stdout.write(r.status + ':' + (r.headers.get('x-eceee-publisher') || ''))).catch(()=>process.stdout.write('000:'))" 2>/dev/null || true)
+            if [ "$response" = "503:nextjs" ]; then
+              exit 0
+            fi
+            if [ "$response" != "000:" ] && [ -n "$response" ]; then
+              echo "Unexpected publisher health response: $response" >&2
+              docker logs --tail=50 eceee-publisher-ci >&2
+              exit 1
+            fi
+            sleep 1
+          done
+          echo "Publisher production image did not become ready." >&2
+          docker logs --tail=50 eceee-publisher-ci >&2
+          exit 1
+
+      - name: Validate production Caddy routing
+        run: |
+          docker run --rm \
+            -e DOMAIN=example.com \
+            -e EMAIL=ci@example.com \
+            -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
+
+      - name: Test publisher deployment health gate
+        run: |
+          bash deploy/scripts/tests/test-healthcheck.sh
+          bash deploy/scripts/tests/test-production-operation.sh
+          bash deploy/scripts/tests/test-validate-deploy-control-ref.sh
+          bash deploy/scripts/tests/test-deploy-build-order.sh
+
+  backend-tests:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    needs: detect
+    if: inputs.full && needs.detect.outputs.backend == 'true'
+    env:
+      COMPOSE_PROJECT_NAME: eceeev4ci-${{ github.run_id }}-${{ github.run_attempt }}-backendtests
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build cached backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          load: true
+          tags: eceee-v4-backend:latest
+          build-args: REQUIREMENTS_FILE=dev.txt
+          cache-from: type=gha,scope=backend-ci
+          cache-to: type=gha,mode=max,scope=backend-ci
+
+      - name: Prepare CI environment
+        run: |
+          cp .env.template .env
+          cat >> .env <<'EOF'
+          AWS_S3_ENDPOINT_URL=http://test-minio:9000
+          AWS_S3_INTERNAL_ENDPOINT_URL=http://test-minio:9000
+          DATABASE_URL=postgresql://postgres:test-only@test-db:5432/eceee_v4_test
+          POSTGRES_DB=eceee_v4_test
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=test-only
+          POSTGRES_HOST=test-db
+          POSTGRES_PORT=5432
+          REDIS_URL=redis://test-redis:6379/0
+          AWS_ACCESS_KEY_ID=test-eceee
+          AWS_SECRET_ACCESS_KEY=test-eceee-secret
+          IMGPROXY_URL=http://imgproxy:8080
+          IMGPROXY_PUBLIC_URL=http://localhost:8080
+          IMGPROXY_KEY=0000000000000000000000000000000000000000000000000000000000000000
+          IMGPROXY_SALT=1111111111111111111111111111111111111111111111111111111111111111
+          EOF
+
+      - name: Run backend tests
+        run: make backend-test
+
+      - name: Verify pilot comparator rejects regressions
+        run: python3 -m unittest discover -s scripts/tests -p test_pilot_baseline.py -v
+
+      - name: Clean up Docker resources
+        if: always()
+        run: |
+          docker compose -f docker-compose.dev.yml down -v --remove-orphans
+          docker compose -f docker-compose.infra.yml -f docker-compose.ci.yml down -v --remove-orphans
+          docker compose -f docker-compose.test-infra.yml down -v --remove-orphans
+
+  frontend-tests:
+    name: Frontend unit tests
+    runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.frontend == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run frontend unit tests
+        working-directory: frontend
+        run: npm run test:run -- --bail=1 --maxWorkers=2
+
+  frontend-admin-e2e:
+    name: Frontend admin Playwright
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.60.0-noble
+    needs: detect
+    if: inputs.full && needs.detect.outputs.frontend == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run admin Playwright tests
+        working-directory: frontend
+        run: npm run test:e2e:admin
+
+      - name: Run isolated pilot browser baseline
+        working-directory: frontend
+        run: npx playwright test --config playwright.pilot.config.js
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-admin-playwright-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/pilot/
+          if-no-files-found: ignore
+
+  python-tests:
+    name: Python helper tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run framework-independent unit tests
+        run: python3 -m unittest discover -s scripts/tests -v
+      - name: Validate workflow syntax
+        run: |
+          python3 -m pip install PyYAML==6.0.3
+          python3 scripts/validate_ci_workflows.py
+
+  publisher-unit-tests:
+    name: Publisher unit tests
+    runs-on: ubuntu-latest
+    needs: detect
+    if: ${{ !inputs.full && needs.detect.outputs.publisher == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: publisher/package-lock.json
+      - name: Install publisher dependencies
+        working-directory: publisher
+        run: npm ci
+      - name: Run publisher unit tests and lint
+        working-directory: publisher
+        run: npm test && npm run lint
+
+  ci-gate:
+    # Only the full caller creates a check with the protected full-gate name.
+    name: ${{ inputs.full && 'Full CI gate' || 'Fast CI gate' }}
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [detect, python-tests, backend-lint, frontend-lint, backend-tests, frontend-tests, frontend-admin-e2e, publisher-checks, publisher-unit-tests]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require the expected checks to succeed
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+          FULL_CI: ${{ inputs.full }}
+        run: python3 scripts/ci_policy.py gate

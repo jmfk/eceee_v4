@@ -5,6 +5,7 @@
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
 | ADR-0049 | [Replayable legacy media with transaction-safe placeholder repairs](active/0049-transaction-safe-legacy-media-repairs.md) | accepted | PRD-0012, PRD-0034 |
+| ADR-0048 | [Fast push feedback and an exact-revision full CI merge gate](active/0048-fast-ci-and-full-merge-gate.md) | accepted | PRD-0028 |
 | ADR-0047 | [Portable editorial definitions and checkpointed draft imports](active/0047-portable-editorial-definitions-and-draft-import.md) | accepted | PRD-0034, PRD-0031 |
 | ADR-0046 | [Gemensam Artikel och avgränsad legacyimport](active/0046-unified-articles-and-bounded-legacy-import.md) | accepted | PRD-0034, PRD-0012, PRD-0031 |
 | ADR-0043 | [Classification governance and staged cutover](active/0043-classification-governance.md) | accepted | PRD-0031 |
