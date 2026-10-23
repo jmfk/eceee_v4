@@ -98,3 +98,46 @@ class ProvisionSupportStorageTests(SimpleTestCase):
             self.run_command()
         client.head_bucket.assert_not_called()
         client.create_bucket.assert_not_called()
+
+
+class SupportStorageCredentialTests(SimpleTestCase):
+    @patch("tenant_support.storage.boto3.client")
+    def test_dedicated_pair_used_for_internal_and_public_signing(self, client):
+        from django.test import override_settings
+        from tenant_support import storage
+
+        with override_settings(
+            SUPPORT_STORAGE_ACCESS_KEY_ID="support-test-key", SUPPORT_STORAGE_SECRET_ACCESS_KEY="support-test-secret"
+        ):
+            storage.client()
+            storage.client(public=True)
+        for call in client.call_args_list:
+            self.assertEqual(call.kwargs["aws_access_key_id"], "support-test-key")
+            self.assertEqual(call.kwargs["aws_secret_access_key"], "support-test-secret")
+
+    @patch("tenant_support.storage.boto3.client")
+    def test_incomplete_pair_fails_before_provider_request(self, client):
+        from django.test import override_settings
+        from django.core.exceptions import ImproperlyConfigured
+        from tenant_support import storage
+
+        for key, secret in [("support-test-key", ""), ("", "support-test-secret")]:
+            with override_settings(SUPPORT_STORAGE_ACCESS_KEY_ID=key, SUPPORT_STORAGE_SECRET_ACCESS_KEY=secret):
+                with self.assertRaises(ImproperlyConfigured):
+                    storage.client()
+        client.assert_not_called()
+
+    @patch("tenant_support.storage.boto3.client")
+    def test_local_legacy_pair_still_supported(self, client):
+        from django.test import override_settings
+        from tenant_support import storage
+
+        with override_settings(
+            SUPPORT_STORAGE_ACCESS_KEY_ID="",
+            SUPPORT_STORAGE_SECRET_ACCESS_KEY="",
+            AWS_ACCESS_KEY_ID="local-test-key",
+            AWS_SECRET_ACCESS_KEY="local-test-secret",
+        ):
+            storage.client()
+        self.assertEqual(client.call_args.kwargs["aws_access_key_id"], "local-test-key")
+        self.assertEqual(client.call_args.kwargs["aws_secret_access_key"], "local-test-secret")

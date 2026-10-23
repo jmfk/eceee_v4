@@ -760,6 +760,8 @@ FM_PASSWORD = config("FM_PASSWORD", default="")
 
 # Private inbox media must never share the public media/checkpoint bucket.
 SUPPORT_STORAGE_BUCKET_NAME = config("SUPPORT_STORAGE_BUCKET_NAME", default="")
+SUPPORT_STORAGE_ACCESS_KEY_ID = config("SUPPORT_STORAGE_ACCESS_KEY_ID", default="")
+SUPPORT_STORAGE_SECRET_ACCESS_KEY = config("SUPPORT_STORAGE_SECRET_ACCESS_KEY", default="")
 SUPPORT_APP_URL = config("SUPPORT_APP_URL", default="")
 SUPPORT_EMAIL_ENABLED = config("SUPPORT_EMAIL_ENABLED", default=False, cast=bool)
 SUPPORT_BUG_MAX_BYTES = 25 * 1024 * 1024
