@@ -50,7 +50,7 @@ class DevAutoLoginMiddleware:
 
     def __call__(self, request):
         # CRITICAL: Only activate in DEBUG mode
-        if settings.DEBUG:
+        if settings.DEBUG and getattr(settings, "DEV_AUTO_LOGIN", True):
             # Check if user is already authenticated via session or other means
             if not hasattr(request, "user") or request.user.is_anonymous:
                 # Get or create dev user on first request
@@ -61,6 +61,7 @@ class DevAutoLoginMiddleware:
                 if self.dev_user:
                     request.user = self.dev_user
                     request._cached_user = self.dev_user
+                    request.cms_dev_auto_login = True
 
         response = self.get_response(request)
         return response
@@ -82,12 +83,13 @@ class DevAutoLoginASGIMiddleware:
         self.inner = inner
 
     async def __call__(self, scope, receive, send):
-        if settings.DEBUG and scope.get("type") == "websocket":
+        if settings.DEBUG and getattr(settings, "DEV_AUTO_LOGIN", True) and scope.get("type") == "websocket":
             user = scope.get("user")
             if not user or not user.is_authenticated:
                 dev_user = await database_sync_to_async(get_or_create_dev_user)()
                 if dev_user:
                     scope = dict(scope)
                     scope["user"] = dev_user
+                    scope["cms_dev_auto_login"] = True
 
         return await self.inner(scope, receive, send)

@@ -35,7 +35,7 @@ tinycss2>=1.2.0
 cryptography>=42.0.0
 
 # Authentication and authorization
-django-allauth>=0.54.0
+django-allauth[mfa,socialaccount]==65.20.1
 
 # Email backend
 django-postmark>=0.1.6

@@ -2296,6 +2296,14 @@ export default defineConfig({
     port: Number(process.env.VITE_DEV_SERVER_PORT || 10100),
     allowedHosts: true, // Allow all hosts (dev only) to support custom hostnames like 'summerstudy'
     proxy: {
+      '/_allauth': {
+        target: process.env.VITE_BACKEND_URL || 'http://backend:8000',
+        changeOrigin: false,
+      },
+      '/accounts': {
+        target: process.env.VITE_BACKEND_URL || 'http://backend:8000',
+        changeOrigin: false,
+      },
       '/api': {
         target: process.env.VITE_BACKEND_URL || 'http://backend:8000',
         changeOrigin: true,

@@ -75,6 +75,8 @@ urlpatterns = [
     # Authentication
     path("api/auth/", include("rest_framework.urls")),
     path("accounts/", include("allauth.urls")),
+    path("_allauth/", include("cms_auth.urls")),
+    path("_allauth/", include("allauth.headless.urls")),
     # Web Page Publishing System (admin/API functions)
     path("webpages/", include("webpages.urls")),
     # Lightbox (HTMX endpoints)

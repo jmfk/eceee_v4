@@ -171,6 +171,11 @@ THIRD_PARTY_APPS = [
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
+    "allauth.socialaccount.providers.google",
+    "allauth.socialaccount.providers.apple",
+    "allauth.mfa",
+    "allauth.headless",
+    "cms_auth.apps.CMSAuthConfig",
     # Development tools
     "django_extensions",
     "debug_toolbar",
@@ -220,10 +225,11 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
+    "cms_auth.middleware.AccountSecurityMiddleware",
     "utils.middleware.dev_auth.DevAutoLoginMiddleware",  # Auto-login for development (only active when DEBUG=True)
     "taxonomy.context.ClassificationActorMiddleware",
     "core.middleware.TenantContextMiddleware",  # Set tenant context after session/dev authentication
-    "allauth.account.middleware.AccountMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -394,9 +400,9 @@ CSRF_USE_SESSIONS = False  # Use cookies instead of sessions for CSRF tokens
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "core.machine_api_keys.MachineAPIKeyAuthentication",
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
-        "rest_framework.authentication.TokenAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
+        "cms_auth.authentication.PersonalJWTAuthentication",
+        "cms_auth.authentication.PersonalTokenAuthentication",
+        "cms_auth.authentication.BrowserSessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -767,3 +773,8 @@ SUPPORT_INSTRUCTION_MAX_BYTES = 200 * 1024 * 1024
 SUPPORT_DAILY_MAX_BYTES = 1024 * 1024 * 1024
 SUPPORT_FFPROBE = "ffprobe"
 SUPPORT_FFMPEG = "ffmpeg"
+
+# Complete browser authentication and MFA; loaded after legacy account defaults.
+from cms_auth.settings import *  # noqa: E402,F401,F403
+
+DEV_AUTO_LOGIN = DEBUG and config("DEV_AUTO_LOGIN", default=True, cast=bool)

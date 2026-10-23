@@ -45,6 +45,7 @@
     "mustache": "^4.2.0",
     "pdfjs-dist": "^5.4.449",
     "prop-types": "^15.8.1",
+    "qrcode.react": "^4.2.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-dropzone": "^14.3.8",
