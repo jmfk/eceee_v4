@@ -155,6 +155,8 @@ const SettingsDashboard = () => {
                             <h4 className="font-semibold text-gray-900">Create New Page</h4>
                             <p className="text-xs text-gray-500 mt-1">Start building a new content page</p>
                         </Link>
+                        <Link to="/settings/roles" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100"><h4 className="font-semibold text-gray-900">Roller och behörigheter</h4><p className="text-xs text-gray-500 mt-1">Hantera arbetsytans roller</p></Link>
+                        <Link to="/settings/support" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100"><h4 className="font-semibold text-gray-900">Support</h4><p className="text-xs text-gray-500 mt-1">Mottagare, publicerare och leveransstatus</p></Link>
                         <Link to="/settings/users" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100">
                             <h4 className="font-semibold text-gray-900">Manage Users</h4>
                             <p className="text-xs text-gray-500 mt-1">Add or edit system administrators</p>

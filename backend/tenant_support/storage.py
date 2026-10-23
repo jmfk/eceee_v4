@@ -77,3 +77,19 @@ def playback_url(key):
         Params={"Bucket": bucket_name(), "Key": key, "ResponseCacheControl": "private, no-store"},
         ExpiresIn=60,
     )
+
+
+def download_url(key, filename):
+    from django.utils.http import content_disposition_header
+
+    assert_private(client())
+    return client(public=True).generate_presigned_url(
+        "get_object",
+        Params={
+            "Bucket": bucket_name(),
+            "Key": key,
+            "ResponseCacheControl": "private, no-store",
+            "ResponseContentDisposition": content_disposition_header(True, filename),
+        },
+        ExpiresIn=60,
+    )

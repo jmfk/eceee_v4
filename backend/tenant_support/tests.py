@@ -248,7 +248,7 @@ class SupportAPITests(TestCase):
         self.assertEqual(self.call(views.VideoPlaybackView, pk=video_id).status_code, 403)
 
     def test_input_validation_and_role_management(self):
-        self.assertEqual(self.create_thread(location="")[0].status_code, 400)
+        self.assertEqual(self.create_thread(location="")[0].status_code, 201)
         self.assertEqual(self.create_thread(location="javascript:alert(1)")[0].status_code, 400)
         self.assertEqual(
             self.call(

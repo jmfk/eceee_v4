@@ -1,3 +1,4 @@
+import { clearReportDiagnostics } from '../utils/reportDiagnostics'
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 
 import { reconcileCurrentTenantId, setCurrentTenantId } from '../utils/tenant';
@@ -248,6 +249,8 @@ export const AuthProvider = ({ children }) => {
             setSessionExpired(false);
         }
     };
+
+    useEffect(() => { clearReportDiagnostics() }, [user?.id, user?.username]);
 
     const value = {
         isAuthenticated,

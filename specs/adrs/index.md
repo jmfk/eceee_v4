@@ -4,6 +4,7 @@
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
+| ADR-0051 | [Tenant recipient snapshots and stable board list roles](active/0051-workspace-messaging-and-roles.md) | accepted | PRD-0036 |
 | ADR-0050 | [Klassificeringens aktivering och medieintegritet](active/0050-classification-cutover-and-media-integrity.md) | accepted | PRD-0035, PRD-0031 |
 | ADR-0049 | [Replayable legacy media with transaction-safe placeholder repairs](active/0049-transaction-safe-legacy-media-repairs.md) | accepted | PRD-0012, PRD-0034 |
 | ADR-0048 | [Fast push feedback and an exact-revision full CI merge gate](active/0048-fast-ci-and-full-merge-gate.md) | accepted | PRD-0028 |

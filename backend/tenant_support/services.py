@@ -1,7 +1,7 @@
 from django.db.models import Max, Q
 from django.utils import timezone
 
-from .access import has_role, support_users
+from .access import has_role, support_users, members
 from .models import EmailDelivery, InboxEntry, SupportThread
 
 
@@ -10,10 +10,10 @@ def visible_entries(user, tenant):
     instructions = Q(instruction__isnull=False)
     if not has_role(user, tenant, "can_publish"):
         instructions &= Q(instruction__withdrawn=False)
-    threads = Q(thread__creator=user)
+    threads = Q(thread__creator=user) | Q(thread__participants=user)
     if has_role(user, tenant, "can_support"):
-        threads = Q(thread__isnull=False)
-    return entries.filter(instructions | threads).select_related("instruction", "thread")
+        threads |= Q(thread__support_target=True)
+    return entries.filter(instructions | threads).distinct().select_related("instruction", "thread")
 
 
 def receive(tenant, user, *, instruction=None, thread=None, event_key, summary):
@@ -37,7 +37,9 @@ def receive(tenant, user, *, instruction=None, thread=None, event_key, summary):
 
 
 def notify_thread(thread, sender, message):
-    users = {u.pk: u for u in support_users(thread.tenant)}
+    users = {u.pk: u for u in members(thread.tenant).filter(private_threads=thread)}
+    if thread.support_target:
+        users.update({u.pk: u for u in support_users(thread.tenant)})
     if thread.creator.is_active and thread.tenant.user_has_access(thread.creator):
         users[thread.creator_id] = thread.creator
     for user in users.values():
@@ -47,7 +49,7 @@ def notify_thread(thread, sender, message):
                 user,
                 thread=thread,
                 event_key=f"message:{message.pk}",
-                summary="Du har fått ett nytt meddelande i en supporttråd. Läs och svara i ECEEE.",
+                summary="Du har fått ett nytt meddelande i ECEEE. Läs och svara i din inbox.",
             )
     # The sender sees their conversation but receives no email or unread event.
     InboxEntry.objects.get_or_create(
@@ -61,8 +63,14 @@ def notify_thread(thread, sender, message):
 def sync_support_inbox(tenant, user):
     """Restore current activity when support is granted, without historical mail."""
     # Serialize catch-up with replies so activity cannot move backwards.
-    list(SupportThread.objects.select_for_update().filter(tenant=tenant).values_list("pk", flat=True))
-    threads = SupportThread.objects.filter(tenant=tenant).annotate(latest=Max("messages__created_at"))
+    list(
+        SupportThread.objects.select_for_update()
+        .filter(tenant=tenant, support_target=True)
+        .values_list("pk", flat=True)
+    )
+    threads = SupportThread.objects.filter(tenant=tenant, support_target=True).annotate(
+        latest=Max("messages__created_at")
+    )
     existing = {
         entry.thread_id: entry for entry in InboxEntry.objects.filter(tenant=tenant, user=user, thread__isnull=False)
     }

@@ -32,7 +32,12 @@ def members(tenant):
 
 def can_access(user, tenant):
     # Kanban has no cross-tenant staff shortcut: only actual members/owner.
-    return bool(user and user.is_authenticated and tenant.is_active and members(tenant).filter(pk=user.pk).exists())
+    if not (user and user.is_authenticated and tenant.is_active and members(tenant).filter(pk=user.pk).exists()):
+        return False
+    from core.roles import permissions_for
+
+    allowed = permissions_for(user, tenant)
+    return "kanban.read" in allowed or "kanban.write" in allowed or "tenant.admin" in allowed
 
 
 @contextmanager
@@ -216,7 +221,22 @@ def update_card(tenant, actor, card, data):
     return card
 
 
+def ensure_required_columns(board):
+    for role, title in [("inbox", "Inbox"), ("done", "Done"), ("archive", "Archive")]:
+        if not board.columns.filter(role=role).exists():
+            column = board.columns.filter(role="", title__iexact=title).first()
+            if column:
+                column.role, column.archived = role, False
+                column.save(update_fields=["role", "archived"])
+            else:
+                Column.objects.create(
+                    tenant=board.tenant, board=board, role=role, title=title, position=board.columns.count()
+                )
+
+
 def update_named(tenant, actor, obj, data):
+    if isinstance(obj, Column) and obj.role and data.get("archived"):
+        raise ValidationError("Inbox, Done and Archive are required lists and cannot be archived.")
     check_revision(obj, data.pop("revision"))
     undo = {}
     changes = {}
@@ -246,6 +266,8 @@ def undo_event(tenant, actor, entry):
         if column.archived or column.board.archived:
             raise Conflict("Restore the original board/column first.")
         place_card(obj, column, data["position"])
+    if isinstance(obj, Column) and obj.role and data.get("archived"):
+        raise Conflict("Required lists cannot be archived.")
     if "archived" in data:
         obj.archived = data["archived"]
     bump(obj)

@@ -12,5 +12,7 @@ urlpatterns = [
     path("threads/<uuid:pk>/", views.ThreadView.as_view()),
     path("videos/", views.VideoUploadView.as_view()),
     path("videos/<uuid:pk>/playback/", views.VideoPlaybackView.as_view()),
+    path("attachments/", views.AttachmentsView.as_view()),
+    path("attachments/<uuid:pk>/download/", views.AttachmentDownloadView.as_view()),
     path("deliveries/", views.DeliveriesView.as_view()),
 ]

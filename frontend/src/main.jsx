@@ -1,3 +1,4 @@
+import { startReportDiagnostics } from './utils/reportDiagnostics'
 /*
  * Copyright (C) 2025 Johan Mats Fred Karlsson
  *
@@ -18,3 +19,5 @@ const bootstrap = isRenderFrame || isStandaloneRender || isStandaloneVersionRend
 bootstrap.catch((error) => {
     console.error('Application bootstrap failed', error)
 })
+
+startReportDiagnostics()

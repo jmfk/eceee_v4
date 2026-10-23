@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
     testDir: './e2e',
-    testMatch: 'kanban.spec.js',
+    testMatch: ['kanban.spec.js', 'workspace-messaging.spec.js'],
     timeout: 30000,
     use: {
         baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:12900',

@@ -127,9 +127,9 @@ describe('tenant inbox journey', () => {
         )
         renderInbox('/inbox/new?tenant=a')
         await screen.findByRole('heading', {
-            name: 'Fråga eller rapportera fel',
+            name: 'Nytt meddelande',
         })
-        fireEvent.change(screen.getByLabelText('Typ'), {
+        fireEvent.change(screen.getByLabelText('Typ (valfri)'), {
             target: { value: 'question' },
         })
         fireEvent.change(screen.getByLabelText('Titel'), {
@@ -139,7 +139,7 @@ describe('tenant inbox journey', () => {
             target: { value: 'Min ändrade text' },
         })
         fireEvent.click(
-            screen.getByRole('button', { name: 'Skicka till support' }),
+            screen.getByRole('button', { name: 'Skicka meddelande' }),
         )
         await screen.findByRole('alert')
         expect(screen.getByLabelText('Beskrivning')).toHaveValue(
@@ -171,9 +171,9 @@ describe('tenant inbox journey', () => {
         })
         renderInbox('/inbox/new?tenant=a')
         await screen.findByRole('heading', {
-            name: 'Fråga eller rapportera fel',
+            name: 'Nytt meddelande',
         })
-        fireEvent.change(screen.getByLabelText('Typ'), {
+        fireEvent.change(screen.getByLabelText('Typ (valfri)'), {
             target: { value: 'question' },
         })
         fireEvent.change(screen.getByLabelText('Titel'), {
@@ -183,7 +183,7 @@ describe('tenant inbox journey', () => {
             target: { value: 'Behöver hjälp' },
         })
         fireEvent.click(
-            screen.getByRole('button', { name: 'Skicka till support' }),
+            screen.getByRole('button', { name: 'Skicka meddelande' }),
         )
         await waitFor(() => expect(finish).toBeTypeOf('function'))
         fireEvent.click(
@@ -201,7 +201,7 @@ describe('tenant inbox journey', () => {
             '/inbox/new?tenant=a&from=https%3A%2F%2Fcms.example.invalid%2Fpages%2F4%3Ftoken%3Dhidden%23secret',
         )
         await screen.findByRole('heading', {
-            name: 'Fråga eller rapportera fel',
+            name: 'Nytt meddelande',
         })
         expect(
             screen.getByRole('navigation', { name: 'Inboxnavigation' }),
@@ -219,7 +219,7 @@ describe('tenant inbox journey', () => {
             target: { value: 'Rubriken försvinner.' },
         })
         fireEvent.click(
-            screen.getByRole('button', { name: 'Skicka till support' }),
+            screen.getByRole('button', { name: 'Skicka meddelande' }),
         )
         await screen.findByRole('heading', { name: thread.title })
         expect(supportRequest).toHaveBeenCalledWith(
@@ -227,7 +227,7 @@ describe('tenant inbox journey', () => {
             'threads/',
             'post',
             expect.objectContaining({
-                kind: 'bug',
+                kind: 'question',
                 videoId: null,
                 requestId: expect.any(String),
                 location: 'https://cms.example.invalid/pages/4',
@@ -265,7 +265,7 @@ describe('tenant inbox journey', () => {
         })
         renderInbox('/inbox/new?tenant=a')
         await screen.findByRole('heading', {
-            name: 'Fråga eller rapportera fel',
+            name: 'Nytt meddelande',
         })
         fireEvent.change(screen.getByLabelText('Titel'), {
             target: { value: 'Ett fel' },
@@ -277,7 +277,7 @@ describe('tenant inbox journey', () => {
             target: { value: 'https://cms.example.invalid/pages/4' },
         })
         fireEvent.click(
-            screen.getByRole('button', { name: 'Skicka till support' }),
+            screen.getByRole('button', { name: 'Skicka meddelande' }),
         )
         await screen.findByRole('alert')
         expect(screen.getByLabelText('Beskrivning')).toHaveValue(

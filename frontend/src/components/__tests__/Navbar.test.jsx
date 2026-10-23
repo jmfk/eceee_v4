@@ -63,9 +63,10 @@ describe('Navbar', () => {
     expect(screen.getByRole('link', { name: 'Designer' })).toHaveAttribute('href', '/designer/themes')
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
     expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/profile')
-    for (const name of ['Inbox', 'Kanban', 'Rapportera fel']) {
+    for (const name of ['Inbox', 'Kanban']) {
       expect(screen.queryByRole('link', { name })).not.toBeInTheDocument()
     }
+    expect(screen.getByRole('link', { name: 'Rapportera fel' })).toHaveAttribute('href', expect.stringContaining('/inbox/new?from='))
     expect(screen.queryByText('EASY v4')).not.toBeInTheDocument()
     expect(screen.queryByText('›')).not.toBeInTheDocument()
   })
@@ -87,7 +88,7 @@ describe('Navbar', () => {
     expect(screen.getByRole('link', { name: 'Pages' })).toBeInTheDocument()
     expect(navigation).toHaveClass('nav-collapsed')
     expect(screen.getByRole('link', { name: 'Profile' })).toBeInTheDocument()
-    for (const name of ['Inbox', 'Kanban', 'Rapportera fel']) {
+    for (const name of ['Inbox', 'Kanban']) {
       expect(screen.queryByRole('link', { name })).not.toBeInTheDocument()
     }
     expect(observers).toHaveLength(1)

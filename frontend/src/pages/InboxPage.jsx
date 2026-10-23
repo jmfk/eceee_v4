@@ -1,3 +1,7 @@
+import Avatar from '../components/Avatar'
+import { MessageFilePicker, MessageFile, uploadMessageFiles } from '../components/support/MessageFiles'
+import { reportDiagnostics } from '../utils/reportDiagnostics'
+import UserToolsNav from '../components/UserToolsNav'
 import { useEffect, useRef, useState } from 'react'
 import {
     Link,
@@ -10,7 +14,7 @@ import Navbar from '../components/Navbar'
 import PrivatePlayer from '../components/support/PrivateVideoPlayer'
 import HelpGuideSelect from '../components/help/HelpGuideSelect'
 import StatusBar from '../components/StatusBar'
-import { Inbox, Search } from 'lucide-react'
+import { Inbox, Search, PenLine, Archive, RotateCw } from 'lucide-react'
 import '../components/user-tools.css'
 import {
     supportError,
@@ -73,14 +77,16 @@ function InboxList({ link }) {
     const identity = useSupportIdentity()
     const queryClient = useQueryClient()
     const [filter, setFilter] = useState('all')
+    const [searchText, setSearchText] = useState('')
+    const [search, setSearch] = useState('')
     const [page, setPage] = useState(1)
     const [undo, setUndo] = useState(null)
     const query = useQuery({
-        queryKey: ['support', tenant, identity, 'inbox', filter, page],
+        queryKey: ['support', tenant, identity, 'inbox', filter, page, search],
         queryFn: () =>
             supportRequest(
                 tenant,
-                `inbox/?page=${page}&kind=${filter}&archived=${filter === 'archive'}`,
+                `inbox/?page=${page}&kind=${filter}&archived=${filter === 'archive'}&search=${encodeURIComponent(search)}`,
             ),
         refetchInterval: 60000,
     })
@@ -94,11 +100,10 @@ function InboxList({ link }) {
     })
     return (
         <>
-            <h2>Din inbox</h2>
-            <p>
-                Senaste inkomna aktivitet först. Supporttrådar är privata mellan
-                dig och behörig support.
-            </p>
+            <form className="mail-search" role="search" onSubmit={(e) => { e.preventDefault(); setSearch(searchText); setPage(1) }}>
+                <Search size={20} aria-hidden="true" /><input aria-label="Sök i meddelanden" placeholder="Sök i meddelanden" value={searchText} onChange={(e) => setSearchText(e.target.value)} /><button>Sök</button>
+            </form>
+            <div className="mail-heading"><h2>Din inbox</h2><button aria-label="Uppdatera inbox" onClick={() => query.refetch()}><RotateCw size={16} /></button><span className="support-muted">{query.data?.count ?? query.data?.results?.length ?? 0} meddelanden</span></div>
             <div className="support-actions" aria-label="Filtrera inbox">
                 {[
                     ['all', 'Alla'],
@@ -120,42 +125,18 @@ function InboxList({ link }) {
             </div>
             <ErrorText error={query.error || archive.error} />
             {query.isPending && <p role="status">Hämtar meddelanden…</p>}
+            <div className="mail-rows">
             {query.data?.results.map((entry) => (
-                <article className="support-row" key={entry.id}>
-                    <div>
-                        <p className="support-muted">
-                            {dateText(entry.activityAt)} ·{' '}
-                            {entry.kind === 'instruction'
-                                ? 'Instruktion'
-                                : 'Support'}{' '}
-                            {entry.status && `· ${statusText[entry.status]}`}
-                        </p>
-                        <h3>
-                            <Link
-                                to={link(
-                                    entry.instructionId
-                                        ? `instructions/${entry.instructionId}`
-                                        : `threads/${entry.threadId}`,
-                                )}
-                            >
-                                {!entry.readAt && <span>Oläst · </span>}
-                                {entry.title}
-                            </Link>
-                        </h3>
-                    </div>
-                    <button
-                        disabled={archive.isPending}
-                        onClick={() =>
-                            archive.mutate({
-                                id: entry.id,
-                                archived: !entry.archived,
-                            })
-                        }
-                    >
-                        {entry.archived ? 'Återför till inbox' : 'Arkivera'}
-                    </button>
+                <article className={`mail-row ${entry.readAt ? '' : 'mail-unread'}`} key={entry.id}>
+                    <span className="mail-sender">{entry.senderName || (entry.kind === 'instruction' ? 'Instruktion' : 'Meddelande')}</span>
+                    <Link className="mail-subject" to={link(entry.instructionId ? `instructions/${entry.instructionId}` : `threads/${entry.threadId}`)}>
+                        {!entry.readAt && <span className="sr-only">Oläst · </span>}<span>{entry.title}</span><span className="mail-preview"> — {entry.preview || (entry.status ? statusText[entry.status] : '')}</span>
+                    </Link>
+                    <time className="mail-time" dateTime={entry.activityAt}>{dateText(entry.activityAt)}</time>
+                    <button title={entry.archived ? 'Återför till inbox' : 'Arkivera'} aria-label={`${entry.archived ? 'Återför till inbox' : 'Arkivera'}: ${entry.title}`} disabled={archive.isPending} onClick={() => archive.mutate({ id: entry.id, archived: !entry.archived })}><Archive size={16} /></button>
                 </article>
             ))}
+            </div>
             {query.data?.results.length === 0 && (
                 <>
                     <p>Inga meddelanden här ännu.</p>
@@ -428,11 +409,11 @@ function Compose({ context, link, publish = false }) {
     const navigate = useNavigate()
     const location = useLocation()
     const queryClient = useQueryClient()
-    const [kind, setKind] = useState(() =>
-        new URLSearchParams(location.search).has('instruction')
-            ? 'question'
-            : 'bug',
-    )
+    const [kind, setKind] = useState('question')
+    const [recipients, setRecipients] = useState(context.supportAvailable ? ['support'] : [])
+    const [files, setFiles] = useState([])
+    const fileCache = useRef(new Map())
+    const [includeDiagnostics, setIncludeDiagnostics] = useState(() => new URLSearchParams(location.search).has('from'))
     const [title, setTitle] = useState('')
     const [body, setBody] = useState('')
     const [transcript, setTranscript] = useState('')
@@ -477,7 +458,7 @@ function Compose({ context, link, publish = false }) {
                 }
             }
             setStage(
-                publish ? 'Publicerar instruktionen…' : 'Skickar till support…',
+                publish ? 'Publicerar instruktionen…' : 'Skickar meddelandet…',
             )
             return supportRequest(
                 tenant,
@@ -496,6 +477,9 @@ function Compose({ context, link, publish = false }) {
                           title,
                           body,
                           kind,
+                          recipients,
+                          attachmentIds: await uploadMessageFiles(tenant, files, fileCache.current),
+                          ...(includeDiagnostics ? { diagnostics: reportDiagnostics() } : {}),
                           location: place,
                           instructionId: instruction,
                           videoId,
@@ -519,19 +503,19 @@ function Compose({ context, link, publish = false }) {
             <h2>
                 {publish
                     ? 'Publicera instruktion'
-                    : 'Fråga eller rapportera fel'}
+                    : 'Nytt meddelande'}
             </h2>
             <p>
                 {publish
                     ? `Mottagare: ${context.tenant.name} · ${context.recipientCount} andra aktiva medlemmar får en avisering.`
-                    : `Privat mellan dig och behörig support i ${context.tenant.name}.`}
+                    : `Till mottagare i ${context.tenant.name}. Välj Support för frågor till supporten.`}
             </p>
             {publish && context.storageConfigured === false && (
                 <p className="support-error" role="alert">
                     Videolagring är inte konfigurerad för miljön. Lagringen behöver aktiveras innan du kan ladda upp filmer.
                 </p>
             )}
-            {!publish && !context.supportAvailable && (
+            {!publish && recipients.includes('support') && !context.supportAvailable && (
                 <p className="support-error">
                     Support är inte konfigurerad för arbetsytan. Kontakta
                     systemägaren.
@@ -543,15 +527,22 @@ function Compose({ context, link, publish = false }) {
                     if (send.error?.response?.status === 409) {
                         requestId.current = crypto.randomUUID()
                         attachment.current = null
+                        fileCache.current.clear()
                     }
                     send.mutate()
                 }}
                 aria-busy={send.isPending}
             >
                 <fieldset disabled={send.isPending}>
+                    {!publish && <fieldset className="message-recipients"><legend>Mottagare</legend>
+                        {(context.recipients || (context.supportAvailable ? [{ id: 'support', name: 'Support', kind: 'support' }] : [])).map((recipient) => <label key={recipient.id}>
+                            <input type="checkbox" checked={recipients.includes(recipient.id)} onChange={(e) => setRecipients(e.target.checked ? [...recipients, recipient.id] : recipients.filter((id) => id !== recipient.id))} /> {recipient.name}
+                        </label>)}
+                        {!context.recipients?.length && !context.supportAvailable && <p>Inga mottagare är tillgängliga i arbetsytan.</p>}
+                    </fieldset>}
                     {!publish && (
                         <label>
-                            Typ
+                            Typ (valfri)
                             <select
                                 value={kind}
                                 onChange={(e) => {
@@ -590,7 +581,6 @@ function Compose({ context, link, publish = false }) {
                                 aria-label="Länk till platsen"
                                 aria-describedby="support-location-hint"
                                 type="url"
-                                required={kind === 'bug'}
                                 maxLength={2000}
                                 value={place}
                                 onChange={(e) => setPlace(e.target.value)}
@@ -605,7 +595,7 @@ function Compose({ context, link, publish = false }) {
                             </span>
                         </label>
                     )}
-                    {(publish || kind === 'bug') && (
+                    {publish && (
                         <VideoField
                             key={kind}
                             purpose={publish ? 'instruction' : 'bug'}
@@ -620,6 +610,8 @@ function Compose({ context, link, publish = false }) {
                             setValid={setValid}
                         />
                     )}
+                    {!publish && <MessageFilePicker files={files} setFiles={setFiles} disabled={send.isPending} />}
+                    {!publish && new URLSearchParams(location.search).has('from') && <label><input type="checkbox" checked={includeDiagnostics} onChange={(e) => setIncludeDiagnostics(e.target.checked)} /> Bifoga filtrerad diagnostik (senaste webbläsarfel och metadata för sändningen)</label>}
                     {publish && (
                         <HelpGuideSelect value={helpGuideId} onChange={setHelpGuideId} />
                     )}
@@ -653,7 +645,7 @@ function Compose({ context, link, publish = false }) {
                         disabled={
                             !valid ||
                             send.isPending ||
-                            (publish ? !file || context.storageConfigured === false : !context.supportAvailable)
+                            (publish ? !file || context.storageConfigured === false : !recipients.length || (recipients.includes('support') && !context.supportAvailable))
                         }
                     >
                         {send.error?.response?.status === 409
@@ -662,7 +654,7 @@ function Compose({ context, link, publish = false }) {
                                 : 'Skicka som nytt ärende'
                             : publish
                               ? `Publicera till ${context.tenant.name}`
-                              : 'Skicka till support'}
+                              : 'Skicka meddelande'}
                     </button>
                 </fieldset>
             </form>
@@ -675,6 +667,8 @@ function ThreadDetail({ id, context }) {
     const identity = useSupportIdentity()
     const queryClient = useQueryClient()
     const [body, setBody] = useState('')
+    const [files, setFiles] = useState([])
+    const fileCache = useRef(new Map())
     const requestId = useRef(crypto.randomUUID())
     const query = useQuery({
         queryKey: ['support', tenant, identity, 'thread', id],
@@ -688,13 +682,16 @@ function ThreadDetail({ id, context }) {
         refetchInterval: 60000,
     })
     const reply = useMutation({
-        mutationFn: () =>
+        mutationFn: async () =>
             supportRequest(tenant, `threads/${id}/`, 'post', {
+                attachmentIds: await uploadMessageFiles(tenant, files, fileCache.current),
                 body,
                 requestId: requestId.current,
             }),
         onSuccess: () => {
             setBody('')
+            setFiles([])
+            fileCache.current.clear()
             requestId.current = crypto.randomUUID()
             queryClient.invalidateQueries({ queryKey: ['support', tenant] })
         },
@@ -714,8 +711,9 @@ function ThreadDetail({ id, context }) {
                     <h2>{t.title}</h2>
                     <p>
                         {t.kind === 'bug' ? 'Felrapport' : 'Fråga'} ·{' '}
-                        {statusText[t.status]} · Privat supporttråd
+                        {statusText[t.status]} · {t.supportTarget !== false ? 'Supporttråd' : 'Privat meddelande'}
                     </p>
+                    {t.boardCardId && <Link to={`/kanban/cards/${t.boardCardId}`}>Öppna kortet i tavlans Inbox</Link>}
                     {t.location && (
                         <p>
                             Plats:{' '}
@@ -732,19 +730,22 @@ function ThreadDetail({ id, context }) {
                     {t.messages.map((message) => (
                         <article className="support-message" key={message.id}>
                             <h3>
-                                {message.senderName}{' '}
+                                <Avatar userId={message.senderId} name={message.senderName} /> {message.senderName}{' '}
                                 <span className="support-muted">
                                     · {dateText(message.createdAt)}
                                 </span>
                             </h3>
                             <p className="support-body">{message.body}</p>
+                            {message.attachments?.map((file) => <MessageFile key={file.id} file={file} />)}
                         </article>
                     ))}
                     <form
                         onSubmit={(e) => {
                             e.preventDefault()
-                            if (reply.error?.response?.status === 409)
+                            if (reply.error?.response?.status === 409) {
                                 requestId.current = crypto.randomUUID()
+                                fileCache.current.clear()
+                            }
                             reply.mutate()
                         }}
                     >
@@ -758,6 +759,7 @@ function ThreadDetail({ id, context }) {
                                 onChange={(e) => setBody(e.target.value)}
                             />
                         </label>
+                        <MessageFilePicker files={files} setFiles={setFiles} disabled={reply.isPending} />
                         <ErrorText error={reply.error} />
                         <div className="support-actions">
                             <button
@@ -836,6 +838,7 @@ function Manage({ context }) {
                     : 'inte aktiverad; aviseringar väntar i kön'}
                 .
             </p>
+            {context.canManage && <p><Link to="/settings/roles">Hantera arbetsytans roller och behörigheter</Link>. Formuläret nedan hanterar direkta supporttilldelningar. Behörigheter från andra roller gäller också.</p>}
             {context.canManage && (
                 <form
                     onSubmit={(e) => {
@@ -940,7 +943,7 @@ export default function InboxPage() {
     const tabs = [
         ['', 'Inbox'],
         ['library', 'Instruktionsfilmer'],
-        ['new', 'Fråga eller rapportera fel'],
+        ['new', 'Skriv meddelande'],
         ...(context.data?.canPublish
             ? [['publish', 'Publicera instruktion']]
             : []),
@@ -1011,6 +1014,7 @@ export default function InboxPage() {
             <Navbar />
             <main className="user-tools-main user-tools-content" key={`${tenant}:${identity}`}>
                 <div className="support-container container mx-auto px-4 py-8">
+                    <UserToolsNav tenant={tenant} unreadCount={context.data?.unreadCount || 0} />
                     <header className="user-tools-header">
                         <div>
                             <div className="user-tools-title">
@@ -1020,9 +1024,8 @@ export default function InboxPage() {
                             <p className="user-tools-description">Meddelanden, instruktioner och support för din arbetsyta.</p>
                             {context.data && <p className="support-workspace">Arbetsyta: {context.data.tenant.name}</p>}
                         </div>
-                        <Link to="/profile" className="user-tools-button">Till Profile</Link>
                     </header>
-                    <div className="user-tools-panel support-panel">
+                    <div className="user-tools-panel support-panel mail-layout">
                         <nav className="support-tabs" aria-label="Inboxnavigation">
                             {tabs.map(([path, title]) => (
                                 <Link
@@ -1030,7 +1033,7 @@ export default function InboxPage() {
                                     to={link(path)}
                                     aria-current={(path === section || (!path && (!section || section === 'threads')) || (path === 'library' && section === 'instructions')) ? 'page' : undefined}
                                 >
-                                    {title}
+                                    {path === 'new' && <PenLine size={18} aria-hidden="true" />} {title}
                                     {!path && context.data?.unreadCount
                                         ? ` (${context.data.unreadCount} olästa)`
                                         : ''}

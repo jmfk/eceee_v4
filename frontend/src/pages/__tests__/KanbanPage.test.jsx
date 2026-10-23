@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -17,7 +17,7 @@ vi.mock('../../utils/tenant', () => ({
 }))
 vi.mock('../../api/kanban', async (importOriginal) => ({
     ...(await importOriginal()),
-    kanbanApi: { get: vi.fn(), cards: vi.fn() },
+    kanbanApi: { get: vi.fn(), cards: vi.fn(), post: vi.fn(), patch: vi.fn() },
 }))
 
 const workspace = {
@@ -62,9 +62,34 @@ describe('Kanban application navigation', () => {
 
     it('identifies the selected board and preserves card links and keyboard move actions', async () => {
         renderKanban('/kanban/boards/board-1')
-        expect(await screen.findByRole('link', { name: 'Redaktionen' })).toHaveAttribute('aria-current', 'page')
+        expect(await screen.findByRole('heading', { name: 'Redaktionen' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Skapa tavla' })).not.toBeInTheDocument()
+        fireEvent.click(screen.getByLabelText('Kortåtgärder för ECE-1'))
         expect(screen.getByRole('link', { name: 'Granska nyhet' })).toHaveAttribute('href', '/kanban/cards/card-1')
         expect(screen.getByRole('button', { name: 'Flytta ECE-1 upp' })).toBeDisabled()
-        expect(screen.getByRole('link', { name: 'Till Profile' })).toHaveAttribute('href', '/profile')
+        expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/profile')
     })
+    it('keeps board creation in the overview and opens the created board', async () => {
+        kanbanApi.post.mockResolvedValue(workspace.boards[0])
+        renderKanban()
+        expect(await screen.findByRole('link', { name: 'Redaktionen' })).toHaveAttribute('href', '/kanban/boards/board-1')
+        expect(screen.queryByRole('textbox', { name: 'Tavelnamn' })).not.toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Skapa tavla' }))
+        fireEvent.change(screen.getByRole('textbox', { name: 'Tavelnamn' }), { target: { value: 'Ny tavla' } })
+        fireEvent.click(screen.getByRole('textbox', { name: 'Tavelnamn' }).closest('form').querySelector('button'))
+        expect(await screen.findByRole('heading', { name: 'Redaktionen' })).toBeInTheDocument()
+        expect(kanbanApi.post).toHaveBeenCalledWith('boards/', { title: 'Ny tavla' })
+        expect(screen.queryByRole('textbox', { name: 'Tavelnamn' })).not.toBeInTheDocument()
+    })
+
+    it('opens filters and the list composer only when requested', async () => {
+        renderKanban('/kanban/boards/board-1')
+        await screen.findByRole('heading', { name: 'Redaktionen' })
+        expect(screen.queryByRole('textbox', { name: 'Sök kort' })).not.toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
+        expect(screen.getByRole('textbox', { name: 'Sök kort' })).toBeVisible()
+        fireEvent.click(screen.getByRole('button', { name: 'Lägg till lista' }))
+        expect(screen.getByRole('textbox', { name: 'Listnamn' })).toHaveFocus()
+    })
+
 })

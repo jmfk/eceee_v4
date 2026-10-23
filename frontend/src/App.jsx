@@ -1,3 +1,4 @@
+import RoleSettings from './pages/RoleSettings'
 /*
  * Copyright (C) 2025 Johan Mats Fred Karlsson
  *
@@ -293,6 +294,8 @@ export const AppRoutes = () => {
             </SettingsLayout>
           </PrivateRoute>
         } />
+        <Route path="/settings/roles" element={<PrivateRoute><SettingsLayout><RoleSettings /></SettingsLayout></PrivateRoute>} />
+        <Route path="/settings/support" element={<Navigate to="/inbox/manage" replace />} />
         {/* Settings dashboard */}
         <Route path="/settings" element={
           <PrivateRoute>
