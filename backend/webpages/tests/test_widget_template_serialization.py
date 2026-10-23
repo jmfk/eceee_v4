@@ -5,32 +5,23 @@ Tests the new widget template JSON serialization system that converts
 Django widget templates to JSON for frontend consumption.
 """
 
-from django.test import TestCase, Client, override_settings
-from django.urls import reverse
-from django.core.cache import cache
-from django.contrib.auth import get_user_model
-from django.template.loader import get_template
-from unittest.mock import patch, Mock
-import json
-import tempfile
-import os
+from unittest.mock import Mock, patch
 
-from webpages.utils.template_parser import WidgetTemplateParser, WidgetSerializer
+from django.contrib.auth import get_user_model
+from django.core.cache import cache
+from django.test import Client, TestCase, override_settings
+
+from core.models import Tenant
+from webpages.utils.template_parser import WidgetSerializer, WidgetTemplateParser
+from webpages.widget_autodiscovery import autodiscover_widgets
 from webpages.widget_registry import (
     widget_type_registry,
-    BaseWidget,
-    register_widget_type,
 )
-from webpages.widget_autodiscovery import autodiscover_widgets
-from pydantic import BaseModel
-
 
 User = get_user_model()
 
 
-@override_settings(
-    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
-)
+@override_settings(CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}})
 class WidgetTemplateParserTest(TestCase):
     """Test the WidgetTemplateParser class"""
 
@@ -50,9 +41,7 @@ class WidgetTemplateParserTest(TestCase):
         mock_template = Mock()
         mock_template.template.source = template_content
 
-        with patch(
-            "webpages.utils.template_parser.get_template", return_value=mock_template
-        ):
+        with patch("webpages.utils.template_parser.get_template", return_value=mock_template):
             result = self.parser.parse_widget_template("test_widget.html")
 
         # Verify structure
@@ -93,9 +82,7 @@ class WidgetTemplateParserTest(TestCase):
         mock_template = Mock()
         mock_template.template.source = template_content
 
-        with patch(
-            "webpages.utils.template_parser.get_template", return_value=mock_template
-        ):
+        with patch("webpages.utils.template_parser.get_template", return_value=mock_template):
             result = self.parser.parse_widget_template("button_widget.html")
 
         # Should detect inline CSS
@@ -105,9 +92,7 @@ class WidgetTemplateParserTest(TestCase):
         structure = result["structure"]
         if structure["type"] == "fragment":
             # Multiple root elements, style should be one of them
-            style_elements = [
-                child for child in structure["children"] if child.get("type") == "style"
-            ]
+            style_elements = [child for child in structure["children"] if child.get("type") == "style"]
             self.assertEqual(len(style_elements), 1)
 
             # Check CSS content
@@ -135,9 +120,7 @@ class WidgetTemplateParserTest(TestCase):
         mock_template = Mock()
         mock_template.template.source = template_content
 
-        with patch(
-            "webpages.utils.template_parser.get_template", return_value=mock_template
-        ):
+        with patch("webpages.utils.template_parser.get_template", return_value=mock_template):
             result = self.parser.parse_widget_template("testimonial_widget.html")
 
         # Check template tags are detected
@@ -160,9 +143,7 @@ class WidgetTemplateParserTest(TestCase):
         mock_template = Mock()
         mock_template.template.source = template_content
 
-        with patch(
-            "webpages.utils.template_parser.get_template", return_value=mock_template
-        ) as mock_get_template:
+        with patch("webpages.utils.template_parser.get_template", return_value=mock_template) as mock_get_template:
             # First call
             result1 = self.parser.parse_widget_template("cache_test.html")
 
@@ -249,9 +230,7 @@ class WidgetTemplateParserTest(TestCase):
             self.assertIn("Widget template parsing failed", str(context.exception))
 
 
-@override_settings(
-    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
-)
+@override_settings(CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}})
 class WidgetSerializerTest(TestCase):
     """Test the WidgetSerializer class"""
 
@@ -310,9 +289,7 @@ class WidgetSerializerTest(TestCase):
             self.assertIn("Widget template parsing failed", str(context.exception))
 
 
-@override_settings(
-    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
-)
+@override_settings(CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}})
 class BaseWidgetTemplateJSONTest(TestCase):
     """Test template JSON functionality in BaseWidget"""
 
@@ -392,9 +369,7 @@ class BaseWidgetTemplateJSONTest(TestCase):
             self.assertNotIn("template_json", widget_dict)
 
 
-@override_settings(
-    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
-)
+@override_settings(CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}})
 class WidgetTypeAPITemplateJSONTest(TestCase):
     """Test template JSON in Widget Type API endpoints"""
 
@@ -403,9 +378,11 @@ class WidgetTypeAPITemplateJSONTest(TestCase):
         cache.clear()
 
         # Create and authenticate a user
-        self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="password123"
-        )
+        self.user = User.objects.create_user(username="testuser", email="test@example.com", password="password123")
+        # Widget metadata is a CMS resource; authenticate within an authorized workspace.
+        owner = User.objects.create_user(username="testuser-owner")
+        tenant = Tenant.objects.create(name="Widget templates", identifier="widget-templates", created_by=owner)
+        tenant.members.add(self.user)
         self.client.login(username="testuser", password="password123")
 
         # Ensure widget registry is populated
@@ -428,9 +405,7 @@ class WidgetTypeAPITemplateJSONTest(TestCase):
 
     def test_widget_types_list_excludes_template_json_when_requested(self):
         """Test that widget types list can exclude template JSON"""
-        response = self.client.get(
-            "/api/v1/webpages/widget-types/?include_template_json=false"
-        )
+        response = self.client.get("/api/v1/webpages/widget-types/?include_template_json=false")
         self.assertEqual(response.status_code, 200)
 
         data = response.json()
@@ -465,9 +440,7 @@ class WidgetTypeAPITemplateJSONTest(TestCase):
             self.skipTest("No widgets available")
 
         widget_name = widgets[0]
-        response = self.client.get(
-            f"/api/v1/webpages/widget-types/{widget_name}/?include_template_json=false"
-        )
+        response = self.client.get(f"/api/v1/webpages/widget-types/{widget_name}/?include_template_json=false")
         self.assertEqual(response.status_code, 200)
 
         data = response.json()
@@ -489,9 +462,7 @@ class WidgetTypeAPITemplateJSONTest(TestCase):
 
     def test_widget_types_active_excludes_template_json_when_requested(self):
         """Test that active widget types can exclude template JSON"""
-        response = self.client.get(
-            "/api/v1/webpages/widget-types/active/?include_template_json=false"
-        )
+        response = self.client.get("/api/v1/webpages/widget-types/active/?include_template_json=false")
         self.assertEqual(response.status_code, 200)
 
         data = response.json()
@@ -530,9 +501,7 @@ class WidgetTypeAPITemplateJSONTest(TestCase):
             self.assertIsInstance(template_json["hasInlineCss"], bool)
 
 
-@override_settings(
-    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
-)
+@override_settings(CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}})
 class WidgetRegistryTemplateJSONTest(TestCase):
     """Test template JSON functionality in WidgetTypeRegistry"""
 
@@ -561,14 +530,10 @@ class WidgetRegistryTemplateJSONTest(TestCase):
     def test_registry_to_dict_with_active_only_parameter(self):
         """Test that registry to_dict works with active_only parameter"""
         # Test with active_only=True and template JSON
-        active_widgets = widget_type_registry.to_dict(
-            active_only=True, include_template_json=True
-        )
+        active_widgets = widget_type_registry.to_dict(active_only=True, include_template_json=True)
 
         # Test with active_only=False and no template JSON
-        all_widgets = widget_type_registry.to_dict(
-            active_only=False, include_template_json=False
-        )
+        all_widgets = widget_type_registry.to_dict(active_only=False, include_template_json=False)
 
         # Both should work without errors
         self.assertIsInstance(active_widgets, list)
@@ -578,9 +543,7 @@ class WidgetRegistryTemplateJSONTest(TestCase):
         self.assertLessEqual(len(active_widgets), len(all_widgets))
 
 
-@override_settings(
-    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
-)
+@override_settings(CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}})
 class TemplateJSONPerformanceTest(TestCase):
     """Test performance aspects of template JSON generation"""
 
@@ -589,9 +552,11 @@ class TemplateJSONPerformanceTest(TestCase):
         cache.clear()
 
         # Create and authenticate a user
-        self.user = User.objects.create_user(
-            username="perfuser", email="perf@example.com", password="password123"
-        )
+        self.user = User.objects.create_user(username="perfuser", email="perf@example.com", password="password123")
+        # Widget metadata is a CMS resource; authenticate within an authorized workspace.
+        owner = User.objects.create_user(username="perfuser-owner")
+        tenant = Tenant.objects.create(name="Widget templates", identifier="widget-templates", created_by=owner)
+        tenant.members.add(self.user)
         self.client.login(username="perfuser", password="password123")
 
         # Ensure widget registry is populated
@@ -632,25 +597,16 @@ class TemplateJSONPerformanceTest(TestCase):
             self.assertIsNotNone(result2)
 
     def test_api_performance_with_template_json_disabled(self):
-        """Test that API is faster with template JSON disabled"""
-        import time
+        """Test that authorized callers can disable template JSON"""
 
-        # Time API call with template JSON
-        start_time = time.time()
-        response_with_json = self.client.get(
-            "/api/v1/webpages/widget-types/?include_template_json=true"
-        )
-        time_with_json = time.time() - start_time
+        # API call with template JSON
+        response_with_json = self.client.get("/api/v1/webpages/widget-types/?include_template_json=true")
 
         # Clear cache
         cache.clear()
 
-        # Time API call without template JSON
-        start_time = time.time()
-        response_without_json = self.client.get(
-            "/api/v1/webpages/widget-types/?include_template_json=false"
-        )
-        time_without_json = time.time() - start_time
+        # API call without template JSON
+        response_without_json = self.client.get("/api/v1/webpages/widget-types/?include_template_json=false")
 
         # Both should succeed
         self.assertEqual(response_with_json.status_code, 200)
@@ -658,7 +614,7 @@ class TemplateJSONPerformanceTest(TestCase):
 
         data_with_json = response_with_json.json()
         data_without_json = response_without_json.json()
-        
+
         if not data_with_json:
             self.skipTest("No widget types available for performance test")
 
@@ -667,9 +623,7 @@ class TemplateJSONPerformanceTest(TestCase):
         self.assertNotIn("templateJson", data_without_json[0])
 
 
-@override_settings(
-    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
-)
+@override_settings(CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}})
 class TemplateParserFixesTest(TestCase):
     """Test cases for template parser bug fixes and refinements"""
 
@@ -688,9 +642,7 @@ class TemplateParserFixesTest(TestCase):
 
         # 2. Block conditional (should NOT be treated as inline)
         # Even if short, if it contains < > it should be a block conditional
-        block_template = (
-            "{% if config.show_title %}<h3>{{ config.title }}</h3>{% endif %}"
-        )
+        block_template = "{% if config.show_title %}<h3>{{ config.title }}</h3>{% endif %}"
         processed_block = self.parser._preprocess_django_template(block_template)
         self.assertNotIn("data-conditional-attrs", processed_block)
         self.assertIn("<template-conditional", processed_block)
@@ -734,9 +686,7 @@ class TemplateParserFixesTest(TestCase):
         result = self.serializer.serialize_widget_template(widget)
 
         self.assertEqual(result["widget"]["name"], "BrokenWidget")
-        self.assertEqual(
-            result["template_json"]["structure"]["content"], "No template available"
-        )
+        self.assertEqual(result["template_json"]["structure"]["content"], "No template available")
 
     def test_parse_widget_template_with_none(self):
         """Test that parse_widget_template handles None input gracefully"""
