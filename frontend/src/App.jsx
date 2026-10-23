@@ -1,3 +1,4 @@
+import { canAccessCmsPath } from './utils/cmsNavigation'
 import RoleSettings from './pages/RoleSettings'
 /*
  * Copyright (C) 2025 Johan Mats Fred Karlsson
@@ -177,7 +178,7 @@ const ContextMenuToggle = () => {
 
 export const AppRoutes = () => {
   useAutoPageTitle()
-  const { user } = useAuth()
+  const { user, isLoading: authLoading } = useAuth()
   const tenantId = getCurrentTenantId()
 
   return (
@@ -188,7 +189,7 @@ export const AppRoutes = () => {
         <Route path="/login" element={<LoginPage />} />
 
         {/* Main application routes with fixed layout */}
-        <Route path="/" element={<Navigate to={user?.isDesignerOnly ? '/designer/themes' : '/pages'} replace />} />
+        <Route path="/" element={authLoading ? null : <Navigate to={user?.isDesignerOnly ? '/designer/themes' : canAccessCmsPath(user, '/pages') ? '/pages' : '/profile'} replace />} />
 
         {/* Self-Contained Form Demo Routes */}
         <Route path="/demo/self-contained-form" element={

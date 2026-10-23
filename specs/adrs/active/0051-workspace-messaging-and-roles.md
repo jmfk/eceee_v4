@@ -39,3 +39,5 @@ Media requests from users outside the current tenant continue through existing p
 Recipient groups use tenant-owned roles and board memberships. Global Django groups have no tenant owner and are excluded to prevent cross-workspace group-name disclosure. Generic attachments and legacy video uploads share the existing rolling tenant count/byte quota under the tenant row lock; generated inline diagnostics do not count as uploads.
 
 CMS navigation and Settings actions/queries follow resource capabilities; empty content roles retain personal Profile and Inbox access. Global user administration stays restricted to system owners.
+
+Authentication probes the role-independent current-user endpoint. The root route waits for authentication and lands users without page-read access in Profile.

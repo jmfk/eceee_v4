@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AuthProvider, useAuth } from '../AuthContext'
 import { getCurrentTenantId, setCurrentTenantId } from '../../utils/tenant'
@@ -14,6 +14,30 @@ describe('AuthProvider workspace synchronization', () => {
         vi.restoreAllMocks()
         localStorage.clear()
         setCurrentTenantId('')
+    })
+
+    afterEach(() => { vi.unstubAllEnvs() })
+
+    it.each([true, false])('authenticates an empty CMS role without probing Pages (development=%s)', async (development) => {
+        vi.stubEnv('DEV', development)
+        if (!development) {
+            localStorage.setItem('access_token', 'test-access')
+            localStorage.setItem('refresh_token', 'test-refresh')
+        }
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+            if (url === '/api/v1/utils/current-user/') return {
+                ok: true,
+                json: async () => ({ username: 'inbox-only', permissions: [] }),
+            }
+            return { ok: false, status: 403 }
+        })
+        const PersonalTools = () => {
+            const { isLoading, isAuthenticated, user } = useAuth()
+            return <div>{isLoading ? 'Loading' : isAuthenticated ? user.username : 'Login required'}</div>
+        }
+        render(<AuthProvider><PersonalTools /></AuthProvider>)
+        expect(await screen.findByText('inbox-only')).toBeInTheDocument()
+        expect(fetchMock).not.toHaveBeenCalledWith('/api/v1/webpages/pages/', expect.anything())
     })
 
     it('uses the server workspace when another valid workspace is stale in browser storage', async () => {
