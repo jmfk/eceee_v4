@@ -92,7 +92,11 @@ services:
   db:
     image: postgres:15-alpine
     restart: unless-stopped
-    env_file: .env
+    # Do not pass private attachment credentials to the database process.
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - /mnt/data/postgres:/var/lib/postgresql/data
     healthcheck:
@@ -125,8 +129,10 @@ services:
   imgproxy:
     image: darthsim/imgproxy:latest
     restart: unless-stopped
-    env_file: .env
+    # This public-facing service must never receive support storage credentials.
     environment:
+      IMGPROXY_KEY: ${IMGPROXY_KEY}
+      IMGPROXY_SALT: ${IMGPROXY_SALT}
       IMGPROXY_USE_S3: "false"
       IMGPROXY_ALLOWED_SOURCES: "local://,https://eu-central-1.linodeobjects.com/,s3://eceee-v4-media/"
     networks: [eceee_prod]
