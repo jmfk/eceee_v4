@@ -43,6 +43,15 @@ class TenantContextMiddleware:
 
         self.authenticate_api_user(request)
 
+        if request.path.startswith("/api/v1/diagnostics/"):
+            # Diagnostics validates its complete tenant selection independently.
+            # Never change the CMS connection's tenant context for a multi-tenant read.
+            request.tenant = None
+            try:
+                return self.get_response(request)
+            finally:
+                clear_tenant_context()
+
         try:
             tenant = self.get_tenant(request)
         except self.InvalidTenantSelection:
@@ -78,15 +87,28 @@ class TenantContextMiddleware:
 
             clear_tenant_context()
             return JsonResponse({"detail": "Din roll saknar behörighet för den här åtgärden."}, status=403)
-        response = self.get_response(request)
-        from tenant_support.system_diagnostics import record
+        import uuid
 
-        record(request, response)
+        from core.diagnostics.events import REQUEST_ID, TENANT
 
-        # Clear tenant context after request
-        clear_tenant_context()
+        verified_diagnostic_tenant = bool(
+            tenant
+            and request.user.is_authenticated
+            and (isinstance(getattr(request, "auth", None), MachineAPIKey) or tenant.user_has_access(request.user))
+        )
+        diagnostic_context = TENANT.set(str(tenant.pk) if verified_diagnostic_tenant else None)
+        diagnostic_request = REQUEST_ID.set(str(uuid.uuid4()))
+        try:
+            response = self.get_response(request)
+            from tenant_support.system_diagnostics import record
 
-        return response
+            record(request, response)
+            response["X-Request-ID"] = REQUEST_ID.get()
+            return response
+        finally:
+            TENANT.reset(diagnostic_context)
+            REQUEST_ID.reset(diagnostic_request)
+            clear_tenant_context()
 
     @staticmethod
     def authenticate_api_user(request):

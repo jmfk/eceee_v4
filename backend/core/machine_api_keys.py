@@ -10,6 +10,10 @@ from rest_framework import authentication, exceptions
 from core.models import MachineAPIKey
 
 SERVER_FULL_ACCESS = "server.full_access"
+DIAGNOSTICS_LOGS_READ = "diagnostics.logs.read"
+DIAGNOSTICS_DATA_READ = "diagnostics.data.read"
+DIAGNOSTICS_GLOBAL_READ = "diagnostics.global.read"
+DIAGNOSTICS_SCOPES = {DIAGNOSTICS_LOGS_READ, DIAGNOSTICS_DATA_READ, DIAGNOSTICS_GLOBAL_READ}
 THEME_READ = "theme.read"
 THEME_WRITE = "theme.write"
 THEME_VERSION = "theme.version"
@@ -32,6 +36,7 @@ SITE_TRANSFER = "site.transfer"
 OBJECT_READ = "object.read"
 OBJECT_TRANSFER = "object.transfer"
 ALLOWED_SCOPES = {
+    *DIAGNOSTICS_SCOPES,
     KANBAN_READ,
     KANBAN_WRITE,
     SERVER_FULL_ACCESS,
@@ -105,6 +110,8 @@ def _read_or_write_scope(request, read_scope, write_scope):
 
 
 def _required_scope(request):
+    if request.path.startswith("/api/v1/diagnostics/"):
+        return DIAGNOSTICS_DATA_READ if request.path.startswith("/api/v1/diagnostics/data/") else DIAGNOSTICS_LOGS_READ
     if request.path.startswith(MACHINE_DENIED_PREFIXES):
         return None
     if request.path.startswith("/api/v1/webpages/themes/sync/") or request.path.startswith(
@@ -208,7 +215,10 @@ class MachineAPIKeyAuthentication(authentication.BaseAuthentication):
             raise exceptions.AuthenticationFailed("Invalid machine API key.")
         required_scope = _required_scope(request)
         scopes = set(api_key.scopes)
-        if required_scope is None or (SERVER_FULL_ACCESS not in scopes and required_scope not in scopes):
+        explicit_diagnostics = request.path.startswith("/api/v1/diagnostics/")
+        if required_scope is None or (
+            required_scope not in scopes and (explicit_diagnostics or SERVER_FULL_ACCESS not in scopes)
+        ):
             raise exceptions.PermissionDenied("This machine API key is not permitted for this endpoint.")
         MachineAPIKey.objects.filter(pk=api_key.pk).update(last_used_at=timezone.now())
         return api_key.principal, api_key
