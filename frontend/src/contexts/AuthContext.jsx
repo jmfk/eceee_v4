@@ -81,10 +81,11 @@ export const AuthProvider = ({ children }) => {
 
     const checkAuthStatus = async () => {
         try {
+            // Authentication must not require CMS resource permissions (e.g. page.read).
             // STEP 1: Try dev auto-login (session-based auth with no tokens)
             // Only in development mode to avoid 401 errors in production
             if (import.meta.env.DEV) {
-                const devAuthResponse = await fetch('/api/v1/webpages/pages/', {
+                const devAuthResponse = await fetch('/api/v1/utils/current-user/', {
                     credentials: 'include', // Include cookies for session auth
                 });
 
@@ -111,7 +112,7 @@ export const AuthProvider = ({ children }) => {
             }
 
             // STEP 3: Try JWT authentication
-            const response = await fetch('/api/v1/webpages/pages/', {
+            const response = await fetch('/api/v1/utils/current-user/', {
                 credentials: 'include',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`
