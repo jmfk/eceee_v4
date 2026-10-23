@@ -38,3 +38,9 @@ Gamla identiteter raderas inte. När lika namn finns i olika typer får en gamma
 
 - [PRD-0035](../../prds/0035-classification-cutover-and-required-media.md)
 - [ADR-0043](0043-classification-governance.md)
+
+### Gräns mellan nya och historiska arkiverade kopplingar
+
+Nya media- och samlingskopplingar kräver en godkänd slutterm, även när det ursprungliga ID:t är en sammanslagningshänvisning. Omordning av befintliga kopplingar behåller historiken. Checkpoint-återställning får återskapa en granskad arkiverad koppling först efter befintlig `restore`-behörighetskontroll. Hjälparen sätter då ett transaktionslokalt PostgreSQL-kontext med exakt relationstabell, resurs-ID och granskade term-ID:n; triggerundantaget gäller endast dessa kopplingar och kontextet återställs direkt efter skrivningen. Termens arkivstatus och revisionshistorik ändras inte. Vanliga ORM-, bulk- och SQL-skrivningar saknar detta återställningskontext och avvisas.
+
+Vid hash-/slug-återanvändning av medier och samlingar kompletterar paketimport destinationens befintliga klassificeringar i bevarad ordning. Versionsbundna tilldelningar ersätts fortsatt exakt med paketets urval.

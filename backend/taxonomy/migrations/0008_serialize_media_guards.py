@@ -23,15 +23,19 @@ def check_function(*, lock):
 
 SQL = """
 CREATE FUNCTION taxonomy_check_new_media_link() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE ns bigint; use_name text; term_id uuid; target uuid; definition_id uuid; term_status text; depth integer := 0;
+DECLARE ns bigint; resource uuid; use_name text; term_id uuid; target uuid; definition_id uuid;
+ term_status text; depth integer := 0;
+ restore_scope jsonb := NULLIF(current_setting('eceee.classification_restore', true),'')::jsonb;
 BEGIN
  IF TG_TABLE_NAME='taxonomy_mediafileclassification' THEN
   IF TG_OP='UPDATE' AND OLD.media_file_id=NEW.media_file_id AND OLD.tag_id=NEW.tag_id THEN RETURN NEW; END IF;
   SELECT namespace_id INTO ns FROM file_manager_mediafile WHERE id=NEW.media_file_id;
+  resource := NEW.media_file_id;
   use_name := 'media_files';
  ELSE
   IF TG_OP='UPDATE' AND OLD.collection_id=NEW.collection_id AND OLD.tag_id=NEW.tag_id THEN RETURN NEW; END IF;
   SELECT namespace_id INTO ns FROM file_manager_mediacollection WHERE id=NEW.collection_id;
+  resource := NEW.collection_id;
   use_name := 'media_collections';
  END IF;
  -- Lock each redirect hop before reading its metadata. FK KEY SHARE alone does
@@ -46,6 +50,12 @@ BEGIN
   term_id := target;
   depth := depth+1;
  END LOOP;
+ IF EXISTS(SELECT 1 FROM taxonomy_classificationrollout WHERE namespace_id=ns AND phase='canonical')
+  AND term_status IS DISTINCT FROM 'approved'
+  AND NOT COALESCE(term_status='archived'
+   AND restore_scope->>'table'=TG_TABLE_NAME AND restore_scope->>'owner'=resource::text
+   AND restore_scope->'tags' ? NEW.tag_id::text, false)
+ THEN RAISE EXCEPTION 'New media assignments require an approved taxonomy term' USING ERRCODE='23514'; END IF;
  IF EXISTS(SELECT 1 FROM taxonomy_classificationrollout WHERE namespace_id=ns AND phase='canonical')
   AND NOT EXISTS(SELECT 1 FROM taxonomy_tag t JOIN taxonomy_classificationtype d ON d.id=t.classification_type_id
    WHERE t.id=NEW.tag_id AND d.allowed_uses ? use_name)

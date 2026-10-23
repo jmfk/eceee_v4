@@ -268,10 +268,15 @@ def export_assignments(instance):
     return payloads
 
 
+@transaction.atomic
 def import_assignments(importer, instance, payloads, namespace):
-    from .assignments import replace_assignments
+    from content.models import Namespace
+
+    from .assignments import classification_ids, replace_assignments
     from .projections import legacy_media_ids
 
+    # Keep the destination snapshot and union serialized with ordinary media edits.
+    Namespace.objects.select_for_update().get(pk=namespace.pk)
     ids = []
     for payload in sorted(payloads, key=lambda item: item.get("position", 0)):
         tag = import_term(payload, namespace, importer.job.created_by)
@@ -281,6 +286,10 @@ def import_assignments(importer, instance, payloads, namespace):
         importer._classification_imports = imports
     if not ids and hasattr(instance, "tags") and hasattr(instance.tags, "all"):
         ids = legacy_media_ids(instance, list(instance.tags.values_list("pk", flat=True)), importer.job.created_by)
+    if instance._meta.label_lower in {"file_manager.mediafile", "file_manager.mediacollection"}:
+        # Hash/slug deduplication reuses destination-owned resources. Imported
+        # terms supplement their editorial selections, while versions stay exact.
+        ids = list(dict.fromkeys([*classification_ids(instance), *ids]))
     replace_assignments(instance, ids, importer.job.created_by)
 
 

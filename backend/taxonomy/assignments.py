@@ -1,7 +1,7 @@
 """Ordered classification assignments. Call only after the content's edit gate."""
 
 from django.core.exceptions import ValidationError as ModelValidationError
-from django.db import transaction
+from django.db import connection, transaction
 from rest_framework.exceptions import ValidationError
 
 from content.models import Namespace
@@ -203,7 +203,22 @@ def restore_assignment_snapshot(instance, ids, user):
 
             if canonical_phase(namespace.pk):
                 raise ValidationError("An untyped legacy checkpoint cannot replace canonical media classifications.")
+    if connection.vendor == "postgresql":
+        import json
+
+        # Only this permission-checked snapshot path may recreate archived links.
+        # Scope it to the exact resource and reviewed terms; never alter term status.
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT current_setting('eceee.classification_restore', true)")
+            previous_scope = cursor.fetchone()[0] or ""
+            cursor.execute(
+                "SELECT set_config('eceee.classification_restore', %s, true)",
+                [json.dumps({"table": model._meta.db_table, "owner": str(instance.pk), "tags": list(terms)})],
+            )
     _replace_links(instance, model, field, [terms[str(pk)] for pk in ids])
+    if connection.vendor == "postgresql":
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT set_config('eceee.classification_restore', %s, true)", [previous_scope])
 
 
 def collection_upload_ids(collection, user):
@@ -221,4 +236,6 @@ def collection_upload_ids(collection, user):
     ]
     if not terms:
         ids = legacy_media_ids(collection, list(collection.tags.values_list("pk", flat=True)), user)
+    elif not ids:
+        raise ValidationError({"classification_ids": "No approved collection term is allowed for this media kind."})
     return validate_media_selection(collection.namespace, user, ids)

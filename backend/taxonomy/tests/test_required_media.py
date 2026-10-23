@@ -8,6 +8,7 @@ from taxonomy.assignments import classification_ids, replace_assignments
 from taxonomy.context import actor_context
 from taxonomy.models import ClassificationRollout
 from taxonomy.rollout import reconciliation_report
+from taxonomy.services import mutate
 
 from .test_governance import create
 
@@ -672,3 +673,132 @@ def test_upgrade_from_merged_main_preserves_classified_media(scope, resources):
         assert classification_ids(resources[2]) == [str(term.pk)]
     finally:
         MigrationExecutor(connection).migrate(targets)
+
+
+@pytest.mark.parametrize("resource_index", [0, 1, 2, 3])
+def test_transfer_preserves_destination_classifications_only_on_shared_media(scope, resources, resource_index):
+    from types import SimpleNamespace
+
+    from taxonomy.transfer import export_term, import_assignments
+
+    owner, _, _, definition = scope
+    local = create(owner, definition, "Local editorial selection")
+    incoming = create(owner, definition, "Imported selection")
+    resource = resources[resource_index]
+    replace_assignments(resource, [str(local.pk)], owner)
+    importer = SimpleNamespace(job=SimpleNamespace(created_by=owner))
+    import_assignments(importer, resource, [export_term(incoming)], definition.namespace)
+    expected = [str(local.pk), str(incoming.pk)] if resource_index in [2, 3] else [str(incoming.pk)]
+    assert classification_ids(resource) == expected
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("resource_index", [2, 3])
+@pytest.mark.parametrize("redirect", [False, True])
+def test_direct_new_media_links_reject_archived_terms(scope, resources, resource_index, redirect):
+    from taxonomy.assignments import assignment_context
+
+    owner, _, _, definition = scope
+    active = create(owner, definition, "Existing active")
+    archived = create(owner, definition, "Archived candidate")
+    candidate = archived
+    if redirect:
+        candidate = create(owner, definition, "Redirect source")
+        mutate(
+            owner,
+            definition,
+            "merge",
+            term=candidate,
+            revision=candidate.revision,
+            payload={"target_id": str(archived.pk), "target_revision": archived.revision},
+        )
+        archived.refresh_from_db()
+    mutate(owner, definition, "archive", term=archived, revision=archived.revision)
+    for resource in resources[2:]:
+        replace_assignments(resource, [str(active.pk)], owner)
+    ClassificationRollout.objects.create(namespace=definition.namespace, phase="canonical")
+    resource = resources[resource_index]
+    model, field, *_ = assignment_context(resource)
+    with pytest.raises(IntegrityError, match="approved taxonomy term"):
+        with transaction.atomic():
+            model.objects.bulk_create([model(**{field: resource, "tag": candidate, "position": 1})])
+    assert classification_ids(resource) == [str(active.pk)]
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("resource_index", [2, 3])
+def test_permission_checked_snapshot_restore_can_recreate_archived_media_links(scope, resources, resource_index):
+    from django.db import connection
+    from rest_framework.exceptions import PermissionDenied
+
+    from taxonomy.assignments import restore_assignment_snapshot
+
+    owner, member, _, definition = scope
+    historical = create(owner, definition, "Historical")
+    replacement = create(owner, definition, "Replacement")
+    for resource in resources[2:]:
+        replace_assignments(resource, [str(historical.pk)], owner)
+    mutate(owner, definition, "archive", term=historical, revision=historical.revision)
+    ClassificationRollout.objects.create(namespace=definition.namespace, phase="canonical")
+    resource = resources[resource_index]
+    replace_assignments(resource, [str(replacement.pk)], owner)
+    with pytest.raises(PermissionDenied):
+        restore_assignment_snapshot(resource, [str(historical.pk)], member)
+    assert classification_ids(resource) == [str(replacement.pk)]
+    restore_assignment_snapshot(resource, [str(historical.pk)], owner)
+    assert classification_ids(resource) == [str(historical.pk)]
+    historical.refresh_from_db()
+    assert historical.status == "archived"
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT current_setting('eceee.classification_restore', true)")
+        assert not cursor.fetchone()[0]
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("resource_index", [2, 3])
+def test_media_transfer_preserves_a_concurrent_destination_selection(scope, resources, resource_index):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    from django.db import close_old_connections
+
+    from content.models import Namespace
+    from taxonomy.transfer import export_term, import_assignments, import_term
+
+    owner, _, _, definition = scope
+    original = create(owner, definition, "Original")
+    concurrent = create(owner, definition, "Concurrent")
+    incoming = create(owner, definition, "Incoming")
+    resource = resources[resource_index]
+    replace_assignments(resource, [str(original.pk)], owner)
+    payload = export_term(incoming)
+    import_term(payload, definition.namespace, owner)
+    started, read = Event(), Event()
+    real_classification_ids = classification_ids
+
+    def observe_read(instance):
+        read.set()
+        return real_classification_ids(instance)
+
+    def import_in_other_connection():
+        close_old_connections()
+        try:
+            importer = SimpleNamespace(job=SimpleNamespace(created_by=owner))
+            started.set()
+            with patch("taxonomy.assignments.classification_ids", side_effect=observe_read):
+                import_assignments(importer, resource, [payload], definition.namespace)
+        finally:
+            close_old_connections()
+
+    with ThreadPoolExecutor(max_workers=1) as workers:
+        with transaction.atomic():
+            Namespace.objects.select_for_update().get(pk=definition.namespace_id)
+            future = workers.submit(import_in_other_connection)
+            assert started.wait(5)
+            # An old pre-lock union would read the stale [original] here.
+            read.wait(0.25)
+            replace_assignments(resource, [str(original.pk), str(concurrent.pk)], owner)
+        future.result(timeout=10)
+    assert classification_ids(resource) == [str(original.pk), str(concurrent.pk), str(incoming.pk)]
