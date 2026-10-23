@@ -17,6 +17,14 @@ def bucket_name():
 
 
 def client(public=False):
+    access_key = getattr(settings, "SUPPORT_STORAGE_ACCESS_KEY_ID", "")
+    secret_key = getattr(settings, "SUPPORT_STORAGE_SECRET_ACCESS_KEY", "")
+    if bool(access_key) != bool(secret_key):
+        raise ImproperlyConfigured("Configure both dedicated support storage credentials.")
+    # Local shared storage may retain the existing credentials. Production
+    # preflight requires a dedicated pair, keeping imgproxy out of private media.
+    if not access_key:
+        access_key, secret_key = settings.AWS_ACCESS_KEY_ID, settings.AWS_SECRET_ACCESS_KEY
     endpoint = (
         settings.AWS_S3_ENDPOINT_URL
         if public
@@ -26,8 +34,8 @@ def client(public=False):
         "s3",
         endpoint_url=endpoint,
         region_name=settings.AWS_S3_REGION_NAME,
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
         config=Config(
             signature_version="s3v4",
             s3={"addressing_style": getattr(settings, "AWS_S3_ADDRESSING_STYLE", "path")},

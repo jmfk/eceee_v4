@@ -97,4 +97,21 @@ if [ -n "$MATCH_PUBLISHER_ENV" ]; then
 fi
 unset publisher_db_password publisher_form_db_password
 
+support_bucket=$(read_env_value SUPPORT_STORAGE_BUCKET_NAME)
+support_access_key=$(read_env_value SUPPORT_STORAGE_ACCESS_KEY_ID)
+support_secret_key=$(read_env_value SUPPORT_STORAGE_SECRET_ACCESS_KEY)
+if [ -n "$support_bucket" ] || [ -n "$support_access_key" ] || [ -n "$support_secret_key" ]; then
+    if [ -z "$support_bucket" ] || [ -z "$support_access_key" ] || [ -z "$support_secret_key" ]; then
+        error "Configured support storage requires a bucket and both dedicated support credentials."
+        exit 1
+    fi
+    media_access_key=$(read_env_value AWS_ACCESS_KEY_ID)
+    if [ "$support_access_key" = "$media_access_key" ]; then
+        error "Support storage must not reuse the media/imgproxy access key."
+        exit 1
+    fi
+    unset media_access_key
+fi
+unset support_bucket support_access_key support_secret_key
+
 echo "[env-validation] Production environment validation passed."
