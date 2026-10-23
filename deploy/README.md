@@ -74,7 +74,7 @@ Public pages and editor previews are rendered by the TypeScript renderer. The Dj
 ### Secrets
 
 - Keep real secrets **only** in `deploy/.env` on the server (not in git, not in tickets or chat). Copy from `deploy/.env.production.example` and replace every placeholder.
-- `IMGPROXY_KEY` and `IMGPROXY_SALT` must **match** between the Django backend and the `imgproxy` container; both load the same `deploy/.env` via Compose. Generate with `openssl rand -hex 32` (two independent values).
+- `IMGPROXY_KEY` and `IMGPROXY_SALT` must **match** between the Django backend and the `imgproxy` container; Compose passes those two signing variables explicitly to imgproxy from `deploy/.env`; only backend/Celery inherit the complete file. Generate with `openssl rand -hex 32` (two independent values).
 - Rotating imgproxy key/salt invalidates **existing signed image URLs** (bookmarks, cached HTML); originals in object storage are unchanged. Plan downtime or cache bust if you rotate.
 
 ### 5. Point DNS

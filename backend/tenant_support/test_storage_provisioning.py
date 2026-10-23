@@ -104,6 +104,7 @@ class SupportStorageCredentialTests(SimpleTestCase):
     @patch("tenant_support.storage.boto3.client")
     def test_dedicated_pair_used_for_internal_and_public_signing(self, client):
         from django.test import override_settings
+
         from tenant_support import storage
 
         with override_settings(
@@ -117,8 +118,9 @@ class SupportStorageCredentialTests(SimpleTestCase):
 
     @patch("tenant_support.storage.boto3.client")
     def test_incomplete_pair_fails_before_provider_request(self, client):
-        from django.test import override_settings
         from django.core.exceptions import ImproperlyConfigured
+        from django.test import override_settings
+
         from tenant_support import storage
 
         for key, secret in [("support-test-key", ""), ("", "support-test-secret")]:
@@ -130,6 +132,7 @@ class SupportStorageCredentialTests(SimpleTestCase):
     @patch("tenant_support.storage.boto3.client")
     def test_local_legacy_pair_still_supported(self, client):
         from django.test import override_settings
+
         from tenant_support import storage
 
         with override_settings(

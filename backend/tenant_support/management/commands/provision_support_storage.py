@@ -5,7 +5,6 @@ from django.core.management.base import BaseCommand, CommandError
 
 from tenant_support import storage
 
-
 # Never include provider messages, request URLs, headers or arbitrary error codes.
 SAFE_PROVIDER_CODES = {
     "AccessDenied",
