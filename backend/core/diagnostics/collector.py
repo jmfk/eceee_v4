@@ -41,6 +41,11 @@ def atomic_json(path, value):
         handle.flush()
         os.fsync(handle.fileno())
     os.replace(temporary, path)
+    directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
 
 
 def bounded_lines(command, deadline, budget):
@@ -59,7 +64,10 @@ def bounded_lines(command, deadline, budget):
                     continue
                 chunk = os.read(process.stdout.fileno(), min(8192, budget[0]))
                 if not chunk:
-                    process.wait(timeout=max(0.01, deadline - time.monotonic()))
+                    try:
+                        process.wait(timeout=max(0.01, deadline - time.monotonic()))
+                    except subprocess.TimeoutExpired:
+                        raise TimeoutError("source=bounded") from None
                     break
                 budget[0] -= len(chunk)
                 pending += chunk
@@ -72,7 +80,7 @@ def bounded_lines(command, deadline, budget):
                     break
             if process.poll() not in (None, 0):
                 raise RuntimeError("source=unavailable")
-            if process.poll() is None and (budget[0] <= 0 or time.monotonic() >= deadline):
+            if budget[0] <= 0 or time.monotonic() >= deadline:
                 raise TimeoutError("source=bounded")
         finally:
             selector.close()
@@ -112,7 +120,7 @@ def open_registered_file(path):
             following = os.open(component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
             os.close(directory)
             directory = following
-        return os.open(path.name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory)
+        return os.open(path.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
     finally:
         os.close(directory)
 
@@ -124,6 +132,8 @@ def collect(root, repository, key, file_sources=()):
     # One writer, including overlapping timer/manual invocations.
     with (root / ".collector.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if (root / ".pending.json").exists():
+            publish_pending(root)
         return _collect(root, repository, key, file_sources)
 
 
@@ -263,37 +273,71 @@ def _collect(root, repository, key, file_sources):
         health[name] = entry
 
     generation = now.strftime("%Y%m%dT%H%M%S%f") + "-" + uuid.uuid4().hex
-    batch = []
-    batch_size = 2
+    batches, batch, batch_size = [], [], 2
 
-    def flush_batch():
+    def finish_batch():
         if batch:
             name = now.strftime("%Y%m%dT%H%M%S%f") + "-" + uuid.uuid4().hex + ".json"
-            atomic_json(root / "segments" / name, batch)
+            batches.append({"name": name, "events": batch.copy()})
 
     for event in events.values():
         size = len(canonical(event)) + 1
         if batch_size + size > 512 * 1024:
-            flush_batch()
+            finish_batch()
             batch, batch_size = [], 2
         batch.append(event)
         batch_size += size
-    flush_batch()
-    segments = sorted((root / "segments").glob("*.json"))
-    total = sum(p.stat().st_size for p in segments)
-    removed = False
-    for path in list(segments):
-        if now.timestamp() - path.stat().st_mtime > 7 * 86400 or total > MAX_STORAGE:
-            total -= path.stat().st_size
-            path.unlink()
-            segments.remove(path)
-            removed = True
+    finish_batch()
+    if len(seen) > 100000:
+        seen = dict(sorted(seen.items(), key=lambda item: item[1])[-100000:])
     manifest = {
         "generation": generation,
         "created_at": now.isoformat(),
         "sources": health,
-        "segments": [p.name for p in segments],
-        "retention_limited": removed or previous.get("__retention_limited__", False),
+        "bytes_read": MAX_INPUT - budget[0],
+        "incomplete": bool(gaps),
+        "gaps": gaps[-10000:],
+    }
+    # Save sanitized events AND their checkpoints before publishing either. Recovery reuses
+    # the exact segment names and state, even if a prior process died midway through publication.
+    atomic_json(
+        root / ".pending.json",
+        {
+            "batches": batches,
+            "manifest": manifest,
+            "state": state,
+            "containers": containers,
+            "gaps": gaps[-10000:],
+            "seen": seen,
+        },
+    )
+    publish_pending(root)
+    return {"status": "incomplete" if manifest["incomplete"] else "ok", "events": len(events)}
+
+
+def publish_pending(root):
+    pending_path = root / ".pending.json"
+    pending = json.loads(pending_path.read_text())
+    now = datetime.now(timezone.utc)
+    for batch in pending["batches"]:
+        atomic_json(root / "segments" / batch["name"], batch["events"])
+    segments = sorted((root / "segments").glob("*.json"))
+    total = sum(path.stat().st_size for path in segments)
+    removed = False
+    for path in list(segments):
+        created = datetime.strptime(path.name.split("-")[0], "%Y%m%dT%H%M%S%f").replace(tzinfo=timezone.utc)
+        if now - created > timedelta(days=7) or total > MAX_STORAGE:
+            total -= path.stat().st_size
+            path.unlink()
+            segments.remove(path)
+            removed = True
+    state = pending["state"]
+    if removed:
+        state["__retention_limited__"] = True
+    manifest = {
+        **pending["manifest"],
+        "segments": [path.name for path in segments],
+        "retention_limited": state.get("__retention_limited__", False),
         "oldest_export_at": (
             datetime.strptime(segments[0].name.split("-")[0], "%Y%m%dT%H%M%S%f")
             .replace(tzinfo=timezone.utc)
@@ -301,24 +345,18 @@ def _collect(root, repository, key, file_sources):
             if segments
             else None
         ),
-        "bytes_read": MAX_INPUT - budget[0],
-        "incomplete": bool(gaps),
-        "gaps": gaps[-10000:],
     }
-    atomic_json(root / "generations" / (generation + ".json"), manifest)
-    if removed:
-        state["__retention_limited__"] = True
-    atomic_json(state_path, state)
-    atomic_json(containers_path, containers)
-    atomic_json(gaps_path, gaps[-10000:])
-    if len(seen) > 100000:
-        seen = dict(sorted(seen.items(), key=lambda item: item[1])[-100000:])
-    atomic_json(seen_path, seen)
+    atomic_json(root / "generations" / (manifest["generation"] + ".json"), manifest)
+    atomic_json(root / ".positions.json", state)
+    atomic_json(root / ".containers.json", pending["containers"])
+    atomic_json(root / ".gaps.json", pending["gaps"])
+    atomic_json(root / ".seen.json", pending["seen"])
     atomic_json(root / "latest.json", manifest)
+    pending_path.unlink()
     for path in (root / "generations").glob("*.json"):
-        if now.timestamp() - path.stat().st_mtime > 3600:
+        created = datetime.strptime(path.name.split("-")[0], "%Y%m%dT%H%M%S%f").replace(tzinfo=timezone.utc)
+        if now - created > timedelta(hours=1):
             path.unlink()
-    return {"status": "incomplete" if manifest["incomplete"] else "ok", "events": len(events)}
 
 
 def main():

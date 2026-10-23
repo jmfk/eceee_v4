@@ -20,3 +20,7 @@ A host timer exports sanitized diagnostics to a backend read-only mount. Signed 
 Exports use immutable bounded segments with immutable generation manifests; pagination binds the query, key and allowed tenant selection to an opaque signed expiring cursor whose bounded continuation state uses the existing cache. Collection failure, skipped unknown records, retention and truncation are reported explicitly. The collector is not an archival replacement; historical rotated-away logs cannot be recovered.
 
 Provisioning is explicit, additive and repeatable. Production installation and credential changes remain subject to separate owner gates. Disabling the feature and timer stops access without rewriting application records; diagnostic files can expire normally. No user-facing CMS UI is added.
+
+## Recovery verification
+
+Publication writes a local journal containing sanitized segment batches and the corresponding collector state before publishing either. A restart finishes that exact publication with the same segment names before ingesting new input. Atomic file replacements fsync their parent directory; retention uses immutable creation timestamps rather than rewrite times. Source metadata summarizes long gap histories to preserve the API response bound.
