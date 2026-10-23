@@ -16,13 +16,15 @@ from rest_framework.test import APIClient
 from core.machine_api_keys import DIAGNOSTICS_DATA_READ, DIAGNOSTICS_GLOBAL_READ, generate_machine_api_key
 from core.models import MachineAPIKey, Tenant
 
+RUN_DIAGNOSTIC_POSTGRES = settings.SETTINGS_MODULE == "core.diagnostics.postgres_test_settings"
+
 
 @skipUnless(
-    settings.SETTINGS_MODULE == "core.diagnostics.postgres_test_settings",
+    RUN_DIAGNOSTIC_POSTGRES,
     "Dedicated disposable PostgreSQL settings required",
 )
 class PostgreSQLDiagnosticTests(TransactionTestCase):
-    databases = {"default", "diagnostics"}
+    databases = {"default", "diagnostics"} if RUN_DIAGNOSTIC_POSTGRES else set()
 
     @classmethod
     def _databases_names(cls, include_mirrors=True):
