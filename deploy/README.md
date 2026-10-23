@@ -134,6 +134,26 @@ which provisions the matching PostgreSQL roles before replacing containers.
 Restart-only and environment-install-only operations reject publisher password
 changes so the installed environment cannot diverge from database credentials.
 
+### Schema and private attachment readiness
+
+Image builds and configured private-support bucket provisioning/privacy checks run
+while the current application is available. The bucket command creates only the
+separate configured bucket if absent; it refuses public ACLs/policies and never
+modifies another bucket. Leave `SUPPORT_STORAGE_BUCKET_NAME` unset only when
+private support/message attachments are intentionally unavailable. Configure
+`SUPPORT_APP_URL` to the public CMS origin for message links. Storage uses the
+existing production AWS/S3 settings and a separate private bucket; the immutable
+workload namespace is `w8c4m2`, with production bucket `w8c4m2-prod-support`.
+
+If migrations are pending, deploy validates the migration plan, then stops the
+backend, Celery worker and Celery scheduler before changing schema. They remain
+stopped until the new release starts. This adds the migration/static-collection
+period to CMS downtime; public publisher reads remain available until the usual
+Compose restart. A failed migration does not automatically resume old writers or
+restore data: stop and obtain a new owner gate for diagnosis/recovery. The
+pre-deploy backup must succeed before any schema change. No support bucket is
+deleted during failure recovery.
+
 ### Rollback
 
 ```bash
