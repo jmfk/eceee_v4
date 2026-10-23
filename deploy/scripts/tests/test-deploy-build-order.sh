@@ -42,3 +42,5 @@ git -C "$TEST_DIR/repo" tag v1.2.3
 git -C "$TEST_DIR/repo" -c user.name=Test -c user.email=test@example.invalid commit --allow-empty -qm untagged
 [ -z "$(resolve_release_tag "$TEST_DIR/repo" HEAD)" ]
 echo "exact release tag metadata test passed"
+
+bash "$SCRIPT_DIR/test-deploy-migration-order.sh"

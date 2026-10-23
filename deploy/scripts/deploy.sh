@@ -36,6 +36,31 @@ build_images_serially() {
     done
 }
 
+stop_application_writers() {
+    local service
+    local writers=()
+    for service in backend celery-worker celery-beat; do
+        if grep -Fxq "$service" <<< "$COMPOSE_SERVICES"; then
+            writers+=("$service")
+        fi
+    done
+    info "Pausing application writers before schema changes..."
+    docker_compose stop --timeout 30 "${writers[@]}"
+}
+
+provision_private_support_storage() {
+    # This pre-migration check does not query application tables. Older releases
+    # without the command remain deployable through the same control plane.
+    IMAGE_TAG="$IMAGE_TAG" docker_compose run --rm backend python -c '
+import django
+django.setup()
+from django.conf import settings
+from django.core.management import call_command, get_commands
+if getattr(settings, "SUPPORT_STORAGE_BUCKET_NAME", "") and "provision_support_storage" in get_commands():
+    call_command("provision_support_storage")
+'
+}
+
 resolve_release_tag() {
     # Only an exact tag describes this build; never label it with an older release.
     git -C "$1" describe --tags --exact-match --match 'v[0-9]*' "$2" 2>/dev/null || true
@@ -100,14 +125,20 @@ if grep -Fxq publisher <<< "$COMPOSE_SERVICES"; then
     BUILD_SERVICES+=(publisher)
     PUBLISHER_DEPLOY_ENABLED=1
 fi
-unset COMPOSE_SERVICES
 build_images_serially "${BUILD_SERVICES[@]}"
+
+info "Checking configured private support storage before schema changes..."
+provision_private_support_storage
 
 # ── 6. Migration check ────────────────────────────────────────────────────────
 info "Checking for unapplied migrations..."
+# Fail on an invalid plan/connection while existing writers are still running.
+IMAGE_TAG="$IMAGE_TAG" docker_compose run --rm backend python manage.py migrate --plan >/dev/null
 if ! IMAGE_TAG="$IMAGE_TAG" docker_compose run --rm backend python manage.py migrate --check 2>/dev/null; then
-    info "Pending migrations found — will apply after health check of current instance."
+    info "Pending migrations found; pausing writers until the new release starts."
+    stop_application_writers
 fi
+unset COMPOSE_SERVICES
 
 # ── 7. Apply migrations ───────────────────────────────────────────────────────
 info "Running migrations..."

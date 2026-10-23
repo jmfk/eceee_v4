@@ -41,3 +41,7 @@ Recipient groups use tenant-owned roles and board memberships. Global Django gro
 CMS navigation and Settings actions/queries follow resource capabilities; empty content roles retain personal Profile and Inbox access. Global user administration stays restricted to system owners.
 
 Authentication probes the role-independent current-user endpoint. The root route waits for authentication and lands users without page-read access in Profile.
+
+## Production rollout preparation
+
+Because the additive fields still reject writes from older application processes, the production deploy flow pauses API/Celery writers whenever migrations are pending. Image builds and configured private support bucket provisioning/privacy validation happen first, followed by migration-plan validation, writer pause, migrations and the existing coordinated restart/health checks. A failed migration leaves writers paused until separately authorized recovery. Deploying the new messaging journey requires a separate private `w8c4m2-prod-support` bucket; no existing media bucket is renamed or made private. This extends the workload namespace already recorded for local storage into the separate production environment.
