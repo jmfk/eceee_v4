@@ -11,6 +11,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "rest_framework",
     "core",
+    "kanban",
     "tenant_support",
 ]
 DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}}

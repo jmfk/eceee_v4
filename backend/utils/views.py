@@ -537,6 +537,9 @@ class CurrentUserView(APIView):
             )
             if not accessible_tenants.filter(pk=current_workspace.pk).exists():
                 current_workspace = accessible_tenants.order_by("name").first()
+        from core.roles import permissions_for
+
+        data["permissions"] = sorted(permissions_for(request.user, current_workspace))
         data["current_workspace"] = (
             {
                 "id": str(current_workspace.id),

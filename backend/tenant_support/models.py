@@ -61,6 +61,11 @@ class Instruction(TenantRecord):
 
 
 class SupportThread(TenantRecord):
+    support_target = models.BooleanField(default=True)
+    participants = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="private_threads", blank=True)
+    recipient_specs = models.JSONField(default=list, blank=True)
+    board_card = models.OneToOneField("kanban.Card", null=True, blank=True, on_delete=models.PROTECT)
+
     creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     instruction = models.ForeignKey(Instruction, null=True, blank=True, on_delete=models.PROTECT)
     video = models.OneToOneField(PrivateVideo, null=True, blank=True, on_delete=models.PROTECT)
@@ -132,3 +137,14 @@ class EmailDelivery(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=["state", "next_attempt_at"], name="support_email_due_idx")]
+
+
+class MessageAttachment(TenantRecord):
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    message = models.ForeignKey(Message, null=True, blank=True, related_name="attachments", on_delete=models.PROTECT)
+    inline_text = models.TextField(blank=True)
+    filename = models.CharField(max_length=255)
+    storage_key = models.CharField(max_length=255, unique=True)
+    content_type = models.CharField(max_length=100)
+    byte_size = models.PositiveBigIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)

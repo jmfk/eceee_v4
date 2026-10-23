@@ -123,6 +123,8 @@ export default function SettingsSidebar() {
             label: 'System',
             icon: Cog,
             items: [
+                { id: 'support', label: 'Support', icon: Users, href: '/settings/support' },
+                { id: 'roles', label: 'Roller och behörigheter', icon: Users, href: '/settings/roles' },
                 ...(user?.isSuperuser ? [{ id: 'users', label: 'Users', icon: Users, href: '/settings/users' }] : []),
                 { id: 'versions', label: 'Versions', icon: Cog, href: '/settings/versions' },
                 { id: 'publishing', label: 'Publishing', icon: Calendar, href: '/settings/publishing' },

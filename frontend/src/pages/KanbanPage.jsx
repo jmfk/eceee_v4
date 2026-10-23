@@ -1,9 +1,11 @@
+import Avatar from '../components/Avatar'
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Navbar from '../components/Navbar'
+import UserToolsNav from '../components/UserToolsNav'
 import StatusBar from '../components/StatusBar'
-import { Columns3 } from 'lucide-react'
+import { Columns3, Plus, MoreHorizontal, SlidersHorizontal, ArrowLeft, X } from 'lucide-react'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import '../components/user-tools.css'
 import { useAuth } from '../contexts/AuthContext'
@@ -220,7 +222,7 @@ function CardDetail({ card, workspace, run, busy, reload }) {
     ].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     return (
         <div>
-            <Link to={`/kanban/boards/${card.board}`}>Till board</Link>
+            <Link to={`/kanban/boards/${card.board}`}>Till tavlan</Link>
             <div className="flex flex-wrap gap-3 items-center mt-4 mb-6">
                 <span className="kb-muted">{card.shortId}</span>
                 <button onClick={() => navigator.clipboard?.writeText(window.location.href)}>Kopiera kortlänk</button>
@@ -611,6 +613,9 @@ export default function KanbanPage() {
     const [assignee, setAssignee] = useState('')
     const [label, setLabel] = useState('')
     const [deadline, setDeadline] = useState('')
+    const [showFilters, setShowFilters] = useState(false)
+    const [addingList, setAddingList] = useState(false)
+    const [showCreateBoard, setShowCreateBoard] = useState(false)
     const [newBoard, setNewBoard] = useState('')
     const [newColumn, setNewColumn] = useState('')
     const [newCard, setNewCard] = useState('')
@@ -645,7 +650,7 @@ export default function KanbanPage() {
     const cardsQuery = useQuery({
         queryKey: ['kanban', tenant, principal, 'cards', params],
         queryFn: async () => await kanbanApi.cards(params),
-        enabled: canLoad && !cardId,
+        enabled: canLoad && !!boardId && !cardId,
     })
     const cardQuery = useQuery({
         queryKey: ['kanban', tenant, principal, 'card', cardId],
@@ -700,6 +705,13 @@ export default function KanbanPage() {
             socket?.close()
         }
     }, [workspace?.tenantId, tenant, client, ticket])
+    useEffect(() => {
+        setCreateColumn('')
+        setNewCard('')
+        setNewColumn('')
+        setAddingList(false)
+        setRename(null)
+    }, [boardId, tenant, principal])
     const board = workspace?.boards.find((item) => item.id === boardId)
     const columns = (workspace?.columns || []).filter((item) => item.board === boardId)
     const cards = cardsQuery.data?.results || []
@@ -765,16 +777,17 @@ export default function KanbanPage() {
             <div className="user-tools-shell">
                 <Navbar />
                 <GlobalWysiwygToolbar />
-                <main className="kb user-tools-main user-tools-content">
-                    <div className="kb-content container mx-auto px-4 py-8">
+                <main className={`kb user-tools-main user-tools-content ${boardId ? 'kb-board-view' : ''}`}>
+                    <div className={`kb-content ${boardId ? 'kb-board-content' : 'container mx-auto px-4 py-8'}`}>
+                    <UserToolsNav tenant={tenant} />
                     <header className="user-tools-header">
                         <div>
-                            <div className="user-tools-title"><Columns3 aria-hidden="true" /><h1>Kanban</h1></div>
-                            <p className="user-tools-description">Planera och följ upp uppgifter i din arbetsyta.</p>
+                            <div className="user-tools-title"><Columns3 aria-hidden="true" /><h1>{board?.title || (boardId ? 'Tavla' : 'Dina tavlor')}</h1></div>
+                            {!boardId && <p className="user-tools-description">Välj en tavla eller skapa en ny för ditt team.</p>}
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                        <Link to="/profile" className="user-tools-button">Till Profile</Link>
-                        <Link to="/kanban" className="user-tools-button">Alla kort</Link>
+                        {boardId && <Link to="/kanban" className="user-tools-button"><ArrowLeft size={16} />Byt tavla</Link>}
+                        {boardId && <button onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters}><SlidersHorizontal size={16} />Filter</button>}
                         <button onClick={() => setShowNotices(!showNotices)} aria-expanded={showNotices}>
                             Aviseringar ({workspace.notifications.filter((item) => !item.read).length})
                         </button>
@@ -854,7 +867,12 @@ export default function KanbanPage() {
                         )
                     ) : (
                         <>
-                            <nav aria-label="Boards" className="kb-boards user-tools-panel" hidden={!workspace.boards.some((item) => archived !== 'false' || !item.archived)}>
+                            {!boardId && <>
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-xl font-semibold">Tavlor</h2>
+                                <button className="user-tools-primary" onClick={() => setShowCreateBoard(true)}><Plus size={16} />Skapa tavla</button>
+                            </div>
+                            <nav aria-label="Tavlor" className="kb-boards">
                                 {workspace.boards
                                     .filter((item) => archived !== 'false' || !item.archived)
                                     .map((item) => (
@@ -875,7 +893,9 @@ export default function KanbanPage() {
                                         </Link>
                                     ))}
                             </nav>
-                            <form
+                            {!workspace.boards.some((item) => !item.archived) && <p className="kb-muted mb-4">Här finns inga aktiva tavlor ännu. Skapa din första tavla.</p>}
+                            <label className="flex items-center gap-2 mb-4"><input type="checkbox" checked={archived === 'all'} onChange={(e) => setArchived(e.target.checked ? 'all' : 'false')} />Visa arkiverade tavlor</label>
+                            {showCreateBoard && <form
                                 onSubmit={(e) => {
                                     e.preventDefault()
                                     run(async () => {
@@ -889,17 +909,20 @@ export default function KanbanPage() {
                                 className="kb-toolbar user-tools-panel"
                             >
                                 <input
-                                    aria-label="Nytt board"
-                                    placeholder="Nytt board"
+                                    aria-label="Tavelnamn"
+                                    placeholder="Tavelnamn"
                                     value={newBoard}
                                     onChange={(e) => setNewBoard(e.target.value)}
                                     required
                                     maxLength={200}
                                 />
-                                <button className="user-tools-primary" disabled={busy}>Skapa board</button>
-                            </form>
+                                <button className="user-tools-primary" disabled={busy || !newBoard.trim()}>Skapa tavla</button>
+                                <button type="button" onClick={() => setShowCreateBoard(false)}>Avbryt</button>
+                            </form>}
+                            </>}
                             <form
                                 className="kb-toolbar user-tools-panel"
+                                hidden={!boardId || !showFilters}
                                 onSubmit={(e) => {
                                     e.preventDefault()
                                     setSearch(query)
@@ -966,47 +989,16 @@ export default function KanbanPage() {
                             )}
                             {cardsQuery.error && <p role="alert">{kanbanError(cardsQuery.error)}</p>}
                             {boardId && !board && <p>Boardet finns inte i den här tenanten.</p>}
-                            {board && (
-                                <div className="flex flex-wrap gap-3 items-center mb-4">
-                                    <h2 className="text-xl font-semibold">{board.title}</h2>
+                            {board && <div className="kb-board-actions">
+                                <span className="kb-muted">{visibleColumns.length} listor · {cards.length} kort{board.archived ? ' · Arkiverad tavla' : ''}</span>
+                                <details className="kb-menu"><summary>Medlemmar</summary><div className="kb-menu-items">
+                                    {workspace.members.map((member) => <label key={member.id} className="flex items-center gap-2"><input type="checkbox" disabled={busy} checked={board.members?.includes(member.id) || false} onChange={(e) => run(async () => await kanbanApi.post(`boards/${board.id}/members/`, { revision: board.revision, members: e.target.checked ? [...(board.members || []), member.id] : board.members.filter((id) => id !== member.id) }))} /><Avatar userId={member.id} name={member.name} />{member.name}</label>)}
+                                </div></details>
+                                <details className="kb-menu"><summary aria-label="Tavelåtgärder"><MoreHorizontal size={18} /></summary><div className="kb-menu-items">
                                     <button onClick={() => setRename({ type: 'boards', ...board })}>Byt namn</button>
-                                    <button
-                                        onClick={() =>
-                                            run(
-                                                async () =>
-                                                    await kanbanApi.patch(`boards/${board.id}/`, {
-                                                        revision: board.revision,
-                                                        archived: !board.archived,
-                                                    }),
-                                            )
-                                        }
-                                    >
-                                        {board.archived ? 'Återställ board' : 'Arkivera board'}
-                                    </button>
-                                    <form
-                                        className="flex gap-2"
-                                        onSubmit={(e) => {
-                                            e.preventDefault()
-                                            run(async () => {
-                                                await kanbanApi.post(`boards/${board.id}/columns/`, {
-                                                    revision: board.revision,
-                                                    title: newColumn,
-                                                })
-                                                setNewColumn('')
-                                            })
-                                        }}
-                                    >
-                                        <input
-                                            aria-label="Ny kolumn"
-                                            placeholder="Ny kolumn"
-                                            required
-                                            value={newColumn}
-                                            onChange={(e) => setNewColumn(e.target.value)}
-                                        />
-                                        <button disabled={busy}>Skapa kolumn</button>
-                                    </form>
-                                </div>
-                            )}
+                                    <button disabled={busy} onClick={() => run(async () => await kanbanApi.patch(`boards/${board.id}/`, { revision: board.revision, archived: !board.archived }))}>{board.archived ? 'Återställ tavla' : 'Arkivera tavla'}</button>
+                                </div></details>
+                            </div>}
                             {rename && (
                                 <form
                                     className="flex gap-2 mb-4"
@@ -1034,7 +1026,7 @@ export default function KanbanPage() {
                                 </form>
                             )}
                             {board ? (
-                                <div className="flex gap-5 overflow-x-auto pb-6" aria-label="Kanban-kolumner">
+                                <div className="kb-lists" aria-label="Kanban-kolumner">
                                     {visibleColumns.map((column, index) => (
                                         <section
                                             key={column.id}
@@ -1068,11 +1060,13 @@ export default function KanbanPage() {
                                                     )
                                                 }
                                             >
-                                                <h3 className="text-lg font-semibold">
+                                                <h3 className="text-sm font-semibold">
                                                     {column.title}
                                                     {column.archived ? ' (arkiverad)' : ''}
                                                 </h3>
-                                                <div className="flex flex-wrap text-sm">
+                                                <span className="kb-column-count">{cards.filter((card) => card.column === column.id).length}</span>
+                                                <details className="kb-menu"><summary aria-label={`Liståtgärder för ${column.title}`}><MoreHorizontal size={18} /></summary>
+                                                <div className="kb-menu-items">
                                                     <button
                                                         aria-label={`Flytta ${column.title} vänster`}
                                                         disabled={index === 0 || busy}
@@ -1091,6 +1085,8 @@ export default function KanbanPage() {
                                                         Byt namn
                                                     </button>
                                                     <button
+                                                        disabled={busy || !!column.role}
+                                                        title={column.role ? 'Obligatorisk lista' : undefined}
                                                         onClick={() =>
                                                             run(
                                                                 async () =>
@@ -1103,7 +1099,7 @@ export default function KanbanPage() {
                                                     >
                                                         {column.archived ? 'Återställ' : 'Arkivera'}
                                                     </button>
-                                                </div>
+                                                </div></details>
                                             </header>
                                             {cards
                                                 .filter((item) => item.column === column.id)
@@ -1127,12 +1123,12 @@ export default function KanbanPage() {
                                                         onDragOver={(e) => e.preventDefault()}
                                                         onDrop={(e) => drop(e, column.id, card.position, true)}
                                                     >
-                                                        <p className="text-sm kb-muted">
+                                                        <p className="kb-card-id">
                                                             {card.shortId}
                                                             {card.archived ? ' · Arkiverat' : ''}
                                                         </p>
                                                         <Link
-                                                            className="font-medium text-lg"
+                                                            className="kb-card-title"
                                                             to={`/kanban/cards/${card.id}`}
                                                         >
                                                             {card.title}
@@ -1142,7 +1138,8 @@ export default function KanbanPage() {
                                                                 {new Date(card.deadline).toLocaleString()}
                                                             </p>
                                                         )}
-                                                        <p className="text-sm kb-muted">
+                                                        <div className="kb-assignees flex justify-end gap-1">{workspace.members.filter((member) => card.assignees.includes(member.id)).map((member) => <Avatar key={member.id} userId={member.id} name={member.name} />)}</div>
+                                                        <p className="sr-only">
                                                             {workspace.members
                                                                 .filter((member) => card.assignees.includes(member.id))
                                                                 .map((member) => member.name)
@@ -1154,7 +1151,7 @@ export default function KanbanPage() {
                                                                 {card.checklist.length} punkter
                                                             </p>
                                                         )}
-                                                        <div className="text-sm flex flex-wrap">
+                                                        <details className="kb-menu kb-card-menu"><summary aria-label={`Kortåtgärder för ${card.shortId}`}><MoreHorizontal size={16} /></summary><div className="kb-menu-items">
                                                             <button
                                                                 disabled={position === 0 || busy}
                                                                 onClick={() =>
@@ -1205,7 +1202,7 @@ export default function KanbanPage() {
                                                                         </option>
                                                                     ))}
                                                             </select>
-                                                        </div>
+                                                        </div></details>
                                                     </article>
                                                 ))}
                                             {!board.archived &&
@@ -1237,14 +1234,27 @@ export default function KanbanPage() {
                                                         </button>
                                                     </form>
                                                 ) : (
-                                                    <button onClick={() => setCreateColumn(column.id)}>
-                                                        Nytt kort
+                                                    <button className="kb-add-card" onClick={() => setCreateColumn(column.id)}>
+                                                        <Plus size={16} /> Lägg till kort
                                                     </button>
                                                 ))}
                                         </section>
                                     ))}
+                                    {!board.archived && <div className="kb-add-list">
+                                        {addingList ? <form onSubmit={(e) => {
+                                            e.preventDefault()
+                                            run(async () => {
+                                                await kanbanApi.post(`boards/${board.id}/columns/`, { revision: board.revision, title: newColumn })
+                                                setNewColumn('')
+                                                setAddingList(false)
+                                            })
+                                        }}>
+                                            <input aria-label="Listnamn" placeholder="Ange listnamn" required autoFocus value={newColumn} onChange={(e) => setNewColumn(e.target.value)} />
+                                            <div className="flex gap-2 mt-2"><button className="user-tools-primary" disabled={busy || !newColumn.trim()}>Lägg till lista</button><button type="button" aria-label="Avbryt ny lista" onClick={() => setAddingList(false)}><X size={16} /></button></div>
+                                        </form> : <button onClick={() => setAddingList(true)}><Plus size={16} />Lägg till lista</button>}
+                                    </div>}
                                 </div>
-                            ) : cards.length > 0 ? (
+                            ) : boardId && cards.length > 0 ? (
                                 <ul className="kb-list user-tools-panel">
                                     {cards.map((card) => (
                                         <li key={card.id}>
@@ -1255,7 +1265,7 @@ export default function KanbanPage() {
                                     ))}
                                 </ul>
                             ) : null}
-                            {!cardsQuery.isFetching && !cards.length && (
+                            {boardId && !cardsQuery.isFetching && !cards.length && showFilters && (
                                 <p className="kb-empty user-tools-panel mt-3">
                                     Inga kort i den här vyn. Skapa ett kort i ett board eller ändra filtren.
                                 </p>

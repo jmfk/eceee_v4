@@ -122,6 +122,7 @@ test('board navigation, accessible movement, Markdown and comments', async ({ pa
     page.on('pageerror', (error) => errors.push(error.message))
     await page.goto(`/kanban/boards/${boardId}`)
     await expect(page.getByRole('link', { name: 'Review homepage', exact: true })).toBeVisible()
+    await page.getByLabel('Kortåtgärder för TASK-1', { exact: true }).click()
     await page.getByRole('combobox', { name: 'Flytta TASK-1 till' }).selectOption(doneId)
     await expect(
         page
@@ -182,6 +183,7 @@ test('movement in a filtered column uses persisted card positions', async ({ pag
     const request = page.waitForRequest(
         (request) => request.method() === 'PATCH' && request.url().includes(`/cards/${cardId}/`),
     )
+    await page.getByLabel('Kortåtgärder för TASK-1', { exact: true }).click()
     await page.getByRole('button', { name: 'Flytta TASK-1 ned', exact: true }).click()
     expect((await request).postDataJSON().position).toBe(5)
 })
@@ -221,4 +223,27 @@ test('visual typing preserves caret order and paragraph breaks across Markdown m
     await expect(page.getByRole('textbox', { name: 'Beskrivning', exact: true })).toHaveValue('ABC\n\nDEF')
     await page.getByRole('button', { name: 'Visuellt', exact: true }).first().click()
     await expect(page.locator('[contenteditable=true]').first()).toHaveText('ABC\nDEF')
+})
+
+test('board overview and compact board keep creation separate at narrow widths', async ({ page }, testInfo) => {
+    await mockWorkspace(page)
+    await page.goto('/kanban')
+    await expect(page.getByRole('link', { name: 'Website', exact: true })).toBeVisible()
+    await expect(page.getByRole('textbox', { name: 'Tavelnamn' })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Skapa tavla' }).click()
+    await expect(page.getByRole('textbox', { name: 'Tavelnamn' })).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath('overview-desktop.png') })
+    await page.getByRole('link', { name: 'Website', exact: true }).click()
+    await expect(page.getByRole('textbox', { name: 'Tavelnamn' })).toHaveCount(0)
+    await page.setViewportSize({ width: 390, height: 844 })
+    await expect(page.getByRole('button', { name: 'Lägg till kort' }).first()).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy()
+    await page.screenshot({ path: testInfo.outputPath('board-mobile.png') })
+    await page.emulateMedia({ colorScheme: 'dark' })
+    await expect(page.locator('.user-tools-shell')).toHaveCSS('color-scheme', 'light')
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.getByRole('navigation', { name: 'Personliga verktyg' }).getByRole('link', { name: 'Profile', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Profile', exact: true })).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath('profile-desktop.png') })
+    await expect(page.getByRole('navigation', { name: 'Personliga verktyg' }).getByRole('link', { name: 'Profile', exact: true })).toHaveAttribute('aria-current', 'page')
 })

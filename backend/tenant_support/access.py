@@ -15,6 +15,11 @@ def members(tenant):
 
 
 def has_role(user, tenant, role):
+    from core.roles import permissions_for
+
+    capability = {"can_support": "support.read", "can_publish": "support.publish"}[role]
+    if capability in permissions_for(user, tenant):
+        return True
     return bool(
         user.is_active
         and tenant.is_active
@@ -34,10 +39,17 @@ def support_users(tenant):
         .objects.filter(is_active=True, supportrole__tenant=tenant, supportrole__can_support=True)
         .distinct()
     )
-    return [u for u in users if tenant.user_has_access(u)]
+    # Iterate tenant members to remain portable across SQLite tests and PostgreSQL JSON storage.
+    users = {u.pk: u for u in users}
+    for user in members(tenant).filter(cms_roles__tenant=tenant).distinct():
+        if has_role(user, tenant, "can_support"):
+            users[user.pk] = user
+    return [u for u in users.values() if tenant.user_has_access(u)]
 
 
 def can_read_thread(user, thread):
     return thread.tenant.user_has_access(user) and (
-        thread.creator_id == user.pk or has_role(user, thread.tenant, "can_support")
+        thread.creator_id == user.pk
+        or (thread.support_target and has_role(user, thread.tenant, "can_support"))
+        or thread.participants.filter(pk=user.pk).exists()
     )

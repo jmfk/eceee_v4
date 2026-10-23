@@ -86,3 +86,21 @@ class Tenant(models.Model):
         if user_can_switch_tenant(user) or self.created_by_id == user.id:
             return True
         return self.members.filter(pk=user.pk).exists()
+
+
+class TenantRole(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="roles")
+    name = models.CharField(max_length=80)
+    permissions = models.JSONField(default=list)
+    users = models.ManyToManyField(User, blank=True, related_name="cms_roles")
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["tenant", "name"], name="core_tenant_role_name")]
+        ordering = ["name", "id"]
+
+
+class ProfilePhoto(models.Model):
+    user = models.OneToOneField(User, primary_key=True, on_delete=models.CASCADE)
+    image = models.BinaryField()
+    updated_at = models.DateTimeField(auto_now=True)

@@ -2,7 +2,7 @@ import { useSupportContext } from './support/useSupportContext'
 import { safeReportLocation } from '../api/support'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Menu, X, Settings, Grid3X3, FolderOpen, Database, Hash, User as UserIcon, BarChart2, Palette } from 'lucide-react'
+import { Menu, X, Settings, Grid3X3, FolderOpen, Database, Hash, User as UserIcon, BarChart2, Palette, Flag } from 'lucide-react'
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 
 const navigation = [
@@ -11,7 +11,7 @@ const navigation = [
   { name: 'Media', href: '/media', icon: FolderOpen },
   { name: 'Statistics', href: '/statistics', icon: BarChart2 },
   { name: 'Classification', href: '/tags', icon: Hash },
-  { name: 'Designer', href: '/designer/themes', icon: Palette },
+  { name: 'Designer', href: '/designer/themes', icon: Palette, Flag },
   { name: 'Settings', href: '/settings', icon: Settings },
   { name: 'Profile', href: '/profile', icon: UserIcon },
 ]
@@ -22,7 +22,12 @@ const Navbar = () => {
   const location = useLocation()
   const support = useSupportContext()
   const inboxCount = support.data?.unreadCount || 0
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
+  const visibleNavigation = navigation.filter((item) => {
+    if (!Array.isArray(user?.permissions) || user.permissions.includes('tenant.admin') || user.isSuperuser) return true
+    const needed = { Pages: 'page.read', Objects: 'object.read', Media: 'media.read', Classification: 'content.read', Designer: 'theme.read' }[item.name]
+    return !needed || user.permissions.includes(needed)
+  })
   const navRef = useRef(null)
   const navContainerRef = useRef(null)
   const desktopNavRef = useRef(null)
@@ -86,7 +91,7 @@ const Navbar = () => {
             aria-hidden={isCollapsed}
             inert={isCollapsed}
           >
-            {navigation.map((item) => (
+            {visibleNavigation.map((item) => (
               <Link
                 key={item.name}
                 to={item.href}
@@ -103,6 +108,7 @@ const Navbar = () => {
 
             {/* Schemas dropdown moved to Settings second-level tabs */}
 
+            {!['/profile', '/inbox', '/kanban'].some((path) => location.pathname.startsWith(path)) && <Link className="flex items-center gap-1 px-3 py-2 text-sm text-gray-600" to={`/inbox/new?from=${encodeURIComponent(safeReportLocation(window.location.href))}`}><Flag size={16} />Rapportera fel</Link>}
             {/* Logout button */}
             <button
               onClick={logout}
@@ -135,7 +141,8 @@ const Navbar = () => {
         {isOpen && isCollapsed && (
           <div id="cms-mobile-navigation" className="py-4 border-t border-gray-200">
             <div className="space-y-2">
-              {navigation.map((item) => (
+              {!['/profile', '/inbox', '/kanban'].some((path) => location.pathname.startsWith(path)) && <Link className="px-3 py-2 text-sm text-gray-600" to={`/inbox/new?from=${encodeURIComponent(safeReportLocation(window.location.href))}`} onClick={() => setIsOpen(false)}>Rapportera fel</Link>}
+              {visibleNavigation.map((item) => (
                 <Link
                   key={item.name}
                   to={item.href}

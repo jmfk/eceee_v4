@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Instruction, Message, SupportThread
+from .models import Instruction, Message, SupportThread, MessageAttachment
 
 
 class InstructionSerializer(serializers.ModelSerializer):
@@ -25,7 +25,14 @@ class InstructionSerializer(serializers.ModelSerializer):
         ]
 
 
+class MessageAttachmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MessageAttachment
+        fields = ["id", "filename", "content_type", "byte_size"]
+
+
 class MessageSerializer(serializers.ModelSerializer):
+    attachments = MessageAttachmentSerializer(many=True, read_only=True)
     sender_name = serializers.SerializerMethodField()
     sender_id = serializers.IntegerField(read_only=True)
 
@@ -34,14 +41,14 @@ class MessageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Message
-        fields = ["id", "body", "sender_id", "sender_name", "created_at"]
+        fields = ["id", "body", "sender_id", "sender_name", "created_at", "attachments"]
 
 
 class ThreadSerializer(serializers.ModelSerializer):
     messages = serializers.SerializerMethodField()
 
     def get_messages(self, obj):
-        return MessageSerializer(obj.messages.select_related("sender"), many=True).data
+        return MessageSerializer(obj.messages.select_related("sender").prefetch_related("attachments"), many=True).data
 
     class Meta:
         model = SupportThread
@@ -56,6 +63,9 @@ class ThreadSerializer(serializers.ModelSerializer):
             "video_id",
             "created_at",
             "messages",
+            "support_target",
+            "participants",
+            "board_card_id",
         ]
 
 
@@ -82,22 +92,22 @@ class ThreadInput(serializers.Serializer):
 
     title = serializers.CharField(max_length=150)
     body = serializers.CharField(max_length=4000)
-    kind = serializers.ChoiceField(choices=["question", "bug"])
+    kind = serializers.ChoiceField(choices=["question", "bug"], default="question", required=False)
     location = serializers.URLField(max_length=2000, allow_blank=True, default="")
     instruction_id = serializers.UUIDField(required=False, allow_null=True)
     video_id = serializers.UUIDField(required=False, allow_null=True)
     request_id = serializers.UUIDField()
+    recipients = serializers.ListField(child=serializers.CharField(max_length=80), max_length=100, default=["support"])
+    attachment_ids = serializers.ListField(child=serializers.UUIDField(), max_length=10, default=list)
+    diagnostics = serializers.JSONField(required=False)
 
     def validate(self, data):
-        if data["kind"] == "bug" and not data["location"]:
-            raise serializers.ValidationError({"location": "Ange länken till platsen där felet uppstod."})
-        if data["kind"] != "bug" and data.get("video_id"):
-            raise serializers.ValidationError({"video_id": "Videobilagor används för felrapporter."})
         return data
 
 
 class ReplyInput(serializers.Serializer):
     body = serializers.CharField(max_length=4000)
+    attachment_ids = serializers.ListField(child=serializers.UUIDField(), max_length=10, default=list)
     request_id = serializers.UUIDField()
 
 

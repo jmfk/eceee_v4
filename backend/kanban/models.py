@@ -16,6 +16,7 @@ class TenantRecord(models.Model):
 
 
 class Board(TenantRecord):
+    members = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="kanban_boards")
     title = models.CharField(max_length=200)
     archived = models.BooleanField(default=False)
     revision = models.PositiveIntegerField(default=1)
@@ -25,6 +26,7 @@ class Board(TenantRecord):
 
 
 class Column(TenantRecord):
+    role = models.CharField(max_length=16, blank=True, default="")
     board = models.ForeignKey(Board, on_delete=models.CASCADE, related_name="columns")
     title = models.CharField(max_length=200)
     position = models.PositiveIntegerField(default=0)
@@ -34,6 +36,11 @@ class Column(TenantRecord):
     class Meta:
         ordering = ["position", "created_at", "id"]
         indexes = [models.Index(fields=["tenant", "board", "position"])]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["board", "role"], condition=~models.Q(role=""), name="kanban_board_list_role"
+            )
+        ]
 
 
 class Label(TenantRecord):

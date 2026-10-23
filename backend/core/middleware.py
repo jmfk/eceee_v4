@@ -71,7 +71,16 @@ class TenantContextMiddleware:
             clear_tenant_context()
             request.tenant = None
 
+        from .roles import allows_request
+
+        if not allows_request(request):
+            from django.http import JsonResponse
+
+            clear_tenant_context()
+            return JsonResponse({"detail": "Din roll saknar behörighet för den här åtgärden."}, status=403)
         response = self.get_response(request)
+        from tenant_support.system_diagnostics import record
+        record(request, response)
 
         # Clear tenant context after request
         clear_tenant_context()

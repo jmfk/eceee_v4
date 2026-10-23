@@ -925,7 +925,8 @@ class KanbanSocketTests(TransactionTestCase):
             tenant = Tenant.objects.create(name="Existing", identifier="existing", created_by=owner)
             tenant_id = tenant.pk
         finally:
-            MigrationExecutor(connection).migrate([("kanban", "0001_initial")])
+            restorer = MigrationExecutor(connection)
+            restorer.migrate(restorer.loader.graph.leaf_nodes())
         self.assertTrue(Tenant.objects.filter(pk=tenant_id, identifier="existing").exists())
         board = Board.objects.create(tenant_id=tenant_id, title="After upgrade")
         self.assertEqual(board.revision, 1)

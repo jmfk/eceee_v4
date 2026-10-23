@@ -49,6 +49,7 @@ from .services import (
     undo_event,
     update_card,
     update_named,
+    ensure_required_columns,
 )
 
 
@@ -81,8 +82,8 @@ class BoardViewSet(BaseViewSet):
         title = serializers.CharField(max_length=200).run_validation(request.data.get("title"))
         with locked_tenant(request) as tenant:
             board = Board.objects.create(tenant=tenant, title=title)
-            for index, name in enumerate(["To do", "In progress", "Done"]):
-                Column.objects.create(tenant=tenant, board=board, title=name, position=index)
+            board.members.set(members(tenant))
+            ensure_required_columns(board)
             event(tenant, request.user, board, "board.created", f"Created board {title}")
         return Response(BoardSerializer(board).data, status=201)
 
@@ -112,6 +113,22 @@ class BoardViewSet(BaseViewSet):
             bump(board)
             event(tenant, request.user, column, "column.created", f"Created column {title}")
         return Response(ColumnSerializer(column).data, status=201)
+
+    @action(detail=True, methods=["post"], url_path="members")
+    def set_members(self, request, pk=None):
+        ids = serializers.ListField(child=serializers.IntegerField(min_value=1), max_length=1000).run_validation(
+            request.data.get("members")
+        )
+        revision = validated(RevisionInput, request.data)["revision"]
+        with locked_tenant(request) as tenant:
+            board = get_record(Board, tenant, pk)
+            check_revision(board, revision)
+            if set(members(tenant).filter(pk__in=ids).values_list("pk", flat=True)) != set(ids):
+                raise ValidationError("Board members must belong to this tenant.")
+            board.members.set(ids)
+            bump(board)
+            event(tenant, request.user, board, "board.members", "Updated board members")
+        return Response(BoardSerializer(board).data)
 
     @action(detail=True, methods=["post"], url_path="reorder-columns")
     def reorder_columns(self, request, pk=None):

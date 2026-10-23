@@ -5,7 +5,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Max, OuterRef, Subquery
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
@@ -20,7 +20,16 @@ from core.permissions import HasTenantAccess
 
 from . import storage
 from .access import can_read_thread, has_role, members, require_role, support_users
-from .models import EmailDelivery, InboxEntry, Instruction, Message, PrivateVideo, SupportRole, SupportThread
+from .models import (
+    EmailDelivery,
+    InboxEntry,
+    Instruction,
+    Message,
+    PrivateVideo,
+    SupportRole,
+    SupportThread,
+    MessageAttachment,
+)
 from .serializers import (
     ArchiveInput,
     InstructionSerializer,
@@ -31,9 +40,11 @@ from .serializers import (
     StatusInput,
     ThreadInput,
     ThreadSerializer,
+    MessageAttachmentSerializer,
 )
 from .services import notify_thread, receive, sync_support_inbox, visible_entries
 from .video import inspect_video
+from .recipients import directory, resolve
 
 
 def validated(serializer_type, request):
@@ -79,8 +90,10 @@ def thread_for(request, pk, lock=False):
     queryset = SupportThread.objects.select_related("tenant", "creator").filter(tenant=request.tenant)
     if lock:
         queryset = queryset.select_for_update(of=("self",))
-    if not has_role(request.user, request.tenant, "can_support"):
-        queryset = queryset.filter(creator=request.user)
+    allowed = Q(creator=request.user) | Q(pk__in=SupportThread.objects.filter(participants=request.user).values("pk"))
+    if has_role(request.user, request.tenant, "can_support"):
+        allowed |= Q(support_target=True)
+    queryset = queryset.filter(allowed)
     return get_object_or_404(queryset, pk=pk)
 
 
@@ -95,7 +108,9 @@ class ContextView(SupportView):
     def get(self, request):
         tenant, user = request.tenant, request.user
         roles = SupportRole.objects.filter(tenant=tenant).select_related("user")
-        manager = user.is_superuser
+        from core.roles import can_manage_roles
+
+        manager = can_manage_roles(user, tenant)
         candidates = members(tenant)
         if manager:
             candidates = (
@@ -112,6 +127,7 @@ class ContextView(SupportView):
                 "can_manage": manager,
                 "recipient_count": members(tenant).exclude(pk=user.pk).count(),
                 "support_available": bool(support_users(tenant)),
+                "recipients": directory(tenant, user),
                 "storage_configured": bool(settings.SUPPORT_STORAGE_BUCKET_NAME),
                 "email_enabled": settings.SUPPORT_EMAIL_ENABLED,
                 "unread_count": visible_entries(user, tenant).filter(archived=False, read_at__isnull=True).count(),
@@ -132,8 +148,10 @@ class ContextView(SupportView):
 
     @transaction.atomic
     def post(self, request):
-        if not request.user.is_superuser:
-            raise PermissionDenied("Endast systemägaren kan utse support och publicerare.")
+        from core.roles import can_manage_roles
+
+        if not can_manage_roles(request.user, request.tenant):
+            raise PermissionDenied("Du saknar behörighet att utse support och publicerare.")
         data = validated(RoleInput, request)
         user = get_object_or_404(get_user_model(), pk=data.pop("user_id"), is_active=True)
         if not request.tenant.user_has_access(user):
@@ -162,6 +180,12 @@ class InboxView(SupportView):
         kind = request.query_params.get("kind")
         if kind in {"instruction", "support"}:
             rows = rows.filter(instruction__isnull=kind == "support")
+            if kind == "support":
+                rows = rows.filter(thread__support_target=True)
+        latest = Message.objects.filter(thread_id=OuterRef("thread_id")).order_by("-created_at", "-id")
+        rows = rows.annotate(
+            sender_name=Subquery(latest.values("sender__username")[:1]), preview=Subquery(latest.values("body")[:1])
+        )
         return self.page(
             rows,
             request,
@@ -170,6 +194,8 @@ class InboxView(SupportView):
                 "instruction_id": e.instruction_id,
                 "thread_id": e.thread_id,
                 "title": e.instruction.title if e.instruction_id else e.thread.title,
+                "sender_name": e.sender_name or "Instruktion",
+                "preview": (e.preview or e.instruction.description if e.instruction_id else e.preview or "")[:160],
                 "kind": "instruction" if e.instruction_id else e.thread.kind,
                 "status": e.thread.status if e.thread_id else None,
                 "activity_at": e.activity_at,
@@ -262,17 +288,25 @@ class ThreadsView(SupportView):
     def post(self, request):
         data = validated(ThreadInput, request)
         Tenant.objects.select_for_update().get(pk=request.tenant.pk)
+        specs = sorted(set(data.pop("recipients")))
+        attachment_ids = data.pop("attachment_ids")
+        diagnostics = data.pop("diagnostics", None)
         previous = SupportThread.objects.filter(
             tenant=request.tenant, creator=request.user, request_id=data["request_id"]
         ).first()
         if previous:
             fields = ["title", "kind", "location", "instruction_id", "video_id"]
             initial = previous.messages.get(sender=request.user, request_id=data["request_id"])
-            if initial.body != data["body"] or any(getattr(previous, field) != data.get(field) for field in fields):
+            if (
+                initial.body != data["body"]
+                or previous.recipient_specs != specs
+                and not (previous.recipient_specs == [] and specs == ["support"])
+                or any(getattr(previous, field) != data.get(field) for field in fields)
+                or set(initial.attachments.filter(inline_text="").values_list("pk", flat=True)) != set(attachment_ids)
+            ):
                 return submission_conflict(previous.pk)
             return Response(ThreadSerializer(previous).data)
-        if not support_users(request.tenant):
-            raise ValidationError({"support": "Support är inte konfigurerad för arbetsytan. Kontakta systemägaren."})
+        support_target, participant_ids, boards = resolve(request.tenant, specs, request.user)
         if (
             SupportThread.objects.filter(
                 tenant=request.tenant, creator=request.user, created_at__gte=timezone.now() - timedelta(days=1)
@@ -290,9 +324,42 @@ class ThreadsView(SupportView):
         video = video_for(request, video_id, "bug") if video_id else None
         body = data.pop("body")
         thread = SupportThread.objects.create(
-            tenant=request.tenant, creator=request.user, instruction=instruction, video=video, **data
+            tenant=request.tenant,
+            creator=request.user,
+            instruction=instruction,
+            video=video,
+            support_target=support_target,
+            recipient_specs=specs,
+            **data,
         )
+        thread.participants.set(participant_ids)
         message = Message.objects.create(thread=thread, sender=request.user, body=body, request_id=data["request_id"])
+        attach_files(request, message, attachment_ids)
+        if diagnostics is not None:
+            # Accept only bounded structured metadata, not arbitrary server logs or request bodies.
+            from .diagnostics import attach_diagnostics
+
+            attach_diagnostics(request, message, diagnostics)
+        if boards:
+            from kanban.models import Card
+            from kanban.services import ensure_required_columns, event, enqueue_index
+
+            board = boards[0]
+            ensure_required_columns(board)
+            column = board.columns.get(role="inbox")
+            number = (Card.objects.filter(tenant=request.tenant).aggregate(number=Max("number"))["number"] or 0) + 1
+            card = Card.objects.create(
+                tenant=request.tenant,
+                column=column,
+                title=title_for_card(thread),
+                description=f"{body}\n\n[Meddelandetråd](/inbox/threads/{thread.pk}?tenant={request.tenant.pk})",
+                number=number,
+                position=column.cards.count(),
+            )
+            thread.board_card = card
+            thread.save(update_fields=["board_card"])
+            event(request.tenant, request.user, card, "card.received", f"Received message in {card.short_id}")
+            enqueue_index(card)
         notify_thread(thread, request.user, message)
         return Response(ThreadSerializer(thread).data, status=status.HTTP_201_CREATED)
 
@@ -308,15 +375,18 @@ class ThreadView(SupportView):
     @transaction.atomic
     def post(self, request, pk):
         thread = thread_for(request, pk, lock=True)
-        if thread.creator_id != request.user.pk:
-            require_role(request.user, request.tenant, "can_support")
         data = validated(ReplyInput, request)
+        attachment_ids = data.pop("attachment_ids")
         message, created = Message.objects.get_or_create(
             thread=thread, sender=request.user, request_id=data["request_id"], defaults={"body": data["body"]}
         )
-        if not created and message.body != data["body"]:
+        if not created and (
+            message.body != data["body"]
+            or set(message.attachments.filter(inline_text="").values_list("pk", flat=True)) != set(attachment_ids)
+        ):
             return submission_conflict(thread.pk)
         if created:
+            attach_files(request, message, attachment_ids)
             if (
                 thread.messages.filter(sender=request.user, created_at__gte=timezone.now() - timedelta(days=1)).count()
                 > 100
@@ -423,3 +493,89 @@ class DeliveriesView(SupportView):
                 "entry_id": row.entry_id,
             },
         )
+
+
+def title_for_card(thread):
+    return thread.title[:250]
+
+
+def attach_files(request, message, ids):
+    files = MessageAttachment.objects.select_for_update().filter(
+        tenant=request.tenant, owner=request.user, pk__in=ids, message__isnull=True
+    )
+    if set(files.values_list("pk", flat=True)) != set(ids):
+        raise ValidationError({"attachment_ids": "Bilagan saknas, tillhör någon annan eller används redan."})
+    files.update(message=message)
+
+
+class AttachmentsView(SupportView):
+    throttle_classes = [VideoUploadThrottle]
+
+    def post(self, request):
+        from pathlib import PurePath
+        from kanban.upload_validation import KanbanUploadValidator
+
+        upload = request.FILES.get("file")
+        if not upload or not upload.size or upload.size > 25 * 1024 * 1024:
+            raise ValidationError({"file": "Välj en fil på högst 25 MB."})
+        result = KanbanUploadValidator.validate_file(upload)
+        if not result["is_valid"]:
+            raise ValidationError({"file": result["errors"]})
+        content_type = result["metadata"]["actual_mime_type"]
+        if content_type in {"image/svg+xml", "text/html", "application/javascript"}:
+            raise ValidationError({"file": "Använd en bild, ett dokument eller MP4/WebM."})
+        filename = PurePath(upload.name.replace("\\", "/")).name[:255]
+        with tempfile.NamedTemporaryFile() as temp:
+            for chunk in upload.chunks():
+                temp.write(chunk)
+            temp.flush()
+            if content_type.startswith("video/"):
+                _, content_type, _ = inspect_video(temp.name, "bug")
+            with transaction.atomic():
+                Tenant.objects.select_for_update().get(pk=request.tenant.pk)
+                used = (
+                    MessageAttachment.objects.filter(
+                        tenant=request.tenant, created_at__gte=timezone.now() - timedelta(days=1)
+                    ).aggregate(total=Sum("byte_size"))["total"]
+                    or 0
+                )
+                if used + upload.size > settings.SUPPORT_DAILY_MAX_BYTES:
+                    raise ValidationError({"file": "Arbetsytans dygnskvot för bilagor är nådd."})
+                key = f"{request.tenant.pk}/messages/{uuid.uuid4()}"
+                try:
+                    storage.save_video(temp.name, key, content_type)
+                except Exception:
+                    return Response(
+                        {"detail": "Privat fillagring är inte tillgänglig. Meddelandet är kvar; försök igen senare."},
+                        status=503,
+                    )
+                file = MessageAttachment.objects.create(
+                    tenant=request.tenant,
+                    owner=request.user,
+                    filename=filename,
+                    storage_key=key,
+                    content_type=content_type,
+                    byte_size=upload.size,
+                )
+        return Response(MessageAttachmentSerializer(file).data, status=201)
+
+
+class AttachmentDownloadView(SupportView):
+    def get(self, request, pk):
+        from .access import can_read_thread
+
+        file = get_object_or_404(
+            MessageAttachment.objects.select_related("message__thread__tenant"),
+            pk=pk,
+            tenant=request.tenant,
+            message__isnull=False,
+        )
+        if not can_read_thread(request.user, file.message.thread):
+            raise PermissionDenied("Du saknar åtkomst till bilagan.")
+        if file.inline_text:
+            return Response({"content": file.inline_text, "filename": file.filename})
+        try:
+            url = storage.download_url(file.storage_key, file.filename)
+        except Exception:
+            return Response({"detail": "Bilagan kunde inte öppnas. Försök igen senare."}, status=503)
+        return Response({"url": url, "expires_in": 60})

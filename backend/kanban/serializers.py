@@ -18,13 +18,13 @@ class MemberSerializer(serializers.ModelSerializer):
 class BoardSerializer(serializers.ModelSerializer):
     class Meta:
         model = Board
-        fields = ["id", "title", "archived", "revision"]
+        fields = ["id", "title", "archived", "revision", "members"]
 
 
 class ColumnSerializer(serializers.ModelSerializer):
     class Meta:
         model = Column
-        fields = ["id", "board", "title", "position", "archived", "revision"]
+        fields = ["id", "board", "title", "position", "archived", "revision", "role"]
 
 
 class LabelSerializer(serializers.ModelSerializer):
