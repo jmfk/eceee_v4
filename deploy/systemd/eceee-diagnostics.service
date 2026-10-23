@@ -1,0 +1,20 @@
+[Unit]
+Description=Export bounded sanitized ECEEE diagnostics
+After=docker.service
+
+[Service]
+Type=oneshot
+Group=1000
+# Installation sets /etc/eceee/diagnostics-collector.env with ECEEE_REPOSITORY only.
+EnvironmentFile=/etc/eceee/diagnostics-collector.env
+WorkingDirectory=/var/lib/eceee-diagnostics
+ExecStart=/usr/bin/env python3 -m core.diagnostics.collector --root /var/lib/eceee-diagnostics --repository ${ECEEE_REPOSITORY} --signing-key-file /etc/eceee/diagnostics-signing.key --file-sources /opt/eceee-diagnostics/deploy/diagnostics-sources.json
+Environment=PYTHONPATH=/opt/eceee-diagnostics/backend
+TimeoutStartSec=30
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/eceee-diagnostics
+# Docker access belongs to this host task only. The backend sees a read-only export.

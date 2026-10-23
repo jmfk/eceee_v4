@@ -1,0 +1,11 @@
+[Unit]
+Description=Collect ECEEE diagnostic logs every minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+Persistent=true
+AccuracySec=1s
+Unit=eceee-diagnostics.service
+
+[Install]
+WantedBy=timers.target
