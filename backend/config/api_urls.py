@@ -27,6 +27,7 @@ router.register(r"namespaces", NamespaceViewSet)
 router.register(r"core/machine-api-keys", MachineAPIKeyViewSet, basename="machine-api-key")
 
 urlpatterns = [
+    path("diagnostics/", include("core.diagnostics.urls")),
     path("support/", include("tenant_support.urls")),
     path("auth/security/", security_status, name="account-security"),
     # JWT Authentication endpoints

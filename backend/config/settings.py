@@ -37,6 +37,9 @@ SECRET_KEY = config(
 DEBUG = config("DEBUG", default=True, cast=bool)
 APP_VERSION = config("APP_VERSION", default="")
 DEPLOYMENT_ENVIRONMENT = config("DEPLOYMENT_ENVIRONMENT", default="development" if DEBUG else "production")
+DIAGNOSTICS_ENABLED = config("DIAGNOSTICS_ENABLED", default=False, cast=bool)
+DIAGNOSTICS_EXPORT_ROOT = config("DIAGNOSTICS_EXPORT_ROOT", default="/var/lib/eceee-diagnostics")
+DIAGNOSTICS_LOG_SIGNING_KEY = config("DIAGNOSTICS_LOG_SIGNING_KEY", default="")
 
 # Django's HTML renderers are retained as source-only compatibility references.
 # They are deliberately hard-disabled in every environment so missing TypeScript
@@ -296,6 +299,18 @@ DATABASES = {
         "PORT": config("POSTGRES_PORT", default="5432"),
     }
 }
+
+if config("DIAGNOSTICS_DB_PASSWORD", default=""):
+    DATABASES["diagnostics"] = {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": DATABASES["default"]["NAME"],
+        "USER": "eceee_diagnostics_reader",
+        "PASSWORD": config("DIAGNOSTICS_DB_PASSWORD"),
+        "HOST": DATABASES["default"]["HOST"],
+        "PORT": DATABASES["default"]["PORT"],
+        "CONN_MAX_AGE": 0,
+        "OPTIONS": {"options": "-c default_transaction_read_only=on -c statement_timeout=5000"},
+    }
 
 # Use SQLite for tests by default to avoid Postgres collation issues in Docker.
 # Set DJANGO_TEST_DATABASE=postgres for suites that need Postgres-specific schema
@@ -614,6 +629,15 @@ LOGGING = {
 }
 
 # Create logs directory if it doesn't exist
+if DIAGNOSTICS_ENABLED:
+    LOGGING["handlers"]["diagnostics"] = {
+        "class": "core.diagnostics.events.DiagnosticHandler",
+        "level": "WARNING",
+    }
+    for logger_config in [LOGGING["root"], *LOGGING["loggers"].values()]:
+        if "diagnostics" not in logger_config["handlers"]:
+            logger_config["handlers"].append("diagnostics")
+
 os.makedirs(BASE_DIR / "logs", exist_ok=True)
 
 # Security Settings for Production
@@ -787,3 +811,16 @@ SUPPORT_FFMPEG = "ffmpeg"
 from cms_auth.settings import *  # noqa: E402,F401,F403
 
 DEV_AUTO_LOGIN = DEBUG and config("DEV_AUTO_LOGIN", default=True, cast=bool)
+
+# Dedicated audit output includes bounded metadata, never query values or response bodies.
+LOGGING["formatters"]["diagnostic_audit"] = {"()": "core.diagnostics.events.AuditFormatter"}
+LOGGING["handlers"]["diagnostic_audit"] = {
+    "class": "logging.StreamHandler",
+    "formatter": "diagnostic_audit",
+    "level": "INFO",
+}
+LOGGING["loggers"]["core.diagnostics.audit"] = {
+    "handlers": ["diagnostic_audit"],
+    "level": "INFO",
+    "propagate": False,
+}
