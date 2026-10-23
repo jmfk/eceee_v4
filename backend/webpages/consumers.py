@@ -169,6 +169,10 @@ class PageEditorConsumer(AsyncWebsocketConsumer):
         from .models import WebPage
 
         user = get_user_model().objects.filter(pk=getattr(user, "pk", None), is_active=True).first()
+        from cms_auth.security import websocket_session_is_valid
+
+        if not user or not websocket_session_is_valid(user, self.scope):
+            return False
         page = WebPage.objects.select_related("tenant", "tenant__created_by").filter(pk=page_id).first()
         return bool(page and {"page.read", "tenant.admin"} & permissions_for(user, page.tenant))
 

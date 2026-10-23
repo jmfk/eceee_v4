@@ -11,11 +11,14 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.clickjacking import xframe_options_exempt
 from rest_framework import permissions, viewsets
-from rest_framework.authentication import BaseAuthentication, SessionAuthentication, TokenAuthentication
+from rest_framework.authentication import BaseAuthentication
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 from rest_framework.response import Response
-from rest_framework_simplejwt.authentication import JWTAuthentication
+
+from cms_auth.authentication import BrowserSessionAuthentication as SessionAuthentication
+from cms_auth.authentication import PersonalJWTAuthentication as JWTAuthentication
+from cms_auth.authentication import PersonalTokenAuthentication as TokenAuthentication
 
 from ..models import PageVersion, PreviewSize, WebPage
 from ..renderers import WebPageRenderer

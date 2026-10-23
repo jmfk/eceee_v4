@@ -1,216 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { User, Lock, AlertCircle } from 'lucide-react';
-import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
-import { useAuth } from '../contexts/AuthContext';
-import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useEffect } from 'react'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import AuthenticationForm from '../components/auth/AuthenticationForm'
+import PasswordRecoveryForm from '../components/auth/PasswordRecoveryForm'
+import { safeDestination } from '../api/auth'
 
-/**
- * LoginPage - Authentication interface for the application
- * 
- * Features:
- * - Username/password login
- * - Session-based authentication with Django
- * - Redirect to intended page after login
- * - Error handling and validation
- */
-const LoginPage = () => {
-    // Set document title
-    useDocumentTitle('Login');
-
-    const navigate = useNavigate();
-    const location = useLocation();
-    const { addNotification } = useGlobalNotifications();
-    const { login, checkAuthStatus, isAuthenticated, isLoading: authLoading } = useAuth();
-
-    const [credentials, setCredentials] = useState({
-        username: '',
-        password: ''
-    });
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState('');
-
-    // Get the intended destination from location state
-    const destination = location.state?.from;
-    const from = destination ? `${destination.pathname}${destination.search || ''}${destination.hash || ''}` : '/';
-
-    // Redirect if already authenticated
+export default function LoginPage() {
+    useDocumentTitle('Login')
+    const navigate = useNavigate()
+    const location = useLocation()
+    const { login, isAuthenticated, isLoading } = useAuth()
+    const target = location.state?.from
+    const destination = safeDestination(target ? `${target.pathname}${target.search || ''}${target.hash || ''}` : sessionStorage.getItem('cms_auth_destination'))
+    const query = new URLSearchParams(location.search)
+    const recovery = query.has('resetPassword') || query.has('resetKey') || query.has('emailKey')
     useEffect(() => {
-        if (!authLoading && isAuthenticated) {
-            navigate(from, { replace: true });
+        if (!isLoading && isAuthenticated && !recovery) {
+            sessionStorage.removeItem('cms_auth_destination')
+            navigate(destination, { replace: true })
         }
-    }, [isAuthenticated, authLoading, navigate, from]);
-
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setCredentials(prev => ({
-            ...prev,
-            [name]: value
-        }));
-        // Clear error when user starts typing
-        if (error) setError('');
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-
-        if (!credentials.username || !credentials.password) {
-            setError('Please enter both username and password');
-            return;
-        }
-
-        setIsLoading(true);
-        setError('');
-
-        try {
-            // Use JWT authentication endpoint
-            const response = await fetch('/api/v1/auth/token/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include',
-                body: JSON.stringify({
-                    username: credentials.username,
-                    password: credentials.password,
-                })
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-
-                // Store JWT tokens
-                localStorage.setItem('access_token', data.access);
-                localStorage.setItem('refresh_token', data.refresh);
-
-                // Update authentication state
-                await login(credentials);
-
-                addNotification('Login successful!', 'success');
-                navigate(from, { replace: true });
-            } else {
-                const errorData = await response.json().catch(() => ({}));
-                if (response.status === 401) {
-                    setError('Invalid username or password');
-                } else {
-                    setError(errorData.detail || 'Login failed. Please try again.');
-                }
-            }
-        } catch (err) {
-            console.error('Login error:', err);
-            setError('An error occurred during login. Please try again.');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-md w-full space-y-8">
-                {/* Header */}
-                <div className="text-center">
-                    <div className="text-4xl font-bold text-gray-900 mb-2" role="heading" aria-level="1">EASY v4</div>
-                    <div className="text-xl text-gray-600 mb-6" role="heading" aria-level="2">AI-Integrated CMS</div>
-                    <div className="text-sm text-gray-500">
-                        Sign in to access the content management system
-                    </div>
-                </div>
-
-                {/* Login Form */}
-                <div className="bg-white rounded-lg shadow-xl p-8">
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        {/* Error Message */}
-                        {error && (
-                            <div className="bg-red-50 border border-red-200 rounded-md p-4 flex items-center space-x-3">
-                                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-                                <div className="text-sm text-red-700">{error}</div>
-                            </div>
-                        )}
-
-                        {/* Username Field */}
-                        <div>
-                            <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
-                                Username
-                            </label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <User className="w-5 h-5 text-gray-400" />
-                                </div>
-                                <input
-                                    id="username"
-                                    name="username"
-                                    type="text"
-                                    autoComplete="username"
-                                    required
-                                    value={credentials.username}
-                                    onChange={handleInputChange}
-                                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                                    placeholder="Enter your username"
-                                    disabled={isLoading}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Password Field */}
-                        <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                                Password
-                            </label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Lock className="w-5 h-5 text-gray-400" />
-                                </div>
-                                <input
-                                    id="password"
-                                    name="password"
-                                    type="password"
-                                    autoComplete="current-password"
-                                    required
-                                    value={credentials.password}
-                                    onChange={handleInputChange}
-                                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                                    placeholder="Enter your password"
-                                    disabled={isLoading}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Submit Button */}
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                            {isLoading ? (
-                                <div className="flex items-center space-x-2">
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                    <span>Signing in...</span>
-                                </div>
-                            ) : (
-                                'Sign In'
-                            )}
-                        </button>
-                    </form>
-
-                    {/* Demo Credentials - Only show in development */}
-                    {import.meta.env.DEV && (
-                        <div className="mt-6 p-4 bg-gray-50 rounded-md">
-                            <div className="text-sm font-medium text-gray-700 mb-2" role="heading" aria-level="3">Demo Credentials:</div>
-                            <div className="text-xs text-gray-600 space-y-1">
-                                <div><span className="font-bold">Username:</span> admin</div>
-                                <div><span className="font-bold">Password:</span> blarg123</div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Footer */}
-                <div className="text-center text-sm text-gray-500">
-                    <div>Powered by Django & React</div>
-                </div>
+    }, [isAuthenticated, isLoading, navigate, destination, recovery])
+    return <main className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md space-y-6">
+            <header><h1 className="text-3xl font-bold text-gray-900">ECEEE CMS</h1><p className="mt-2 text-gray-600">Sign in to your existing account</p></header>
+            <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+                {recovery ? <PasswordRecoveryForm query={query} /> : <AuthenticationForm destination={destination} onAuthenticated={login} />}
             </div>
+            {!recovery && <Link className="text-sm text-blue-700 underline" to="/login?resetPassword=1">Forgot password?</Link>}
         </div>
-    );
-};
-
-export default LoginPage;
+    </main>
+}

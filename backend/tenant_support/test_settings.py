@@ -38,3 +38,22 @@ SUPPORT_FFPROBE = "ffprobe"
 SUPPORT_FFMPEG = "ffmpeg"
 AWS_STORAGE_BUCKET_NAME = "public-tests"
 AWS_CHECKPOINT_STORAGE_BUCKET_NAME = "checkpoints-tests"
+
+# Shared authentication models are used by credential and ticket revocation.
+INSTALLED_APPS += [
+    "django.contrib.sites",
+    "django.contrib.messages",
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "allauth.mfa",
+    "allauth.headless",
+    "cms_auth",
+]
+ACCOUNT_ADAPTER = "cms_auth.adapters.AccountAdapter"
+SOCIALACCOUNT_ADAPTER = "cms_auth.adapters.SocialAccountAdapter"
+MFA_ADAPTER = "cms_auth.adapters.MFAAdapter"
+CMS_MFA_ENCRYPTION_KEYS = []
+CMS_WEBAUTHN_RP_ID = "testserver"
+ACCOUNT_REAUTHENTICATION_TIMEOUT = 300
+MIDDLEWARE += ["allauth.account.middleware.AccountMiddleware"]

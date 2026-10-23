@@ -20,6 +20,10 @@ class KanbanConsumer(AsyncJsonWebsocketConsumer):
                 return False
         if not self.scope.get("user") or not self.scope["user"].is_authenticated:
             return False
+        from cms_auth.security import websocket_session_is_valid
+
+        if not websocket_session_is_valid(self.scope["user"], self.scope):
+            return False
         tenant = Tenant.objects.filter(pk=self.tenant_id).first()
         return bool(tenant and can_access(self.scope.get("user"), tenant))
 

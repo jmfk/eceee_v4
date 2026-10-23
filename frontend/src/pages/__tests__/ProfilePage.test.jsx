@@ -23,6 +23,7 @@ vi.mock('../../components/support/useSupportContext', () => ({
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: mocks.user }) }))
 vi.mock('../../contexts/GlobalNotificationContext', () => ({ useGlobalNotifications: () => ({ addNotification: mocks.addNotification }) }))
 vi.mock('../../api/users', () => ({ changePassword: mocks.changePassword, switchCurrentWorkspace: mocks.switchCurrentWorkspace }))
+vi.mock('../../components/auth/AccountSecurityPanel', () => ({ default: () => <section>Account security</section> }))
 vi.mock('../../hooks/useDocumentTitle', () => ({ useDocumentTitle: vi.fn() }))
 vi.mock('../../utils/tenant', () => ({
     getCurrentTenantId: () => 'first-workspace',

@@ -1,5 +1,6 @@
+import { authRequest, clearLegacyTokens } from '../api/auth';
 import { clearReportDiagnostics } from '../utils/reportDiagnostics'
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 
 import { reconcileCurrentTenantId, setCurrentTenantId } from '../utils/tenant';
 
@@ -20,10 +21,6 @@ export const AuthProvider = ({ children }) => {
     const [sessionExpired, setSessionExpired] = useState(false);
     const requestQueueRef = useRef([]);
 
-    // Check authentication status on mount
-    useEffect(() => {
-        checkAuthStatus();
-    }, []);
 
     // Listen for session expired events from API client
     useEffect(() => {
@@ -46,127 +43,33 @@ export const AuthProvider = ({ children }) => {
         };
     }, [sessionExpired]);
 
-    const fetchUserDetails = async () => {
+    const fetchUserDetails = useCallback(async () => {
+        const response = await fetch('/api/v1/utils/current-user/', {
+            credentials: 'include', cache: 'no-store', headers: { 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (data.designerTenants?.length) reconcileCurrentTenantId(data.currentWorkspace, data.designerTenants);
+        return data;
+    }, []);
+
+    const checkAuthStatus = useCallback(async () => {
+        clearLegacyTokens();
         try {
-            const accessToken = localStorage.getItem('access_token');
-            const headers = {
-                'Content-Type': 'application/json',
-            };
-            
-            // Add JWT token if available (not needed for session auth in dev)
-            if (accessToken) {
-                headers['Authorization'] = `Bearer ${accessToken}`;
-            }
-
-            const response = await fetch('/api/v1/utils/current-user/', {
-                credentials: 'include',
-                headers: headers
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                if (data.designerTenants?.length) {
-                    // The server-side session is authoritative. Repair a missing
-                    // or stale browser selection before workspace-scoped screens
-                    // mount and start populating their query caches.
-                    reconcileCurrentTenantId(data.currentWorkspace, data.designerTenants);
-                }
-                return data;
-            }
-        } catch (error) {
-            console.error('Failed to fetch user details:', error);
-        }
-        return null;
-    };
-
-    const checkAuthStatus = async () => {
-        try {
-            // Authentication must not require CMS resource permissions (e.g. page.read).
-            // STEP 1: Try dev auto-login (session-based auth with no tokens)
-            // Only in development mode to avoid 401 errors in production
-            if (import.meta.env.DEV) {
-                const devAuthResponse = await fetch('/api/v1/utils/current-user/', {
-                    credentials: 'include', // Include cookies for session auth
-                });
-
-                if (devAuthResponse.ok) {
-                    // Dev auto-login is working! No tokens needed
-                    setIsAuthenticated(true);
-                    // Try to fetch user details
-                    const userData = await fetchUserDetails();
-                    setUser(userData || { username: 'dev_auto_user' });
-                    setIsLoading(false);
-                    return;
-                }
-            }
-
-            // STEP 2: Dev auth didn't work, check for JWT tokens
-            const accessToken = localStorage.getItem('access_token');
-            const refreshToken = localStorage.getItem('refresh_token');
-
-            if (!accessToken || !refreshToken) {
-                setIsAuthenticated(false);
-                setUser(null);
-                setIsLoading(false);
-                return;
-            }
-
-            // STEP 3: Try JWT authentication
-            const response = await fetch('/api/v1/utils/current-user/', {
-                credentials: 'include',
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`
-                }
-            });
-
-            if (response.ok) {
-                setIsAuthenticated(true);
-                // Fetch full user details
-                const userData = await fetchUserDetails();
-                setUser(userData);
-            } else if (response.status === 401) {
-                // Token might be expired, try to refresh
-                try {
-                    const refreshResponse = await fetch('/api/v1/auth/token/refresh/', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            refresh: refreshToken
-                        })
-                    });
-
-                    if (refreshResponse.ok) {
-                        const data = await refreshResponse.json();
-                        localStorage.setItem('access_token', data.access);
-                        setIsAuthenticated(true);
-                        // Fetch full user details
-                        const userData = await fetchUserDetails();
-                        setUser(userData);
-                    } else {
-                        // Refresh failed, clear tokens
-                        localStorage.removeItem('access_token');
-                        localStorage.removeItem('refresh_token');
-                        setIsAuthenticated(false);
-                        setUser(null);
-                    }
-                } catch (refreshError) {
-                    console.error('Token refresh failed:', refreshError);
-                    localStorage.removeItem('access_token');
-                    localStorage.removeItem('refresh_token');
-                    setIsAuthenticated(false);
-                    setUser(null);
-                }
-            }
-        } catch (error) {
-            console.error('Auth check failed:', error);
+            const userData = await fetchUserDetails();
+            setIsAuthenticated(Boolean(userData));
+            setUser(userData);
+            return Boolean(userData);
+        } catch {
             setIsAuthenticated(false);
             setUser(null);
+            return false;
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [fetchUserDetails]);
+
+    useEffect(() => { checkAuthStatus(); }, [checkAuthStatus]);
 
     const queueRequest = (request) => {
         // Skip queueing if request doesn't have config (e.g., WebSocket verification events)
@@ -201,12 +104,7 @@ export const AuthProvider = ({ children }) => {
         // Retry all queued requests
         for (const queuedRequest of queue) {
             try {
-                // Add the new access token to the request
-                const accessToken = localStorage.getItem('access_token');
-                if (accessToken) {
-                    queuedRequest.config.headers['Authorization'] = `Bearer ${accessToken}`;
-                }
-
+                if (queuedRequest.config.headers) delete queuedRequest.config.headers.Authorization;
                 const response = await apiClient.request(queuedRequest.config);
                 queuedRequest.resolve(response);
             } catch (error) {
@@ -223,11 +121,9 @@ export const AuthProvider = ({ children }) => {
         requestQueueRef.current = [];
     };
 
-    const login = async (credentials) => {
-        // Update authentication state after successful login
-        setIsAuthenticated(true);
-        // Refresh auth state to get user details
-        await checkAuthStatus();
+    const login = async () => {
+        if (!await checkAuthStatus()) throw new Error("Sign-in was not completed. Please try again.");
+        setSessionExpired(false);
         // Retry all queued requests after successful login
         await retryQueuedRequests();
         // Notify WebSocket hooks to reconnect
@@ -235,20 +131,14 @@ export const AuthProvider = ({ children }) => {
     };
 
     const logout = async () => {
-        try {
-            // Clear JWT tokens from localStorage
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('refresh_token');
-            setCurrentTenantId('');
-            // Clear any queued requests
-            clearRequestQueue();
-        } catch (error) {
-            console.error('Logout error:', error);
-        } finally {
-            setIsAuthenticated(false);
-            setUser(null);
-            setSessionExpired(false);
-        }
+        const result = await authRequest('/auth/session', { method: 'DELETE' });
+        if (result.status !== 401 && result.status !== 200) throw new Error("Could not sign out. Please try again.");
+        clearLegacyTokens();
+        setCurrentTenantId('');
+        clearRequestQueue();
+        setIsAuthenticated(false);
+        setUser(null);
+        setSessionExpired(false);
     };
 
     useEffect(() => { clearReportDiagnostics() }, [user?.id, user?.username]);

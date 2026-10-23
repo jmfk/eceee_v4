@@ -9,6 +9,7 @@ from django.core import signing
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 
+from cms_auth.security import security_version
 from core.models import Tenant
 
 from .services import can_access
@@ -18,7 +19,9 @@ MAX_AGE = 900
 
 
 def issue_ticket(user, tenant):
-    return signing.TimestampSigner(salt=SALT, sep=".").sign_object({"user": user.pk, "tenant": str(tenant.pk)})
+    return signing.TimestampSigner(salt=SALT, sep=".").sign_object(
+        {"user": user.pk, "tenant": str(tenant.pk), "security_version": security_version(user)}
+    )
 
 
 def resolve_ticket(ticket):
@@ -26,7 +29,7 @@ def resolve_ticket(ticket):
         data = signing.TimestampSigner(salt=SALT, sep=".").unsign_object(ticket, max_age=MAX_AGE)
         user = User.objects.get(pk=data["user"], is_active=True)
         tenant = Tenant.objects.get(pk=data["tenant"], is_active=True)
-        if not can_access(user, tenant):
+        if data.get("security_version", 0) != security_version(user) or not can_access(user, tenant):
             raise ValueError
         return user, tenant
     except (signing.BadSignature, User.DoesNotExist, Tenant.DoesNotExist, KeyError, ValueError, TypeError) as exc:

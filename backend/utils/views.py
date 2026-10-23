@@ -612,6 +612,9 @@ class ChangePasswordView(APIView):
 
             # Update session to prevent logout
             update_session_auth_hash(request, user)
+            from cms_auth.security import revoke_credentials
+
+            revoke_credentials(user, request)
 
             logger.info(f"Password changed successfully for user {user.username}")
 
@@ -759,7 +762,7 @@ class GeneratePasswordResetView(APIView):
 
         # Build reset URL
         # Using the frontend URL pattern
-        reset_url = f"{request.scheme}://{request.get_host()}/accounts/password/reset/key/{uid}-{token}/"
+        reset_url = f"{request.scheme}://{request.get_host()}/login?resetKey={uid}-{token}"
 
         logger.info(f"Password reset link generated for user {user.username} by {request.user.username}")
 

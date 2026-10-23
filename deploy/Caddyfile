@@ -72,6 +72,14 @@ app.{$DOMAIN} {
         reverse_proxy backend:8000
     }
 
+    # Browser identity API and provider callbacks share the CMS origin.
+    handle /_allauth/* {
+        reverse_proxy backend:8000
+    }
+    handle /accounts/* {
+        reverse_proxy backend:8000
+    }
+
     # CSRF token endpoint
     handle /csrf-token* {
         reverse_proxy backend:8000

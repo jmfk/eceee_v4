@@ -8,10 +8,10 @@ Also adds tenant object to request for use in views.
 from django.conf import settings
 from django.db.models import Q
 from django.http import HttpResponseForbidden
-from rest_framework.authentication import TokenAuthentication
 from rest_framework.exceptions import APIException
-from rest_framework_simplejwt.authentication import JWTAuthentication
 
+from cms_auth.authentication import PersonalJWTAuthentication as JWTAuthentication
+from cms_auth.authentication import PersonalTokenAuthentication as TokenAuthentication
 from core.machine_api_keys import MachineAPIKeyAuthentication
 from core.models import MachineAPIKey, Tenant
 from core.permissions import user_can_switch_tenant
@@ -31,7 +31,7 @@ class TenantContextMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
-    EXEMPT_PATHS = ("/health/",)
+    EXEMPT_PATHS = ("/health/", "/_allauth/", "/accounts/", "/csrf-token/", "/api/v1/auth/")
 
     class InvalidTenantSelection(ValueError):
         pass

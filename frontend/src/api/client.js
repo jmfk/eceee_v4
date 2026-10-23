@@ -69,7 +69,7 @@ export const getCsrfToken = async () => {
     return null
 }
 
-// Request interceptor to add JWT token, CSRF token, and session ID
+// Request interceptor to add CSRF token and session ID
 apiClient.interceptors.request.use(
     async (config) => {
         // Add session ID to all requests
@@ -81,12 +81,6 @@ apiClient.interceptors.request.use(
             if (currentTenantId) config.headers['X-Tenant-ID'] = currentTenantId;
         }
         
-        // Add JWT token to requests
-        const accessToken = localStorage.getItem('access_token');
-        if (accessToken) {
-            config.headers['Authorization'] = `Bearer ${accessToken}`;
-        }
-
         // Add CSRF token for non-GET requests
         if (config.method && config.method.toLowerCase() !== 'get') {
             // Try to get CSRF token from cookie
@@ -102,7 +96,7 @@ apiClient.interceptors.request.use(
                 await getCsrfToken()
             }
 
-            if (csrfToken) {
+            if (!cookieValue && csrfToken) {
                 config.headers['X-CSRFToken'] = csrfToken
             }
         }
@@ -117,7 +111,7 @@ apiClient.interceptors.request.use(
     }
 )
 
-// Response interceptor for error handling and token refresh
+// Response interceptor for expired browser sessions
 apiClient.interceptors.response.use(
     (response) => {
         inspectAppVersionResponse(response)
@@ -143,47 +137,9 @@ apiClient.interceptors.response.use(
             });
         }
 
-        // If we get a 401 Unauthorized, try to refresh the token
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
             originalRequest._retry = true;
-
-            const refreshToken = localStorage.getItem('refresh_token');
-            if (refreshToken) {
-                try {
-                    const response = await fetch('/api/v1/auth/token/refresh/', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            refresh: refreshToken
-                        })
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        localStorage.setItem('access_token', data.access);
-
-                        // Retry the original request with new token
-                        originalRequest.headers['Authorization'] = `Bearer ${data.access}`;
-                        return apiClient.request(originalRequest);
-                    } else {
-                        // Refresh failed, clear tokens and show session expired overlay
-                        localStorage.removeItem('access_token');
-                        localStorage.removeItem('refresh_token');
-
-                        return waitForReauthentication();
-                    }
-                } catch (refreshError) {
-                    console.error('Token refresh failed:', refreshError);
-                    localStorage.removeItem('access_token');
-                    localStorage.removeItem('refresh_token');
-
-                    return waitForReauthentication();
-                }
-            } else {
-                return waitForReauthentication();
-            }
+            return waitForReauthentication();
         }
 
         // Convert error response data as well
@@ -195,7 +151,7 @@ apiClient.interceptors.response.use(
     }
 )
 
-// JWT authentication is handled via interceptors
+// Browser authentication uses the HttpOnly Django session cookie.
 
 export default apiClient
 
