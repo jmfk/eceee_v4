@@ -41,7 +41,7 @@ backend-test: prepare-test-infra refresh-db-collation ## Run the backend test su
 		-e REDIS_URL=redis://test-redis:6379/0 \
 		-e AWS_ACCESS_KEY_ID=test-eceee -e AWS_SECRET_ACCESS_KEY=test-eceee-secret \
 		-e AWS_S3_INTERNAL_ENDPOINT_URL=http://test-minio:9000 \
-		backend sh -c 'python manage.py test --keepdb --verbosity=2 --failfast --noinput && pytest taxonomy/tests/test_governance.py taxonomy/tests/test_assignments.py --ds=config.settings --reuse-db -q'
+		backend sh -c 'python manage.py test --keepdb --verbosity=2 --failfast --noinput && pytest taxonomy/tests/test_governance.py taxonomy/tests/test_assignments.py taxonomy/tests/test_required_media.py --ds=config.settings --reuse-db -q'
 
 # Run the focused News migration suite against PostgreSQL. Historical migrations
 # contain PostgreSQL-native ArrayFields and therefore cannot be validated on SQLite.
@@ -81,7 +81,7 @@ backend-test-parallel: prepare-test-infra refresh-db-collation ## Run backend te
 		-e REDIS_URL=redis://test-redis:6379/0 \
 		-e AWS_ACCESS_KEY_ID=test-eceee -e AWS_SECRET_ACCESS_KEY=test-eceee-secret \
 		-e AWS_S3_INTERNAL_ENDPOINT_URL=http://test-minio:9000 \
-		backend sh -c 'python manage.py test --keepdb --parallel auto --verbosity=2 --failfast --noinput && pytest taxonomy/tests/test_governance.py taxonomy/tests/test_assignments.py --ds=config.settings --reuse-db -q'
+		backend sh -c 'python manage.py test --keepdb --parallel auto --verbosity=2 --failfast --noinput && pytest taxonomy/tests/test_governance.py taxonomy/tests/test_assignments.py taxonomy/tests/test_required_media.py --ds=config.settings --reuse-db -q'
 
 # Run frontend tests
 frontend-test: prepare-test-infra ## Run frontend unit tests.
