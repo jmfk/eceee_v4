@@ -1,3 +1,4 @@
+import '../user-tools.css'
 import React, { useId, useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { taxonomyApi, classificationError } from '../../api/taxonomy'
@@ -51,9 +52,9 @@ export default function ClassificationPicker({ value = [], onChange, namespace, 
     }
     const choices = (terms.data?.results || []).filter(term =>
         !value.includes(term.id) && (term.status === 'approved' || (allowProposed && term.status === 'proposed')))
-    return <fieldset disabled={disabled} className="space-y-3 text-gray-900">
-        <legend className="font-medium">Classification</legend>
-        <ul className="space-y-2" aria-label="Selected classifications">
+    return <fieldset disabled={disabled} className="user-tools-content min-w-0 space-y-3 text-gray-900">
+        <legend className="font-medium">Tags</legend>
+        <ul className="space-y-2" aria-label="Selected tags">
             {value.map(termId => {
                 const term = selected.data?.find(item => item.id === termId)
                 return <li key={termId} className="flex items-center gap-3">
@@ -62,28 +63,28 @@ export default function ClassificationPicker({ value = [], onChange, namespace, 
                 </li>
             })}
         </ul>
-        <label htmlFor={id} className="block text-sm">Find a classification</label>
-        <input id={id} value={search} onChange={event => { setSearch(event.target.value); setPage(1) }} className="w-full rounded border-gray-300 bg-transparent" type="search" />
-        {terms.isPending && <p role="status">Loading classifications…</p>}
+        <label htmlFor={id} className="block text-sm">Find a tag</label>
+        <input id={id} value={search} onChange={event => { setSearch(event.target.value); setPage(1) }} className="w-full" type="search" />
+        {terms.isPending && <p role="status">Loading tags…</p>}
         {(terms.error || selected.error || defaultNamespace.error) && <p role="alert">{classificationError(terms.error || selected.error || defaultNamespace.error)}</p>}
-        {!terms.isPending && !terms.error && choices.length === 0 && <p className="text-sm">No matching classifications.</p>}
+        {!terms.isPending && !terms.error && choices.length === 0 && <p className="text-sm">No matching tags.</p>}
         <ul className="max-h-56 overflow-auto space-y-1">
-            {choices.map(term => <li key={term.id}><button type="button" className="w-full px-2 py-2 text-left hover:bg-gray-100 focus-visible:outline" onClick={() => onChange([...value, term.id])}>
+            {choices.map(term => <li key={term.id}><button type="button" className="w-full justify-start px-2 py-2 text-left hover:bg-gray-100 focus-visible:outline" onClick={() => onChange([...value, term.id])}>
                 {term.path}{term.status === 'proposed' ? ' (pending approval)' : ''}
             </button></li>)}
         </ul>
-        {!suggesting && <button type="button" className="underline text-sm" onClick={() => { setSuggesting(true); setProposalName(search) }}>Suggest a term</button>}
+        {!suggesting && <button type="button" className="underline text-sm" onClick={() => { setSuggesting(true); setProposalName(search) }}>Suggest a tag</button>}
         {suggesting && <div className="space-y-2 rounded border p-3">
-            <label htmlFor={`${id}-type`} className="block text-sm">Classification type</label>
-            <select id={`${id}-type`} className="w-full rounded border-gray-300 bg-transparent" value={proposalType || proposalTypes[0]?.id || ''} onChange={event => setProposalType(event.target.value)}>
+            <label htmlFor={`${id}-type`} className="block text-sm">Tag type</label>
+            <select id={`${id}-type`} className="w-full" value={proposalType || proposalTypes[0]?.id || ''} onChange={event => setProposalType(event.target.value)}>
                 {proposalTypes.map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
             </select>
-            <label htmlFor={`${id}-proposal`} className="block text-sm">Suggested term name</label>
-            <input id={`${id}-proposal`} className="w-full rounded border-gray-300 bg-transparent" value={proposalName} onChange={event => setProposalName(event.target.value)} />
-            {definitions.isPending && <p role="status">Loading classification types…</p>}
+            <label htmlFor={`${id}-proposal`} className="block text-sm">Suggested tag name</label>
+            <input id={`${id}-proposal`} className="w-full" value={proposalName} onChange={event => setProposalName(event.target.value)} />
+            {definitions.isPending && <p role="status">Loading tag types…</p>}
             {definitions.error && <p role="alert">{classificationError(definitions.error)}</p>}
-            {!definitions.isPending && !definitions.error && proposalTypes.length === 0 && <p>No classification types available for proposals in this scope.</p>}
-            <div className="flex gap-4"><button type="button" disabled={proposalBusy || !proposalName.trim() || proposalTypes.length === 0} onClick={submitProposal}>Submit proposal</button><button type="button" onClick={() => setSuggesting(false)}>Cancel</button></div>
+            {!definitions.isPending && !definitions.error && proposalTypes.length === 0 && <p>No tag types available for proposals in this scope.</p>}
+            <div className="flex gap-4"><button type="button" className="user-tools-primary" disabled={proposalBusy || !proposalName.trim() || proposalTypes.length === 0} onClick={submitProposal}>Submit proposal</button><button type="button" onClick={() => setSuggesting(false)}>Cancel</button></div>
         </div>}
         {proposalError && <p role="alert">{proposalError}</p>}
         {proposalMessage && <p role="status">{proposalMessage}</p>}
