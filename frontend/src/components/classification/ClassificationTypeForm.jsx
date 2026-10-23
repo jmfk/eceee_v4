@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { taxonomyApi } from '../../api/taxonomy'
 
-const inputClass = 'block w-full rounded border-gray-300 bg-transparent mt-1'
+const inputClass = 'block w-full mt-1'
 
 export default function ClassificationTypeForm({ definition, tenant, busy, onSave }) {
     const [name, setName] = useState(definition?.name || '')
@@ -20,7 +20,7 @@ export default function ClassificationTypeForm({ definition, tenant, busy, onSav
         onSave({ name, description, sort_order: Number(sortOrder), allowed_uses: uses,
             ...(!definition && { key, namespace: Number(namespace) }) })
     }}>
-        <h2 className="text-xl font-semibold">{definition ? 'Configure type' : 'New classification type'}</h2>
+        <h2 className="text-xl font-semibold">{definition ? 'Configure type' : 'New tag type'}</h2>
         <label className="block">Name<input required className={inputClass} value={name} onChange={event => setName(event.target.value)} /></label>
         {!definition && <>
             <label className="block">Stable key<input required maxLength={32} pattern="[a-z0-9_-]+" className={inputClass} value={key} onChange={event => setKey(event.target.value)} /></label>
@@ -31,6 +31,6 @@ export default function ClassificationTypeForm({ definition, tenant, busy, onSav
         <label className="block">Description<textarea className={inputClass} value={description} onChange={event => setDescription(event.target.value)} /></label>
         <label className="block">Sort order<input min={0} required type="number" className={inputClass} value={sortOrder} onChange={event => setSortOrder(event.target.value)} /></label>
         <fieldset className="space-y-2"><legend className="font-medium mb-2">Allowed uses</legend>{choices.map(([id, label]) => <label key={id} className="flex items-center gap-2 py-1"><input type="checkbox" checked={uses.includes(id)} onChange={event => setUses(event.target.checked ? [...uses, id] : uses.filter(item => item !== id))} />{label}</label>)}</fieldset>
-        <button disabled={busy} className="rounded px-4 py-2 bg-primary-600 text-white disabled:opacity-50">Save type</button>
+        <button disabled={busy} className="user-tools-primary">Save type</button>
     </form>
 }

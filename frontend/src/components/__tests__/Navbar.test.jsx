@@ -63,6 +63,7 @@ describe('Navbar', () => {
     expect(pagesLink.parentElement.parentElement).toHaveClass('justify-start')
     expect(screen.getAllByText('Pages')).toHaveLength(1)
     expect(screen.queryByRole('link', { name: 'A/B Tests' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Tags' })).toHaveAttribute('href', '/tags')
     expect(screen.getByRole('link', { name: 'Designer' })).toHaveAttribute('href', '/designer/themes')
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
     expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/profile')
