@@ -1,13 +1,15 @@
 import io
-from django.test import TestCase
+
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
-from rest_framework.test import APIRequestFactory, force_authenticate
+from django.test import TestCase
 from PIL import Image
-from .models import Tenant, TenantRole, ProfilePhoto
-from .roles import permissions_for, allows_request
-from .role_views import RolesView
+from rest_framework.test import APIRequestFactory, force_authenticate
+
+from .models import ProfilePhoto, Tenant, TenantRole
 from .profile_views import ProfilePhotoView
+from .role_views import RolesView
+from .roles import allows_request, permissions_for
 
 
 class RolesAndProfilesTests(TestCase):
@@ -68,12 +70,38 @@ class RolesAndProfilesTests(TestCase):
         self.assertEqual(self.call(ProfilePhotoView, "delete", user_id=self.user.pk).status_code, 200)
         self.assertEqual(self.call(ProfilePhotoView, user_id=self.user.pk).status_code, 404)
 
-
     def test_existing_designer_assignment_keeps_its_bounded_access(self):
-        from webpages.models import ThemeDesignerAssignment, PageTheme
+        from webpages.models import PageTheme, ThemeDesignerAssignment
+
         theme = PageTheme.objects.create(tenant=self.tenant, created_by=self.owner, name="Assigned theme")
-        ThemeDesignerAssignment.objects.create(tenant=self.tenant, theme=theme, user=self.outsider, created_by=self.owner)
+        ThemeDesignerAssignment.objects.create(
+            tenant=self.tenant, theme=theme, user=self.outsider, created_by=self.owner
+        )
         permissions = permissions_for(self.outsider, self.tenant)
         self.assertIn("theme.write", permissions)
         self.assertNotIn("page.write", permissions)
         self.assertNotIn("roles.manage", permissions)
+
+    def test_empty_cms_role_preserves_explicit_direct_support_grants(self):
+        from tenant_support.models import SupportRole
+        from tenant_support.views import ContextView
+
+        role = TenantRole.objects.create(tenant=self.tenant, name="No content permissions", permissions=[])
+        role.users.add(self.user)
+        SupportRole.objects.create(tenant=self.tenant, user=self.user, can_support=True, can_publish=True)
+        request = self.factory.get("/api/v1/support/context/")
+        request.tenant, request.user = self.tenant, self.user
+        self.assertTrue(allows_request(request))
+        response = self.call(ContextView)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(response.data["can_support"])
+        self.assertTrue(response.data["can_publish"])
+
+    def test_media_retains_namespace_authorization_for_outside_users(self):
+        request = self.factory.get("/api/v1/media/files/00000000-0000-0000-0000-000000000000/")
+        request.tenant, request.user = self.tenant, self.outsider
+        self.assertTrue(allows_request(request))
+        role = TenantRole.objects.create(tenant=self.tenant, name="No media", permissions=["page.read"])
+        role.users.add(self.user)
+        request.user = self.user
+        self.assertFalse(allows_request(request))

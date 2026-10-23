@@ -1,3 +1,5 @@
+import { useAuth } from '../contexts/AuthContext'
+import { canAccessCmsPath } from '../utils/cmsNavigation'
 import React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -42,9 +44,12 @@ const StatCard = ({ title, count, icon: Icon, color, link, description }) => (
 )
 
 const SettingsDashboard = () => {
-    // Fetch counts
+    const { user } = useAuth()
+    const allowed = (path) => canAccessCmsPath(user, path)
+    // Fetch only counts available to this role
     const { data: themes = [] } = useQuery({
         queryKey: ['themes'],
+        enabled: allowed('/settings/themes'),
         queryFn: async () => {
             const response = await themesApi.list()
             return Array.isArray(response) ? response : response?.results || []
@@ -53,6 +58,7 @@ const SettingsDashboard = () => {
 
     const { data: objectTypes = [] } = useQuery({
         queryKey: ['objectTypes'],
+        enabled: allowed('/settings/object-types'),
         queryFn: async () => {
             const response = await objectTypesApi.list()
             return response.data || []
@@ -61,6 +67,7 @@ const SettingsDashboard = () => {
 
     const { data: pagesResponse } = useQuery({
         queryKey: ['pages'],
+        enabled: allowed('/pages'),
         queryFn: async () => {
             const response = await api.get('/api/v1/webpages/pages/')
             return response.data
@@ -138,7 +145,7 @@ const SettingsDashboard = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {stats.map((stat, index) => (
+                {stats.filter((stat) => allowed(stat.link)).map((stat, index) => (
                     <StatCard key={index} {...stat} />
                 ))}
             </div>
@@ -151,28 +158,28 @@ const SettingsDashboard = () => {
                         Quick Actions
                     </h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <Link to="/pages/new" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100">
+                        {allowed('/pages/new') && <Link to="/pages/new" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100">
                             <h4 className="font-semibold text-gray-900">Create New Page</h4>
                             <p className="text-xs text-gray-500 mt-1">Start building a new content page</p>
-                        </Link>
-                        <Link to="/settings/roles" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100"><h4 className="font-semibold text-gray-900">Roller och behörigheter</h4><p className="text-xs text-gray-500 mt-1">Hantera arbetsytans roller</p></Link>
-                        <Link to="/settings/support" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100"><h4 className="font-semibold text-gray-900">Support</h4><p className="text-xs text-gray-500 mt-1">Mottagare, publicerare och leveransstatus</p></Link>
-                        <Link to="/settings/users" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100">
+                        </Link>}
+                        {allowed('/settings/roles') && <Link to="/settings/roles" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100"><h4 className="font-semibold text-gray-900">Roller och behörigheter</h4><p className="text-xs text-gray-500 mt-1">Hantera arbetsytans roller</p></Link>}
+                        {allowed('/settings/support') && <Link to="/settings/support" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100"><h4 className="font-semibold text-gray-900">Support</h4><p className="text-xs text-gray-500 mt-1">Mottagare, publicerare och leveransstatus</p></Link>}
+                        {allowed('/settings/users') && <Link to="/settings/users" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100">
                             <h4 className="font-semibold text-gray-900">Manage Users</h4>
                             <p className="text-xs text-gray-500 mt-1">Add or edit system administrators</p>
-                        </Link>
-                        <Link to="/settings/publishing" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100">
+                        </Link>}
+                        {allowed('/settings/publishing') && <Link to="/settings/publishing" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100">
                             <h4 className="font-semibold text-gray-900">Publishing Workflow</h4>
                             <p className="text-xs text-gray-500 mt-1">Check scheduled content tasks</p>
-                        </Link>
-                        <Link to="/settings/content-migration" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100">
+                        </Link>}
+                        {allowed('/settings/content-migration') && <Link to="/settings/content-migration" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100">
                             <h4 className="font-semibold text-gray-900">Content Migration</h4>
                             <p className="text-xs text-gray-500 mt-1">Batch import external content</p>
-                        </Link>
-                        <Link to="/schemas/system" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100">
+                        </Link>}
+                        {allowed('/schemas/system') && <Link to="/schemas/system" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100">
                             <h4 className="font-semibold text-gray-900">System Schemas</h4>
                             <p className="text-xs text-gray-500 mt-1">Configure core data fields</p>
-                        </Link>
+                        </Link>}
                     </div>
                 </div>
 

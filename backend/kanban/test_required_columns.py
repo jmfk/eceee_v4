@@ -1,13 +1,15 @@
 import importlib
+
 from django.apps import apps
+from django.contrib.auth.models import User
 from django.db import connection
 from django.test import TestCase
 from rest_framework.test import APIRequestFactory, force_authenticate
-from django.contrib.auth.models import User
+
 from core.models import Tenant
-from .models import Board, Column, Card
+
+from .models import Board, Card, Column
 from .views import BoardViewSet, ColumnViewSet
-from .services import ensure_required_columns
 
 
 class RequiredColumnsTests(TestCase):

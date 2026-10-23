@@ -2,15 +2,15 @@ import io
 import warnings
 
 from django.contrib.auth import get_user_model
-from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from PIL import Image, ImageOps, UnidentifiedImageError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.exceptions import ValidationError, PermissionDenied
-from .models import ProfilePhoto, MachineAPIKey
+
+from .models import MachineAPIKey, ProfilePhoto
 
 
 class ProfilePhotoView(APIView):

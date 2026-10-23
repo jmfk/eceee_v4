@@ -28,3 +28,14 @@ Files remain private and are downloaded with attachment disposition after author
 Interactive CMS requests use the existing resource scope vocabulary plus tenant role-management, support, settings, integration, statistics and AI capabilities. Machine credentials keep their independent scope boundary. Existing direct support/publisher role grants remain explicit compatibility grants, combined with tenant roles; tenant administration does not imply private support access. Upgrade assigns existing tenant members the administrator role to preserve access. The default for unassigned new members is CMS resource reads plus Kanban write, excluding support access. An explicit role, including an empty one, replaces this default. System/tenant owners retain recovery access.
 
 Photos are private, bounded, reencoded JPEGs in the existing database. This avoids introducing another public upload path or depending on S3 setup for account photos. Diagnostic JSON is also private database content; generic user attachments remain in the separate private support bucket.
+
+
+## Review corrections (PR #274)
+
+Board delivery creates only a generic card and a protected thread link. It must not copy the private subject/body into the tenant-wide Kanban surface. Inbox remains a personal utility governed by tenant, participant and support/publisher checks, including direct grants paired with an empty CMS content role. Page-editor sockets enforce the same page-read capability as HTTP and recheck access before receiving or emitting editor events.
+
+Media requests from users outside the current tenant continue through existing public-resource/private-namespace checks, preserving private-resource concealment. Tenant members remain subject to role-based media capabilities. Message/reply submission waits for video validation; credential redaction handles quoted JSON error fragments as well as plain text.
+
+Recipient groups use tenant-owned roles and board memberships. Global Django groups have no tenant owner and are excluded to prevent cross-workspace group-name disclosure. Generic attachments and legacy video uploads share the existing rolling tenant count/byte quota under the tenant row lock; generated inline diagnostics do not count as uploads.
+
+CMS navigation and Settings actions/queries follow resource capabilities; empty content roles retain personal Profile and Inbox access. Global user administration stays restricted to system owners.

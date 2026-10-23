@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Instruction, Message, SupportThread, MessageAttachment
+from .models import Instruction, Message, MessageAttachment, SupportThread
 
 
 class InstructionSerializer(serializers.ModelSerializer):

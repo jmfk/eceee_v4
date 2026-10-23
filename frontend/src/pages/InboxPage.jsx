@@ -412,6 +412,7 @@ function Compose({ context, link, publish = false }) {
     const [kind, setKind] = useState('question')
     const [recipients, setRecipients] = useState(context.supportAvailable ? ['support'] : [])
     const [files, setFiles] = useState([])
+    const [checkingFiles, setCheckingFiles] = useState(false)
     const fileCache = useRef(new Map())
     const [includeDiagnostics, setIncludeDiagnostics] = useState(() => new URLSearchParams(location.search).has('from'))
     const [title, setTitle] = useState('')
@@ -610,7 +611,7 @@ function Compose({ context, link, publish = false }) {
                             setValid={setValid}
                         />
                     )}
-                    {!publish && <MessageFilePicker files={files} setFiles={setFiles} disabled={send.isPending} />}
+                    {!publish && <MessageFilePicker files={files} setFiles={setFiles} disabled={send.isPending} onCheckingChange={setCheckingFiles} />}
                     {!publish && new URLSearchParams(location.search).has('from') && <label><input type="checkbox" checked={includeDiagnostics} onChange={(e) => setIncludeDiagnostics(e.target.checked)} /> Bifoga filtrerad diagnostik (senaste webbläsarfel och metadata för sändningen)</label>}
                     {publish && (
                         <HelpGuideSelect value={helpGuideId} onChange={setHelpGuideId} />
@@ -644,6 +645,7 @@ function Compose({ context, link, publish = false }) {
                         className="user-tools-primary"
                         disabled={
                             !valid ||
+                            checkingFiles ||
                             send.isPending ||
                             (publish ? !file || context.storageConfigured === false : !recipients.length || (recipients.includes('support') && !context.supportAvailable))
                         }
@@ -668,6 +670,7 @@ function ThreadDetail({ id, context }) {
     const queryClient = useQueryClient()
     const [body, setBody] = useState('')
     const [files, setFiles] = useState([])
+    const [checkingFiles, setCheckingFiles] = useState(false)
     const fileCache = useRef(new Map())
     const requestId = useRef(crypto.randomUUID())
     const query = useQuery({
@@ -759,12 +762,12 @@ function ThreadDetail({ id, context }) {
                                 onChange={(e) => setBody(e.target.value)}
                             />
                         </label>
-                        <MessageFilePicker files={files} setFiles={setFiles} disabled={reply.isPending} />
+                        <MessageFilePicker files={files} setFiles={setFiles} disabled={reply.isPending} onCheckingChange={setCheckingFiles} />
                         <ErrorText error={reply.error} />
                         <div className="support-actions">
                             <button
                                 className="user-tools-primary"
-                                disabled={reply.isPending || !body.trim()}
+                                disabled={reply.isPending || checkingFiles || !body.trim()}
                             >
                                 {reply.error?.response?.status === 409
                                     ? 'Skicka som nytt svar'

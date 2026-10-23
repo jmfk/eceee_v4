@@ -61,6 +61,8 @@ class PageEditorConsumer(AsyncWebsocketConsumer):
             self.joined_group = False
 
     async def receive(self, text_data=None, bytes_data=None):
+        if not await self._ensure_access():
+            return
         try:
             data = json.loads(text_data or "{}")
         except (TypeError, ValueError):
@@ -83,6 +85,8 @@ class PageEditorConsumer(AsyncWebsocketConsumer):
             )
 
     async def version_updated(self, event):
+        if not await self._ensure_access():
+            return
         await self.send(
             text_data=json.dumps(
                 {
@@ -100,6 +104,8 @@ class PageEditorConsumer(AsyncWebsocketConsumer):
         )
 
     async def presence_event(self, event):
+        if not await self._ensure_access():
+            return
         await self.send(
             text_data=json.dumps(
                 {
@@ -115,6 +121,8 @@ class PageEditorConsumer(AsyncWebsocketConsumer):
         )
 
     async def presence_sync_request(self, event):
+        if not await self._ensure_access():
+            return
         requester = event.get("requester_connection_id")
         if requester == self.connection_id:
             return
@@ -143,12 +151,26 @@ class PageEditorConsumer(AsyncWebsocketConsumer):
             },
         )
 
+    async def _ensure_access(self):
+        if await self._can_access_page(self.scope.get("user"), self.page_id):
+            return True
+        await self.send(
+            text_data=json.dumps({"type": "auth_failure", "message": "Page access is required", "code": "FORBIDDEN"})
+        )
+        await self.close(code=4003)
+        return False
+
     @database_sync_to_async
     def _can_access_page(self, user, page_id):
+        from django.contrib.auth import get_user_model
+
+        from core.roles import permissions_for
+
         from .models import WebPage
 
+        user = get_user_model().objects.filter(pk=getattr(user, "pk", None), is_active=True).first()
         page = WebPage.objects.select_related("tenant", "tenant__created_by").filter(pk=page_id).first()
-        return bool(page and (user.is_staff or page.tenant.user_has_access(user)))
+        return bool(page and {"page.read", "tenant.admin"} & permissions_for(user, page.tenant))
 
 
 def broadcast_version_update(

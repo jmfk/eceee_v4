@@ -80,6 +80,7 @@ class TenantContextMiddleware:
             return JsonResponse({"detail": "Din roll saknar behörighet för den här åtgärden."}, status=403)
         response = self.get_response(request)
         from tenant_support.system_diagnostics import record
+
         record(request, response)
 
         # Clear tenant context after request

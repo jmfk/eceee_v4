@@ -1,9 +1,12 @@
+import { useAuth } from '../contexts/AuthContext'
+import { canAccessCmsPath } from '../utils/cmsNavigation'
 import { Link, useLocation } from 'react-router-dom'
 import { User, Inbox, Columns3, Flag } from 'lucide-react'
 import { safeReportLocation } from '../api/support'
 import './user-tools.css'
 
 export default function UserToolsNav({ tenant, unreadCount = 0 }) {
+    const { user } = useAuth()
     const location = useLocation()
     const reportFrom = safeReportLocation(location.state?.reportFrom || window.location.href)
     const links = [
@@ -13,6 +16,6 @@ export default function UserToolsNav({ tenant, unreadCount = 0 }) {
         { title: 'Rapportera fel', href: `/inbox/new?tenant=${encodeURIComponent(tenant || '')}&from=${encodeURIComponent(reportFrom)}`, icon: Flag, active: location.pathname.startsWith('/inbox/new') },
     ]
     return <nav aria-label="Personliga verktyg" className="user-tools-nav">
-        {links.map(({ title, href, icon: Icon, active }) => <Link key={title} to={href} state={{ reportFrom }} aria-current={active ? 'page' : undefined}><Icon size={16} aria-hidden="true" />{title}</Link>)}
+        {links.filter((item) => canAccessCmsPath(user, item.href)).map(({ title, href, icon: Icon, active }) => <Link key={title} to={href} state={{ reportFrom }} aria-current={active ? 'page' : undefined}><Icon size={16} aria-hidden="true" />{title}</Link>)}
     </nav>
 }

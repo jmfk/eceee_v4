@@ -3,11 +3,13 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import Navbar from '../Navbar'
+import UserToolsNav from '../UserToolsNav'
+import { useAuth } from '../../contexts/AuthContext'
 
 vi.mock('../support/useSupportContext', () => ({ useSupportContext: () => ({ data: { unreadCount: 0 } }), useSupportTenant: () => 'a' }))
 
 vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ logout: vi.fn(), user: { username: 'editor' } }),
+  useAuth: vi.fn(() => ({ logout: vi.fn(), user: { username: 'editor' } })),
 }))
 
 describe('Navbar', () => {
@@ -28,6 +30,7 @@ describe('Navbar', () => {
   }
 
   beforeEach(() => {
+    useAuth.mockReturnValue({ logout: vi.fn(), user: { username: 'editor' } })
     availableWidth = 1200
     menuWidth = 1060
     observers = []
@@ -69,6 +72,24 @@ describe('Navbar', () => {
     expect(screen.getByRole('link', { name: 'Rapportera fel' })).toHaveAttribute('href', expect.stringContaining('/inbox/new?from='))
     expect(screen.queryByText('EASY v4')).not.toBeInTheDocument()
     expect(screen.queryByText('›')).not.toBeInTheDocument()
+  })
+
+  it('keeps personal tools but hides denied CMS navigation for an empty role', () => {
+    useAuth.mockReturnValue({ logout: vi.fn(), user: { permissions: [] } })
+    render(<MemoryRouter><Navbar /><UserToolsNav tenant="a" /></MemoryRouter>)
+    for (const name of ['Statistics', 'Settings', 'Pages', 'Kanban']) {
+      expect(screen.queryByRole('link', { name })).not.toBeInTheDocument()
+    }
+    expect(screen.getByRole('link', { name: 'Inbox' })).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'Profile' })).toHaveLength(2)
+  })
+
+  it('exposes settings to role managers and Statistics only to its readers', () => {
+    useAuth.mockReturnValue({ logout: vi.fn(), user: { permissions: ['roles.manage', 'statistics.read'] } })
+    renderNavbar()
+    expect(screen.getByRole('link', { name: 'Settings' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Statistics' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Pages' })).not.toBeInTheDocument()
   })
 
   it('stays collapsed across measurements and menu interaction, then expands when space is available', () => {

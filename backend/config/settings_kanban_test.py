@@ -6,7 +6,8 @@ from config.settings import *  # noqa: F403,F401
 DEBUG = False
 INSTALLED_APPS = [app for app in base_settings.INSTALLED_APPS if app != "debug_toolbar"]
 MIDDLEWARE = [item for item in base_settings.MIDDLEWARE if "debug_toolbar" not in item]
-ROOT_URLCONF = "kanban.urls"
+# Role regressions need the same API routes as the CMS.
+ROOT_URLCONF = "config.urls"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",

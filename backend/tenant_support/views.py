@@ -5,7 +5,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import Q, Sum, Max, OuterRef, Subquery
+from django.db.models import Count, Max, OuterRef, Q, Subquery, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
@@ -25,26 +25,26 @@ from .models import (
     InboxEntry,
     Instruction,
     Message,
+    MessageAttachment,
     PrivateVideo,
     SupportRole,
     SupportThread,
-    MessageAttachment,
 )
+from .recipients import directory, resolve
 from .serializers import (
     ArchiveInput,
     InstructionSerializer,
     InstructionStateInput,
+    MessageAttachmentSerializer,
     PublishInput,
     ReplyInput,
     RoleInput,
     StatusInput,
     ThreadInput,
     ThreadSerializer,
-    MessageAttachmentSerializer,
 )
 from .services import notify_thread, receive, sync_support_inbox, visible_entries
 from .video import inspect_video
-from .recipients import directory, resolve
 
 
 def validated(serializer_type, request):
@@ -342,7 +342,7 @@ class ThreadsView(SupportView):
             attach_diagnostics(request, message, diagnostics)
         if boards:
             from kanban.models import Card
-            from kanban.services import ensure_required_columns, event, enqueue_index
+            from kanban.services import enqueue_index, ensure_required_columns, event
 
             board = boards[0]
             ensure_required_columns(board)
@@ -351,8 +351,8 @@ class ThreadsView(SupportView):
             card = Card.objects.create(
                 tenant=request.tenant,
                 column=column,
-                title=title_for_card(thread),
-                description=f"{body}\n\n[Meddelandetråd](/inbox/threads/{thread.pk}?tenant={request.tenant.pk})",
+                title="Nytt meddelande",
+                description=f"[Öppna meddelandet](/inbox/threads/{thread.pk}?tenant={request.tenant.pk})",
                 number=number,
                 position=column.cards.count(),
             )
@@ -413,6 +413,21 @@ class VideoUploadThrottle(UserRateThrottle):
     rate = "20/hour"
 
 
+def check_upload_quota(tenant, byte_size):
+    """Called under the tenant lock by both upload paths; generated diagnostics are not uploads."""
+    since = timezone.now() - timedelta(days=1)
+    uploads = [
+        PrivateVideo.objects.filter(tenant=tenant, created_at__gte=since),
+        MessageAttachment.objects.filter(tenant=tenant, created_at__gte=since, inline_text=""),
+    ]
+    usage = [query.aggregate(count=Count("pk"), total=Sum("byte_size")) for query in uploads]
+    if (
+        sum(row["count"] for row in usage) >= 50
+        or sum(row["total"] or 0 for row in usage) + byte_size > settings.SUPPORT_DAILY_MAX_BYTES
+    ):
+        raise ValidationError({"file": "Arbetsytans dygnskvot för bilagor är nådd. Försök igen senare."})
+
+
 class VideoUploadView(SupportView):
     throttle_classes = [VideoUploadThrottle]
 
@@ -435,12 +450,7 @@ class VideoUploadView(SupportView):
                 Tenant.objects.select_for_update().get(pk=request.tenant.pk)
                 if purpose == "instruction":
                     require_role(request.user, request.tenant, "can_publish")
-                recent = PrivateVideo.objects.filter(
-                    tenant=request.tenant, created_at__gte=timezone.now() - timedelta(days=1)
-                )
-                total = recent.aggregate(total=Sum("byte_size"))["total"] or 0
-                if recent.count() >= 50 or total + upload.size > settings.SUPPORT_DAILY_MAX_BYTES:
-                    raise ValidationError({"file": "Arbetsytans dygnskvot för video är nådd. Försök igen senare."})
+                check_upload_quota(request.tenant, upload.size)
                 key = f"{request.tenant.pk}/{uuid.uuid4()}.{extension}"
                 try:
                     storage.save_video(temp.name, key, content_type)
@@ -495,10 +505,6 @@ class DeliveriesView(SupportView):
         )
 
 
-def title_for_card(thread):
-    return thread.title[:250]
-
-
 def attach_files(request, message, ids):
     files = MessageAttachment.objects.select_for_update().filter(
         tenant=request.tenant, owner=request.user, pk__in=ids, message__isnull=True
@@ -513,6 +519,7 @@ class AttachmentsView(SupportView):
 
     def post(self, request):
         from pathlib import PurePath
+
         from kanban.upload_validation import KanbanUploadValidator
 
         upload = request.FILES.get("file")
@@ -533,14 +540,7 @@ class AttachmentsView(SupportView):
                 _, content_type, _ = inspect_video(temp.name, "bug")
             with transaction.atomic():
                 Tenant.objects.select_for_update().get(pk=request.tenant.pk)
-                used = (
-                    MessageAttachment.objects.filter(
-                        tenant=request.tenant, created_at__gte=timezone.now() - timedelta(days=1)
-                    ).aggregate(total=Sum("byte_size"))["total"]
-                    or 0
-                )
-                if used + upload.size > settings.SUPPORT_DAILY_MAX_BYTES:
-                    raise ValidationError({"file": "Arbetsytans dygnskvot för bilagor är nådd."})
+                check_upload_quota(request.tenant, upload.size)
                 key = f"{request.tenant.pk}/messages/{uuid.uuid4()}"
                 try:
                     storage.save_video(temp.name, key, content_type)

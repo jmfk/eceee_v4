@@ -41,6 +41,7 @@ from .services import (
     can_access,
     check_revision,
     enqueue_index,
+    ensure_required_columns,
     event,
     get_record,
     locked_tenant,
@@ -49,7 +50,6 @@ from .services import (
     undo_event,
     update_card,
     update_named,
-    ensure_required_columns,
 )
 
 

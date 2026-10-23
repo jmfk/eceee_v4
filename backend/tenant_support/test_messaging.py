@@ -1,17 +1,19 @@
-import importlib
 import uuid
-from decimal import Decimal
 from unittest.mock import patch
-from django.test import TestCase
+
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
-from rest_framework.test import APIRequestFactory, force_authenticate
-from .tests import SupportAPITests
-from . import views
-from .models import Message, SupportThread, MessageAttachment, InboxEntry, EmailDelivery
-from kanban.models import Board, Column, Card
-from kanban.views import BoardViewSet, ColumnViewSet
+from django.test import TestCase, override_settings
+from rest_framework.test import force_authenticate
+
+from core.models import TenantRole
+from kanban.models import Board, Card
 from kanban.services import ensure_required_columns
+
+from . import views
+from .models import EmailDelivery, InboxEntry, MessageAttachment, PrivateVideo, SupportThread
+from .recipients import directory
+from .tests import SupportAPITests
 
 
 class MessagingTests(TestCase):
@@ -50,14 +52,25 @@ class MessagingTests(TestCase):
         self.assertEqual(self.call(views.ThreadView, pk=tid, user=self.bob).status_code, 403)
 
     def test_group_recipients_are_a_snapshot_and_foreign_recipients_rejected(self):
-        group = Group.objects.create(name="Redaktionen")
-        group.user_set.add(self.bob)
-        response, _ = self.send([f"group:{group.pk}"])
+        group = TenantRole.objects.create(tenant=self.tenant, name="Redaktionen", permissions=[])
+        group.users.add(self.bob)
+        response, _ = self.send([f"role:{group.pk}"])
         self.assertEqual(response.status_code, 201, response.data)
-        group.user_set.add(self.support)
+        group.users.add(self.support)
         self.assertEqual(self.call(views.ThreadView, pk=response.data["id"], user=self.support).status_code, 404)
         self.assertEqual(self.send(["user:99999999"])[0].status_code, 400)
         self.assertEqual(self.send(["group:99999999"])[0].status_code, 400)
+
+    def test_global_and_foreign_groups_are_not_workspace_recipients(self):
+        global_group = Group.objects.create(name="Private cross-workspace group")
+        global_group.user_set.add(self.bob)
+        foreign_role = TenantRole.objects.create(tenant=self.other, name="Private foreign role", permissions=[])
+        foreign_role.users.add(self.bob)
+        options = directory(self.tenant, self.anna)
+        self.assertNotIn(global_group.name, [item["name"] for item in options])
+        self.assertNotIn(f"role:{foreign_role.pk}", [item["id"] for item in options])
+        self.assertEqual(self.send([f"group:{global_group.pk}"])[0].status_code, 400)
+        self.assertEqual(self.send([f"role:{foreign_role.pk}"])[0].status_code, 400)
 
     @patch("kanban.services.enqueue_index")
     def test_board_inbox_delivery_is_atomic_and_idempotent(self, index):
@@ -117,8 +130,9 @@ class MessagingTests(TestCase):
 
     @patch("tenant_support.storage.save_video")
     def test_generic_attachments_accept_images_and_reject_invalid_files(self, save):
-        from PIL import Image
         from io import BytesIO
+
+        from PIL import Image
 
         output = BytesIO()
         Image.new("RGB", (20, 20)).save(output, "PNG")
@@ -137,6 +151,52 @@ class MessagingTests(TestCase):
         request.tenant = self.tenant
         force_authenticate(request, self.anna)
         self.assertEqual(views.AttachmentsView.as_view()(request).status_code, 400)
+
+    @patch("tenant_support.storage.save_video")
+    @patch("tenant_support.views.inspect_video", return_value=(5, "video/mp4", "mp4"))
+    @patch(
+        "kanban.upload_validation.KanbanUploadValidator.validate_file",
+        return_value={
+            "is_valid": True,
+            "metadata": {"actual_mime_type": "video/mp4"},
+        },
+    )
+    def test_both_upload_paths_share_count_and_byte_quotas(self, validate, inspect, save):
+        # Unattached uploads from both models consume the same rolling tenant quota.
+        for _ in range(49):
+            self.attachment()
+        PrivateVideo.objects.create(
+            tenant=self.tenant,
+            owner=self.anna,
+            purpose="bug",
+            storage_key=str(uuid.uuid4()),
+            content_type="video/mp4",
+            byte_size=100,
+            duration=5,
+        )
+
+        def upload(view):
+            request = self.factory.post(
+                "/",
+                {
+                    "purpose": "bug",
+                    "file": SimpleUploadedFile("clip.mp4", b"video", content_type="video/mp4"),
+                },
+                format="multipart",
+            )
+            request.tenant = self.tenant
+            force_authenticate(request, self.anna)
+            return view.as_view()(request)
+
+        for view in (views.AttachmentsView, views.VideoUploadView):
+            self.assertEqual(upload(view).status_code, 400)
+        # Keep one attachment and one video: each fits alone, but their combined bytes do not.
+        retained = MessageAttachment.objects.first()
+        MessageAttachment.objects.exclude(pk=retained.pk).update(created_at="2020-01-01T00:00:00Z")
+        with override_settings(SUPPORT_DAILY_MAX_BYTES=202):
+            for view in (views.AttachmentsView, views.VideoUploadView):
+                self.assertEqual(upload(view).status_code, 400)
+        save.assert_not_called()
 
     @patch("tenant_support.views.inspect_video", side_effect=ValueError("must validate"))
     def test_video_policy_runs_for_generic_uploads(self, inspect):
@@ -158,17 +218,20 @@ class MessagingTests(TestCase):
 
     def test_board_delivery_respects_the_senders_cms_role(self):
         from core.models import TenantRole
-        board = Board.objects.create(tenant=self.tenant, title='Read only')
+
+        board = Board.objects.create(tenant=self.tenant, title="Read only")
         board.members.add(self.bob)
-        role = TenantRole.objects.create(tenant=self.tenant, name='Reader', permissions=['kanban.read'])
+        role = TenantRole.objects.create(tenant=self.tenant, name="Reader", permissions=["kanban.read"])
         role.users.add(self.anna)
-        self.assertEqual(self.send([f'board:{board.pk}'])[0].status_code, 400)
-        self.assertEqual(self.send([f'board-members:{board.pk}'])[0].status_code, 201)
+        self.assertEqual(self.send([f"board:{board.pk}"])[0].status_code, 400)
+        self.assertEqual(self.send([f"board-members:{board.pk}"])[0].status_code, 201)
 
     def test_server_diagnostics_are_per_tenant_and_user(self):
-        from .system_diagnostics import record, recent
         from django.http import HttpResponse
-        request = self.factory.get('/')
+
+        from .system_diagnostics import recent, record
+
+        request = self.factory.get("/")
         request.tenant, request.user = self.tenant, self.anna
         record(request, HttpResponse(status=500))
         self.assertEqual(len(recent(request)), 1)
@@ -177,20 +240,44 @@ class MessagingTests(TestCase):
         request.user, request.tenant = self.anna, self.other
         self.assertEqual(recent(request), [])
 
-
     def test_mixed_support_and_person_recipients_both_receive_the_message(self):
-        response, _ = self.send(['support', f'user:{self.bob.pk}'])
+        response, _ = self.send(["support", f"user:{self.bob.pk}"])
         self.assertEqual(response.status_code, 201, response.data)
         self.assertTrue(InboxEntry.objects.filter(user=self.support).exists())
         self.assertTrue(InboxEntry.objects.filter(user=self.bob).exists())
 
-
     def test_support_grant_through_cms_role_catches_up_without_historical_email(self):
         from core.role_views import RolesView
-        response, _ = self.send(['support'])
+
+        response, _ = self.send(["support"])
         self.assertEqual(response.status_code, 201)
         before = EmailDelivery.objects.count()
-        grant = self.call(RolesView, 'post', {'name': 'Support group', 'permissions': ['support.read'], 'users': [self.bob.pk]}, user=self.owner)
+        grant = self.call(
+            RolesView,
+            "post",
+            {"name": "Support group", "permissions": ["support.read"], "users": [self.bob.pk]},
+            user=self.owner,
+        )
         self.assertEqual(grant.status_code, 200, grant.data)
-        self.assertEqual(self.call(views.InboxView, user=self.bob).data['count'], 1)
+        self.assertEqual(self.call(views.InboxView, user=self.bob).data["count"], 1)
         self.assertEqual(EmailDelivery.objects.count(), before)
+
+    @patch("kanban.services.enqueue_index")
+    def test_board_card_does_not_expose_private_message_content(self, index):
+        from kanban.views import CardViewSet
+
+        board = Board.objects.create(tenant=self.tenant, title="Shared board")
+        board.members.add(self.bob)
+        response, _ = self.send([f"board:{board.pk}"], title="Private subject", body="Private message body")
+        self.assertEqual(response.status_code, 201, response.data)
+        request = self.factory.get("/")
+        request.tenant = self.tenant
+        force_authenticate(request, self.support)
+        public = CardViewSet.as_view({"get": "list"})(request)
+        self.assertEqual(public.status_code, 200)
+        self.assertNotIn("Private subject", str(public.data))
+        self.assertNotIn("Private message body", str(public.data))
+        self.assertEqual(self.call(views.ThreadView, pk=response.data["id"], user=self.support).status_code, 404)
+        self.assertEqual(
+            self.call(views.ThreadView, pk=response.data["id"], user=self.bob).data["title"], "Private subject"
+        )

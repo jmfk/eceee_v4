@@ -5,9 +5,10 @@ URL Configuration for General Utilities
 from django.urls import include, path, re_path
 from rest_framework.routers import DefaultRouter
 
-from . import views
 from core.profile_views import ProfilePhotoView
 from core.role_views import RolesView
+
+from . import views
 
 app_name = "utils"
 

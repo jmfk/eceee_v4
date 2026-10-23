@@ -1,11 +1,13 @@
 from asgiref.sync import async_to_sync
+from channels.db import database_sync_to_async
+from channels.layers import get_channel_layer
 from channels.routing import URLRouter
 from channels.testing import WebsocketCommunicator
 from django.contrib.auth.models import AnonymousUser, User
 from django.test import TransactionTestCase, override_settings
 
 from config.routing import websocket_urlpatterns
-from core.models import Tenant
+from core.models import Tenant, TenantRole
 from utils.middleware.dev_auth import DevAutoLoginASGIMiddleware
 from webpages.models import WebPage
 
@@ -24,7 +26,7 @@ class PageEditorConsumerTest(TransactionTestCase):
         self.outsider = User.objects.create_user("socket-outsider")
         self.staff = User.objects.create_user("socket-staff", is_staff=True)
         self.tenant = Tenant.objects.create(name="Socket tenant", identifier="socket", created_by=self.owner)
-        self.tenant.members.add(self.member)
+        self.tenant.members.add(self.member, self.staff)
         self.page = WebPage.objects.create(
             title="Socket page",
             slug="socket-page",
@@ -103,6 +105,46 @@ class PageEditorConsumerTest(TransactionTestCase):
             self.assertTrue(connected)
             established = await communicator.receive_json_from()
             self.assertEqual(established["type"], "connection_established")
+            await communicator.disconnect()
+
+        async_to_sync(scenario)()
+
+    def test_members_and_staff_without_page_read_cannot_connect(self):
+        role = TenantRole.objects.create(tenant=self.tenant, name="No page access", permissions=["kanban.read"])
+        role.users.add(self.member, self.staff)
+
+        async def scenario():
+            for user in (self.member, self.staff):
+                communicator, connected = await self.connect_as(user)
+                self.assertTrue(connected)
+                self.assertEqual((await communicator.receive_json_from())["type"], "auth_failure")
+                await communicator.wait()
+
+        async_to_sync(scenario)()
+
+    def test_page_reader_can_connect_but_revocation_stops_version_events(self):
+        role = TenantRole.objects.create(tenant=self.tenant, name="Page reader", permissions=["page.read"])
+        role.users.add(self.member)
+
+        async def scenario():
+            communicator, connected = await self.connect_as(self.member)
+            self.assertTrue(connected)
+            self.assertEqual((await communicator.receive_json_from())["type"], "connection_established")
+            await communicator.receive_json_from()  # own join
+            await database_sync_to_async(TenantRole.objects.filter(pk=role.pk).update)(permissions=[])
+            await get_channel_layer().group_send(
+                f"page_editor_{self.page.pk}",
+                {
+                    "type": "version_updated",
+                    "page_id": self.page.pk,
+                    "version_id": 1,
+                    "updated_at": "2026-10-23T00:00:00Z",
+                },
+            )
+            self.assertEqual((await communicator.receive_json_from())["type"], "auth_failure")
+            output = await communicator.receive_output()
+            self.assertEqual(output["type"], "websocket.close")
+            self.assertEqual(output["code"], 4003)
             await communicator.disconnect()
 
         async_to_sync(scenario)()
