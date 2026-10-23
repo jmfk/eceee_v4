@@ -55,6 +55,8 @@ class SourcesSerializer(serializers.Serializer):
     sources = serializers.ListField(child=serializers.DictField())
     health = serializers.DictField(required=False)
     gaps = serializers.ListField(child=serializers.DictField(), required=False)
+    gap_count = serializers.IntegerField(required=False)
+    gaps_limited = serializers.BooleanField(required=False)
     created_at = serializers.DateTimeField(required=False)
     oldest_export_at = serializers.DateTimeField(required=False, allow_null=True)
     stale = serializers.BooleanField(required=False)

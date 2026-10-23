@@ -165,8 +165,10 @@ is not an authorization or a replacement for `make prod-deploy`.
 
 The collector runs every minute with a 30-second systemd deadline, 20 MiB input
 budget and 10000 new events/run. Exports use immutable segments up to 512 KiB.
-It checkpoints complete records, overlaps reads for retry safety and deduplicates
-recent IDs. It detects changed containers, missing sources, file rotation,
+It journals sanitized segments together with their checkpoints before publication,
+finishes any interrupted publication on restart, overlaps reads for retry safety
+and deduplicates recent IDs. The local journal contains no raw log text or signing
+credentials. It detects changed containers, missing sources, file rotation,
 truncation and interrupted runs and records explicit possible gaps. Signing
 protects tenant attribution; unsigned historical errors are always global.
 Unrecognized raw records are discarded and counted. Application exception messages
@@ -180,7 +182,9 @@ generation manifests retain one hour. Large or oversized individual records may
 produce explicitly reported gaps. Collection cannot recover logs already removed
 by Docker rotation or container replacement. Historical coverage is never implied
 by an empty result. Global sources metadata reports staleness after three minutes,
-incomplete collection, unknown record counts and retention limitation.
+incomplete collection, unknown record counts and retention limitation. It returns
+the latest 100 gap entries plus `gap_count` and `gaps_limited`, so lengthy gap
+histories cannot make source metadata exceed the response limit.
 
 Diagnostic audit records include operation, key ID, requested tenant IDs, sources,
 result count, status, limits and elapsed time, never filter values or record bodies.

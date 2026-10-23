@@ -62,7 +62,10 @@ def source_inventory(request):
             {key: current.get(key) for key in ("created_at", "retention_limited", "incomplete", "oldest_export_at")}
         )
         result["health"] = current.get("sources", {})
-        result["gaps"] = current.get("gaps", [])
+        gaps = current.get("gaps", [])
+        result["gaps"] = gaps[-100:]
+        result["gap_count"] = len(gaps)
+        result["gaps_limited"] = len(gaps) > 100
         result["stale"] = datetime.fromisoformat(current["created_at"]) < datetime.now(timezone.utc) - timedelta(
             minutes=3
         )

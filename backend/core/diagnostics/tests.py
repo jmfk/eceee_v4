@@ -108,6 +108,57 @@ class SanitizationTests(SimpleTestCase):
         with self.assertRaises(RuntimeError):
             list(bounded_lines([sys.executable, "-c", "raise SystemExit(4)"], time.monotonic() + 2, [1024]))
 
+    def test_exhausted_input_is_incomplete_even_if_the_producer_has_exited_successfully(self):
+        import time
+        from unittest.mock import MagicMock
+
+        process = MagicMock()
+        process.__enter__.return_value = process
+        process.__exit__.return_value = False
+        process.poll.return_value = 0
+        selector = MagicMock()
+        selector.select.return_value = [(None, None)]
+        with (
+            patch("core.diagnostics.collector.subprocess.Popen", return_value=process),
+            patch("core.diagnostics.collector.selectors.DefaultSelector", return_value=selector),
+            patch("core.diagnostics.collector.os.read", side_effect=[b"one\n", b"two\n", b""]),
+            self.assertRaises(TimeoutError),
+        ):
+            list(bounded_lines(["fixture"], time.monotonic() + 2, [4]))
+
+    def test_normal_discovery_never_requires_the_optional_diagnostic_database(self):
+        from django.conf import settings
+        from django.test.runner import DiscoverRunner
+
+        if settings.SETTINGS_MODULE == "core.diagnostics.postgres_test_settings":
+            self.skipTest("Dedicated diagnostic database explicitly enabled")
+        runner = DiscoverRunner(verbosity=0)
+        suite = runner.build_suite(["core.diagnostics.test_postgres"])
+        self.assertNotIn("diagnostics", runner.get_databases(suite))
+
+    def test_interrupted_publish_replays_without_duplicate_persisted_events(self):
+        when = timezone.now().isoformat()
+
+        def output(command, deadline, budget):
+            return iter(["a" * 64] if "ps" in command else [when + " ValueError: withheld"])
+
+        def interrupt(path, value):
+            if path.name == ".positions.json":
+                raise OSError("simulated interruption")
+            return atomic_json(path, value)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch("core.diagnostics.collector.bounded_lines", side_effect=output):
+                with patch("core.diagnostics.collector.atomic_json", side_effect=interrupt), self.assertRaises(OSError):
+                    collect(root, root, b"test-key-" * 8)
+                collect(root, root, b"test-key-" * 8)
+            rows = [
+                event for segment in (root / "segments").glob("*.json") for event in json.loads(segment.read_text())
+            ]
+            self.assertEqual(len(rows), 10)
+            self.assertEqual(len({row["id"] for row in rows}), 10)
+
     def test_collector_marks_failures_and_preserves_checkpoint(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -340,6 +391,21 @@ class DiagnosticAPITests(TestCase):
         self.key.save()
         response = self.client.get("/api/v1/diagnostics/sources/")
         self.assertFalse(response.data["stale"])
+
+    def test_source_gap_history_stays_within_the_response_budget(self):
+        self.key.scopes.append(DIAGNOSTICS_GLOBAL_READ)
+        self.key.save()
+        path = self.root / "latest.json"
+        current = json.loads(path.read_text())
+        current["gaps"] = [
+            {"time": self.now.isoformat(), "source": "celery-worker", "reason": "source_changed_or_incomplete"}
+        ] * 10000
+        atomic_json(path, current)
+        response = self.client.get("/api/v1/diagnostics/sources/")
+        self.assertEqual(response.status_code, 200)
+        self.assertLessEqual(len(response.data["gaps"]), 100)
+        self.assertEqual(response.data["gap_count"], 10000)
+        self.assertTrue(response.data["gaps_limited"])
 
     def test_validation_disabled_state_rate_and_database_fail_closed(self):
         self.assertEqual(self.search(limit=201).status_code, 400)

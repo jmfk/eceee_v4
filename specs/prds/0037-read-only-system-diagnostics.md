@@ -45,3 +45,9 @@ Focused tests demonstrate explicit authorization, single/multi-tenant and global
 - OpenAPI generation/validation with `spectacular --validate --fail-on-warn`, skill validation, specs governance, Python syntax, compose/unit static checks and whitespace validation passed.
 - Full backend/frontend suites and external CI were not run: verification was focused on the new diagnostic boundary. Live Linux timer/production acceptance remain rollout work requiring the repository's owner gates. No production connections, deployments or real credential provisioning occurred.
 - Files: `backend/core/diagnostics/`, diagnostic management commands, minimal auth/middleware/settings/routes/role integration, host collector units/mount, protected helper/skill, and `docs/diagnostics.md`. Existing unrelated working-tree edits were preserved; the diagnostic batch is isolated on a branch based on the workspace-messaging PR.
+
+## Review fixes
+
+- 2026-10-23: Fixed four verified P2 findings: ordinary Django discovery declaring an absent optional DB alias, successful child exits hiding input truncation, duplicate segments after interrupted publication, and oversized source-gap metadata. Added focused reproductions for all four.
+- The full backend Django suite passed locally: 1,639 tests, 18 skipped. The dedicated diagnostic PostgreSQL suite passed six tests and the helper suite passed five. Changed Python lint, OpenAPI validation and specs governance passed. The first broad attempt used an older image missing ffmpeg; verification succeeded on the current backend-editor image.
+- The collector now journals sanitized publication data before writing segments/checkpoints and replays pending publication idempotently. No production access, data migration or deployment was performed.
