@@ -2,8 +2,9 @@ import { subscribeToCurrentTenantId } from './tenant'
 // Keep only bounded errors, never console arguments, form values, headers or storage.
 const errors = []
 export const redactDiagnostic = (value) => String(value || '').slice(0, 1000)
+    .replace(/bearer\s+\S+/gi, '[redacted]')
     .replace(/https?:\/\/\S+/gi, '[URL]')
-    .replace(/(bearer\s+|(?:password|secret|token|api[_-]?key|authorization|cookie)\s*[:=]\s*)\S+/gi, '[redacted]')
+    .replace(/[\w-]*(?:password|secret|token|api[_-]?key|authorization|cookie)[\w-]*["']?\s*[:=]\s*(?:"(?:\\[\s\S]?|[^"\\])*(?:"|$)|'(?:\\[\s\S]?|[^'\\])*(?:'|$)|[^\s,;}]+)/gi, '[redacted]')
     .replace(/\beyJ[\w-]+\.[\w-]+\.[\w-]+\b/g, '[redacted]')
     .replace(/\bsk-[\w-]+\b/g, '[redacted]')
 const record = (name, message) => {

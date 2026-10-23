@@ -1,9 +1,9 @@
 """Resolve recipient choices in the current tenant; persist the resolved snapshot."""
 
-from django.contrib.auth.models import Group
-from django.db.models import Q
 from rest_framework.exceptions import ValidationError
+
 from kanban.models import Board
+
 from .access import members, support_users
 
 
@@ -11,16 +11,13 @@ def directory(tenant, actor=None):
     users = members(tenant)
     options = [{"id": "support", "name": "Support", "kind": "support"}] if support_users(tenant) else []
     options += [{"id": f"user:{u.pk}", "name": u.get_full_name() or u.username, "kind": "user"} for u in users]
-    options += [
-        {"id": f"group:{g.pk}", "name": g.name, "kind": "group"}
-        for g in Group.objects.filter(user__in=users).distinct()
-    ]
     from core.models import TenantRole
 
     options += [
         {"id": f"role:{r.pk}", "name": r.name, "kind": "group"} for r in TenantRole.objects.filter(tenant=tenant)
     ]
     from core.roles import permissions_for
+
     permissions = permissions_for(actor, tenant) if actor else {"tenant.admin"}
     if not {"kanban.read", "kanban.write", "tenant.admin"} & permissions:
         return options
@@ -46,8 +43,6 @@ def resolve(tenant, specs, actor=None):
         kind, value = spec.split(":", 1)
         if kind == "user":
             users.add(int(value))
-        elif kind == "group":
-            users.update(members(tenant).filter(groups__pk=value).values_list("pk", flat=True))
         elif kind == "role":
             users.update(
                 members(tenant).filter(cms_roles__tenant=tenant, cms_roles__pk=value).values_list("pk", flat=True)

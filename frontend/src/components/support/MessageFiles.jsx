@@ -19,7 +19,7 @@ export async function uploadMessageFiles(tenant, files, cache) {
     return ids
 }
 
-export function MessageFilePicker({ files, setFiles, disabled = false }) {
+export function MessageFilePicker({ files, setFiles, disabled = false, onCheckingChange }) {
     const tenant = useSupportTenant()
     const identity = useSupportIdentity()
     const [error, setError] = useState('')
@@ -35,23 +35,23 @@ export function MessageFilePicker({ files, setFiles, disabled = false }) {
         const selected = [...event.target.files]
         event.target.value = ''
         const version = ++sequence.current
-        setError(''); setChecking(true)
+        setError(''); setChecking(true); onCheckingChange?.(true)
         try {
             if (files.length + selected.length > 10) throw new Error('Högst tio bilagor per meddelande.')
             for (const file of selected) {
                 if (file.size > 25 * 1024 * 1024) throw new Error('Varje bilaga får vara högst 25 MB.')
                 if (file.type.startsWith('video/')) await validateBugVideo(file, 25 * 1024 * 1024)
             }
-            if (version === sequence.current) setFiles([...files, ...selected])
+            if (version === sequence.current) setFiles((previous) => [...previous, ...selected])
         } catch (err) { setError(err.message) }
-        finally { if (version === sequence.current) setChecking(false) }
+        finally { if (version === sequence.current) { setChecking(false); onCheckingChange?.(false) } }
     }
     return <section aria-label="Meddelandebilagor" className="message-files">
         <label>Filer, bilder eller video
             <input type="file" multiple disabled={disabled || checking} onChange={select} />
         </label>
         <p className="support-muted">Högst 25 MB per fil. Video: MP4 eller WebM, högst 5 sekunder. Videons längd kontrolleras även på servern.</p>
-        {files.map((file, index) => <div key={index} className="flex items-center gap-2 my-2"><span>{file.name}</span><button type="button" disabled={disabled} onClick={() => setFiles(files.filter((_, i) => i !== index))}>Ta bort {file.name}</button></div>)}
+        {files.map((file, index) => <div key={index} className="flex items-center gap-2 my-2"><span>{file.name}</span><button type="button" disabled={disabled || checking} onClick={() => setFiles(files.filter((_, i) => i !== index))}>Ta bort {file.name}</button></div>)}
         {checking && <p role="status">Kontrollerar bilagorna…</p>}
         {error && <p role="alert" className="support-error">{error}</p>}
         <button type="button" aria-expanded={showHelp} onClick={() => setShowHelp(!showHelp)}>Så spelar du in en femsekunders buggrapport</button>

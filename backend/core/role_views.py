@@ -1,12 +1,13 @@
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.exceptions import PermissionDenied, ValidationError
-from .models import TenantRole, Tenant, MachineAPIKey
-from .roles import permissions_for, can_manage_roles, ROLE_PERMISSIONS
+
+from .models import MachineAPIKey, Tenant, TenantRole
+from .roles import ROLE_PERMISSIONS, can_manage_roles, permissions_for
 
 
 class RoleInput(serializers.Serializer):
@@ -60,8 +61,9 @@ class RolesView(APIView):
         pk = data.pop("id", None)
         if TenantRole.objects.filter(tenant=request.tenant, name=data["name"]).exclude(pk=pk).exists():
             raise ValidationError({"name": "Det finns redan en roll med det namnet."})
-        from tenant_support.access import support_users, has_role
+        from tenant_support.access import has_role, support_users
         from tenant_support.services import sync_support_inbox
+
         previous_support = {user.pk for user in support_users(request.tenant)}
         role = get_object_or_404(TenantRole, tenant=request.tenant, pk=pk) if pk else TenantRole(tenant=request.tenant)
         for name, value in data.items():

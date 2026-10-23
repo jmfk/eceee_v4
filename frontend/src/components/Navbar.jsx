@@ -1,3 +1,4 @@
+import { canAccessCmsPath } from '../utils/cmsNavigation'
 import { useSupportContext } from './support/useSupportContext'
 import { safeReportLocation } from '../api/support'
 import { Link, useLocation } from 'react-router-dom'
@@ -23,11 +24,7 @@ const Navbar = () => {
   const support = useSupportContext()
   const inboxCount = support.data?.unreadCount || 0
   const { logout, user } = useAuth()
-  const visibleNavigation = navigation.filter((item) => {
-    if (!Array.isArray(user?.permissions) || user.permissions.includes('tenant.admin') || user.isSuperuser) return true
-    const needed = { Pages: 'page.read', Objects: 'object.read', Media: 'media.read', Classification: 'content.read', Designer: 'theme.read' }[item.name]
-    return !needed || user.permissions.includes(needed)
-  })
+  const visibleNavigation = navigation.filter((item) => canAccessCmsPath(user, item.href))
   const navRef = useRef(null)
   const navContainerRef = useRef(null)
   const desktopNavRef = useRef(null)

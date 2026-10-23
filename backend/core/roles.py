@@ -1,8 +1,9 @@
 """One capability boundary for interactive CMS accounts; machine scopes stay independent."""
 
 from rest_framework.permissions import SAFE_METHODS
+
+from .machine_api_keys import ALLOWED_SCOPES, SERVER_FULL_ACCESS, _required_scope
 from .models import TenantRole
-from .machine_api_keys import ALLOWED_SCOPES, _required_scope, SERVER_FULL_ACCESS
 
 EXTRA_PERMISSIONS = {
     "roles.manage",
@@ -22,13 +23,7 @@ DEFAULT_PERMISSIONS = {p for p in ROLE_PERMISSIONS if p.endswith(".read") and no
 
 
 def permissions_for(user, tenant):
-    if (
-        not user
-        or not user.is_authenticated
-        or not user.is_active
-        or not tenant
-        or not tenant.is_active
-    ):
+    if not user or not user.is_authenticated or not user.is_active or not tenant or not tenant.is_active:
         return set()
     if not tenant.user_has_access(user):
         assignments = getattr(tenant, "theme_designer_assignments", None)
@@ -79,7 +74,8 @@ def allows_request(request):
     if path.startswith("/api/v1/utils/roles/"):
         return bool(permissions) if request.method in SAFE_METHODS else "roles.manage" in permissions
     if path.startswith("/api/v1/support/"):
-        return bool(permissions)  # Participant and support/publisher checks are enforced by support views.
+        return bool(tenant and user.is_active and tenant.is_active and tenant.user_has_access(user))
+        # Support views enforce participant access and combine direct and CMS support grants.
     if path.startswith("/api/v1/utils/users/"):
         return False  # Global account administration remains a system-owner operation.
     # Human-facing helper routes are broader than the machine API contract.
@@ -104,5 +100,9 @@ def allows_request(request):
             return (read if request.method in SAFE_METHODS else write) in permissions
     if path.startswith("/api/v1/utils/clipboard/"):
         return bool(permissions)  # The existing view scopes clipboard entries to their owner.
+    if path.startswith("/api/v1/media/") and tenant and not tenant.user_has_access(user):
+        # Media also serves public resources and conceals private namespaces with 404.
+        # Its existing namespace/object checks govern users outside this workspace.
+        return True
     needed = _required_scope(request)
     return needed in permissions

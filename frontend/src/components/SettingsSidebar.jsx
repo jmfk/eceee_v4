@@ -1,3 +1,4 @@
+import { canAccessCmsPath } from '../utils/cmsNavigation'
 import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -40,6 +41,7 @@ export default function SettingsSidebar() {
 
     const { data: themes = [] } = useQuery({
         queryKey: ['themes'],
+        enabled: canAccessCmsPath(user, '/settings/themes'),
         queryFn: async () => {
             try {
                 const response = await themesApi.list()
@@ -171,6 +173,12 @@ export default function SettingsSidebar() {
         }
     ]
 
+    const visibleNavigation = navigation.flatMap((item) => {
+        if (item.href) return canAccessCmsPath(user, item.href) ? [item] : []
+        const items = item.items.filter((child) => canAccessCmsPath(user, child.href))
+        return items.length ? [{ ...item, items }] : []
+    })
+
     return (
         <aside className={`${isCollapsed ? 'w-14' : 'w-64'} h-full shrink-0 border-r border-gray-200 bg-white transition-[width] duration-200 ease-out flex flex-col`}>
             <div className={`flex h-16 shrink-0 items-center ${isCollapsed ? 'justify-center px-2' : 'justify-between px-4'}`}>
@@ -188,7 +196,7 @@ export default function SettingsSidebar() {
                 </button>
             </div>
             {!isCollapsed && <nav id="settings-navigation" aria-label="Settings" className="flex-1 overflow-y-auto px-2 pb-6 space-y-1">
-                    {navigation.map(section => (
+                    {visibleNavigation.map(section => (
                         <NavItem key={section.id} item={section} />
                     ))}
                 </nav>}

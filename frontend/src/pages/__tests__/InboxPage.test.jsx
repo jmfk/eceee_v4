@@ -3,7 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import InboxPage from '../InboxPage'
-import { supportRequest } from '../../api/support'
+import { supportRequest, validateBugVideo } from '../../api/support'
 
 vi.unmock('react-router-dom')
 
@@ -19,6 +19,7 @@ vi.mock('../../contexts/AuthContext', () => ({
 vi.mock('../../api/support', async (importOriginal) => ({
     ...(await importOriginal()),
     supportRequest: vi.fn(),
+    validateBugVideo: vi.fn(),
 }))
 
 const context = {
@@ -284,4 +285,18 @@ describe('tenant inbox journey', () => {
             'Min text finns kvar.',
         )
     })
+    it('waits for video validation before sending a message', async () => {
+        let finishValidation
+        validateBugVideo.mockImplementation(() => new Promise((resolve) => { finishValidation = resolve }))
+        renderInbox('/inbox/new?tenant=a')
+        await screen.findByRole('heading', { name: 'Nytt meddelande' })
+        fireEvent.change(screen.getByLabelText('Titel'), { target: { value: 'Video report' } })
+        fireEvent.change(screen.getByLabelText('Beskrivning'), { target: { value: 'See attached video' } })
+        fireEvent.change(screen.getByLabelText('Filer, bilder eller video'), { target: { files: [new File(['clip'], 'clip.mp4', { type: 'video/mp4' })] } })
+        expect(screen.getByRole('button', { name: 'Skicka meddelande' })).toBeDisabled()
+        await act(async () => finishValidation())
+        expect(screen.getByRole('button', { name: 'Skicka meddelande' })).toBeEnabled()
+        expect(screen.getByRole('button', { name: 'Ta bort clip.mp4' })).toBeInTheDocument()
+    })
+
 })
