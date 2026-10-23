@@ -36,6 +36,7 @@ services:
       PLAYWRIGHT_SERVICE_URL: ${PLAYWRIGHT_SERVICE_URL:-http://playwright:5000}
     volumes:
       - backend_static:/app/staticfiles
+      - /var/lib/eceee-diagnostics:/var/lib/eceee-diagnostics:ro
     depends_on:
       db:
         condition: service_healthy

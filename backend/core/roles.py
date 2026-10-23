@@ -2,7 +2,7 @@
 
 from rest_framework.permissions import SAFE_METHODS
 
-from .machine_api_keys import ALLOWED_SCOPES, SERVER_FULL_ACCESS, _required_scope
+from .machine_api_keys import ALLOWED_SCOPES, DIAGNOSTICS_SCOPES, SERVER_FULL_ACCESS, _required_scope
 from .models import TenantRole
 
 EXTRA_PERMISSIONS = {
@@ -16,7 +16,7 @@ EXTRA_PERMISSIONS = {
     "statistics.read",
     "ai.use",
 }
-ROLE_PERMISSIONS = sorted((set(ALLOWED_SCOPES) - {SERVER_FULL_ACCESS}) | EXTRA_PERMISSIONS)
+ROLE_PERMISSIONS = sorted((set(ALLOWED_SCOPES) - {SERVER_FULL_ACCESS} - DIAGNOSTICS_SCOPES) | EXTRA_PERMISSIONS)
 DEFAULT_PERMISSIONS = {p for p in ROLE_PERMISSIONS if p.endswith(".read") and not p.startswith("support.")} | {
     "kanban.write"
 }

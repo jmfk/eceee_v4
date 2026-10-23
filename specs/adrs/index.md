@@ -49,6 +49,7 @@
 | ADR-0030 | [Tenant BYOK through capability-aware provider adapters](active/0030-tenant-byok-provider-adapters.md) | accepted | PRD-0022, PRD-0023, PRD-0024 |
 | ADR-0031 | [Human-controlled publication and recoverable mutations](active/0031-human-controlled-publication.md) | accepted | PRD-0022, PRD-0023, PRD-0024 |
 | ADR-0032 | [Eval-first prompt optimization](active/0032-eval-first-prompt-optimization.md) | accepted | PRD-0022, PRD-0023, PRD-0024 |
+| ADR-0052 | [Explicit read-only system diagnostics](active/0052-read-only-system-diagnostics.md) | accepted | PRD-0037 |
 
 ## Archived Decisions
 
