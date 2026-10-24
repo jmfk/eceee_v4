@@ -26,3 +26,5 @@ Administrators use **Types** to configure names and allowed content types, and *
 If existing tags appear with a setup notice, a workspace owner must complete the migration before they can be edited in this view.
 
 The new register is being introduced alongside the older tag fields. Complete the verified migration before switching the site's existing tag readers to the shared register.
+
+To import an approved Kanban attachment into Media Manager, open its card and select **Importera till media** beside the attachment. Choose the destination namespace and approved tags, then **Importera kopia**. The source file stays attached to its card.

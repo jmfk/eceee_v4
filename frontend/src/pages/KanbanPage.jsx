@@ -1,3 +1,4 @@
+import KanbanMediaImport from '../components/kanban/KanbanMediaImport'
 import Avatar from '../components/Avatar'
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -125,9 +126,7 @@ function Attachments({ card, workspace, run }) {
                             </p>
                         ))}
                         {file.approvedAt && (
-                            <p className="kb-muted">
-                                Importera via Media Library eller Designer → Importera från Kanban.
-                            </p>
+                            <KanbanMediaImport key={`${card.id}:${file.id}`} file={file} revision={card.revision} />
                         )}
                         {file.contentType.startsWith('image/') && (
                             <button
