@@ -78,7 +78,7 @@ endef
 .PHONY: howto-video-demo howto-video-demo-both howto-video-demo-all howto-video-demo-all-both
 .PHONY: howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both
 .PHONY: docker-up docker-down restart clean infra-up infra-down infra-restart
-.PHONY: configure-local-infra local-dev-check shared-infra-check use-external-infra
+.PHONY: configure-local-infra configure-support local-dev-check shared-infra-check use-external-infra
 .PHONY: check-servers check-conf check-db clear-layout-cache clear-layout-cache-all
 .PHONY: tailwind-build tailwind-watch sync-from sync-to
 .PHONY: prod-preflight prod-deploy prod-restart prod-env prod-rollback prod-backup
@@ -208,6 +208,8 @@ help: ## Show this help message (use: make help-TARGET for one target)
 		echo "  clean             Clean Python, Node, and Docker artifacts"; \
 		echo ""; \
 		echo "Production Deployment:"; \
+		echo "  prod-configure-support  Plan support settings (APPLY=yes, optional ACTIVATE=yes)"; \
+		echo "  prod-support-recipient  Plan support-only login creation (SUPPORT_RECIPIENT=email)"; \
 		echo "  prod-deploy       Check and deploy latest main, or a specific TAG/ref/hash"; \
 		echo "  prod-rollback     Rollback to previous deployment"; \
 		echo "  prod-backup       Run ad-hoc production DB backup"; \
@@ -230,6 +232,7 @@ help: ## Show this help message (use: make help-TARGET for one target)
 		echo "  check-servers          Check if backend and frontend servers are up"; \
 		echo "  check-conf             Check database and server configuration"; \
 		echo "  configure-local-infra  Configure .env for shared OrbStack services"; \
+		echo "  configure-support      Configure/reload local support with email disabled"; \
 		echo "  shared-infra-check     Validate OrbStack and ECEEE service isolation"; \
 		echo ""; \
 		echo "Usage:"; \
@@ -656,6 +659,11 @@ clean:
 # Environment & Health Checks
 configure-local-infra: ## Configure ignored .env for the shared OrbStack services.
 	python3 scripts/configure_orbstack.py
+
+configure-support: configure-local-infra ## Configure local support, rebuild/reload backend and worker, and verify private storage.
+	$(COMPOSE_DEV) build backend
+	$(COMPOSE_DEV) up -d --no-deps --force-recreate --wait --wait-timeout 120 backend celery-worker
+	$(COMPOSE_DEV) exec -T backend python manage.py provision_support_storage
 
 shared-infra-check: ## Validate OrbStack, shared endpoints, and ECEEE's local configuration.
 	python3 scripts/configure_orbstack.py --check-only

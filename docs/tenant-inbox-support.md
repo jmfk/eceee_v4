@@ -39,6 +39,32 @@ The storage adapter uses the existing AWS endpoint/region settings. Production u
 - Celery worker and Beat process `tenant_support.tasks.deliver_pending` on the default queue every minute. Enable sending only after testing the existing Django email backend, sender identity and a controlled recipient. No real email has been sent by automated tests.
 - The normal database backup includes the support tables. **The database backup script does not back up S3 objects.** Configure private-bucket object backup/versioning/retention separately and perform a coordinated database/object restore drill before production activation. Preserve object keys when recovering metadata. The API offers no permanent deletion/reset. Do not run destructive rollback/restore without its separate gate.
 
+## Setup commands
+
+From the repository root, `make configure-support` configures local support with the checkout's registered frontend URL and email disabled. It uses the existing shared MinIO admission workflow, builds the backend image, reloads only the local backend and worker, and verifies the private bucket inside Docker. It does not require a host Django installation or touch production.
+
+`make prod-configure-support` prints a production plan without connecting over SSH. It requires `app.eceee.org`, `admin.eceee.org` and `imgproxy.eceee.org` to resolve to the same public IPv4 address. After the fresh production owner gate, run:
+
+```sh
+SUPPORT_EXPECTED_HOST=<reported-ip> make prod-configure-support APPLY=yes
+```
+
+This stages the canonical private bucket `w8c4m2-prod-support`, `SUPPORT_APP_URL=https://app.eceee.org` and `SUPPORT_EMAIL_ENABLED=False`. Both existing `deploy/.env` files must be protected (mode 0600); the local file must be Git-ignored. The server must already have a dedicated `SUPPORT_STORAGE_ACCESS_KEY_ID`/`SUPPORT_STORAGE_SECRET_ACCESS_KEY` pair with the intended bucket access, different from its media/imgproxy identity. The helper does not create/rotate keys or broaden permissions. It verifies support-storage compatibility before creating/verifying the bucket, saves a protected remote environment recovery copy, then updates only the three public settings remotely and locally. Credentials stay in their existing protected files and enter verification processes only through stdin.
+
+Add `ACTIVATE=yes` to perform a separately gated configuration reload of backend, worker and scheduler using exactly their current image IDs. `make prod-activate-support APPLY=yes` runs that reload separately. It checks for pending migrations and refuses a schema upgrade; it builds/pulls no images, restarts no frontend services and never enables email. An application/schema upgrade still requires the ordinary tagged `make prod-deploy` workflow and its deployment gate. Activation supports the established `/srv/eceee_v4` checkout and canonical bucket. A failure never triggers automatic rollback, restoration or deletion; stop and obtain the required diagnostic/recovery gate. Private object backup and coordinated restore readiness remain separate prerequisites.
+
+### Dedicated support recipient
+
+`make prod-support-recipient SUPPORT_RECIPIENT=user@example.invalid` prints an account-creation plan. After a fresh gate naming the account, workspace permission scope and host:
+
+```sh
+SUPPORT_EXPECTED_HOST=<reported-ip> make prod-support-recipient SUPPORT_RECIPIENT=user@example.invalid APPLY=yes
+```
+
+The deployed release must already contain the workspace role controls and their schema. The helper fails closed before account creation if they are absent. It creates a non-staff, non-superuser login in the sole active workspace and assigns only `support.read`, without implicit CMS editing permissions. It synchronizes existing support inbox entries without historical email, preserves normal email verification, and refuses to reset another account's password or reuse unrelated role assignments. Account/membership/role changes are transactional. A protected bootstrap credential file may remain after a failed attempt; its presence does not prove an account exists.
+
+Bootstrap credentials are stored in mode-0600 `deploy/.env.support-account` on the server and synchronized to the same ignored local path over SSH. Never print, screenshot or preview that file through agent tools. The account owner completes their normal sign-in and email-verification flow. This command sends no email, changes no service state and does not enable notification delivery.
+
 ## Mail recovery and operator visibility
 
 Inbox events and email jobs commit together, with a unique recipient/event key. Workers claim jobs under row locks before external IO. Failures before provider submission retry with exponential minute backoff, at most five attempts. A missing recipient email is an explicit failed job. Jobs are skipped when the recipient loses access. A missing application URL leaves the job pending with a visible configuration error.

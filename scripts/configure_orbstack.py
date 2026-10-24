@@ -402,6 +402,8 @@ def main() -> int:
         "AWS_STORAGE_BUCKET_NAME": media_bucket,
         "AWS_CHECKPOINT_STORAGE_BUCKET_NAME": checkpoint_bucket,
         "SUPPORT_STORAGE_BUCKET_NAME": support_bucket,
+        "SUPPORT_APP_URL": f"http://localhost:{frontend_port}",
+        "SUPPORT_EMAIL_ENABLED": "False",
         "AWS_S3_ENDPOINT_URL": "http://localhost:10302",
         "AWS_S3_INTERNAL_ENDPOINT_URL": "http://host.docker.internal:10302",
         "IMGPROXY_KEY": present.get("IMGPROXY_KEY") or secrets.token_hex(32),
