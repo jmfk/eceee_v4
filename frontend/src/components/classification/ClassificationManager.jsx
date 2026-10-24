@@ -202,7 +202,7 @@ export default function ClassificationManager({ namespace } = {}) {
         {error && <p role="alert" className="text-red-700">{error}</p>}
         {view === 'types' && <>
             {definition && !permissions.includes('administer') ? <p>Type administration requires administrator rights.</p> :
-                <ClassificationTypeForm key={typeId || 'new'} definition={definition} tenant={tenant} busy={busy}
+                <ClassificationTypeForm key={typeId || 'new'} definition={definition} tenant={tenant} namespaceScope={namespace} busy={busy}
                     onSave={values => run(async () => {
                         if (definition) await taxonomyApi.configure(definition, values)
                         else await taxonomyApi.createType(values)
