@@ -1,4 +1,4 @@
 interface:
   display_name: "ECEEE v4 Design"
-  short_description: "Match the established ECEEE CMS application UI"
-  default_prompt: "Use $eceee-v4-design to match this view to the existing ECEEE v4 application."
+  short_description: "Compact ECEEE CMS UI with floating labels"
+  default_prompt: "Use $eceee-v4-design to follow the approved compact ECEEE CMS style: floating labels, slim controls, small corners, search filter pills and connected tabs."

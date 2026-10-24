@@ -4,7 +4,7 @@
  * Main media management interface with tabs for:
  * - Media Library (approved files) - uses MediaBrowser
  * - Collections - uses MediaCollectionManager
- * - Tags - uses MediaTagManager
+ * - Tags - uses the shared classification manager
  * - Pending Files (awaiting approval) - uses PendingMediaManager
  * 
  * Provides unified navigation and pending file count notifications.
@@ -21,7 +21,8 @@ import {
 import MediaBrowser from './MediaBrowser';
 import PendingMediaManager from './PendingMediaManager';
 import MediaCollectionManager from './MediaCollectionManager';
-import MediaTagManager from './MediaTagManager';
+import ClassificationManager from '../classification/ClassificationManager';
+import '../user-tools.css';
 import { mediaApi } from '../../api';
 
 const MediaManager = ({
@@ -182,14 +183,9 @@ const MediaManager = ({
                 )}
 
                 {activeTab === 'tags' && (
-                    <MediaTagManager
-                        namespace={namespace}
-                        onTagSelect={(tag) => {
-                            // When a tag is selected, switch to library view
-                            // Note: This would require MediaBrowser to support tag filtering
-                            // For now, just keep the user on the tags view
-                        }}
-                    />
+                    <div className="p-6">
+                        <ClassificationManager key={namespace} namespace={namespace} />
+                    </div>
                 )}
 
                 {activeTab === 'pending' && (

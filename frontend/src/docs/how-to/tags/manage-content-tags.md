@@ -1,19 +1,19 @@
 ---
 id: tags-manage
-title: Manage classifications
-summary: Maintain shared classification types, terms and proposals.
+title: Manage tags
+summary: Maintain shared tag types, tags and proposals.
 order: 1
 sectionId: tags
-sectionTitle: Classification
+sectionTitle: Tags
 sectionSummary: Organize pages, objects and media with a shared vocabulary.
 sectionOrder: 5
 ---
 
-# Manage classifications
+# Manage tags
 
-Open **Classification** in the main navigation. Choose a type, then search or select a term in its hierarchy.
+Open **Tags** in the main navigation to search all tags. The default list shows all types, ordered by name, with 50 tags per page. Choose a tag to edit it, or use the add-filter icon in the search field to filter by type. Selected filters appear as removable pills. The **Tags** tab in Media Manager uses the same register, scoped to the selected media namespace.
 
-Select **New term** to enter a name, description and alternative names. Depending on your rights, **Apply change** saves directly or **Submit proposal** sends the change for approval. Members can use terms and submit proposals; only explicitly authorized users can change the structure.
+Select **New tag** to enter a name, description and alternative names. Depending on your rights, **Apply change** saves directly or **Submit proposal** sends the change for approval. Members can use terms and submit proposals; only explicitly authorized users can change the structure.
 
 For a selected term, choose **Edit**, **Move**, **Merge** or **Archive**. Move keeps the subtree together. Merge keeps the old identity and directs existing assignments to the target. Archive preserves existing assignments and prevents new ones. Move or archive active children before archiving their parent. Archived terms can be reactivated by a user with restore permission.
 
@@ -23,4 +23,8 @@ Successful structure changes offer **Undo**. If later changes prevent restoratio
 
 Administrators use **Types** to configure names and allowed content types, and **Rights** to assign named users a role template or specific permissions. Classification permissions do not grant access to edit the content itself.
 
+If existing tags appear with a setup notice, a workspace owner must complete the migration before they can be edited in this view.
+
 The new register is being introduced alongside the older tag fields. Complete the verified migration before switching the site's existing tag readers to the shared register.
+
+To import an approved Kanban attachment into Media Manager, open its card and select **Importera till media** beside the attachment. Choose the destination namespace and approved tags, then **Importera kopia**. The source file stays attached to its card.

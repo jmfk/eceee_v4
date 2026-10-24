@@ -7,9 +7,6 @@ import MediaManagerPage from '../../pages/MediaManagerPage'
 import { GlobalNotificationProvider } from '../../contexts/GlobalNotificationContext'
 import { namespacesApi } from '../../api'
 
-// The embedded import panel requires the same authenticated principal as the app.
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 1 } }) }))
-
 vi.mock('../../api', () => ({
     namespacesApi: {
         list: vi.fn(),

@@ -1,0 +1,51 @@
+.classification-manager .cms-compact-select {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    gap: .75rem;
+    min-height: 1.875rem;
+    margin: 0;
+    padding: .375rem .625rem .25rem;
+    border: 1px solid #d1d5db;
+    border-radius: 3px;
+    background: white;
+    color: #111827;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1rem;
+    text-align: left;
+}
+.classification-manager .cms-compact-select > svg { flex-shrink: 0; color: #6b7280; }
+.classification-manager .cms-compact-select:is(:focus-visible, [aria-expanded='true']) {
+    border-color: #2563eb;
+    outline: none;
+    box-shadow: none;
+}
+.cms-compact-select-options {
+    z-index: 100;
+    width: var(--button-width);
+    max-height: min(240px, var(--available-height, 240px));
+    overflow-y: auto;
+    padding: 3px;
+    border: 1px solid #d1d5db;
+    border-radius: 3px;
+    background: white;
+    color: #374151;
+    box-shadow: 0 3px 8px rgb(0 0 0 / .08);
+    font: 12px/1.4 Inter, sans-serif;
+    outline: none;
+}
+.cms-compact-select-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    min-height: 28px;
+    padding: 4px 8px;
+    border-radius: 2px;
+    cursor: pointer;
+}
+.cms-compact-select-option[data-focus] { background: #eff6ff; color: #1d4ed8; }
+.cms-compact-select-option[data-selected] { color: #1d4ed8; }
+.cms-compact-select-option[data-disabled] { opacity: .5; cursor: default; }
+.cms-compact-select-error { display: block; margin-top: 4px; color: #b91c1c; font-size: 12px; }

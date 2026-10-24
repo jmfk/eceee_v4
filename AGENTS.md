@@ -26,6 +26,8 @@ The system centers on page management, publishing workflows, code-based layouts/
 
 Use the repository's [eceee-v4-design skill](.agents/skills/eceee-v4-design/SKILL.md) when creating, changing or reviewing ECEEE application UI. Its established ECEEE visual contract takes precedence over generic design skills, including recommendations against cards, borders or the existing blue action styling. This applies to CMS application chrome and tools, not tenant website themes or public rendering.
 
+Use the approved compact Tags style for new and revised CMS tools: 12px control text, slim fields, small corners, filters added by an icon and displayed as removable pills inside search, and tabs connected to a baseline. Field labels sit in the placeholder position when empty and unfocused, then animate into the border on focus or when filled; respect Reduce Motion and keep labels clear of values. Preserve comfortable text/chevron/icon insets and panel padding, and avoid repeated labels or metadata. Follow the repository design skill for the concrete patterns and accessibility requirements.
+
 ## Core Conventions
 
 - Prefer existing project patterns over new abstractions.
