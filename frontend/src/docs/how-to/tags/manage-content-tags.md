@@ -11,7 +11,7 @@ sectionOrder: 5
 
 # Manage tags
 
-Open **Tags** in the main navigation. Choose a type, then search or select a term in its hierarchy.
+Open **Tags** in the main navigation to search all tags. The default list shows all types, ordered by name, with 50 tags per page. Choose a tag to edit it, or use the add-filter icon in the search field to filter by type. Selected filters appear as removable pills. The **Tags** tab in Media Manager uses the same register, scoped to the selected media namespace.
 
 Select **New tag** to enter a name, description and alternative names. Depending on your rights, **Apply change** saves directly or **Submit proposal** sends the change for approval. Members can use terms and submit proposals; only explicitly authorized users can change the structure.
 
