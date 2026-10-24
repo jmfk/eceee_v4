@@ -14,6 +14,17 @@ THEME_WORKSPACE ?=
 THEME_ADMIN ?=
 export RUN_ID CANARY_SIZE THEME_WORKSPACE THEME_ADMIN
 
+.PHONY: prod-configure-support prod-activate-support prod-support-recipient
+prod-configure-support: ## Plan support setup; APPLY=yes stages settings, ACTIVATE=yes reloads existing images.
+	python3 deploy/scripts/configure-support.py $(if $(filter yes,$(APPLY)),--apply) --directory "$(PROD_DIR)"
+	$(if $(filter yes,$(ACTIVATE)),python3 deploy/scripts/activate-support.py $(if $(filter yes,$(APPLY)),--apply),@true)
+
+prod-activate-support: ## Plan a support reload using existing images; APPLY=yes reloads backend/worker/scheduler only.
+	python3 deploy/scripts/activate-support.py $(if $(filter yes,$(APPLY)),--apply)
+
+prod-support-recipient: ## Plan support-only login creation; SUPPORT_RECIPIENT=email and APPLY=yes after owner gate.
+	python3 deploy/scripts/provision-support-recipient.py --email "$(SUPPORT_RECIPIENT)" $(if $(filter yes,$(APPLY)),--apply)
+
 prod-preflight: ## Run checks required before production deploy (use: make prod-preflight [TAG=v0.x.x|hash])
 	bash deploy/scripts/preflight.sh "$(TAG)"
 
