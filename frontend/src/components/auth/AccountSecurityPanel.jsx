@@ -5,7 +5,7 @@ import { FactorForm, authInputClass, authButtonClass, secondaryAuthButtonClass }
 
 function RecentAuthentication({ mfa, types, onVerified }) {
     const [password, setPassword] = useState('')
-    const [error, setError] = useState(() => new URLSearchParams(window.location.search).has('providerError') ? 'Could not connect this sign-in account. Verify your identity again and use an account that is not already connected to another user.' : '')
+    const [error, setError] = useState('')
     const [busy, setBusy] = useState(false)
     const finish = async result => {
         if (result.status === 200) await onVerified()
@@ -29,7 +29,7 @@ function RecentAuthentication({ mfa, types, onVerified }) {
 
 export default function AccountSecurityPanel() {
     const [state, setState] = useState(null)
-    const [error, setError] = useState('')
+    const [error, setError] = useState(() => new URLSearchParams(window.location.search).has('providerError') ? 'Could not connect this sign-in account. Verify your identity again and use an account that is not already connected to another user.' : '')
     const [message, setMessage] = useState('')
     const [busy, setBusy] = useState(false)
     const [reauthenticate, setReauthenticate] = useState(false)

@@ -8,7 +8,9 @@ from allauth.mfa.adapter import DefaultMFAAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from cryptography.fernet import Fernet, MultiFernet
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ImproperlyConfigured
+from django.db import transaction
 from django.http import JsonResponse
 
 from .security import recently_verified, security_version, stamp_session
@@ -23,16 +25,20 @@ class AccountAdapter(DefaultAccountAdapter):
         return super().pre_login(request, user, **kwargs)
 
     def login(self, request, user):
-        expected = request.session.pop("cms_pending_security", None)
-        if expected != [str(user.pk), security_version(user)]:
-            raise ImmediateHttpResponse(
-                JsonResponse(
-                    {"status": 409, "errors": [{"message": "Account security changed. Start sign-in again."}]},
-                    status=409,
+        # Serialize the version check and session stamp with revocation. A
+        # security change after this block invalidates the stamped version.
+        with transaction.atomic():
+            get_user_model()._default_manager.select_for_update().get(pk=user.pk)
+            expected = request.session.pop("cms_pending_security", None)
+            if expected != [str(user.pk), security_version(user)]:
+                raise ImmediateHttpResponse(
+                    JsonResponse(
+                        {"status": 409, "errors": [{"message": "Account security changed. Start sign-in again."}]},
+                        status=409,
+                    )
                 )
-            )
-        super().login(request, user)
-        stamp_session(request, user)
+            super().login(request, user)
+            stamp_session(request, user)
 
     def is_safe_url(self, url):
         # Provider callbacks may only return to the CMS origin.

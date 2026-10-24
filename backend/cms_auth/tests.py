@@ -1,5 +1,6 @@
 import json
 import time
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from allauth.account.models import EmailAddress
@@ -13,9 +14,9 @@ from django.test import Client, TestCase, TransactionTestCase, override_settings
 from rest_framework.authtoken.models import Token
 
 from . import test_settings as isolated_settings
-from .adapters import MFAAdapter, SocialAccountAdapter
+from .adapters import AccountAdapter, MFAAdapter, SocialAccountAdapter
 from .models import AccountSecurity
-from .security import SESSION_MFA, SESSION_VERSION, revoke_credentials, security_version
+from .security import SESSION_MFA, SESSION_VERSION, revoke_credentials, security_version, session_is_valid
 
 # Also isolate URLs, mail, cache and synthetic keys when Django's normal project
 # discovery runs this module. Keep the runner's database and installed apps.
@@ -200,6 +201,33 @@ class BrowserAuthenticationTests(TestCase):
         self.login()
         self.write(BASE + "/auth/session", method="delete")
         self.assertEqual(self.client.get("/protected/").status_code, 401)
+
+    def test_in_flight_security_change_cannot_revive_revoked_session(self):
+        self.login()
+        # An already-authorized request retains its session snapshot while a
+        # different request changes account security and revokes that snapshot.
+        request = SimpleNamespace(user=self.user, session=self.client.session)
+        revoke_credentials(self.user)
+        self.assertFalse(session_is_valid(self.user, request.session))
+        revoke_credentials(self.user, request, factor_proven=True)
+        self.assertFalse(session_is_valid(self.user, request.session))
+
+    def test_security_change_preserves_only_its_current_session(self):
+        self.login()
+        request = SimpleNamespace(user=self.user, session=self.client.session)
+        revoke_credentials(self.user, request)
+        self.assertTrue(session_is_valid(self.user, request.session))
+        self.assertEqual(request.session[SESSION_VERSION], security_version(self.user))
+
+    def test_pending_login_rejects_changed_security_version(self):
+        from allauth.core.exceptions import ImmediateHttpResponse
+
+        request = SimpleNamespace(session={"cms_pending_security": [str(self.user.pk), security_version(self.user)]})
+        revoke_credentials(self.user)
+        with self.assertRaises(ImmediateHttpResponse) as caught:
+            AccountAdapter().login(request, self.user)
+        self.assertEqual(caught.exception.response.status_code, 409)
+        self.assertNotIn("_auth_user_id", request.session)
 
     def test_provider_email_does_not_link_local_account(self):
         social = SocialLogin(
