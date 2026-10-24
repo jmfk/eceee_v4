@@ -7,8 +7,11 @@ As you add new apps, include their API URLs here.
 
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
 
+from cms_auth.tokens import PersonalTokenObtainView as TokenObtainPairView
+from cms_auth.tokens import PersonalTokenRefreshView as TokenRefreshView
+from cms_auth.tokens import PersonalTokenVerifyView as TokenVerifyView
+from cms_auth.views import security_status
 from content.views import CategoryViewSet, NamespaceViewSet, TagViewSet
 from core.api_views import MachineAPIKeyViewSet
 
@@ -25,6 +28,7 @@ router.register(r"core/machine-api-keys", MachineAPIKeyViewSet, basename="machin
 
 urlpatterns = [
     path("support/", include("tenant_support.urls")),
+    path("auth/security/", security_status, name="account-security"),
     # JWT Authentication endpoints
     path("auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),

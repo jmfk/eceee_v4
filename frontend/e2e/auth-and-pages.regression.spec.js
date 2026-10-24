@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockCmsApi, seedAuthenticatedSession, testTokens } from './fixtures/apiMocks'
+import { mockCmsApi, seedAuthenticatedSession } from './fixtures/apiMocks'
 import { openCmsPage } from './fixtures/navigation'
 
 test.describe('CMS auth and page management regressions', () => {
@@ -9,25 +9,25 @@ test.describe('CMS auth and page management regressions', () => {
     await openCmsPage(page, '/pages')
 
     await expect(page).toHaveURL(/\/login$/)
-    await expect(page.getByRole('heading', { name: 'EASY v4' })).toBeVisible()
-    await expect(page.getByLabel('Username')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'ECEEE CMS' })).toBeVisible()
+    await expect(page.getByLabel('Username or email')).toBeVisible()
     await expect(page.getByLabel('Password')).toBeVisible()
   })
 
-  test('logs in with JWT credentials and returns to the requested pages route', async ({ page }) => {
+  test('logs in with a browser session and returns to the requested pages route', async ({ page }) => {
     await mockCmsApi(page)
 
     await openCmsPage(page, '/pages')
-    await page.getByLabel('Username').fill('admin')
+    await page.getByLabel('Username or email').fill('admin')
     await page.getByLabel('Password').fill('blarg123')
-    await page.getByRole('button', { name: 'Sign In' }).click()
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 
     await expect(page).toHaveURL(/\/pages$/)
     await expect(page.getByText('Summer Study')).toBeVisible()
     await expect(page.getByText('summerstudy.local')).toBeVisible()
 
-    await expect.poll(() => page.evaluate(() => window.localStorage.getItem('access_token'))).toBe(testTokens.access)
-    await expect.poll(() => page.evaluate(() => window.localStorage.getItem('refresh_token'))).toBe(testTokens.refresh)
+    await expect.poll(() => page.evaluate(() => window.localStorage.getItem('access_token'))).toBeNull()
+    await expect.poll(() => page.evaluate(() => window.localStorage.getItem('refresh_token'))).toBeNull()
   })
 
   test('renders the authenticated pages workspace from API data', async ({ page }) => {

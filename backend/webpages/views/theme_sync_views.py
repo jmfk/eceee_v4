@@ -14,6 +14,7 @@ from rest_framework import authentication, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from cms_auth.authentication import PersonalTokenAuthentication
 from core.machine_api_keys import MachineAPIKeyAuthentication
 from core.models import Tenant
 from core.permissions import HasTenantAccess
@@ -42,7 +43,7 @@ class ThemeSyncViewSet(viewsets.ViewSet):
     authentication_classes = [
         MachineAPIKeyAuthentication,
         ThemeRemoteAccessKeyAuthentication,
-        authentication.TokenAuthentication,
+        PersonalTokenAuthentication,
         authentication.SessionAuthentication,
     ]
 

@@ -4,7 +4,7 @@ from channels.layers import get_channel_layer
 from channels.routing import URLRouter
 from channels.testing import WebsocketCommunicator
 from django.contrib.auth.models import AnonymousUser, User
-from django.test import TransactionTestCase, override_settings
+from django.test import Client, TransactionTestCase, override_settings
 
 from config.routing import websocket_urlpatterns
 from core.models import Tenant, TenantRole
@@ -42,6 +42,15 @@ class PageEditorConsumerTest(TransactionTestCase):
             f"/ws/pages/{self.page.pk}/editor/",
         )
         communicator.scope["user"] = user
+        if user.is_authenticated:
+
+            @database_sync_to_async
+            def authenticated_session():
+                client = Client()
+                client.force_login(user, backend="django.contrib.auth.backends.ModelBackend")
+                return client.session
+
+            communicator.scope["session"] = await authenticated_session()
         connected, _ = await communicator.connect()
         return communicator, connected
 

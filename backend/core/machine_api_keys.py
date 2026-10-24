@@ -58,6 +58,8 @@ ALLOWED_SCOPES = {
 AUTH_SCHEME = b"ApiKey"
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 MACHINE_DENIED_PREFIXES = (
+    "/_allauth/",
+    "/accounts/",
     "/api/v1/auth/",
     "/api/v1/core/machine-api-keys",
     "/api/v1/data-connections/",

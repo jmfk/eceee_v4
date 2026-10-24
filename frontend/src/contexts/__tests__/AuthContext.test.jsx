@@ -43,7 +43,6 @@ describe('AuthProvider workspace synchronization', () => {
     it('uses the server workspace when another valid workspace is stale in browser storage', async () => {
         localStorage.setItem('eceee_tenant_id', 'demo')
         vi.spyOn(globalThis, 'fetch')
-            .mockResolvedValueOnce({ ok: true })
             .mockResolvedValueOnce({
                 ok: true,
                 json: async () => ({
