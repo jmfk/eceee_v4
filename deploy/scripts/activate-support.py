@@ -32,6 +32,8 @@ assert not settings.DEBUG
 assert settings.SUPPORT_STORAGE_BUCKET_NAME=='w8c4m2-prod-support'
 assert settings.SUPPORT_APP_URL=='https://app.eceee.org'
 assert settings.SUPPORT_EMAIL_ENABLED is False
+assert settings.SUPPORT_STORAGE_ACCESS_KEY_ID and settings.SUPPORT_STORAGE_SECRET_ACCESS_KEY
+assert settings.SUPPORT_STORAGE_ACCESS_KEY_ID != settings.AWS_ACCESS_KEY_ID
 storage.client().head_bucket(Bucket=settings.SUPPORT_STORAGE_BUCKET_NAME)
 storage.assert_private(storage.client())
 from config.celery import app
@@ -70,7 +72,17 @@ def activate():
                 os.fchmod(target.fileno(), 0o600)
                 json.dump(overrides, target)
             pinned = compose + ["-f", path]
-            print("Schema current; existing images pinned. Reloading backend, worker, and scheduler only.", flush=True)
+            # Check the staged env_file with the pinned image before changing
+            # running services. In particular, fail before a worker can send mail.
+            output = checked(
+                pinned + ["run", "--rm", "--no-deps", "--pull", "never", "backend", "python", "-c", VERIFY]
+            )
+            if b"SUPPORT_RUNTIME_PASS" not in output:
+                raise RuntimeError("staged_support_configuration_invalid")
+            print(
+                "Schema current; staged configuration verified; existing images pinned. Reloading backend, worker, and scheduler only.",
+                flush=True,
+            )
             # Worker/Beat intentionally disable image HTTP healthchecks. Verify
             # their state independently instead of Compose's shared --wait gate.
             checked(pinned + ["up", "-d", "--no-deps", "--no-build", "--pull", "never", "--force-recreate", *SERVICES])

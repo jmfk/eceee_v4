@@ -2,6 +2,10 @@
 
 import importlib.util
 import os
+import json
+import shlex
+import subprocess
+import sys
 from pathlib import Path
 import socket
 import tempfile
@@ -47,6 +51,39 @@ class SupportConfigurationTests(unittest.TestCase):
             "SUPPORT_STORAGE_ACCESS_KEY_ID=support-fixture\nSUPPORT_STORAGE_SECRET_ACCESS_KEY=support-secret-fixture\n"
         )
         self.assertEqual(set(credentials), {"SUPPORT_STORAGE_ACCESS_KEY_ID", "SUPPORT_STORAGE_SECRET_ACCESS_KEY"})
+
+    def test_ssh_transports_credential_comparison_only_through_stdin(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "deploy").mkdir()
+            env = root / "deploy/.env"
+            original = "AWS_ACCESS_KEY_ID=media-fixture\nSUPPORT_STORAGE_ACCESS_KEY_ID=support-fixture\nSUPPORT_STORAGE_SECRET_ACCESS_KEY=support-secret-fixture\n"
+            env.write_text(original)
+            env.chmod(0o600)
+            with mock.patch.object(subject, "ROOT", root), mock.patch.object(
+                subject, "production_host", return_value="8.8.8.8"
+            ), mock.patch.dict(os.environ, {"SUPPORT_EXPECTED_HOST": "8.8.8.8"}), mock.patch(
+                "sys.argv", ["configure-support.py", "--apply"]
+            ), mock.patch.object(
+                subject.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)
+            ) as run:
+                subject.main()
+                call = run.call_args_list[1]
+                self.assertEqual(call.args[0][0], "ssh")
+                self.assertNotIn("support-secret-fixture", str(call.args[0]))
+                packet = json.loads(call.kwargs["input"])
+                self.assertEqual(packet["credentials"], subject.support_credentials(original))
+                wrapper = shlex.split(call.args[0][-1])[2]
+            # Run only the transport wrapper with a harmless fixture script,
+            # proving stdin remains available to the remote comparison.
+            packet["script"] = (
+                "import json,sys; assert json.load(sys.stdin)['SUPPORT_STORAGE_ACCESS_KEY_ID']=='support-fixture'; print('fixture-pass')"
+            )
+            result = subprocess.run(
+                [sys.executable, "-c", wrapper], input=json.dumps(packet), capture_output=True, text=True
+            )
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(result.stdout.strip(), "fixture-pass")
 
     def test_dns_must_agree(self):
         def resolve(domain, *_):
@@ -97,6 +134,31 @@ class SupportConfigurationTests(unittest.TestCase):
             with self.assertRaises(subject.SetupError):
                 subject.prepared_env(env, subject.settings_for("w8c4m2-prod-support"))
 
+    def test_credential_mismatch_stops_before_provisioning_or_env_change(self):
+        previous_cwd = Path.cwd()
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                deploy = Path(directory) / "deploy"
+                deploy.mkdir()
+                env = deploy / ".env"
+                original = "AWS_ACCESS_KEY_ID=media-fixture\nSUPPORT_STORAGE_ACCESS_KEY_ID=remote-fixture\nSUPPORT_STORAGE_SECRET_ACCESS_KEY=remote-secret-fixture\n"
+                env.write_text(original)
+                env.chmod(0o600)
+                expected = {
+                    "SUPPORT_STORAGE_ACCESS_KEY_ID": "local-fixture",
+                    "SUPPORT_STORAGE_SECRET_ACCESS_KEY": "local-secret-fixture",
+                }
+                with mock.patch.object(subject, "PRODUCTION_LOCK", str(Path(directory) / "lock")), mock.patch.object(
+                    subject, "run_bounded"
+                ) as run:
+                    with self.assertRaisesRegex(subject.SetupError, "credentials differ"):
+                        subject.stage_remote(directory, subject.settings_for("w8c4m2-prod-support"), expected)
+                    run.assert_not_called()
+                self.assertEqual(env.read_text(), original)
+                self.assertEqual(list(deploy.glob(".env.before-support-*")), [])
+        finally:
+            os.chdir(previous_cwd)
+
     def test_provision_failure_preserves_remote_env_and_backup(self):
         previous_cwd = Path.cwd()
         try:
@@ -110,7 +172,11 @@ class SupportConfigurationTests(unittest.TestCase):
                 with mock.patch.object(subject, "PRODUCTION_LOCK", str(Path(directory) / "lock")):
                     with mock.patch.object(subject, "run_bounded", side_effect=[None, subject.SetupError("failed")]):
                         with self.assertRaises(subject.SetupError):
-                            subject.stage_remote(directory, subject.settings_for("w8c4m2-prod-support"))
+                            subject.stage_remote(
+                                directory,
+                                subject.settings_for("w8c4m2-prod-support"),
+                                subject.support_credentials(original),
+                            )
                 self.assertEqual(env.read_text(), original)
                 backups = list(deploy.glob(".env.before-support-*"))
                 self.assertEqual(len(backups), 1)

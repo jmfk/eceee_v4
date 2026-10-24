@@ -11,6 +11,7 @@ import re
 import shlex
 import socket
 import stat
+import sys
 import subprocess
 import tempfile
 
@@ -102,18 +103,21 @@ def run_bounded(command, payload=None):
         raise SetupError("Production support step failed; command output suppressed to protect credentials.")
 
 
-def stage_remote(directory, updates):
+def stage_remote(directory, updates, expected_credentials):
     os.chdir(directory)
     env = Path("deploy/.env").absolute()
     with open(PRODUCTION_LOCK, "a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         original, content = prepared_env(env, updates)
         compose = ["docker", "compose", "-f", "deploy/docker-compose.prod.yml", "--env-file", str(env)]
+        remote_credentials = support_credentials(original)
+        if remote_credentials != expected_credentials:
+            raise SetupError("Local and remote dedicated support credentials differ; reconcile them before staging.")
         # Verify the staged identity, which may differ from the running process.
         # Credentials travel only through stdin, never command arguments or output.
         staged = dict(updates)
         staged["SUPPORT_EMAIL_ENABLED"] = False
-        staged.update(support_credentials(original))
+        staged.update(remote_credentials)
         payload = json.dumps(staged).encode()
         # Only public settings enter argv; the dedicated identity uses stdin.
         overrides = [item for key, value in updates.items() for item in ("-e", key + "=" + value)]
@@ -161,7 +165,7 @@ def main():
     args = parser.parse_args()
     updates = settings_for(args.bucket)
     if args.remote:
-        stage_remote(args.directory, updates)
+        stage_remote(args.directory, updates, json.load(sys.stdin))
         return
     host = production_host()
     print("Production SSH target: root@" + host, flush=True)
@@ -194,11 +198,14 @@ def main():
     if ignored.returncode:
         raise SetupError("Local deploy/.env must be Git-ignored.")
     original, content = prepared_env(local_env, updates)
-    support_credentials(original)
+    credentials = support_credentials(original)
     remote_command = shlex.join(
         [
             "python3",
-            "-",
+            "-c",
+            "import io,json,sys; packet=json.load(sys.stdin); "
+            "sys.stdin=io.StringIO(json.dumps(packet['credentials'])); "
+            "__file__='<support-setup>'; exec(compile(packet['script'],__file__,'exec'))",
             "--remote",
             "--bucket",
             args.bucket,
@@ -208,7 +215,7 @@ def main():
     )
     result = subprocess.run(
         ["ssh", "-o", "BatchMode=yes", "root@" + host, remote_command],
-        input=Path(__file__).read_bytes(),
+        input=json.dumps({"script": Path(__file__).read_text(), "credentials": credentials}).encode(),
         capture_output=True,
         timeout=240,
     )
