@@ -34,7 +34,7 @@ export function FactorForm({ onResult, reauthenticate = false, types = ['totp', 
     </div>
 }
 
-export default function AuthenticationForm({ onAuthenticated, destination = '/' }) {
+export default function AuthenticationForm({ onAuthenticated, destination = '/', allowProviderRedirects = true }) {
     const [identifier, setIdentifier] = useState('')
     const [password, setPassword] = useState('')
     const [code, setCode] = useState('')
@@ -98,7 +98,7 @@ export default function AuthenticationForm({ onAuthenticated, destination = '/' 
                     </>}
                     <button disabled={busy} className={`${authButtonClass} w-full`}>{busy ? 'Verifying…' : pending ? 'Verify email' : 'Sign in'}</button>
                 </form>
-                {!pending && providers.map(provider => <button key={provider.id} type="button" disabled={busy} className={`${secondaryAuthButtonClass} w-full`} onClick={async () => {
+                {!pending && allowProviderRedirects && providers.map(provider => <button key={provider.id} type="button" disabled={busy} className={`${secondaryAuthButtonClass} w-full`} onClick={async () => {
                     setBusy(true)
                     try { await redirectToProvider(provider.id, 'login', destination) }
                     catch (err) { setError(err.message); setBusy(false) }

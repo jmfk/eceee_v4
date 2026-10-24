@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AuthenticationForm from '../AuthenticationForm'
 import AccountSecurityPanel from '../AccountSecurityPanel'
+import SessionExpiredOverlay from '../../SessionExpiredOverlay'
+import { useAuth } from '../../../contexts/AuthContext'
 import { authRequest, redirectToProvider, requireAuthResult } from '../../../api/auth'
 
 vi.mock('../../../api/auth', () => ({
@@ -9,6 +11,8 @@ vi.mock('../../../api/auth', () => ({
     clearLegacyTokens: vi.fn(), verifyWebAuthn: vi.fn(), webAuthnCredential: vi.fn(),
     authError: result => result.errors?.[0]?.message || 'Authentication failed',
 }))
+
+vi.mock('../../../contexts/AuthContext', () => ({ useAuth: vi.fn() }))
 
 beforeEach(() => { vi.clearAllMocks() })
 
@@ -69,4 +73,26 @@ it('requires fresh verification before showing enrollment secrets in Profile', a
     fireEvent.click(await screen.findByRole('button', { name: 'Set up authenticator app' }))
     expect(await screen.findByText('Confirm your identity')).toBeInTheDocument()
     expect(screen.queryByText('Manual setup key:')).not.toBeInTheDocument()
+})
+
+
+it('restores an expired session in place without offering provider navigation', async () => {
+    const login = vi.fn()
+    useAuth.mockReturnValue({ sessionExpired: true, login })
+    authRequest.mockImplementation(async path => {
+        if (path === '/config') return { status: 200, data: { socialaccount: { providers: [{ id: 'apple', name: 'Apple' }, { id: 'google', name: 'Google' }] } } }
+        if (path === '/auth/session') return { status: 401 }
+        if (path === '/auth/login') return { status: 401, data: { flows: [{ id: 'mfa_authenticate', is_pending: true, types: ['totp'] }] } }
+        return { status: 200, meta: { is_authenticated: true } }
+    })
+    render(<SessionExpiredOverlay />)
+    fireEvent.change(await screen.findByLabelText('Username or email'), { target: { value: 'editor' } })
+    expect(screen.queryByRole('button', { name: /Sign in with/ })).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    fireEvent.change(await screen.findByLabelText('Authenticator or recovery code'), { target: { value: '123456' } })
+    expect(login).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Verify code' }))
+    await waitFor(() => expect(login).toHaveBeenCalledTimes(1))
+    expect(redirectToProvider).not.toHaveBeenCalled()
 })
