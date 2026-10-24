@@ -40,6 +40,10 @@ backend/media/*
 # Production: deploy/.env (deploy.sh, deploy/docker-compose.prod.yml) — keep only on server.
 .env
 deploy/.env
+deploy/.env.before-support-*
+deploy/.env.support-account
+deploy/.support-config-*
+deploy/.support-images-*
 .env.local
 .env.development.local
 .env.test.local
