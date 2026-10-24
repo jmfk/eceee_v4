@@ -47,10 +47,18 @@ def revoke_credentials(user, request=None, *, factor_proven=False):
     with transaction.atomic():
         get_user_model()._default_manager.select_for_update().get(pk=user.pk)
         state, _ = AccountSecurity.objects.get_or_create(user_id=user.pk)
+        preserve_session = (
+            request
+            and request.user.is_authenticated
+            and request.user.pk == user.pk
+            and request.session.get(SESSION_VERSION, 0) == state.version
+        )
         state.version += 1
         state.changed_at = timezone.now()
         state.save(update_fields=["version", "changed_at"])
-        if request and request.user.is_authenticated and request.user.pk == user.pk:
+        # A request that started before another revocation must not promote its
+        # stale session to the new version, even if its own mutation completes.
+        if preserve_session:
             stamp_session(request, user, mfa=factor_proven or request.session.get(SESSION_MFA, False))
     return state.version
 
