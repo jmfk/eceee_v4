@@ -10,8 +10,8 @@ export default function SessionExpiredOverlay() {
         <div className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
         <DialogPanel className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <DialogTitle className="text-xl font-semibold text-gray-900">Sign in to continue</DialogTitle>
-            <p className="mb-6 mt-2 text-sm text-gray-600">Your session expired. Your current work stays open.</p>
-            <AuthenticationForm onAuthenticated={login} destination={`${window.location.pathname}${window.location.search}${window.location.hash}`} />
+            <p className="mb-6 mt-2 text-sm text-gray-600">Your session expired. Sign in with your password and any second factor to keep your current work open.</p>
+            <AuthenticationForm onAuthenticated={login} allowProviderRedirects={false} />
         </DialogPanel>
         </div>
     </Dialog>

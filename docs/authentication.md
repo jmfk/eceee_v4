@@ -78,3 +78,5 @@ Production remains subject to the repository's exact-tag deployment gate, prefli
 ## Current batch evidence
 
 Implementation and local verification are recorded in PRD-0038. Live provider acceptance remains pending environment-specific credential provisioning and a registered HTTPS test origin. No production action is included.
+
+The expired-session dialog uses password and second-factor verification in place. Provider redirects are available on the login page; they are omitted from the dialog because leaving the editor would discard unsaved work and queued requests.
