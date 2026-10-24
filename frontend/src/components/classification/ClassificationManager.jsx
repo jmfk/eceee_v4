@@ -187,7 +187,7 @@ export default function ClassificationManager() {
                     <p className="text-sm">Proposed by user {proposal.proposedBy} · {new Date(proposal.createdAt).toLocaleString()}</p>
                     <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><dt className="font-medium">Current</dt><dd className="whitespace-pre-wrap break-words text-sm">{JSON.stringify({ name: proposal.term.name, parent: proposal.term.parent, status: proposal.term.status }, null, 2)}</dd></div><div><dt className="font-medium">Proposed change</dt><dd className="whitespace-pre-wrap break-words text-sm">{JSON.stringify(proposal.payload, null, 2)}</dd></div></dl>
                     {proposal.reason && <p>{proposal.reason}</p>}
-                    {proposal.status === 'pending' && <div className="flex gap-3">
+                    {proposal.status === 'pending' && <div className="flex flex-wrap gap-3">
                         {canDecide && ['approved', 'rejected'].map(decision => <button type="button" key={decision} disabled={busy} className={buttonClass} onClick={() => run(async () => await taxonomyApi.decide(proposal.id, decision, reason))}>{decision === 'approved' ? 'Approve' : 'Reject'}</button>)}
                         <button type="button" disabled={busy} className={buttonClass} onClick={() => run(async () => await taxonomyApi.decide(proposal.id, 'withdrawn', reason))}>Withdraw own proposal</button>
                     </div>}

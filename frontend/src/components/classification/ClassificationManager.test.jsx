@@ -65,6 +65,22 @@ describe('classification management', () => {
         expect(screen.queryByLabelText('Tag type')).not.toBeInTheDocument()
         expect(screen.queryByLabelText('Decision reason')).not.toBeInTheDocument()
     })
+    it('shows decision controls for pending proposals and sends the reason on approval', async () => {
+        taxonomyApi.proposals.mockResolvedValue({ count: 1, results: [{
+            id: 'proposal', classificationType: 'type', action: 'edit', status: 'pending',
+            term: { name: 'Energy', status: 'approved' }, payload: { name: 'Energy efficiency' },
+            proposedBy: 1, createdAt: '2026-10-23T12:00:00Z',
+        }] })
+        renderManager()
+        await screen.findByRole('option', { name: 'Topics' })
+        fireEvent.click(screen.getByRole('button', { name: 'Proposals' }))
+        fireEvent.change(await screen.findByLabelText('Decision reason'), { target: { value: 'Clearer name' } })
+        expect(screen.getByRole('button', { name: 'Reject' })).toBeEnabled()
+        expect(screen.getByRole('button', { name: 'Withdraw own proposal' })).toBeEnabled()
+        expect(screen.queryByLabelText('Tag type')).not.toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+        await waitFor(() => expect(taxonomyApi.decide).toHaveBeenCalledWith('proposal', 'approved', 'Clearer name'))
+    })
     it('creates an approved term for an authorized user and offers undo', async () => {
         renderManager()
         await chooseType()
