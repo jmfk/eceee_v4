@@ -53,3 +53,10 @@ Implementation started 2026-10-23. Preserve unrelated workspace messaging, role 
 - Re-ran the isolated auth suite on this branch: 33 tests passed. Preserved the two newer limited-role login regressions from `main`; focused frontend verification now passes 19 tests across six files.
 - Frontend production build passed. Applied the repository's exact Black 25.11.0, isort and flake8 gate to changed Python files. Test classes now explicitly isolate their URLs/mail/cache/synthetic keys when discovered by the normal project runner.
 - Broader suites and live provider acceptance remain outside this preparation. No merge or production deployment is authorized by the request to create a PR.
+
+## Review verification (2026-10-24)
+
+- Fixed the operator-generated password-reset link contract: allauth-compatible user ID encoding and output serialization. Real API regressions redeem the returned link, reject reuse, preserve existing MFA and advance credential revocation state.
+- Authentication tests now assert that the existing user-ID set is unchanged instead of assuming a migration-free empty database.
+- `python manage.py test core.tests.AdminPasswordResetLinkTest cms_auth --keepdb --noinput` passed 35 tests using the full project migrations on an isolated PostgreSQL 17 test database, with development auto-login disabled. The standalone in-memory auth suite still passes 33 tests; `makemigrations cms_auth --check --dry-run` reports no changes. Changed Python files pass Black/isort/flake8.
+- Review and CI evidence is tracked in [PR #277](https://github.com/jmfk/eceee_v4/pull/277). Live ECEEE provider acceptance and environment-specific secret provisioning remain pending; this review performs no production/provider configuration changes.

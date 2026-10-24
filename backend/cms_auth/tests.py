@@ -37,6 +37,7 @@ class BrowserAuthenticationTests(TestCase):
         cache.clear()
         self.user = get_user_model().objects.create_user("editor", "editor@example.invalid", "password-123")
         EmailAddress.objects.create(user=self.user, email=self.user.email, primary=True, verified=True)
+        self.initial_user_ids = set(get_user_model().objects.values_list("pk", flat=True))
         self.client = Client(enforce_csrf_checks=True)
 
     def write(self, path, data=None, method="post", client=None):
@@ -87,7 +88,7 @@ class BrowserAuthenticationTests(TestCase):
         )
         self.assertEqual(result.status_code, 403)
         self.assertEqual(self.client.get(BASE + "/auth/webauthn/login").status_code, 404)
-        self.assertEqual(get_user_model().objects.count(), 1)
+        self.assertEqual(set(get_user_model().objects.values_list("pk", flat=True)), self.initial_user_ids)
 
     def test_factor_management_requires_recent_authentication(self):
         self.login()
@@ -396,7 +397,7 @@ class BrowserAuthenticationTests(TestCase):
         )
         response = self.write(BASE + "/auth/2fa/authenticate", {"code": codes[0]}, client=other)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(get_user_model().objects.count(), 1)
+        self.assertEqual(set(get_user_model().objects.values_list("pk", flat=True)), self.initial_user_ids)
 
     @override_settings(
         SOCIALACCOUNT_PROVIDERS={"google": {"APPS": [{"client_id": "test-client", "secret": "test-only"}]}}
@@ -519,7 +520,7 @@ class BrowserAuthenticationTests(TestCase):
         self.assertEqual(complete.status_code, 200, complete.content)
         self.user.refresh_from_db()
         self.assertEqual(self.user.email, "editor@example.invalid")
-        self.assertEqual(get_user_model().objects.count(), 1)
+        self.assertEqual(set(get_user_model().objects.values_list("pk", flat=True)), self.initial_user_ids)
 
     def test_real_password_reset_flow_retains_second_factor(self):
         import re

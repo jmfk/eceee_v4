@@ -753,12 +753,11 @@ class GeneratePasswordResetView(APIView):
 
         # Generate password reset token using django-allauth
         from allauth.account.forms import default_token_generator
-        from django.utils.encoding import force_bytes
-        from django.utils.http import urlsafe_base64_encode
+        from allauth.account.utils import user_pk_to_url_str
 
-        # Generate token
+        # Match allauth's headless reset-key contract (base36 for integer IDs).
         token = default_token_generator.make_token(user)
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        uid = user_pk_to_url_str(user)
 
         # Build reset URL
         # Using the frontend URL pattern
@@ -767,15 +766,13 @@ class GeneratePasswordResetView(APIView):
         logger.info(f"Password reset link generated for user {user.username} by {request.user.username}")
 
         serializer = PasswordResetLinkSerializer(
-            data={
+            instance={
                 "reset_url": reset_url,
                 "user_id": user.id,
                 "username": user.username,
                 "expires_in": "3 days",
             }
         )
-        serializer.is_valid(raise_exception=True)
-
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 

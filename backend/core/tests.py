@@ -833,3 +833,66 @@ class ProvisionLocalMachineAccessTest(TestCase):
             self.assertFalse(env_file.exists())
             self.assertFalse(MachineAPIKey.objects.filter(name="Codex local CMS access").exists())
             self.assertFalse(self.tenant.members.filter(username="codex-local").exists())
+
+
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    SECURE_SSL_REDIRECT=False,
+    CMS_MFA_ENCRYPTION_KEYS=["MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="],
+    CMS_WEBAUTHN_RP_ID="testserver",
+)
+class AdminPasswordResetLinkTest(TestCase):
+    def test_generated_link_is_redeemable_by_browser_reset_flow(self):
+        self.assert_reset_flow(mfa=False)
+
+    def test_generated_link_preserves_mfa_and_revokes_old_credentials(self):
+        self.assert_reset_flow(mfa=True)
+
+    def assert_reset_flow(self, *, mfa):
+        from urllib.parse import parse_qs, urlsplit
+
+        from allauth.mfa.models import Authenticator
+        from django.test import Client
+
+        from cms_auth.adapters import MFAAdapter
+        from cms_auth.security import security_version
+
+        target = User.objects.create_user("reset-target", "reset-target@example.invalid", "old-password-123")
+        if mfa:
+            Authenticator.objects.create(
+                user=target, type=Authenticator.Type.TOTP, data={"secret": MFAAdapter().encrypt("A" * 32)}
+            )
+        before = security_version(target)
+        admin = User.objects.create_superuser("reset-admin", "reset-admin@example.invalid", "admin-password-123")
+        tenant = Tenant.objects.create(name="Reset test", identifier="reset-test", created_by=admin)
+        client = APIClient()
+        client.force_login(admin)
+        response = client.post(f"/api/v1/utils/users/{target.pk}/reset-password/", HTTP_X_TENANT_ID=tenant.identifier)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("reset_url", response.data)
+        key = parse_qs(urlsplit(response.data["reset_url"]).query)["resetKey"][0]
+
+        browser = Client(enforce_csrf_checks=True)
+        csrf = browser.get("/csrf-token/").json()["csrfToken"]
+        result = browser.post(
+            "/_allauth/browser/v1/auth/password/reset",
+            data={"key": key, "password": "new-strong-password-456"},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf,
+        )
+        self.assertIn(result.status_code, [200, 401], result.content)
+        target.refresh_from_db()
+        self.assertTrue(target.check_password("new-strong-password-456"))
+        self.assertGreater(security_version(target), before)
+        self.assertEqual(Authenticator.objects.filter(user=target, type=Authenticator.Type.TOTP).exists(), mfa)
+        self.assertNotIn("_auth_user_id", browser.session)
+
+        reused = browser.post(
+            "/_allauth/browser/v1/auth/password/reset",
+            data={"key": key, "password": "reused-password-789"},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=browser.get("/csrf-token/").json()["csrfToken"],
+        )
+        self.assertEqual(reused.status_code, 400)
+        target.refresh_from_db()
+        self.assertTrue(target.check_password("new-strong-password-456"))
