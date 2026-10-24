@@ -1,4 +1,7 @@
-import React, { useState } from 'react'
+import CompactSelect from './CompactSelect'
+import React, { useEffect, useId, useRef, useState } from 'react'
+import { ListFilterPlus, Search, X } from 'lucide-react'
+import './classification.css'
 import ClassificationTypeForm from './ClassificationTypeForm'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { taxonomyApi, classificationError } from '../../api/taxonomy'
@@ -10,7 +13,7 @@ const buttonClass = 'shrink-0'
 function TermTree({ terms, selectedId, onSelect, parent = null, seen = [] }) {
     return <ul className={parent ? 'ml-5' : ''}>
         {terms.filter(term => term.parent === parent || (!parent && term.parent && !terms.some(item => item.id === term.parent))).filter(term => !seen.includes(term.id)).map(term => <li key={term.id}>
-            <button type="button" aria-current={term.id === selectedId ? 'true' : undefined} onClick={() => onSelect(term)} className={`${buttonClass} w-full justify-start break-words text-left ${term.id === selectedId ? 'font-semibold bg-blue-50 text-blue-700' : ''}`}>
+            <button type="button" aria-current={term.id === selectedId ? 'true' : undefined} onClick={() => onSelect(term)} className={`${buttonClass} classification-tree-row w-full justify-start break-words text-left ${term.id === selectedId ? 'font-semibold bg-blue-50 text-blue-700' : ''}`}>
                 {term.name}{term.status !== 'approved' && <span className="text-xs ml-2">{term.status}</span>}
             </button>
             <TermTree terms={terms} selectedId={selectedId} onSelect={onSelect} parent={term.id} seen={[...seen, term.id]} />
@@ -18,10 +21,27 @@ function TermTree({ terms, selectedId, onSelect, parent = null, seen = [] }) {
     </ul>
 }
 
-export default function ClassificationManager() {
+export default function ClassificationManager({ namespace } = {}) {
+    const scope = namespace ? { namespace } : {}
     const tenant = getCurrentTenantId()
     const client = useQueryClient()
     const [typeId, setTypeId] = useState('')
+    const [showEditor, setShowEditor] = useState(false)
+    const [filterOpen, setFilterOpen] = useState(false)
+    const filterRef = useRef(null)
+    const filterButtonRef = useRef(null)
+    const filterSelectRef = useRef(null)
+    const searchId = useId()
+    const filterId = useId()
+    useEffect(() => {
+        if (!filterOpen) return
+        filterSelectRef.current?.focus()
+        const dismiss = event => {
+            if (!filterRef.current?.contains(event.target) && !event.target.closest('[data-cms-select-options]')) setFilterOpen(false)
+        }
+        document.addEventListener('pointerdown', dismiss)
+        return () => document.removeEventListener('pointerdown', dismiss)
+    }, [filterOpen])
     const [selected, setSelected] = useState(null)
     const [view, setView] = useState('terms')
     const [search, setSearch] = useState('')
@@ -41,14 +61,14 @@ export default function ClassificationManager() {
     const [undoId, setUndoId] = useState(null)
     const [grantUser, setGrantUser] = useState('')
     const [grantRole, setGrantRole] = useState('proposer')
-    const types = useQuery({ queryKey: ['classification', tenant, 'types'], queryFn: async () => await taxonomyApi.types({ page_size: 200 }) })
+    const types = useQuery({ queryKey: ['classification', tenant, 'types', namespace], queryFn: async () => await taxonomyApi.types({ ...scope, page_size: 200 }) })
     const hasTypes = (types.data?.results || []).length > 0
     const setupPending = types.isSuccess && !hasTypes
     const definition = types.data?.results?.find(type => type.id === typeId)
     const permissions = definition?.permissions || []
-    const terms = useQuery({ queryKey: ['classification', tenant, 'terms', typeId, search, page], queryFn: async () => await taxonomyApi.terms({ classification_type: typeId, search, page, page_size: 200 }), enabled: !!typeId || (setupPending && ['terms', 'history'].includes(view)) })
-    const proposals = useQuery({ queryKey: ['classification', tenant, 'proposals', proposalPage], queryFn: async () => await taxonomyApi.proposals({ page: proposalPage }), enabled: view === 'proposals' })
-    const history = useQuery({ queryKey: ['classification', tenant, 'history', typeId, historyPage], queryFn: async () => await taxonomyApi.history({ classification_type: typeId, page: historyPage }), enabled: view === 'history' && !!typeId })
+    const terms = useQuery({ queryKey: ['classification', tenant, 'terms', namespace, typeId, search, page], queryFn: async () => await taxonomyApi.terms({ ...scope, classification_type: typeId, search, page, page_size: 50, ordering: 'name' }), enabled: view === 'terms' || !!typeId || (setupPending && ['terms', 'history'].includes(view)) })
+    const proposals = useQuery({ queryKey: ['classification', tenant, 'proposals', namespace, proposalPage], queryFn: async () => await taxonomyApi.proposals({ ...scope, page: proposalPage }), enabled: view === 'proposals' })
+    const history = useQuery({ queryKey: ['classification', tenant, 'history', namespace, typeId, historyPage], queryFn: async () => await taxonomyApi.history({ ...scope, classification_type: typeId, page: historyPage }), enabled: view === 'history' && !!typeId })
     const grants = useQuery({ queryKey: ['classification', tenant, 'grants', typeId], queryFn: async () => await taxonomyApi.grants(typeId), enabled: view === 'rights' && permissions.includes('administer') })
     const usage = useQuery({ queryKey: ['classification', tenant, 'usage', selected?.id], queryFn: async () => await taxonomyApi.usage(selected.id), enabled: !!selected })
     const members = useQuery({ queryKey: ['classification', tenant, 'members', typeId], queryFn: async () => await taxonomyApi.members(typeId), enabled: view === 'rights' && permissions.includes('administer') })
@@ -58,6 +78,8 @@ export default function ClassificationManager() {
         try { await operation(); await refresh() } catch (failure) { setError(classificationError(failure)) } finally { setBusy(false) }
     }
     const choose = term => {
+        setShowEditor(true); setPage(1)
+        if (term.classificationType) setTypeId(term.classificationType)
         setSelected(term); setAction(term.status === 'archived' ? 'reactivate' : 'edit'); setName(term.name); setDescription(term.description || '')
         setAliases((term.alternativeNames || []).join('\n')); setDestination(''); setError('')
     }
@@ -86,19 +108,73 @@ export default function ClassificationManager() {
         steward: ['use', 'propose', 'create', 'edit', 'move', 'merge', 'archive', 'restore', 'approve'],
         administrator: ['administer'],
     }
-    return <div className="user-tools-content min-w-0 space-y-6 text-gray-900" aria-busy={busy}>
-        <nav aria-label="Tag views" className="flex flex-wrap gap-2 border-b border-gray-200 pb-4">
+    const selectType = value => {
+        setTypeId(value); setSelected(null); setShowEditor(false); setAction('create'); setPage(1); setHistoryPage(1)
+        setName(''); setDescription(''); setAliases(''); setFilterOpen(false)
+    }
+    const visibleTerms = terms.data?.results || []
+    const showTypeColumn = !typeId && new Set(visibleTerms.map(term => term.classificationType)).size > 1
+    return <div className="classification-manager user-tools-content min-w-0 space-y-4 text-gray-900" aria-busy={busy}>
+        <nav aria-label="Tag views" className="classification-tabs">
             {['terms', 'types', 'proposals', 'history', ...(permissions.includes('administer') ? ['rights'] : [])].map(item => <button type="button" key={item} className={buttonClass} aria-pressed={view === item} aria-current={view === item ? 'page' : undefined} onClick={() => { setView(item); setError('') }}>{({ terms: 'Tags', types: 'Types', proposals: 'Proposals', history: 'History', rights: 'Rights' })[item]}</button>)}
         </nav>
         {types.isPending && <p role="status">Loading tag types…</p>}
         {types.error && <p role="alert">{classificationError(types.error)}</p>}
-        {!types.isPending && !types.error && (types.data?.results || []).length > 0 && view !== 'proposals' && <div className="flex flex-wrap items-end gap-3">
-            <label className="block w-full max-w-sm font-medium">Tag type<select className={inputClass} value={typeId} onChange={event => { setTypeId(event.target.value); setSelected(null); setAction('create'); setPage(1); setHistoryPage(1); setName(''); setDescription(''); setAliases('') }}>
-                <option value="">{view === 'types' ? 'New tag type' : 'Choose a type'}</option>{(types.data?.results || []).map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
-            </select></label>
+        {view === 'terms' && hasTypes && <div className="classification-search-wrap" ref={filterRef}
+            onKeyDown={event => { if (event.key === 'Escape' && filterOpen) { setFilterOpen(false); filterButtonRef.current?.focus() } }}>
+            <div className="classification-search" data-filled={Boolean(search || definition)}>
+                <label className="classification-search-label" htmlFor={searchId}>Search tags</label>
+                <div className="classification-search-content">
+                    <Search size={16} aria-hidden="true" className="shrink-0 text-gray-400" />
+                    {definition && <button type="button" className="classification-filter-pill" aria-label={`Remove type filter: ${definition.name}`} onClick={() => selectType('')}>
+                        {definition.name}<X size={12} aria-hidden="true" />
+                    </button>}
+                    <input id={searchId} type="search" placeholder=" " data-filled={String(search ?? '').length > 0} value={search}
+                        onChange={event => { setSearch(event.target.value); setPage(1) }} />
+                    <button ref={filterButtonRef} type="button" className="classification-icon" title="Add filter" aria-label="Add filter"
+                        aria-expanded={filterOpen} aria-controls={filterId} onClick={() => setFilterOpen(!filterOpen)}>
+                        <ListFilterPlus size={18} aria-hidden="true" />
+                    </button>
+                </div>
+            </div>
+            {filterOpen && <div id={filterId} role="dialog" aria-label="Add tag filter" className="classification-filter-menu">
+                <label className="classification-field"><span>Tag type</span>
+                    <CompactSelect label="Tag type" ref={filterSelectRef} value={typeId} onChange={event => { selectType(event.target.value); filterButtonRef.current?.focus() }}>
+                        <option value="">All types</option>{(types.data?.results || []).map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
+                    </CompactSelect>
+                </label>
+            </div>}
         </div>}
-        {!types.isPending && !types.error && ['terms', 'history'].includes(view) && !definition && <div className="py-4 space-y-4">
-            {hasTypes ? <p className="text-gray-600">Choose a tag type to {view === 'history' ? 'view its history' : 'browse and manage its tags'}.</p> : <>
+        {hasTypes && ['types', 'history'].includes(view) && <label className="classification-field max-w-sm"><span>Tag type</span>
+            <CompactSelect label="Tag type" className={inputClass} value={typeId} onChange={event => selectType(event.target.value)}>
+                <option value="">{view === 'types' ? 'New tag type' : 'Choose a type'}</option>{(types.data?.results || []).map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
+            </CompactSelect>
+        </label>}
+        {!types.isPending && !types.error && ((view === 'terms' && !showEditor) || (view === 'history' && !definition)) && <div className="space-y-3">
+            {hasTypes ? (view === 'history' ? <p className="text-gray-600">Choose a tag type to view its history.</p> : <section aria-label="Tag list" className="space-y-2">
+                {terms.isPending && <p role="status">Loading tags…</p>}
+                {terms.error && <p role="alert">{classificationError(terms.error)}</p>}
+                {terms.isSuccess && <>
+                    <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs text-gray-500">{terms.data.count ?? terms.data.results?.length ?? 0} tags</p>
+                        <button type="button" onClick={() => { setTypeId(typeId || types.data.results[0].id); setShowEditor(true); setSelected(null); setAction('create'); setName(''); setDescription(''); setAliases('') }}>New tag</button>
+                    </div>
+                    {(terms.data.results || []).length ? <ul className="divide-y divide-gray-200">
+                        {terms.data.results.map(term => <li key={term.id}>
+                            <button type="button" onClick={() => choose(term)} className="classification-row">
+                                <span className="min-w-0"><span className="block font-semibold break-words">{term.name}</span>
+                                    {term.description && <span className="mt-1 block text-sm text-gray-500 break-words">{term.description}</span>}
+                                </span>
+                                {(showTypeColumn || term.status !== 'approved') && <span className="shrink-0 text-xs text-gray-500">{showTypeColumn && types.data.results.find(type => type.id === term.classificationType)?.name}{term.status !== 'approved' && <span className="ml-2">{term.status}</span>}</span>}
+                            </button>
+                        </li>)}
+                    </ul> : <p>{search ? 'No tags match your search.' : 'No tags yet. Choose a type to add a tag.'}</p>}
+                    <div className="flex gap-3">
+                        {page > 1 && <button type="button" onClick={() => setPage(page - 1)}>Previous tags</button>}
+                        {terms.data.next && <button type="button" onClick={() => setPage(page + 1)}>Next tags</button>}
+                    </div>
+                </>}
+            </section>) : <>
                 {terms.isPending && <p role="status">Checking existing tags…</p>}
                 {terms.error && <p role="alert">{classificationError(terms.error)}</p>}
                 {terms.isSuccess && ((terms.data?.results || []).length > 0 ? <section aria-label="Existing tags" className="space-y-4">
@@ -133,9 +209,9 @@ export default function ClassificationManager() {
                         setNotice('Tag type saved.')
                     })} />}
         </>}
-        {view === 'terms' && definition && <div className="grid grid-cols-1 lg:grid-cols-[minmax(220px,1fr)_2fr] gap-8">
-            <section aria-label="Tag tree" className="min-w-0 space-y-4">
-                <label className="block">Search tags<input type="search" value={search} className={inputClass} onChange={event => { setSearch(event.target.value); setPage(1) }} /></label>
+        {view === 'terms' && definition && showEditor && <div className="grid grid-cols-1 lg:grid-cols-[minmax(220px,1fr)_2fr] gap-8">
+            <section aria-label="Tag tree" className="min-w-0 space-y-3">
+                <button type="button" onClick={() => { setShowEditor(false); setSelected(null) }}>Back to tags</button>
                 {terms.isPending && <p role="status">Loading tags…</p>}
                 {terms.error && <p role="alert">{classificationError(terms.error)}</p>}
                 {terms.data?.count === 0 && <p>No tags yet. Use the form to add your first tag.</p>}
@@ -145,7 +221,7 @@ export default function ClassificationManager() {
             </section>
             <section className="min-w-0 space-y-5">
                 <h2 className="text-xl font-semibold">{selected?.name || 'New tag'}</h2>
-                {selected && <p className="text-sm">{selected.path} · {selected.status} · revision {selected.revision}</p>}
+                {selected && <p className="text-xs text-gray-500">{selected.status}</p>}
                 {selected && <section className="space-y-3" aria-label="Term usage">
                     <h3 className="font-medium">Usage</h3>
                     {usage.isPending && <p role="status">Loading usage…</p>}
@@ -156,14 +232,14 @@ export default function ClassificationManager() {
                     </div>)}
                 </section>}
                 <form onSubmit={save} className="space-y-4 max-w-xl">
-                    <label className="block">Action<select className={inputClass} value={action} onChange={event => { setAction(event.target.value); setDestination('') }}>{(selected ? (selected.status === 'archived' ? ['reactivate'] : ['edit', 'move', 'merge', 'archive']) : ['create']).map(item => <option key={item} value={item}>{item}</option>)}</select></label>
+                    <label className="block"><span className="classification-field-label">Action</span><CompactSelect label="Action" className={inputClass} value={action} onChange={event => { setAction(event.target.value); setDestination('') }}>{(selected ? (selected.status === 'archived' ? ['reactivate'] : ['edit', 'move', 'merge', 'archive']) : ['create']).map(item => <option key={item} value={item}>{item}</option>)}</CompactSelect></label>
                     {['create', 'edit'].includes(action) && <>
-                        <label className="block">Name<input required maxLength={50} className={inputClass} value={name} onChange={event => setName(event.target.value)} /></label>
-                        <label className="block">Description<textarea className={inputClass} value={description} onChange={event => setDescription(event.target.value)} /></label>
-                        <label className="block">Alternative names (one per line)<textarea className={inputClass} value={aliases} onChange={event => setAliases(event.target.value)} /></label>
+                        <label className="block"><span className="classification-field-label">Name</span><input placeholder=" " required maxLength={50} className={inputClass} data-filled={String(name ?? '').length > 0} value={name} onChange={event => setName(event.target.value)} /></label>
+                        <label className="block"><span className="classification-field-label">Description</span><textarea placeholder=" " className={inputClass} data-filled={String(description ?? '').length > 0} value={description} onChange={event => setDescription(event.target.value)} /></label>
+                        <label className="block"><span className="classification-field-label">Alternative names (one per line)</span><textarea placeholder=" " className={inputClass} data-filled={String(aliases ?? '').length > 0} value={aliases} onChange={event => setAliases(event.target.value)} /></label>
                     </>}
                     {['move', 'merge'].includes(action) && <>
-                        <label className="block">{action === 'move' ? 'New parent' : 'Merge target'}<select required={action === 'merge'} className={inputClass} value={destination} onChange={event => setDestination(event.target.value)}><option value="">{action === 'move' ? 'Type root' : 'Choose target'}</option>{(terms.data?.results || []).filter(term => term.id !== selected?.id && term.status === 'approved').map(term => <option key={term.id} value={term.id}>{term.path}</option>)}</select></label>
+                        <label className="block"><span className="classification-field-label">{action === 'move' ? 'New parent' : 'Merge target'}</span><CompactSelect label={action === 'move' ? 'New parent' : 'Merge target'} required={action === 'merge'} className={inputClass} value={destination} onChange={event => setDestination(event.target.value)}><option value="">{action === 'move' ? 'Type root' : 'Choose target'}</option>{(terms.data?.results || []).filter(term => term.id !== selected?.id && term.status === 'approved').map(term => <option key={term.id} value={term.id}>{term.path}</option>)}</CompactSelect></label>
                         <p className="text-sm">{action === 'merge' ? 'The source keeps its identity and redirects to the target. Its children move to the target. Existing version assignments are preserved.' : 'The term and its subtree move together. Existing assignments keep their identities.'}</p>
                     </>}
                     {action === 'archive' && <p>Existing assignments remain visible. New assignments will be blocked. Active children must be moved or archived first.</p>}
@@ -172,11 +248,10 @@ export default function ClassificationManager() {
             </section>
         </div>}
         {view === 'proposals' && <section className="space-y-6">
-            <h2 className="text-xl font-semibold">Proposals</h2>
             {(proposals.data?.results || []).some(proposal => {
                 const rights = types.data?.results?.find(type => type.id === proposal.classificationType)?.permissions || []
                 return proposal.status === 'pending' && rights.includes('approve') && rights.includes(proposal.action)
-            }) && <label className="block max-w-lg">Decision reason<input className={inputClass} value={reason} onChange={event => setReason(event.target.value)} /></label>}
+            }) && <label className="block max-w-lg"><span className="classification-field-label">Decision reason</span><input placeholder=" " className={inputClass} data-filled={String(reason ?? '').length > 0} value={reason} onChange={event => setReason(event.target.value)} /></label>}
             {proposals.isPending && <p role="status">Loading proposals…</p>}{proposals.error && <p role="alert">{classificationError(proposals.error)}</p>}
             {proposals.data?.count === 0 && <p className="py-8 text-gray-500">No tag proposals to review.</p>}
             {(proposals.data?.results || []).map(proposal => {
@@ -187,7 +262,7 @@ export default function ClassificationManager() {
                     <p className="text-sm">Proposed by user {proposal.proposedBy} · {new Date(proposal.createdAt).toLocaleString()}</p>
                     <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><dt className="font-medium">Current</dt><dd className="whitespace-pre-wrap break-words text-sm">{JSON.stringify({ name: proposal.term.name, parent: proposal.term.parent, status: proposal.term.status }, null, 2)}</dd></div><div><dt className="font-medium">Proposed change</dt><dd className="whitespace-pre-wrap break-words text-sm">{JSON.stringify(proposal.payload, null, 2)}</dd></div></dl>
                     {proposal.reason && <p>{proposal.reason}</p>}
-                    {proposal.status === 'pending' && <div className="flex flex-wrap gap-3">
+                    {proposal.status === 'pending' && <div className="flex gap-3">
                         {canDecide && ['approved', 'rejected'].map(decision => <button type="button" key={decision} disabled={busy} className={buttonClass} onClick={() => run(async () => await taxonomyApi.decide(proposal.id, decision, reason))}>{decision === 'approved' ? 'Approve' : 'Reject'}</button>)}
                         <button type="button" disabled={busy} className={buttonClass} onClick={() => run(async () => await taxonomyApi.decide(proposal.id, 'withdrawn', reason))}>Withdraw own proposal</button>
                     </div>}
@@ -195,7 +270,7 @@ export default function ClassificationManager() {
             })}
             <div className="flex gap-4">{proposalPage > 1 && <button type="button" onClick={() => setProposalPage(proposalPage - 1)}>Previous proposals</button>}{proposals.data?.next && <button type="button" onClick={() => setProposalPage(proposalPage + 1)}>Next proposals</button>}</div>
         </section>}
-        {view === 'history' && definition && <section className="min-w-0 space-y-5"><h2 className="text-xl font-semibold">History</h2>{history.isPending && <p role="status">Loading history…</p>}{history.data?.count === 0 && <p className="py-8 text-gray-500">No changes recorded for this tag type.</p>}{history.error && <p role="alert">{classificationError(history.error)}</p>}{(history.data?.results || []).map(operation => <article key={operation.id} className="space-y-2"><p>{operation.action} · user {operation.actor} · {new Date(operation.createdAt).toLocaleString()}</p><details><summary className="cursor-pointer py-2">Before and after</summary><pre className="overflow-auto text-sm">{JSON.stringify({ before: operation.before, after: operation.after }, null, 2)}</pre></details>{permissions.includes('restore') && ['create', 'edit', 'move', 'merge', 'archive', 'reactivate'].includes(operation.action) && operation.typeRevision === definition.revision && <button type="button" className={buttonClass} disabled={busy} onClick={() => run(async () => await taxonomyApi.undo(operation.id))}>Undo change</button>}</article>)}<div className="flex gap-4">{historyPage > 1 && <button type="button" onClick={() => setHistoryPage(historyPage - 1)}>Previous history</button>}{history.data?.next && <button type="button" onClick={() => setHistoryPage(historyPage + 1)}>Next history</button>}</div></section>}
-        {view === 'rights' && permissions.includes('administer') && <section className="space-y-5 max-w-xl"><h2 className="text-xl font-semibold">Named user rights</h2><p>Members can use and propose. These templates add explicit permissions for this type.</p>{grants.error && <p role="alert">{classificationError(grants.error)}</p>}<ul>{(grants.data?.results || []).map(grant => <li key={grant.id}>{grant.username}: {grant.permissions.join(', ')}</li>)}</ul><form className="space-y-4" onSubmit={event => { event.preventDefault(); run(async () => await taxonomyApi.grant(typeId, Number(grantUser), customPermissions)) }}><label className="block">User<select required className={inputClass} value={grantUser} onChange={event => setGrantUser(event.target.value)}><option value="">Choose user</option>{(members.data?.results || []).map(user => <option key={user.id} value={user.id}>{user.name}</option>)}</select></label><label className="block">Role template<select className={inputClass} value={grantRole} onChange={event => { setGrantRole(event.target.value); setCustomPermissions(roles[event.target.value]) }}>{Object.keys(roles).map(role => <option key={role}>{role}</option>)}</select></label><fieldset className="space-y-2"><legend>Permissions</legend>{roles.administrator.concat(roles.steward).map(permission => <label key={permission} className="flex items-center gap-2"><input type="checkbox" checked={customPermissions.includes(permission)} onChange={event => setCustomPermissions(event.target.checked ? [...customPermissions, permission] : customPermissions.filter(item => item !== permission))} />{permission}</label>)}</fieldset><button className={buttonClass} disabled={busy}>Save permissions</button></form></section>}
+        {view === 'history' && definition && <section className="min-w-0 space-y-5">{history.isPending && <p role="status">Loading history…</p>}{history.data?.count === 0 && <p className="py-8 text-gray-500">No changes recorded for this tag type.</p>}{history.error && <p role="alert">{classificationError(history.error)}</p>}{(history.data?.results || []).map(operation => <article key={operation.id} className="space-y-2"><p>{operation.action} · user {operation.actor} · {new Date(operation.createdAt).toLocaleString()}</p><details><summary className="cursor-pointer py-2">Before and after</summary><pre className="overflow-auto text-sm">{JSON.stringify({ before: operation.before, after: operation.after }, null, 2)}</pre></details>{permissions.includes('restore') && ['create', 'edit', 'move', 'merge', 'archive', 'reactivate'].includes(operation.action) && operation.typeRevision === definition.revision && <button type="button" className={buttonClass} disabled={busy} onClick={() => run(async () => await taxonomyApi.undo(operation.id))}>Undo change</button>}</article>)}<div className="flex gap-4">{historyPage > 1 && <button type="button" onClick={() => setHistoryPage(historyPage - 1)}>Previous history</button>}{history.data?.next && <button type="button" onClick={() => setHistoryPage(historyPage + 1)}>Next history</button>}</div></section>}
+        {view === 'rights' && permissions.includes('administer') && <section className="space-y-5 max-w-xl"><h2 className="text-xl font-semibold">Named user rights</h2><p>Members can use and propose. These templates add explicit permissions for this type.</p>{grants.error && <p role="alert">{classificationError(grants.error)}</p>}<ul>{(grants.data?.results || []).map(grant => <li key={grant.id}>{grant.username}: {grant.permissions.join(', ')}</li>)}</ul><form className="space-y-4" onSubmit={event => { event.preventDefault(); run(async () => await taxonomyApi.grant(typeId, Number(grantUser), customPermissions)) }}><label className="block"><span className="classification-field-label">User</span><CompactSelect label="User" required className={inputClass} value={grantUser} onChange={event => setGrantUser(event.target.value)}><option value="">Choose user</option>{(members.data?.results || []).map(user => <option key={user.id} value={user.id}>{user.name}</option>)}</CompactSelect></label><label className="block"><span className="classification-field-label">Role template</span><CompactSelect label="Role template" className={inputClass} value={grantRole} onChange={event => { setGrantRole(event.target.value); setCustomPermissions(roles[event.target.value]) }}>{Object.keys(roles).map(role => <option key={role}>{role}</option>)}</CompactSelect></label><fieldset className="space-y-2"><legend>Permissions</legend>{roles.administrator.concat(roles.steward).map(permission => <label key={permission} className="flex items-center gap-2"><input type="checkbox" checked={customPermissions.includes(permission)} onChange={event => setCustomPermissions(event.target.checked ? [...customPermissions, permission] : customPermissions.filter(item => item !== permission))} />{permission}</label>)}</fieldset><button className={buttonClass} disabled={busy}>Save permissions</button></form></section>}
     </div>
 }

@@ -13,7 +13,6 @@ import React, { useState, useEffect } from 'react';
 import { Loader2, FolderOpen } from 'lucide-react';
 import { namespacesApi } from '../api';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
-import KanbanImport from '../components/kanban/KanbanImport';
 import MediaManager from '../components/media/MediaManager';
 import ContextualHelpLink from '../components/help/ContextualHelpLink';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -25,8 +24,6 @@ const MediaManagerPage = () => {
   const [namespaces, setNamespaces] = useState([]);
   const [selectedNamespace, setSelectedNamespace] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  const [mediaVersion, setMediaVersion] = useState(0);
 
   const { addNotification } = useGlobalNotifications();
 
@@ -120,12 +117,12 @@ const MediaManagerPage = () => {
             </div>
           </div>
         ) : (
-          <div className="h-full flex flex-col"><KanbanImport destination="media" namespace={namespaces.find(item => item.slug === selectedNamespace)?.id} onImported={() => setMediaVersion(value => value + 1)} /><MediaManager key={mediaVersion}
+          <MediaManager
             namespace={selectedNamespace}
             onFileSelect={handleFileSelect}
             onFilesLoaded={handleFilesLoaded}
             selectionMode="multiple"
-          /></div>
+          />
         )}
       </div>
     </div>

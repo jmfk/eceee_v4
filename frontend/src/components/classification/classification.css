@@ -1,0 +1,219 @@
+/* Compact classification controls; scoped away from app chrome and tenant content. */
+.classification-manager .classification-tabs {
+    display: flex;
+    gap: .125rem;
+    overflow-x: auto;
+    border-bottom: 1px solid #d1d5db;
+}
+.classification-manager .classification-tabs > button {
+    flex-shrink: 0;
+    min-height: 1.75rem;
+    margin-bottom: -1px;
+    padding: .25rem .625rem;
+    border: 1px solid transparent;
+    border-radius: .1875rem .1875rem 0 0;
+    background: transparent;
+    color: #6b7280;
+    font-weight: 400;
+}
+.classification-manager .classification-tabs > button[aria-pressed='true'] {
+    border-color: #d1d5db;
+    border-bottom-color: white;
+    background: white;
+    color: #2563eb;
+    font-weight: 500;
+}
+.classification-manager .classification-search-wrap { position: relative; }
+.classification-manager .classification-search {
+    min-width: 0;
+    position: relative;
+    padding: .25rem .625rem;
+    border: 1px solid #d1d5db;
+    border-radius: .1875rem;
+}
+.classification-manager { font-size: .75rem; }
+.classification-manager .classification-search:focus-within {
+    border-color: #2563eb;
+    box-shadow: none;
+}
+.classification-manager .classification-search-content {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem;
+    min-height: 1.5rem;
+}
+.classification-manager .classification-search input {
+    flex: 1;
+    width: 6rem;
+    min-width: 4rem;
+    min-height: 1.5rem;
+    margin: 0;
+    padding: .25rem 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    font-size: .75rem;
+    outline: none;
+    box-shadow: none;
+}
+.classification-manager .classification-search .classification-icon {
+    width: 1.5rem;
+    min-height: 1.5rem;
+    margin-left: auto;
+    padding: .25rem;
+    border: 0;
+    border-radius: .1875rem;
+    background: transparent;
+}
+.classification-manager .classification-search .classification-filter-pill {
+    gap: .375rem;
+    min-height: 1.375rem;
+    padding: .125rem .5rem;
+    border: 0;
+    border-radius: .1875rem;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: .75rem;
+    line-height: 1.2;
+}
+.classification-manager .classification-filter-menu {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + .5rem);
+    right: 0;
+    width: min(18rem, 100%);
+    padding: .75rem .625rem .625rem;
+    border: 1px solid #e5e7eb;
+    border-radius: .1875rem;
+    background: white;
+    box-shadow: 0 4px 12px rgb(0 0 0 / .08);
+}
+.classification-manager .classification-field,
+.classification-manager label:has(> .classification-field-label) {
+    position: relative;
+    display: block;
+    min-width: 0;
+    padding-top: .5rem;
+}
+/* Labels share the empty value line, then lift into a masked border notch. */
+.classification-manager .classification-field > span:not([role='alert']),
+.classification-manager .classification-field-label {
+    position: absolute;
+    top: 1.4375rem;
+    left: .5rem;
+    z-index: 1;
+    max-width: calc(100% - 1.25rem);
+    padding: 0 .125rem;
+    transform: translateY(-50%);
+    background: white;
+    color: #6b7280;
+    font-size: .75rem;
+    font-weight: 400;
+    line-height: 1rem;
+    cursor: text;
+    transition: top 140ms ease, font-size 140ms ease, line-height 140ms ease, color 140ms ease;
+}
+.classification-manager :is(.classification-field, label:has(> .classification-field-label)):is(
+    :focus-within,
+    :has(> input[data-filled='true']),
+    :has(> textarea[data-filled='true']),
+    :has(> .cms-compact-select[data-filled='true']),
+    :has(> .cms-compact-select[aria-expanded='true'])
+) > :is(.classification-field-label, span:not([role='alert'])) {
+    top: .5rem;
+    font-size: .625rem;
+    line-height: .625rem;
+}
+.classification-manager :is(.classification-field, label:has(> .classification-field-label)):focus-within > span:not([role='alert']) {
+    color: #2563eb;
+}
+.classification-manager :is(.classification-field, label:has(> .classification-field-label)):not(:focus-within)
+    > .cms-compact-select[data-filled='false']:not([aria-expanded='true']) .cms-compact-select-value { opacity: 0; }
+.classification-manager .classification-search-label {
+    position: absolute;
+    top: 50%;
+    left: 2.125rem;
+    z-index: 1;
+    padding: 0 .125rem;
+    transform: translateY(-50%);
+    background: white;
+    color: #6b7280;
+    font-size: .75rem;
+    line-height: 1rem;
+    cursor: text;
+    transition: top 140ms ease, left 140ms ease, font-size 140ms ease, line-height 140ms ease, color 140ms ease;
+}
+.classification-manager .classification-search:is(:focus-within, [data-filled='true']) .classification-search-label {
+    top: 0;
+    left: .5rem;
+    font-size: .625rem;
+    line-height: .625rem;
+}
+.classification-manager .classification-search:focus-within .classification-search-label { color: #2563eb; }
+@media (prefers-reduced-motion: reduce) {
+    .classification-manager :is(.classification-field-label, .classification-search-label, .classification-field > span) { transition: none; }
+}
+.classification-manager :is(input, select, textarea) {
+    min-height: 1.75rem;
+    margin-top: 0;
+    padding: .25rem .625rem;
+    border-radius: .1875rem;
+}
+.classification-manager select {
+    width: 100%;
+    padding-right: 2.25rem;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='1.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-position: right .75rem center;
+    background-repeat: no-repeat;
+}
+.classification-manager button { min-height: 1.75rem; padding: .25rem .625rem; }
+.classification-manager .classification-row {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 2rem;
+    padding: .375rem .75rem;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    text-align: left;
+}
+.classification-manager .classification-row:hover { background: #f9fafb; }
+
+.classification-manager .classification-tree-row {
+    justify-content: flex-start;
+    min-height: 1.75rem;
+    padding: .25rem .625rem;
+    border: 0;
+    border-radius: .1875rem;
+    background: transparent;
+}
+.classification-manager .classification-tree-row[aria-current='true'] {
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.classification-manager .classification-search input:focus-visible {
+    outline: none;
+    box-shadow: none;
+}
+.classification-manager .classification-tabs > button,
+.classification-manager :is(button, input, select, textarea) { font-size: .75rem; }
+.classification-manager .classification-field:focus-within :is(input, select, textarea),
+.classification-manager label:has(> .classification-field-label):focus-within :is(input, select, textarea) {
+    border-color: #2563eb;
+    outline: none;
+    box-shadow: none;
+}
+
+/* Keep border labels clear of the value without enlarging unrelated controls. */
+.classification-manager .classification-field > :is(input, select, textarea),
+.classification-manager label:has(> .classification-field-label) > :is(input, select, textarea) {
+    min-height: 1.875rem;
+    padding-top: .375rem;
+    padding-bottom: .25rem;
+    line-height: 1rem;
+}

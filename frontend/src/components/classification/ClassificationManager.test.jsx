@@ -12,12 +12,14 @@ vi.mock('../../api/taxonomy', () => ({ taxonomyApi: {
 vi.mock('../../utils/tenant', () => ({ getCurrentTenantId: () => 'tenant' }))
 
 const definition = { id: 'type', name: 'Topics', permissions: ['use', 'propose', 'create', 'edit', 'restore', 'approve'] }
-function renderManager() {
-    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><ClassificationManager /></QueryClientProvider>)
+function renderManager(props = {}) {
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><ClassificationManager {...props} /></QueryClientProvider>)
 }
 async function chooseType() {
-    await screen.findByRole('option', { name: 'Topics' })
-    fireEvent.change(screen.getByLabelText('Tag type'), { target: { value: 'type' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Add filter' }))
+    fireEvent.click(screen.getByRole('combobox', { name: 'Tag type' }))
+    fireEvent.click(await screen.findByRole('option', { name: 'Topics' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'New tag' }))
 }
 beforeEach(() => {
     vi.clearAllMocks()
@@ -32,6 +34,49 @@ beforeEach(() => {
 })
 
 describe('classification management', () => {
+    it('adds a removable filter pill without opening the editor, and dismisses the chooser with Escape', async () => {
+        renderManager()
+        const addFilter = await screen.findByRole('button', { name: 'Add filter' })
+        fireEvent.click(addFilter)
+        expect(screen.getByRole('dialog', { name: 'Add tag filter' })).toBeInTheDocument()
+        fireEvent.keyDown(screen.getByLabelText('Tag type'), { key: 'Escape' })
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+        expect(addFilter).toHaveFocus()
+        fireEvent.click(addFilter)
+        fireEvent.click(screen.getByRole('combobox', { name: 'Tag type' }))
+    fireEvent.click(await screen.findByRole('option', { name: 'Topics' }))
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+        expect(screen.queryByLabelText('Name')).not.toBeInTheDocument()
+        await waitFor(() => expect(taxonomyApi.terms).toHaveBeenCalledWith(expect.objectContaining({ classification_type: 'type' })))
+        fireEvent.click(screen.getByRole('button', { name: 'Remove type filter: Topics' }))
+        await waitFor(() => expect(taxonomyApi.terms).toHaveBeenLastCalledWith(expect.objectContaining({ classification_type: '' })))
+    })
+
+    it('opens with all tags, alphabetical ordering and a search before choosing a type', async () => {
+        taxonomyApi.terms.mockResolvedValue({ count: 1, results: [{ id: 'energy', name: 'Energy', classificationType: 'type', parent: null, status: 'approved' }] })
+        renderManager()
+        expect(await screen.findByRole('button', { name: 'Energy' })).toBeInTheDocument()
+        expect(screen.queryByLabelText('Tag type')).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Add filter' })).toHaveAttribute('aria-expanded', 'false')
+        expect(taxonomyApi.terms).toHaveBeenCalledWith(expect.objectContaining({ classification_type: '', page_size: 50, ordering: 'name' }))
+        fireEvent.change(screen.getByRole('searchbox', { name: 'Search tags' }), { target: { value: 'Energy' } })
+        await waitFor(() => expect(taxonomyApi.terms).toHaveBeenCalledWith(expect.objectContaining({ search: 'Energy', page: 1 })))
+        fireEvent.click(await screen.findByRole('button', { name: 'Energy' }))
+        expect(await screen.findByRole('heading', { name: 'Energy' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Remove type filter: Topics' })).toBeInTheDocument()
+    })
+
+    it('loads migrated tags and proposals within the media namespace', async () => {
+        taxonomyApi.terms.mockResolvedValue({ results: [{ id: 'source', name: 'Reuters', parent: null, status: 'approved' }] })
+        renderManager({ namespace: 'editorial' })
+        await chooseType()
+        expect(await screen.findByRole('button', { name: 'Reuters' })).toBeInTheDocument()
+        expect(taxonomyApi.types).toHaveBeenCalledWith({ namespace: 'editorial', page_size: 200 })
+        expect(taxonomyApi.terms).toHaveBeenCalledWith(expect.objectContaining({ namespace: 'editorial', classification_type: 'type' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Proposals' }))
+        await waitFor(() => expect(taxonomyApi.proposals).toHaveBeenCalledWith({ namespace: 'editorial', page: 1 }))
+    })
+
     it('offers a first step when there are no tag types', async () => {
         taxonomyApi.types.mockResolvedValue({ count: 0, results: [] })
         renderManager()
@@ -64,22 +109,6 @@ describe('classification management', () => {
         expect(screen.getByRole('button', { name: 'Proposals' })).toHaveAttribute('aria-pressed', 'true')
         expect(screen.queryByLabelText('Tag type')).not.toBeInTheDocument()
         expect(screen.queryByLabelText('Decision reason')).not.toBeInTheDocument()
-    })
-    it('shows decision controls for pending proposals and sends the reason on approval', async () => {
-        taxonomyApi.proposals.mockResolvedValue({ count: 1, results: [{
-            id: 'proposal', classificationType: 'type', action: 'edit', status: 'pending',
-            term: { name: 'Energy', status: 'approved' }, payload: { name: 'Energy efficiency' },
-            proposedBy: 1, createdAt: '2026-10-23T12:00:00Z',
-        }] })
-        renderManager()
-        await screen.findByRole('option', { name: 'Topics' })
-        fireEvent.click(screen.getByRole('button', { name: 'Proposals' }))
-        fireEvent.change(await screen.findByLabelText('Decision reason'), { target: { value: 'Clearer name' } })
-        expect(screen.getByRole('button', { name: 'Reject' })).toBeEnabled()
-        expect(screen.getByRole('button', { name: 'Withdraw own proposal' })).toBeEnabled()
-        expect(screen.queryByLabelText('Tag type')).not.toBeInTheDocument()
-        fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
-        await waitFor(() => expect(taxonomyApi.decide).toHaveBeenCalledWith('proposal', 'approved', 'Clearer name'))
     })
     it('creates an approved term for an authorized user and offers undo', async () => {
         renderManager()

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import MediaManager from '../media/MediaManager'
 import { mediaApi } from '../../api'
 
@@ -25,14 +25,21 @@ vi.mock('../media/MediaCollectionManager', () => ({
     default: () => <div>Collections</div>,
 }))
 
-vi.mock('../media/MediaTagManager', () => ({
-    default: () => <div>Tags</div>,
+vi.mock('../classification/ClassificationManager', () => ({
+    default: ({ namespace }) => <div data-testid="shared-tags">Shared tags: {namespace}</div>,
 }))
 
 describe('MediaManager', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         mediaApi.pendingFiles.list.mockResolvedValue({ results: [] })
+    })
+
+    it('uses the shared tag register in the current media namespace', async () => {
+        render(<MediaManager namespace="editorial" />)
+        fireEvent.click(screen.getByRole('button', { name: 'Tags' }))
+        await waitFor(() => expect(mediaApi.pendingFiles.list).toHaveBeenCalled())
+        expect(screen.getByTestId('shared-tags')).toHaveTextContent('Shared tags: editorial')
     })
 
     it('opens the media library in list view by default', () => {
