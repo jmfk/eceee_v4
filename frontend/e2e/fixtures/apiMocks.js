@@ -312,6 +312,22 @@ export async function mockCmsApi(page, {
     body: JSON.stringify({ csrfToken: 'playwright-csrf-token' }),
   }))
 
+  await page.route('**/_allauth/browser/v1/**', async (route, request) => {
+    const path = new URL(request.url()).pathname
+    if (path.endsWith('/config')) return json(route, { data: { socialaccount: { providers: [] } } })
+    if (path.endsWith('/auth/login') && request.method() === 'POST') {
+      const credentials = request.postDataJSON()
+      if (credentials.username !== 'admin' || credentials.password !== 'blarg123' || !request.headers()['x-csrftoken']) {
+        return json(route, { errors: [{ message: 'Invalid credentials or missing CSRF token.' }] }, 400)
+      }
+      authenticated = true
+    }
+    if (path.endsWith('/auth/session') || path.endsWith('/auth/login')) {
+      return json(route, { meta: { is_authenticated: authenticated }, data: { flows: [] } }, authenticated ? 200 : 401)
+    }
+    return json(route, { errors: [{ message: 'Unhandled authentication route.' }] }, 404)
+  })
+
   await page.route('**/api/v1/**', async (route, request) => {
     const url = new URL(request.url())
     const method = request.method()
