@@ -61,7 +61,7 @@ export default function ClassificationManager({ namespace } = {}) {
     const [undoId, setUndoId] = useState(null)
     const [grantUser, setGrantUser] = useState('')
     const [grantRole, setGrantRole] = useState('proposer')
-    const types = useQuery({ queryKey: ['classification', tenant, 'types', namespace], queryFn: async () => await taxonomyApi.types({ ...scope, page_size: 200 }) })
+    const types = useQuery({ queryKey: ['classification', tenant, 'types', namespace], queryFn: async () => await taxonomyApi.types({ ...scope, page_size: 200, ordering: 'name' }) })
     const hasTypes = (types.data?.results || []).length > 0
     const setupPending = types.isSuccess && !hasTypes
     const definition = types.data?.results?.find(type => type.id === typeId)

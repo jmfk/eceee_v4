@@ -21,7 +21,7 @@ Successful structure changes offer **Undo**. If later changes prevent restoratio
 
 **Proposals** shows proposed changes and their decision status. Approval requires both approval rights and permission for the proposed action. A term proposed for a draft must be approved or removed before publication. Media assignments require an approved term.
 
-Administrators use **Types** to configure names and allowed content types, and **Rights** to assign named users a role template or specific permissions. Classification permissions do not grant access to edit the content itself.
+Types are listed alphabetically by name. Administrators use **Types** to configure names and allowed content types, and **Rights** to assign named users a role template or specific permissions. Classification permissions do not grant access to edit the content itself.
 
 If existing tags appear with a setup notice, a workspace owner must complete the migration before they can be edited in this view.
 
