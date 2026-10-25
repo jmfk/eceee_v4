@@ -30,6 +30,20 @@ export const kanbanApi = {
     async patch(path, data) {
         return convertKeysToCamel((await apiClient.patch(base + path, snake(data))).data)
     },
+    async delete(path, data) {
+        return convertKeysToCamel((await apiClient.delete(base + path, { data: snake(data) })).data)
+    },
+    async background(boardId) {
+        return (await apiClient.get(`${base}boards/${boardId}/background/`, { responseType: 'blob' })).data
+    },
+    async uploadBackground(boardId, file, revision) {
+        const body = new FormData()
+        body.append('file', file)
+        body.append('revision', revision)
+        return convertKeysToCamel((await apiClient.post(`${base}boards/${boardId}/background/`, body, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })).data)
+    },
     async upload(cardId, file, revision, comment) {
         const body = new FormData()
         body.append('file', file)

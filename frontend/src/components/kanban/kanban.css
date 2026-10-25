@@ -167,7 +167,30 @@
 .kb-card:hover { border-color: #64748b; }
 .kb-board-actions { gap: 12px; justify-content: flex-end; }
 .kb-board-summary { margin-right: auto; }
+.kb-board-dialog { position: relative; z-index: 110; color-scheme: light; }
+.kb-board-dialog-backdrop { position: fixed; inset: 0; background: rgb(17 24 39 / 0.45); }
+.kb-board-dialog-panel { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(440px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 18px; border: 1px solid #d1d5db; border-radius: 5px; background: white; box-shadow: 0 20px 50px rgb(0 0 0 / 0.22); font: 12px/1.5 Inter, sans-serif; }
+.kb-board-dialog-panel > header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.kb-board-dialog-panel > header h2 { font-size: 16px; font-weight: 600; }
+.kb-board-dialog-panel > header button { min-width: 28px; min-height: 28px; display: grid; place-items: center; }
+.kb-board-dialog-panel :is(input[type="text"], input:not([type])) { width: 100%; min-height: 32px; margin: 8px 0 14px; padding: 6px 10px; border: 1px solid #9ca3af; border-radius: 3px; background: white; }
+.kb-board-dialog-panel :is(input, button):focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.kb-board-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.kb-board-dialog-actions button { min-height: 30px; padding: 5px 12px; border-radius: 3px; }
+.kb-board-member-list { max-height: min(360px, 50dvh); overflow-y: auto; border-top: 1px solid #e5e7eb; }
+.kb-board-member-list label { display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 6px 2px; border-bottom: 1px solid #e5e7eb; cursor: pointer; }
+.kb-board-member-list label span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.kb-board-actions > .kb-menu > summary { width: auto; padding: 0 8px; white-space: nowrap; }
 .kb-card-cover { height: 32px; margin: -12px -12px 10px !important; border-radius: 3px 3px 0 0; }
+.kb-card-cover-image { display: block; width: calc(100% + 24px); height: 110px; object-fit: cover; }
+.kb-detail-cover.kb-detail-cover-image { display: block; width: 100%; height: 190px; object-fit: cover; }
+.kb-board-background-preview { display: block; width: 100%; height: 110px; margin: 8px 0; object-fit: cover; border-radius: 3px; }
+.kb-image-generator { display: grid; gap: 8px; margin: 12px 0; padding-top: 12px; border-top: 1px solid #d1d5db; }
+.kb-image-generator textarea { width: 100%; min-height: 72px; padding: 7px 9px; border: 1px solid #9ca3af; border-radius: 3px; resize: vertical; }
+.kb-image-generator button { width: fit-content; padding: 5px 10px; border: 1px solid #9ca3af; border-radius: 3px; background: #fff; }
+.kb-image-generator button:disabled { opacity: 0.5; }
+.kb-cover-upload { display: grid; gap: 5px; margin: 12px 0; }
+.kb-lists[style*="background-image"] { background-size: cover; background-position: center; }
 .kb-card:has(.kb-card-cover) .kb-action-trigger { background: white; }
 .kb-actions { position: relative; flex-shrink: 0; }
 .kb-actions .kb-action-trigger { display: flex; align-items: center; justify-content: center; min-width: 28px; min-height: 28px; padding: 4px; border: 0; background: transparent; border-radius: 3px; }

@@ -1,7 +1,7 @@
 import Avatar from '../components/Avatar'
 import { Fragment } from 'react'
 import { Dialog, DialogBackdrop, DialogPanel, DialogTitle, Popover, PopoverButton, PopoverPanel } from '@headlessui/react'
-import { CardActions, ColumnActions } from '../components/kanban/KanbanActions'
+import { ActionsMenu, CardActions, ColumnActions } from '../components/kanban/KanbanActions'
 import { coverColors } from '../components/kanban/cardPresentation'
 import useBoardDrag from '../components/kanban/useBoardDrag'
 import { useEffect, useRef, useState } from 'react'
@@ -10,7 +10,7 @@ import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import UserToolsNav from '../components/UserToolsNav'
 import StatusBar from '../components/StatusBar'
-import { Columns3, Plus, MoreHorizontal, SlidersHorizontal, ArrowLeft, X, Tag, Clock, ListChecks, Paperclip, AlignLeft, MessageSquare } from 'lucide-react'
+import { Columns3, Plus, MoreHorizontal, SlidersHorizontal, ArrowLeft, X, Tag, Clock, ListChecks, Paperclip, AlignLeft, MessageSquare, Users, Pencil, Archive } from 'lucide-react'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import '../components/user-tools.css'
 import { useAuth } from '../contexts/AuthContext'
@@ -254,7 +254,7 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
             <div className="kb-detail-position">
                 <DialogPanel className="kb kb-detail user-tools-content">
                     <DialogTitle className="sr-only">{card.title}</DialogTitle>
-                    {card.coverColor && (
+                    {card.coverAttachment ? <img className="kb-detail-cover kb-detail-cover-image" src={attachmentUrl(card.coverAttachment, ticket)} alt="" /> : card.coverColor && (
                         <div
                             className="kb-detail-cover"
                             style={{ background: coverColors[card.coverColor] }}
@@ -913,6 +913,11 @@ export default function KanbanPage() {
     const [showNotices, setShowNotices] = useState(false)
     const [showActivity, setShowActivity] = useState(false)
     const [rename, setRename] = useState(null)
+    const [boardDialog, setBoardDialog] = useState('')
+    const [boardTitle, setBoardTitle] = useState('')
+    const [backgroundPrompt, setBackgroundPrompt] = useState('')
+    const [memberSearch, setMemberSearch] = useState('')
+    const [boardBackground, setBoardBackground] = useState('')
     const searchRef = useRef(null)
     const workspaceQuery = useQuery({
         queryKey: ['kanban', tenant, principal, 'workspace'],
@@ -934,6 +939,11 @@ export default function KanbanPage() {
         enabled: canLoad && !!cardId,
     })
     const boardId = routeBoardId || cardQuery.data?.board
+    const availableMembers = useQuery({
+        queryKey: ['kanban', tenant, principal, 'available-members', boardId],
+        queryFn: async () => await kanbanApi.get(`boards/${boardId}/available-members/`),
+        enabled: canLoad && !!boardId && boardDialog === 'members',
+    })
     const boardDrag = useBoardDrag(`${tenant}:${boardId}`)
     const params = {
         board: boardId || '',
@@ -1018,8 +1028,25 @@ export default function KanbanPage() {
         setNewColumn('')
         setAddingList(false)
         setRename(null)
+        setBoardDialog('')
+        setMemberSearch('')
     }, [boardId, tenant, principal])
     const board = workspace?.boards.find((item) => item.id === boardId)
+    useEffect(() => {
+        if (!board?.hasBackground) return undefined
+        let active = true
+        let objectUrl = ''
+        kanbanApi.background(board.id).then((blob) => {
+            if (!active) return
+            objectUrl = URL.createObjectURL(blob)
+            setBoardBackground(objectUrl)
+        }).catch(() => { if (active) setBoardBackground('') })
+        return () => {
+            active = false
+            if (objectUrl) URL.revokeObjectURL(objectUrl)
+            setBoardBackground('')
+        }
+    }, [board?.id, board?.hasBackground, board?.revision])
     const columns = (workspace?.columns || []).filter((item) => item.board === boardId)
     const cards = cardsQuery.data?.results || []
     const visibleColumns = columns.filter((column) => archived === 'all' || archived === 'true' || !column.archived)
@@ -1281,15 +1308,52 @@ export default function KanbanPage() {
                             {cardsQuery.error && <p role="alert">{kanbanError(cardsQuery.error)}</p>}
                             {boardId && !board && <p>Boardet finns inte i den här tenanten.</p>}
                             {board && <div className="kb-board-actions">
-                                <span className="kb-muted">{visibleColumns.length} listor · {cards.length} kort{board.archived ? ' · Arkiverad tavla' : ''}</span>
-                                <details className="kb-menu"><summary>Medlemmar</summary><div className="kb-menu-items">
-                                    {workspace.members.map((member) => <label key={member.id} className="flex items-center gap-2"><input type="checkbox" disabled={busy} checked={board.members?.includes(member.id) || false} onChange={(e) => run(async () => await kanbanApi.post(`boards/${board.id}/members/`, { revision: board.revision, members: e.target.checked ? [...(board.members || []), member.id] : board.members.filter((id) => id !== member.id) }))} /><Avatar userId={member.id} name={member.name} />{member.name}</label>)}
-                                </div></details>
-                                <details className="kb-menu"><summary aria-label="Tavelåtgärder"><MoreHorizontal size={18} /></summary><div className="kb-menu-items">
-                                    <button onClick={() => setRename({ type: 'boards', ...board })}>Byt namn</button>
-                                    <button disabled={busy} onClick={() => run(async () => await kanbanApi.patch(`boards/${board.id}/`, { revision: board.revision, archived: !board.archived }))}>{board.archived ? 'Återställ tavla' : 'Arkivera tavla'}</button>
-                                </div></details>
+                                <span className="kb-muted kb-board-summary">{visibleColumns.length} listor · {cards.length} kort{board.archived ? ' · Arkiverad tavla' : ''}</span>
+                                <ActionsMenu label="Tavelåtgärder">
+                                    {(close) => <>
+                                        <button onClick={() => { close(); setBoardDialog('members') }}><Users size={15} />Medlemmar</button>
+                                        <button onClick={() => { close(); setBoardTitle(board.title); setBoardDialog('edit') }}><Pencil size={15} />Redigera tavlan</button>
+                                        <button disabled={busy} onClick={() => { close(); run(async () => await kanbanApi.patch(`boards/${board.id}/`, { revision: board.revision, archived: !board.archived })) }}><Archive size={15} />{board.archived ? 'Återställ tavla' : 'Arkivera tavla'}</button>
+                                    </>}
+                                </ActionsMenu>
                             </div>}
+                            {board && <Dialog open={!!boardDialog} onClose={() => setBoardDialog('')} className="kb-board-dialog">
+                                <DialogBackdrop className="kb-board-dialog-backdrop" />
+                                <DialogPanel className="kb-board-dialog-panel">
+                                    <header><DialogTitle>{boardDialog === 'members' ? 'Medlemmar' : 'Redigera tavlan'}</DialogTitle><button type="button" aria-label="Stäng dialog" onClick={() => setBoardDialog('')}><X size={18} /></button></header>
+                                    {boardDialog === 'members' ? <>
+                                        <p className="kb-muted">Lägg till eller ta bort användare från tavlan. En administratör kan lägga till alla aktiva användare i systemet. Då får de även tillgång till arbetsytan. Att ta bort någon från tavlan tar inte bort tillgången till arbetsytan.</p>
+                                        <input aria-label="Sök användare" placeholder="Sök användare" value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)} />
+                                        {availableMembers.isPending && <p role="status">Läser användare…</p>}
+                                        {availableMembers.error && <p role="alert">{kanbanError(availableMembers.error)}</p>}
+                                        <div className="kb-board-member-list">
+                                            {(availableMembers.data || []).filter((member) => `${member.name} ${member.username}`.toLocaleLowerCase().includes(memberSearch.toLocaleLowerCase())).map((member) => <label key={member.id}>
+                                                <input type="checkbox" disabled={busy} checked={board.members?.includes(member.id) || false} onChange={(e) => run(async () => await kanbanApi.post(`boards/${board.id}/members/`, { revision: board.revision, members: e.target.checked ? [...(board.members || []), member.id] : board.members.filter((id) => id !== member.id) }))} />
+                                                <Avatar userId={member.id} name={member.name} /><span>{member.name}</span>
+                                            </label>)}
+                                        </div>
+                                    </> : <form onSubmit={(e) => { e.preventDefault(); run(async () => { await kanbanApi.patch(`boards/${board.id}/`, { revision: board.revision, title: boardTitle.trim() }); setBoardDialog('') }) }}>
+                                        <label htmlFor="kb-board-title">Tavelnamn</label>
+                                        <input id="kb-board-title" autoFocus value={boardTitle} onChange={(e) => setBoardTitle(e.target.value)} maxLength={200} required />
+                                        <label htmlFor="kb-board-background">Bakgrundsbild</label>
+                                        {boardBackground && <img className="kb-board-background-preview" src={boardBackground} alt="Aktuell bakgrundsbild" />}
+                                        <input id="kb-board-background" type="file" accept="image/jpeg,image/png,image/gif,image/webp" disabled={busy} onChange={(e) => {
+                                            const file = e.target.files?.[0]
+                                            if (file) run(async () => await kanbanApi.uploadBackground(board.id, file, board.revision))
+                                            e.target.value = ''
+                                        }} />
+                                        {workspace.canGenerateImages && <div className="kb-image-generator">
+                                            <label htmlFor="kb-background-prompt">Beskriv bakgrundsbilden</label>
+                                            <textarea id="kb-background-prompt" value={backgroundPrompt} onChange={(e) => setBackgroundPrompt(e.target.value)} maxLength={4000} placeholder="Till exempel kustlandskap med starka färger" />
+                                            <button type="button" disabled={busy || !backgroundPrompt.trim()} onClick={() => run(async () => await kanbanApi.post(`boards/${board.id}/generate-background/`, { revision: board.revision, prompt: backgroundPrompt }))}>Generera från beskrivning</button>
+                                            <button type="button" disabled={busy} onClick={() => run(async () => await kanbanApi.post(`boards/${board.id}/generate-background/`, { revision: board.revision, fromContent: true }))}>Generera från tavlans innehåll</button>
+                                        </div>}
+                                        {board.hasBackground && <button type="button" disabled={busy} onClick={() => run(async () => await kanbanApi.delete(`boards/${board.id}/background/`, { revision: board.revision }))}>Ta bort bakgrundsbild</button>}
+                                        {error && <p role="alert">{error}</p>}
+                                        <div className="kb-board-dialog-actions"><button type="button" onClick={() => setBoardDialog('')}>Avbryt</button><button className="user-tools-primary" disabled={busy || !boardTitle.trim()}>Spara</button></div>
+                                    </form>}
+                                </DialogPanel>
+                            </Dialog>}
                             {rename && (
                                 <form
                                     className="flex gap-2 mb-4"
@@ -1317,7 +1381,7 @@ export default function KanbanPage() {
                                 </form>
                             )}
                             {board ? (
-                                <div className="kb-lists" aria-label="Kanban-kolumner" ref={boardDrag.boardRef}
+                                <div className="kb-lists" aria-label="Kanban-kolumner" ref={boardDrag.boardRef} style={boardBackground ? { backgroundImage: `linear-gradient(rgb(15 23 42 / 0.1), rgb(15 23 42 / 0.1)), url("${boardBackground}")` } : undefined}
                                     onDrop={(e) => {
                                         const target = boardDrag.targetRef.current
                                         if (!boardDrag.drag || !target) return
@@ -1360,7 +1424,7 @@ export default function KanbanPage() {
                                                         draggable={!busy}
                                                         onDragStart={(e) => boardDrag.start(e, { type: 'card', id: card.id, revision: card.revision })}
                                                     >
-                                                        {card.coverColor && <div className="kb-card-cover" style={{ background: coverColors[card.coverColor] }} />}
+                                                        {card.coverAttachment ? <img className="kb-card-cover kb-card-cover-image" src={attachmentUrl(card.coverAttachment, ticket)} alt="" loading="lazy" /> : card.coverColor && <div className="kb-card-cover" style={{ background: coverColors[card.coverColor] }} />}
                                                         {!!card.labels?.length && <div className="kb-card-labels">{workspace.labels.filter((label) => card.labels.includes(label.id)).map((label) => <span key={label.id}>{label.name}</span>)}</div>}
                                                         <p className="kb-card-id">
                                                             {card.shortId}{card.mirrorOf ? ' · Spegling' : ''}

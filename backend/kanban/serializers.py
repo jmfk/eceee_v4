@@ -16,9 +16,14 @@ class MemberSerializer(serializers.ModelSerializer):
 
 
 class BoardSerializer(serializers.ModelSerializer):
+    has_background = serializers.SerializerMethodField()
+
+    def get_has_background(self, board):
+        return bool(board.background_path)
+
     class Meta:
         model = Board
-        fields = ["id", "title", "archived", "revision", "members"]
+        fields = ["id", "title", "archived", "revision", "members", "has_background"]
 
 
 class ColumnSerializer(serializers.ModelSerializer):
@@ -47,6 +52,7 @@ class CardSerializer(serializers.ModelSerializer):
             "id",
             "short_id",
             "cover_color",
+            "cover_attachment",
             "mirror_of",
             "content_revision",
             "board",
@@ -124,6 +130,7 @@ class DuplicateInput(RevisionInput):
 
 class CardInput(RevisionInput):
     cover_color = serializers.ChoiceField(choices=COVER_COLORS, required=False)
+    cover_attachment = serializers.UUIDField(allow_null=True, required=False)
     title = serializers.CharField(max_length=250, required=False)
     description = serializers.CharField(max_length=100000, allow_blank=True, required=False)
     deadline = serializers.DateTimeField(allow_null=True, required=False)
@@ -154,6 +161,16 @@ class CardInput(RevisionInput):
             fields.is_valid(raise_exception=True)
             result.append(fields.validated_data)
         return result
+
+
+class GenerateImageInput(RevisionInput):
+    prompt = serializers.CharField(max_length=4000, allow_blank=True, required=False, default="")
+    from_content = serializers.BooleanField(default=False)
+
+    def validate(self, data):
+        if not data["from_content"] and not data["prompt"].strip():
+            raise serializers.ValidationError("Enter a prompt or generate from the board or card content.")
+        return data
 
 
 class ChecklistItem(serializers.Serializer):

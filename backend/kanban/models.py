@@ -18,6 +18,8 @@ class TenantRecord(models.Model):
 class Board(TenantRecord):
     members = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="kanban_boards")
     title = models.CharField(max_length=200)
+    background_path = models.CharField(max_length=500, blank=True, default="")
+    background_content_type = models.CharField(max_length=100, blank=True, default="")
     archived = models.BooleanField(default=False)
     revision = models.PositiveIntegerField(default=1)
 
@@ -53,6 +55,9 @@ class Label(TenantRecord):
 
 class Card(TenantRecord):
     cover_color = models.CharField(max_length=16, blank=True, default="")
+    cover_attachment = models.ForeignKey(
+        "Attachment", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
     mirror_of = models.ForeignKey("self", null=True, blank=True, on_delete=models.PROTECT, related_name="mirrors")
     number = models.PositiveIntegerField()
     column = models.ForeignKey(Column, on_delete=models.CASCADE, related_name="cards")

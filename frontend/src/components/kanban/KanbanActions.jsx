@@ -75,6 +75,7 @@ export function CardActions({
     const [panel, setPanel] = useState('')
     const [draft, setDraft] = useState({})
     const [labelName, setLabelName] = useState('')
+    const [imagePrompt, setImagePrompt] = useState('')
     const destinations = workspace.columns.filter(
         (column) =>
             !column.archived &&
@@ -83,6 +84,7 @@ export function CardActions({
     )
     const contentId = card.mirrorOf || card.id
     const show = (name) => {
+        setImagePrompt('')
         setDraft({
             assignees: card.assignees || [],
             labels: card.labels || [],
@@ -138,6 +140,7 @@ export function CardActions({
                                                         ? {
                                                               coverColor:
                                                                   draft.coverColor,
+                                                              coverAttachment: null,
                                                           }
                                                         : {
                                                               deadline:
@@ -298,7 +301,7 @@ export function CardActions({
                                     </label>
                                 )}
                                 {panel === 'cover' && (
-                                    <fieldset>
+                                    <><fieldset>
                                         <legend>Omslagsfärg</legend>
                                         <div className="kb-cover-options">
                                             {Object.entries({
@@ -337,6 +340,35 @@ export function CardActions({
                                             ))}
                                         </div>
                                     </fieldset>
+                                    <label className="kb-cover-upload">Ladda upp omslagsbild
+                                        <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" disabled={busy} onChange={(e) => {
+                                            const file = e.target.files?.[0]
+                                            if (file) run(async () => {
+                                                const uploaded = await kanbanApi.upload(contentId, file, card.contentRevision || card.revision)
+                                                const latest = await kanbanApi.get(`cards/${contentId}/`)
+                                                await kanbanApi.patch(`cards/${contentId}/`, { revision: latest.revision, coverAttachment: uploaded.id })
+                                                setPanel('')
+                                                close()
+                                            })
+                                            e.target.value = ''
+                                        }} />
+                                    </label>
+                                    {workspace.canGenerateImages && <div className="kb-image-generator">
+                                        <label>Beskriv omslagsbilden
+                                            <textarea value={imagePrompt} onChange={(e) => setImagePrompt(e.target.value)} maxLength={4000} placeholder="Till exempel en varm illustration av ett team som samarbetar" />
+                                        </label>
+                                        <button type="button" disabled={busy || !imagePrompt.trim()} onClick={() => run(async () => {
+                                            await kanbanApi.post(`cards/${contentId}/generate-cover/`, { revision: card.contentRevision || card.revision, prompt: imagePrompt })
+                                            setPanel('')
+                                            close()
+                                        })}>Generera från beskrivning</button>
+                                        <button type="button" disabled={busy} onClick={() => run(async () => {
+                                            await kanbanApi.post(`cards/${contentId}/generate-cover/`, { revision: card.contentRevision || card.revision, fromContent: true })
+                                            setPanel('')
+                                            close()
+                                        })}>Generera från kortets innehåll</button>
+                                    </div>}
+                                    </>
                                 )}
                                 {(panel === 'copy' || panel === 'mirror') && (
                                     <>
