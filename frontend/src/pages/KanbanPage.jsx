@@ -1,12 +1,16 @@
-import KanbanMediaImport from '../components/kanban/KanbanMediaImport'
 import Avatar from '../components/Avatar'
+import { Fragment } from 'react'
+import { Dialog, DialogBackdrop, DialogPanel, DialogTitle, Popover, PopoverButton, PopoverPanel } from '@headlessui/react'
+import { CardActions, ColumnActions } from '../components/kanban/KanbanActions'
+import { coverColors } from '../components/kanban/cardPresentation'
+import useBoardDrag from '../components/kanban/useBoardDrag'
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import UserToolsNav from '../components/UserToolsNav'
 import StatusBar from '../components/StatusBar'
-import { Columns3, Plus, MoreHorizontal, SlidersHorizontal, ArrowLeft, X } from 'lucide-react'
+import { Columns3, Plus, MoreHorizontal, SlidersHorizontal, ArrowLeft, X, Tag, Clock, ListChecks, Paperclip, AlignLeft, MessageSquare } from 'lucide-react'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import '../components/user-tools.css'
 import { useAuth } from '../contexts/AuthContext'
@@ -126,7 +130,9 @@ function Attachments({ card, workspace, run }) {
                             </p>
                         ))}
                         {file.approvedAt && (
-                            <KanbanMediaImport key={`${card.id}:${file.id}`} file={file} revision={card.revision} />
+                            <p className="kb-muted">
+                                Importera via Media Library eller Designer → Importera från Kanban.
+                            </p>
                         )}
                         {file.contentType.startsWith('image/') && (
                             <button
@@ -155,14 +161,30 @@ const editableSignature = (card) =>
         card.externalReferences,
     ])
 
-function CardDetail({ card, workspace, run, busy, reload }) {
+function CardDetail({ card, workspace, run, busy, reload, error }) {
     const ticket = useKanbanAccess()
     const [draft, setDraft] = useState(card)
+    const navigate = useNavigate()
     const baselineRef = useRef(editableSignature(card))
+    const draftRef = useRef(draft)
+    draftRef.current = draft
+    const [section, setSection] = useState('')
+    const [editingDescription, setEditingDescription] = useState(false)
+    const [commentOpen, setCommentOpen] = useState(false)
+    const [pendingClose, setPendingClose] = useState(false)
+    const dirty = editableSignature(draft) !== baselineRef.current
+    const leave = () => navigate(`/kanban/boards/${card.board}`, { state: { focusCard: card.id } })
+    const close = () => {
+        if (dirty || body.trim()) setPendingClose(true)
+        else leave()
+    }
+    const reveal = (name) => setSection((previous) => (previous === name ? '' : name))
     useEffect(() => {
-        // Comments, attachments, archive and movement can advance the revision
-        // without changing form fields. Rebase only when those fields are unchanged.
-        if (editableSignature(card) === baselineRef.current) {
+        // Apply remote edits only when no local form changes would be lost.
+        if (editableSignature(draftRef.current) === baselineRef.current) {
+            baselineRef.current = editableSignature(card)
+            setDraft(card)
+        } else if (editableSignature(card) === baselineRef.current) {
             setDraft((previous) => ({ ...previous, revision: card.revision }))
         }
     }, [card])
@@ -191,12 +213,16 @@ function CardDetail({ card, workspace, run, busy, reload }) {
             })
             baselineRef.current = editableSignature(result)
             setDraft(result)
+            setEditingDescription(false)
+            setSection('')
         })
     }
     const toggle = (field, id) =>
         setDraft({
             ...draft,
-            [field]: draft[field].includes(id) ? draft[field].filter((value) => value !== id) : [...draft[field], id],
+            [field]: draft[field].includes(id)
+                ? draft[field].filter((value) => value !== id)
+                : [...draft[field], id],
         })
     const sendComment = async (e) => {
         e.preventDefault()
@@ -213,379 +239,642 @@ function CardDetail({ card, workspace, run, busy, reload }) {
                 })
             setBody('')
             setEditingComment(null)
+            setCommentOpen(false)
         })
     }
     const timeline = [
         ...card.comments.map((item) => ({ ...item, entryType: 'comment' })),
-        ...(activityFilter === 'all' ? card.activity.map((item) => ({ ...item, entryType: 'activity' })) : []),
-    ].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+        ...(activityFilter === 'all'
+            ? card.activity.map((item) => ({ ...item, entryType: 'activity' }))
+            : []),
+    ].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     return (
-        <div>
-            <Link to={`/kanban/boards/${card.board}`}>Till tavlan</Link>
-            <div className="flex flex-wrap gap-3 items-center mt-4 mb-6">
-                <span className="kb-muted">{card.shortId}</span>
-                <button onClick={() => navigator.clipboard?.writeText(window.location.href)}>Kopiera kortlänk</button>
-                <button
-                    disabled={busy}
-                    onClick={() =>
-                        run(
-                            async () =>
-                                await kanbanApi.patch(`cards/${card.id}/`, {
-                                    revision: card.revision,
-                                    archived: !card.archived,
-                                }),
-                        )
-                    }
-                >
-                    {card.archived ? 'Återställ kort' : 'Arkivera kort'}
-                </button>
-                <label>
-                    Flytta till{' '}
-                    <select
-                        value={card.column}
-                        disabled={busy}
-                        onChange={(e) =>
-                            run(
-                                async () =>
-                                    await kanbanApi.patch(`cards/${card.id}/`, {
-                                        revision: card.revision,
-                                        column: e.target.value,
-                                        position: 0,
-                                    }),
-                            )
-                        }
-                    >
-                        {workspace.columns
-                            .filter(
-                                (column) =>
-                                    !column.archived &&
-                                    !workspace.boards.find((board) => board.id === column.board)?.archived,
-                            )
-                            .map((column) => (
-                                <option key={column.id} value={column.id}>
-                                    {workspace.boards.find((board) => board.id === column.board)?.title} /{' '}
-                                    {column.title}
-                                </option>
-                            ))}
-                    </select>
-                </label>
-            </div>
-            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)] gap-6">
-                <div className="user-tools-panel">
-                    {card.revision !== draft.revision && (
-                        <div className="mb-4" role="status">
-                            Kortet har uppdaterats. Din text är kvar i formuläret.{' '}
-                            <button
-                                onClick={() => {
-                                    baselineRef.current = editableSignature(card)
-                                    setDraft(card)
-                                    reload()
-                                }}
+        <Dialog open onClose={close} className="kb-detail-dialog">
+            <DialogBackdrop className="kb-detail-backdrop" />
+            <div className="kb-detail-position">
+                <DialogPanel className="kb kb-detail user-tools-content">
+                    <DialogTitle className="sr-only">{card.title}</DialogTitle>
+                    {card.coverColor && (
+                        <div
+                            className="kb-detail-cover"
+                            style={{ background: coverColors[card.coverColor] }}
+                        />
+                    )}
+                    <header className="kb-detail-header">
+                        <label className="kb-detail-destination">
+                            <span className="sr-only">Flytta till</span>
+                            <select
+                                aria-label="Flytta till"
+                                value={card.column}
+                                disabled={busy}
+                                onChange={(e) =>
+                                    run(
+                                        async () =>
+                                            await kanbanApi.patch(`cards/${card.id}/`, {
+                                                revision: card.revision,
+                                                column: e.target.value,
+                                                position: 0,
+                                            }),
+                                    )
+                                }
                             >
-                                Läs in senaste kortet i formuläret
+                                {workspace.columns
+                                    .filter(
+                                        (column) =>
+                                            !column.archived &&
+                                            !workspace.boards.find((board) => board.id === column.board)
+                                                ?.archived,
+                                    )
+                                    .map((column) => (
+                                        <option key={column.id} value={column.id}>
+                                            {
+                                                workspace.boards.find((board) => board.id === column.board)
+                                                    ?.title
+                                            }{' '}
+                                            / {column.title}
+                                        </option>
+                                    ))}
+                            </select>
+                        </label>
+                        <span className="kb-muted">
+                            {card.shortId}
+                            {card.archived ? ' · Arkiverat' : ''}
+                        </span>
+                        <div className="kb-detail-header-actions">
+                            <CardActions
+                                inDetail
+                                card={card}
+                                columnCards={[card]}
+                                position={0}
+                                workspace={workspace}
+                                busy={busy}
+                                run={run}
+                                move={(item, column, position) =>
+                                    run(
+                                        async () =>
+                                            await kanbanApi.patch(`cards/${item.id}/`, {
+                                                revision: item.revision,
+                                                column,
+                                                position,
+                                            }),
+                                    )
+                                }
+                            />
+                            <button aria-label="Stäng kort" onClick={close}>
+                                <X size={18} />
                             </button>
+                        </div>
+                    </header>
+                    {error && (
+                        <p role="alert" className="kb-error">
+                            {error}
+                        </p>
+                    )}
+                    {pendingClose && (
+                        <div className="kb-unsaved" role="status">
+                            <span>
+                                Du har osparade ändringar. Spara dem i kortet eller kommentaren innan du
+                                stänger.
+                            </span>
+                            <button onClick={() => setPendingClose(false)}>Fortsätt redigera</button>
+                            <button onClick={leave}>Stäng utan att spara</button>
                         </div>
                     )}
-                    <form onSubmit={save} className="space-y-5">
-                        <label className="block font-medium">
-                            Rubrik
-                            <input
-                                className="block w-full text-2xl mt-2"
-                                required
-                                maxLength={250}
-                                value={draft.title}
-                                onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-                            />
-                        </label>
-                        <MarkdownEditor
-                            label="Beskrivning"
-                            value={draft.description}
-                            onChange={(description) => setDraft({ ...draft, description })}
-                            members={workspace.members}
-                        />
-                        <label className="block">
-                            Deadline{' '}
-                            <input
-                                type="datetime-local"
-                                value={draft.deadline ? localDate(draft.deadline) : ''}
-                                onChange={(e) =>
-                                    setDraft({
-                                        ...draft,
-                                        deadline: e.target.value ? new Date(e.target.value).toISOString() : null,
-                                    })
-                                }
-                            />
-                        </label>
-                        <fieldset>
-                            <legend className="font-medium mb-2">Ansvariga</legend>
-                            <div className="flex flex-wrap gap-4">
-                                {workspace.members.map((member) => (
-                                    <label key={member.id}>
-                                        <input
-                                            type="checkbox"
-                                            checked={draft.assignees.includes(member.id)}
-                                            onChange={() => toggle('assignees', member.id)}
-                                        />{' '}
-                                        {member.name}
-                                    </label>
-                                ))}
-                            </div>
-                        </fieldset>
-                        <fieldset>
-                            <legend className="font-medium mb-2">Etiketter</legend>
-                            <div className="flex flex-wrap gap-4">
-                                {workspace.labels.map((label) => (
-                                    <label key={label.id}>
-                                        <input
-                                            type="checkbox"
-                                            checked={draft.labels.includes(label.id)}
-                                            onChange={() => toggle('labels', label.id)}
-                                        />{' '}
-                                        {label.name}
-                                    </label>
-                                ))}
-                            </div>
-                        </fieldset>
-                        <div className="flex gap-2">
-                            <input
-                                aria-label="Ny etikett"
-                                placeholder="Ny etikett"
-                                value={labelName}
-                                onChange={(e) => setLabelName(e.target.value)}
-                            />
-                            <button
-                                type="button"
-                                disabled={!labelName.trim() || busy}
-                                onClick={() =>
-                                    run(async () => {
-                                        await kanbanApi.post('workspace/labels/', {
-                                            name: labelName,
-                                        })
-                                        setLabelName('')
-                                    })
-                                }
-                            >
-                                Skapa etikett
-                            </button>
-                        </div>
-                        <section>
-                            <h2 className="font-medium mb-2">Checklista</h2>
-                            {draft.checklist.map((item) => (
-                                <div key={item.id} className="flex gap-3 items-center mb-2">
-                                    <input
-                                        aria-label={item.text}
-                                        type="checkbox"
-                                        checked={item.done}
-                                        onChange={() =>
-                                            setDraft({
-                                                ...draft,
-                                                checklist: draft.checklist.map((row) =>
-                                                    row.id === item.id ? { ...row, done: !row.done } : row,
-                                                ),
-                                            })
-                                        }
-                                    />
-                                    <input
-                                        aria-label="Checklisttext"
-                                        value={item.text}
-                                        onChange={(e) =>
-                                            setDraft({
-                                                ...draft,
-                                                checklist: draft.checklist.map((row) =>
-                                                    row.id === item.id ? { ...row, text: e.target.value } : row,
-                                                ),
-                                            })
-                                        }
-                                    />
+                    <div className="kb-detail-grid">
+                        <div className="kb-detail-main">
+                            {card.revision !== draft.revision && (
+                                <div className="mb-4" role="status">
+                                    Kortet har uppdaterats. Din text är kvar i formuläret.{' '}
                                     <button
-                                        type="button"
-                                        onClick={() =>
-                                            setDraft({
-                                                ...draft,
-                                                checklist: draft.checklist.filter((row) => row.id !== item.id),
-                                            })
-                                        }
+                                        onClick={() => {
+                                            baselineRef.current = editableSignature(card)
+                                            setDraft(card)
+                                            reload()
+                                        }}
                                     >
-                                        Ta bort punkt
+                                        Läs in senaste kortet i formuläret
                                     </button>
                                 </div>
-                            ))}
-                            <div className="flex gap-2">
-                                <input
-                                    aria-label="Ny checklistpunkt"
-                                    value={checkText}
-                                    onChange={(e) => setCheckText(e.target.value)}
-                                />
-                                <button
-                                    type="button"
-                                    disabled={!checkText.trim()}
-                                    onClick={() => {
-                                        setDraft({
-                                            ...draft,
-                                            checklist: [
-                                                ...draft.checklist,
-                                                {
-                                                    id: crypto.randomUUID(),
-                                                    text: checkText,
-                                                    done: false,
-                                                },
-                                            ],
-                                        })
-                                        setCheckText('')
-                                    }}
-                                >
-                                    Lägg till punkt
-                                </button>
-                            </div>
-                        </section>
-                        <section>
-                            <h2 className="font-medium mb-2">Externa issues</h2>
-                            {draft.externalReferences.map((item, index) => (
-                                <div key={`${item.system}-${item.issueId}`}>
-                                    <a href={item.url} target="_blank" rel="noreferrer">
-                                        {item.system}: {item.issueId}
-                                    </a>{' '}
+                            )}
+                            <form onSubmit={save} className="kb-detail-form">
+                                <label className="kb-detail-title">
+                                    <span className="sr-only">Rubrik</span>
+                                    <textarea
+                                        rows={1}
+                                        aria-label="Rubrik"
+                                        required
+                                        maxLength={250}
+                                        value={draft.title}
+                                        onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+                                    />
+                                </label>
+                                <div className="kb-detail-tools">
+                                    <Popover className="kb-detail-add">
+                                        <PopoverButton>
+                                            <Plus size={15} />
+                                            Lägg till
+                                        </PopoverButton>
+                                        <PopoverPanel anchor="bottom start" className="kb-action-popup">
+                                            {({ close }) => (
+                                                <>
+                                                    {[
+                                                        ['members', 'Medlemmar'],
+                                                        ['labels', 'Etiketter'],
+                                                        ['dates', 'Datum'],
+                                                        ['checklist', 'Checklista'],
+                                                        ['attachments', 'Bilaga'],
+                                                        ['references', 'Extern koppling'],
+                                                    ].map(([name, title]) => (
+                                                        <button
+                                                            key={name}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                reveal(name)
+                                                                close()
+                                                            }}
+                                                        >
+                                                            {title}
+                                                        </button>
+                                                    ))}
+                                                </>
+                                            )}
+                                        </PopoverPanel>
+                                    </Popover>
                                     <button
                                         type="button"
-                                        onClick={() =>
-                                            setDraft({
-                                                ...draft,
-                                                externalReferences: draft.externalReferences.filter(
-                                                    (_, i) => i !== index,
-                                                ),
-                                            })
-                                        }
+                                        aria-expanded={section === 'labels'}
+                                        onClick={() => reveal('labels')}
                                     >
-                                        Ta bort koppling
+                                        <Tag size={15} />
+                                        Etiketter
+                                    </button>
+                                    <button
+                                        type="button"
+                                        aria-expanded={section === 'dates'}
+                                        onClick={() => reveal('dates')}
+                                    >
+                                        <Clock size={15} />
+                                        Datum
+                                    </button>
+                                    <button
+                                        type="button"
+                                        aria-expanded={section === 'checklist'}
+                                        onClick={() => reveal('checklist')}
+                                    >
+                                        <ListChecks size={15} />
+                                        Checklista
+                                    </button>
+                                    <button
+                                        type="button"
+                                        aria-expanded={section === 'attachments'}
+                                        onClick={() => reveal('attachments')}
+                                    >
+                                        <Paperclip size={15} />
+                                        Bilaga
                                     </button>
                                 </div>
-                            ))}
-                            <div className="flex flex-wrap gap-2">
-                                {[
-                                    ['system', 'System'],
-                                    ['issueId', 'Issue-ID'],
-                                    ['url', 'URL'],
-                                ].map(([key, label]) => (
-                                    <input
-                                        key={key}
-                                        type={key === 'url' ? 'url' : 'text'}
-                                        aria-label={label}
-                                        placeholder={label}
-                                        value={reference[key]}
-                                        onChange={(e) => setReference({ ...reference, [key]: e.target.value })}
-                                    />
-                                ))}
-                                <button
-                                    type="button"
-                                    disabled={
-                                        !reference.system || !reference.issueId || !/^https?:\/\//.test(reference.url)
-                                    }
-                                    onClick={() => {
-                                        setDraft({
-                                            ...draft,
-                                            externalReferences: [...draft.externalReferences, reference],
-                                        })
-                                        setReference({ system: '', issueId: '', url: '' })
-                                    }}
-                                >
-                                    Lägg till koppling
-                                </button>
-                            </div>
-                        </section>
-                        <button className="user-tools-primary" disabled={busy}>
-                            Spara kort
-                        </button>
-                    </form>
-                    <Attachments card={card} workspace={workspace} run={run} />
-                </div>
-                <aside aria-label="Kommentarer och aktivitet" className="user-tools-panel">
-                    <h2 className="text-xl font-semibold mb-3">Kommentarer och aktivitet</h2>
-                    <div className="flex gap-2 mb-4">
-                        <button
-                            aria-pressed={activityFilter === 'comments'}
-                            onClick={() => setActivityFilter('comments')}
-                        >
-                            Kommentarer
-                        </button>
-                        <button aria-pressed={activityFilter === 'all'} onClick={() => setActivityFilter('all')}>
-                            All aktivitet
-                        </button>
-                    </div>
-                    <ol className="space-y-5 mb-6">
-                        {timeline.map((item) => (
-                            <li key={`${item.entryType}-${item.id}`}>
-                                <p className="text-sm kb-muted">
-                                    {item.entryType === 'comment' ? item.author.name : item.actor.name} ·{' '}
-                                    {new Date(item.createdAt).toLocaleString()}
-                                    {item.editedAt && ' · Redigerad'}
-                                </p>
-                                {item.entryType === 'comment' ? (
-                                    <>
-                                        <MarkdownView value={item.body} />
-                                        <button
-                                            onClick={() => {
-                                                setEditingComment(item)
-                                                setBody(item.body)
-                                            }}
-                                        >
-                                            Redigera kommentar
-                                        </button>
-                                        {card.attachments
-                                            .filter((file) => file.comment === item.id)
-                                            .map((file) => (
-                                                <p key={file.id}>
-                                                    <a href={attachmentUrl(file.id, ticket)}>{file.filename}</a>
-                                                </p>
-                                            ))}
-                                    </>
-                                ) : (
-                                    <>
-                                        <p>{item.message}</p>
-                                        {item.canUndo && (
+                                <div className="kb-detail-metadata">
+                                    <div>
+                                        <h3>Medlemmar</h3>
+                                        <div className="kb-detail-members">
+                                            {workspace.members
+                                                .filter((member) => draft.assignees.includes(member.id))
+                                                .map((member) => (
+                                                    <Avatar
+                                                        key={member.id}
+                                                        userId={member.id}
+                                                        name={member.name}
+                                                    />
+                                                ))}
                                             <button
-                                                disabled={busy}
+                                                type="button"
+                                                aria-label="Ändra medlemmar"
+                                                aria-expanded={section === 'members'}
+                                                onClick={() => reveal('members')}
+                                            >
+                                                <Plus size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {!!draft.labels.length && (
+                                        <div>
+                                            <h3>Etiketter</h3>
+                                            <div className="kb-card-labels">
+                                                {workspace.labels
+                                                    .filter((label) => draft.labels.includes(label.id))
+                                                    .map((label) => (
+                                                        <span key={label.id}>{label.name}</span>
+                                                    ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {draft.deadline && (
+                                        <div>
+                                            <h3>Deadline</h3>
+                                            <button type="button" onClick={() => reveal('dates')}>
+                                                {new Date(draft.deadline).toLocaleString()}
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                                {section === 'dates' && (
+                                    <div className="kb-detail-field-group">
+                                        <label className="block">
+                                            Deadline{' '}
+                                            <input
+                                                type="datetime-local"
+                                                value={draft.deadline ? localDate(draft.deadline) : ''}
+                                                onChange={(e) =>
+                                                    setDraft({
+                                                        ...draft,
+                                                        deadline: e.target.value
+                                                            ? new Date(e.target.value).toISOString()
+                                                            : null,
+                                                    })
+                                                }
+                                            />
+                                        </label>
+                                    </div>
+                                )}
+                                {section === 'members' && (
+                                    <fieldset className="kb-detail-field-group">
+                                        <legend className="font-medium mb-2">Ansvariga</legend>
+                                        <div className="flex flex-wrap gap-4">
+                                            {workspace.members.map((member) => (
+                                                <label key={member.id}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={draft.assignees.includes(member.id)}
+                                                        onChange={() => toggle('assignees', member.id)}
+                                                    />{' '}
+                                                    {member.name}
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </fieldset>
+                                )}
+                                {section === 'labels' && (
+                                    <div className="kb-detail-field-group">
+                                        <fieldset>
+                                            <legend className="font-medium mb-2">Etiketter</legend>
+                                            <div className="flex flex-wrap gap-4">
+                                                {workspace.labels.map((label) => (
+                                                    <label key={label.id}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={draft.labels.includes(label.id)}
+                                                            onChange={() => toggle('labels', label.id)}
+                                                        />{' '}
+                                                        {label.name}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </fieldset>
+                                        <div className="flex gap-2">
+                                            <input
+                                                aria-label="Ny etikett"
+                                                placeholder="Ny etikett"
+                                                value={labelName}
+                                                onChange={(e) => setLabelName(e.target.value)}
+                                            />
+                                            <button
+                                                type="button"
+                                                disabled={!labelName.trim() || busy}
                                                 onClick={() =>
-                                                    run(
-                                                        async () =>
-                                                            await kanbanApi.post('workspace/undo/', {
-                                                                activityId: item.id,
-                                                            }),
-                                                    )
+                                                    run(async () => {
+                                                        await kanbanApi.post('workspace/labels/', {
+                                                            name: labelName,
+                                                        })
+                                                        setLabelName('')
+                                                    })
                                                 }
                                             >
-                                                Ångra
+                                                Skapa etikett
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                                <section className="kb-detail-description">
+                                    <div className="kb-detail-section-heading">
+                                        <h2>
+                                            <AlignLeft size={18} />
+                                            Beskrivning
+                                        </h2>
+                                        {!editingDescription && <button
+                                            type="button"
+                                            aria-label="Redigera beskrivning"
+                                            onClick={() => setEditingDescription(!editingDescription)}
+                                        >
+                                            Redigera
+                                        </button>}
+                                    </div>
+                                    {editingDescription ? (
+                                        <MarkdownEditor
+                                            label="Beskrivning"
+                                            value={draft.description}
+                                            onChange={(description) => setDraft({ ...draft, description })}
+                                            members={workspace.members}
+                                            onSave={save}
+                                            busy={busy}
+                                            onCancel={() => { setDraft((previous) => ({ ...previous, description: card.description })); setEditingDescription(false) }}
+                                        />
+                                    ) : draft.description ? (
+                                        <MarkdownView value={draft.description} />
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            className="kb-description-empty"
+                                            onClick={() => setEditingDescription(true)}
+                                        >
+                                            Lägg till en beskrivning…
+                                        </button>
+                                    )}
+                                </section>
+                                {(section === 'checklist' || draft.checklist.length > 0) && (
+                                    <section>
+                                        <h2 className="kb-detail-section-heading">
+                                            <ListChecks size={18} />
+                                            Checklista
+                                        </h2>
+                                        {draft.checklist.map((item) => (
+                                            <div key={item.id} className="flex gap-3 items-center mb-2">
+                                                <input
+                                                    aria-label={item.text}
+                                                    type="checkbox"
+                                                    checked={item.done}
+                                                    onChange={() =>
+                                                        setDraft({
+                                                            ...draft,
+                                                            checklist: draft.checklist.map((row) =>
+                                                                row.id === item.id
+                                                                    ? { ...row, done: !row.done }
+                                                                    : row,
+                                                            ),
+                                                        })
+                                                    }
+                                                />
+                                                <input
+                                                    aria-label="Checklisttext"
+                                                    value={item.text}
+                                                    onChange={(e) =>
+                                                        setDraft({
+                                                            ...draft,
+                                                            checklist: draft.checklist.map((row) =>
+                                                                row.id === item.id
+                                                                    ? { ...row, text: e.target.value }
+                                                                    : row,
+                                                            ),
+                                                        })
+                                                    }
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setDraft({
+                                                            ...draft,
+                                                            checklist: draft.checklist.filter(
+                                                                (row) => row.id !== item.id,
+                                                            ),
+                                                        })
+                                                    }
+                                                >
+                                                    Ta bort punkt
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <div className="flex gap-2">
+                                            <input
+                                                aria-label="Ny checklistpunkt"
+                                                value={checkText}
+                                                onChange={(e) => setCheckText(e.target.value)}
+                                            />
+                                            <button
+                                                type="button"
+                                                disabled={!checkText.trim()}
+                                                onClick={() => {
+                                                    setDraft({
+                                                        ...draft,
+                                                        checklist: [
+                                                            ...draft.checklist,
+                                                            {
+                                                                id: crypto.randomUUID(),
+                                                                text: checkText,
+                                                                done: false,
+                                                            },
+                                                        ],
+                                                    })
+                                                    setCheckText('')
+                                                }}
+                                            >
+                                                Lägg till punkt
+                                            </button>
+                                        </div>
+                                    </section>
+                                )}
+                                {(section === 'references' || draft.externalReferences.length > 0) && (
+                                    <section>
+                                        <h2 className="font-medium mb-2">Externa kopplingar</h2>
+                                        {draft.externalReferences.map((item, index) => (
+                                            <div key={`${item.system}-${item.issueId}`}>
+                                                <a href={item.url} target="_blank" rel="noreferrer">
+                                                    {item.system}: {item.issueId}
+                                                </a>{' '}
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setDraft({
+                                                            ...draft,
+                                                            externalReferences:
+                                                                draft.externalReferences.filter(
+                                                                    (_, i) => i !== index,
+                                                                ),
+                                                        })
+                                                    }
+                                                >
+                                                    Ta bort koppling
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <div className="flex flex-wrap gap-2">
+                                            {[
+                                                ['system', 'System'],
+                                                ['issueId', 'Issue-ID'],
+                                                ['url', 'URL'],
+                                            ].map(([key, label]) => (
+                                                <input
+                                                    key={key}
+                                                    type={key === 'url' ? 'url' : 'text'}
+                                                    aria-label={label}
+                                                    placeholder={label}
+                                                    value={reference[key]}
+                                                    onChange={(e) =>
+                                                        setReference({ ...reference, [key]: e.target.value })
+                                                    }
+                                                />
+                                            ))}
+                                            <button
+                                                type="button"
+                                                disabled={
+                                                    !reference.system ||
+                                                    !reference.issueId ||
+                                                    !/^https?:\/\//.test(reference.url)
+                                                }
+                                                onClick={() => {
+                                                    setDraft({
+                                                        ...draft,
+                                                        externalReferences: [
+                                                            ...draft.externalReferences,
+                                                            reference,
+                                                        ],
+                                                    })
+                                                    setReference({ system: '', issueId: '', url: '' })
+                                                }}
+                                            >
+                                                Lägg till koppling
+                                            </button>
+                                        </div>
+                                    </section>
+                                )}
+                                {!editingDescription && (dirty || (section && section !== 'attachments')) && (
+                                    <div className="kb-detail-save">
+                                        <button className="user-tools-primary" disabled={busy}>
+                                            Spara kort
+                                        </button>
+                                        {dirty && <span className="kb-muted">Osparade ändringar</span>}
+                                    </div>
+                                )}
+                            </form>
+                            {(section === 'attachments' || card.attachments.length > 0) && (
+                                <Attachments card={card} workspace={workspace} run={run} />
+                            )}
+                        </div>
+                        <aside aria-label="Kommentarer och aktivitet" className="kb-detail-activity">
+                            <h2 className="kb-detail-section-heading">
+                                <MessageSquare size={18} />
+                                Kommentarer och aktivitet
+                            </h2>
+                            <div className="flex gap-2 mb-4">
+                                <button
+                                    aria-pressed={activityFilter === 'comments'}
+                                    onClick={() => setActivityFilter('comments')}
+                                >
+                                    Kommentarer
+                                </button>
+                                <button
+                                    aria-pressed={activityFilter === 'all'}
+                                    onClick={() => setActivityFilter('all')}
+                                >
+                                    All aktivitet
+                                </button>
+                            </div>
+                            {!commentOpen && !editingComment ? (
+                                <button className="kb-comment-prompt" onClick={() => setCommentOpen(true)}>
+                                    Skriv en kommentar…
+                                </button>
+                            ) : (
+                                <>
+                                    <form onSubmit={sendComment} className="kb-detail-comment">
+                                        <MarkdownEditor
+                                            label={editingComment ? 'Redigera kommentar' : 'Ny kommentar'}
+                                            value={body}
+                                            onChange={setBody}
+                                            members={workspace.members}
+                                        />
+                                        <button
+                                            className="user-tools-primary mt-2"
+                                            disabled={busy || !body.trim()}
+                                        >
+                                            {editingComment ? 'Spara kommentar' : 'Kommentera'}
+                                        </button>
+                                        {editingComment && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setEditingComment(null)
+                                                    setBody('')
+                                                }}
+                                            >
+                                                Avbryt redigering
                                             </button>
                                         )}
-                                    </>
-                                )}
-                            </li>
-                        ))}
-                    </ol>
-                    <form onSubmit={sendComment}>
-                        <MarkdownEditor
-                            label={editingComment ? 'Redigera kommentar' : 'Ny kommentar'}
-                            value={body}
-                            onChange={setBody}
-                            members={workspace.members}
-                        />
-                        <button className="user-tools-primary mt-2" disabled={busy || !body.trim()}>
-                            {editingComment ? 'Spara kommentar' : 'Kommentera'}
-                        </button>
-                        {editingComment && (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setEditingComment(null)
-                                    setBody('')
-                                }}
-                            >
-                                Avbryt redigering
-                            </button>
-                        )}
-                    </form>
-                </aside>
+                                    </form>{' '}
+                                </>
+                            )}
+                            <ol className="space-y-5 mb-6">
+                                {timeline.map((item) => (
+                                    <li className="kb-activity-entry" key={`${item.entryType}-${item.id}`}>
+                                        <Avatar
+                                            userId={
+                                                item.entryType === 'comment' ? item.author.id : item.actor.id
+                                            }
+                                            name={
+                                                item.entryType === 'comment'
+                                                    ? item.author.name
+                                                    : item.actor.name
+                                            }
+                                        />
+                                        <div>
+                                            <p className="text-sm kb-muted">
+                                                {item.entryType === 'comment'
+                                                    ? item.author.name
+                                                    : item.actor.name}{' '}
+                                                · {new Date(item.createdAt).toLocaleString()}
+                                                {item.editedAt && ' · Redigerad'}
+                                            </p>
+                                            {item.entryType === 'comment' ? (
+                                                <>
+                                                    <MarkdownView value={item.body} />
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingComment(item)
+                                                            setCommentOpen(true)
+                                                            setBody(item.body)
+                                                        }}
+                                                    >
+                                                        Redigera kommentar
+                                                    </button>
+                                                    {card.attachments
+                                                        .filter((file) => file.comment === item.id)
+                                                        .map((file) => (
+                                                            <p key={file.id}>
+                                                                <a href={attachmentUrl(file.id, ticket)}>
+                                                                    {file.filename}
+                                                                </a>
+                                                            </p>
+                                                        ))}
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <p>{item.message}</p>
+                                                    {item.canUndo && (
+                                                        <button
+                                                            disabled={busy}
+                                                            onClick={() =>
+                                                                run(
+                                                                    async () =>
+                                                                        await kanbanApi.post(
+                                                                            'workspace/undo/',
+                                                                            {
+                                                                                activityId: item.id,
+                                                                            },
+                                                                        ),
+                                                                )
+                                                            }
+                                                        >
+                                                            Ångra
+                                                        </button>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    </li>
+                                ))}
+                            </ol>
+                        </aside>
+                    </div>
+                </DialogPanel>
             </div>
-        </div>
+        </Dialog>
     )
 }
 
@@ -596,13 +885,15 @@ const localDate = (value) => {
 
 export default function KanbanPage() {
     useDocumentTitle('Kanban')
-    const { boardId, cardId } = useParams()
+    const { boardId: routeBoardId, cardId } = useParams()
     const tenant = useTenant()
     const { user } = useAuth()
     const principal = user?.id ?? user?.username
     const canLoad = !!(tenant && principal)
     const navigate = useNavigate()
     const client = useQueryClient()
+    const location = useLocation()
+    const focusedLocation = useRef(null)
     const [error, setError] = useState('')
     const [busy, setBusy] = useState(false)
     const [query, setQuery] = useState('')
@@ -637,6 +928,13 @@ export default function KanbanPage() {
         enabled: canLoad,
     })
     const ticket = accessQuery.data?.ticket || ''
+    const cardQuery = useQuery({
+        queryKey: ['kanban', tenant, principal, 'card', cardId],
+        queryFn: async () => await kanbanApi.get(`cards/${cardId}/`),
+        enabled: canLoad && !!cardId,
+    })
+    const boardId = routeBoardId || cardQuery.data?.board
+    const boardDrag = useBoardDrag(`${tenant}:${boardId}`)
     const params = {
         board: boardId || '',
         q: search,
@@ -649,13 +947,23 @@ export default function KanbanPage() {
     const cardsQuery = useQuery({
         queryKey: ['kanban', tenant, principal, 'cards', params],
         queryFn: async () => await kanbanApi.cards(params),
-        enabled: canLoad && !!boardId && !cardId,
+        enabled: canLoad && !!boardId,
     })
-    const cardQuery = useQuery({
-        queryKey: ['kanban', tenant, principal, 'card', cardId],
-        queryFn: async () => await kanbanApi.get(`cards/${cardId}/`),
-        enabled: canLoad && !!cardId,
-    })
+    useEffect(() => {
+        if (cardId || !location.state?.focusCard || !cardsQuery.isSuccess || focusedLocation.current === location.key) return
+        const frame = requestAnimationFrame(() => {
+            const target = document.querySelector(`[data-card-id="${CSS.escape(location.state.focusCard)}"] .kb-card-title`) || document.querySelector('.kb-board-content h1')
+            if (target) {
+                focusedLocation.current = location.key
+                if (target.tagName === 'H1') target.tabIndex = -1
+                target.focus()
+            }
+        })
+        return () => cancelAnimationFrame(frame)
+    }, [cardId, location.key, location.state, cardsQuery.isSuccess])
+    useEffect(() => {
+        if (cardId && cardQuery.data?.mirrorOf) navigate(`/kanban/cards/${cardQuery.data.mirrorOf}`, { replace: true })
+    }, [cardId, cardQuery.data?.mirrorOf, navigate])
     const activities = useQuery({
         queryKey: ['kanban', tenant, principal, 'activity', boardId],
         queryFn: async () => await kanbanApi.get('workspace/activity/', { board: boardId }),
@@ -795,7 +1103,7 @@ export default function KanbanPage() {
                         </button>
                         </div>
                     </header>
-                    {error && (
+                    {error && !cardId && (
                         <p role="alert" className="kb-error mb-4">
                             {error}
                         </p>
@@ -849,23 +1157,7 @@ export default function KanbanPage() {
                             ))}
                         </section>
                     )}
-                    {cardId ? (
-                        cardQuery.data ? (
-                            <CardDetail
-                                key={`${tenant}:${principal}:${cardId}`}
-                                card={cardQuery.data}
-                                workspace={workspace}
-                                run={run}
-                                busy={busy}
-                                reload={() => cardQuery.refetch()}
-                            />
-                        ) : (
-                            <p role={cardQuery.error ? 'alert' : 'status'}>
-                                {cardQuery.error ? kanbanError(cardQuery.error) : 'Läser kortet…'}
-                            </p>
-                        )
-                    ) : (
-                        <>
+                    <>
                             {!boardId && <>
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="text-xl font-semibold">Tavlor</h2>
@@ -1025,110 +1317,58 @@ export default function KanbanPage() {
                                 </form>
                             )}
                             {board ? (
-                                <div className="kb-lists" aria-label="Kanban-kolumner">
+                                <div className="kb-lists" aria-label="Kanban-kolumner" ref={boardDrag.boardRef}
+                                    onDrop={(e) => {
+                                        const target = boardDrag.targetRef.current
+                                        if (!boardDrag.drag || !target) return
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        if (boardDrag.drag.type === 'column') {
+                                            const sourceIndex = visibleColumns.findIndex((column) => column.id === boardDrag.drag.id)
+                                            reorder(boardDrag.drag.id, target.index > sourceIndex ? target.index - 1 : target.index)
+                                        } else drop(e, target.column, target.position, !!target.before)
+                                        boardDrag.clear()
+                                    }}>
                                     {visibleColumns.map((column, index) => (
+                                        <Fragment key={column.id}>
+                                        {boardDrag.drag?.type === 'column' && boardDrag.target?.index === index && <div className="kb-column-landing" aria-label="Placera lista här" />}
                                         <section
-                                            key={column.id}
-                                            className="kb-column"
-                                            onDragOver={(e) => e.preventDefault()}
-                                            onDrop={(e) => {
-                                                try {
-                                                    const payload = JSON.parse(
-                                                        e.dataTransfer.getData('application/kanban'),
-                                                    )
-                                                    if (payload.type === 'column') {
-                                                        e.preventDefault()
-                                                        reorder(payload.id, index)
-                                                    } else
-                                                        drop(
-                                                            e,
-                                                            column.id,
-                                                            2147483647, // append after all cards, including filtered-out cards
-                                                        )
-                                                } catch {
-                                                    /* unrelated drag */
-                                                }
-                                            }}
+                                            data-column-id={column.id}
+                                            className={`kb-column ${boardDrag.drag?.id === column.id ? 'kb-drag-source' : ''}`}
                                         >
                                             <header
                                                 draggable
-                                                onDragStart={(e) =>
-                                                    e.dataTransfer.setData(
-                                                        'application/kanban',
-                                                        JSON.stringify({ type: 'column', id: column.id }),
-                                                    )
-                                                }
+                                                onDragStart={(e) => boardDrag.start(e, { type: 'column', id: column.id })}
                                             >
                                                 <h3 className="text-sm font-semibold">
                                                     {column.title}
                                                     {column.archived ? ' (arkiverad)' : ''}
                                                 </h3>
                                                 <span className="kb-column-count">{cards.filter((card) => card.column === column.id).length}</span>
-                                                <details className="kb-menu"><summary aria-label={`Liståtgärder för ${column.title}`}><MoreHorizontal size={18} /></summary>
-                                                <div className="kb-menu-items">
-                                                    <button
-                                                        aria-label={`Flytta ${column.title} vänster`}
-                                                        disabled={index === 0 || busy}
-                                                        onClick={() => reorder(column.id, index - 1)}
-                                                    >
-                                                        ←
-                                                    </button>
-                                                    <button
-                                                        aria-label={`Flytta ${column.title} höger`}
-                                                        disabled={index === visibleColumns.length - 1 || busy}
-                                                        onClick={() => reorder(column.id, index + 1)}
-                                                    >
-                                                        →
-                                                    </button>
-                                                    <button onClick={() => setRename({ type: 'columns', ...column })}>
-                                                        Byt namn
-                                                    </button>
-                                                    <button
-                                                        disabled={busy || !!column.role}
-                                                        title={column.role ? 'Obligatorisk lista' : undefined}
-                                                        onClick={() =>
-                                                            run(
-                                                                async () =>
-                                                                    await kanbanApi.patch(`columns/${column.id}/`, {
-                                                                        revision: column.revision,
-                                                                        archived: !column.archived,
-                                                                    }),
-                                                            )
-                                                        }
-                                                    >
-                                                        {column.archived ? 'Återställ' : 'Arkivera'}
-                                                    </button>
-                                                </div></details>
+                                                <ColumnActions column={column} index={index} columns={visibleColumns} board={board} busy={busy} run={run} reorder={reorder} rename={setRename} addCard={setCreateColumn} />
                                             </header>
                                             {cards
                                                 .filter((item) => item.column === column.id)
                                                 .sort((left, right) => left.position - right.position)
                                                 .map((card, position, columnCards) => (
+                                                    <Fragment key={card.id}>
+                                                    {boardDrag.drag?.type === 'card' && boardDrag.target?.column === column.id && boardDrag.target.before === card.id && <div className="kb-card-landing" style={{ height: boardDrag.drag.height }} aria-label="Placera kort här" />}
                                                     <article
-                                                        key={card.id}
-                                                        className="kb-card"
-                                                        draggable
-                                                        onDragStart={(e) => {
-                                                            e.stopPropagation()
-                                                            e.dataTransfer.setData(
-                                                                'application/kanban',
-                                                                JSON.stringify({
-                                                                    type: 'card',
-                                                                    id: card.id,
-                                                                    revision: card.revision,
-                                                                }),
-                                                            )
-                                                        }}
-                                                        onDragOver={(e) => e.preventDefault()}
-                                                        onDrop={(e) => drop(e, column.id, card.position, true)}
+                                                        data-card-id={card.id}
+                                                        data-position={card.position}
+                                                        className={`kb-card ${boardDrag.drag?.id === card.id ? 'kb-drag-source' : ''}`}
+                                                        draggable={!busy}
+                                                        onDragStart={(e) => boardDrag.start(e, { type: 'card', id: card.id, revision: card.revision })}
                                                     >
+                                                        {card.coverColor && <div className="kb-card-cover" style={{ background: coverColors[card.coverColor] }} />}
+                                                        {!!card.labels?.length && <div className="kb-card-labels">{workspace.labels.filter((label) => card.labels.includes(label.id)).map((label) => <span key={label.id}>{label.name}</span>)}</div>}
                                                         <p className="kb-card-id">
-                                                            {card.shortId}
+                                                            {card.shortId}{card.mirrorOf ? ' · Spegling' : ''}
                                                             {card.archived ? ' · Arkiverat' : ''}
                                                         </p>
                                                         <Link
                                                             className="kb-card-title"
-                                                            to={`/kanban/cards/${card.id}`}
+                                                            to={`/kanban/cards/${card.mirrorOf || card.id}`}
                                                         >
                                                             {card.title}
                                                         </Link>
@@ -1150,60 +1390,11 @@ export default function KanbanPage() {
                                                                 {card.checklist.length} punkter
                                                             </p>
                                                         )}
-                                                        <details className="kb-menu kb-card-menu"><summary aria-label={`Kortåtgärder för ${card.shortId}`}><MoreHorizontal size={16} /></summary><div className="kb-menu-items">
-                                                            <button
-                                                                disabled={position === 0 || busy}
-                                                                onClick={() =>
-                                                                    move(
-                                                                        card,
-                                                                        column.id,
-                                                                        columnCards[position - 1].position,
-                                                                    )
-                                                                }
-                                                                aria-label={`Flytta ${card.shortId} upp`}
-                                                            >
-                                                                ↑
-                                                            </button>
-                                                            <button
-                                                                disabled={busy || position === columnCards.length - 1}
-                                                                onClick={() =>
-                                                                    move(
-                                                                        card,
-                                                                        column.id,
-                                                                        columnCards[position + 1].position,
-                                                                    )
-                                                                }
-                                                                aria-label={`Flytta ${card.shortId} ned`}
-                                                            >
-                                                                ↓
-                                                            </button>
-                                                            <select
-                                                                aria-label={`Flytta ${card.shortId} till`}
-                                                                value={column.id}
-                                                                onChange={(e) => move(card, e.target.value)}
-                                                            >
-                                                                {workspace.columns
-                                                                    .filter(
-                                                                        (item) =>
-                                                                            !item.archived &&
-                                                                            !workspace.boards.find(
-                                                                                (board) => board.id === item.board,
-                                                                            )?.archived,
-                                                                    )
-                                                                    .map((item) => (
-                                                                        <option key={item.id} value={item.id}>
-                                                                            {
-                                                                                workspace.boards.find(
-                                                                                    (board) => board.id === item.board,
-                                                                                )?.title
-                                                                            }{' '}
-                                                                            / {item.title}
-                                                                        </option>
-                                                                    ))}
-                                                            </select>
-                                                        </div></details>
+                                                        <CardActions card={card} columnCards={columnCards} position={position} workspace={workspace} busy={busy} run={run} move={move} />
                                                     </article>
+                                                    </Fragment>
                                                 ))}
+                                            {boardDrag.drag?.type === 'card' && boardDrag.target?.column === column.id && !boardDrag.target.before && <div className="kb-card-landing" style={{ height: boardDrag.drag.height }} aria-label="Placera kort här" />}
                                             {!board.archived &&
                                                 !column.archived &&
                                                 (createColumn === column.id ? (
@@ -1238,7 +1429,9 @@ export default function KanbanPage() {
                                                     </button>
                                                 ))}
                                         </section>
+                                        </Fragment>
                                     ))}
+                                    {boardDrag.drag?.type === 'column' && boardDrag.target?.index === visibleColumns.length && <div className="kb-column-landing" aria-label="Placera lista här" />}
                                     {!board.archived && <div className="kb-add-list">
                                         {addingList ? <form onSubmit={(e) => {
                                             e.preventDefault()
@@ -1269,8 +1462,8 @@ export default function KanbanPage() {
                                     Inga kort i den här vyn. Skapa ett kort i ett board eller ändra filtren.
                                 </p>
                             )}
-                        </>
-                    )}
+                    </>
+                    {cardId && (cardQuery.data ? <CardDetail key={`${tenant}:${principal}:${cardId}`} card={cardQuery.data} workspace={workspace} run={run} busy={busy} reload={() => cardQuery.refetch()} error={error} /> : <p role={cardQuery.error ? 'alert' : 'status'}>{cardQuery.error ? kanbanError(cardQuery.error) : 'Läser kortet…'}</p>)}
                     </div>
                 </main>
                 <StatusBar customStatusContent={<span>Kanban</span>} />

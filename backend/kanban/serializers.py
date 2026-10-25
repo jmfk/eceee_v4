@@ -36,12 +36,19 @@ class LabelSerializer(serializers.ModelSerializer):
 class CardSerializer(serializers.ModelSerializer):
     board = serializers.UUIDField(source="column.board_id", read_only=True)
     short_id = serializers.CharField(read_only=True)
+    content_revision = serializers.SerializerMethodField()
+
+    def get_content_revision(self, card):
+        return card.mirror_of.revision if card.mirror_of_id else card.revision
 
     class Meta:
         model = Card
         fields = [
             "id",
             "short_id",
+            "cover_color",
+            "mirror_of",
+            "content_revision",
             "board",
             "column",
             "title",
@@ -107,7 +114,16 @@ class NamedInput(RevisionInput):
     archived = serializers.BooleanField(required=False)
 
 
+COVER_COLORS = ["", "slate", "red", "amber", "green", "blue", "purple"]
+
+
+class DuplicateInput(RevisionInput):
+    column = serializers.UUIDField()
+    mirror = serializers.BooleanField(default=False)
+
+
 class CardInput(RevisionInput):
+    cover_color = serializers.ChoiceField(choices=COVER_COLORS, required=False)
     title = serializers.CharField(max_length=250, required=False)
     description = serializers.CharField(max_length=100000, allow_blank=True, required=False)
     deadline = serializers.DateTimeField(allow_null=True, required=False)

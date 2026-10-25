@@ -37,7 +37,10 @@ def maintain_kanban():
     from django.utils import timezone
 
     due = Card.objects.filter(
-        deadline__gte=timezone.now(), deadline__lte=timezone.now() + timedelta(days=1), archived=False
+        deadline__gte=timezone.now(),
+        deadline__lte=timezone.now() + timedelta(days=1),
+        archived=False,
+        mirror_of__isnull=True,
     )
     for card_id, tenant_id in due.values_list("pk", "tenant_id").iterator():
         with transaction.atomic():

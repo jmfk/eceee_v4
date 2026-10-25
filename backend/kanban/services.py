@@ -9,7 +9,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.contrib.auth.models import User
 from django.db import transaction
-from django.db.models import F, Q
+from django.db.models import F, Max, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
@@ -108,7 +108,8 @@ def mentions(tenant, actor, card, text, key):
 
 def deadline_notifications(card):
     if (
-        card.deadline
+        not card.mirror_of_id
+        and card.deadline
         and not card.archived
         and not card.column.archived
         and not card.column.board.archived
@@ -160,8 +161,53 @@ def place_card(card, column, position):
         normalize_positions(Card, card.tenant, column_id=previous_column)
 
 
+SHARED_CARD_FIELDS = ("title", "description", "checklist", "external_references", "deadline", "cover_color")
+
+
+def duplicate_card(tenant, actor, source, column, mirror=False):
+    """Caller holds the tenant lock; copies and mirrors cannot cross tenants."""
+    if source.mirror_of_id:
+        source = get_record(Card, tenant, source.mirror_of_id)
+    if column.archived or column.board.archived:
+        raise ValidationError("Restore the destination before creating cards there.")
+    number = (Card.objects.filter(tenant=tenant).aggregate(number=Max("number"))["number"] or 0) + 1
+    card = Card.objects.create(
+        tenant=tenant,
+        column=column,
+        number=number,
+        position=column.cards.count(),
+        mirror_of=source if mirror else None,
+        **{field: getattr(source, field) for field in SHARED_CARD_FIELDS},
+    )
+    card.assignees.set(source.assignees.all())
+    card.labels.set(source.labels.all())
+    kind = "mirrored" if mirror else "copied"
+    event(
+        tenant,
+        actor,
+        card,
+        f"card.{kind}",
+        f"{source.short_id} {kind} as {card.short_id}",
+        undo={"model": "card", "id": str(card.pk), "revision": card.revision, "archived": True},
+    )
+    enqueue_index(card)
+    return card
+
+
+def sync_mirrors(card):
+    for mirror in card.mirrors.filter(tenant=card.tenant):
+        for field in SHARED_CARD_FIELDS:
+            setattr(mirror, field, getattr(card, field))
+        mirror.assignees.set(card.assignees.all())
+        mirror.labels.set(card.labels.all())
+        bump(mirror)
+        enqueue_index(mirror)
+
+
 def update_card(tenant, actor, card, data):
     check_revision(card, data.pop("revision"))
+    if card.mirror_of_id and set(data) - {"column", "position", "archived"}:
+        raise ValidationError("Edit shared content through the original card.")
     undo = {}
     changes = {}
     if "column" in data or "position" in data:
@@ -218,6 +264,8 @@ def update_card(tenant, actor, card, data):
         mentions(tenant, actor, card, card.description, f"mention:{entry.pk}")
     deadline_notifications(card)
     enqueue_index(card)
+    if not card.mirror_of_id and set(changes) - {"move", "archived"}:
+        sync_mirrors(card)
     return card
 
 

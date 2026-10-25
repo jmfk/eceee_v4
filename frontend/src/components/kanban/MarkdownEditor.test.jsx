@@ -67,3 +67,19 @@ it('echoes local visual HTML but rehydrates genuine external Markdown changes', 
     fireEvent.click(screen.getByRole('button', { name: 'Visuellt' }))
     expect(screen.getByLabelText('Visual HTML').value).toContain('<h1>Source</h1>')
 })
+
+
+it('exposes editor save/cancel and toggles formatting help without submitting a form', () => {
+    const onSave = vi.fn(), onCancel = vi.fn()
+    render(<MarkdownEditor label="Beskrivning" value="Draft" onChange={vi.fn()} onSave={onSave} onCancel={onCancel} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Spara', exact: true }))
+    expect(onSave).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: 'Avbryt', exact: true }))
+    expect(onCancel).toHaveBeenCalledOnce()
+    const help = screen.getByRole('button', { name: 'Formateringshjälp' })
+    fireEvent.click(help)
+    expect(help).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText(/Markera text/)).toBeVisible()
+    fireEvent.click(help)
+    expect(screen.queryByText(/Markera text/)).not.toBeInTheDocument()
+})
