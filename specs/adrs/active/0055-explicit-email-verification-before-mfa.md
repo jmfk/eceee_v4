@@ -29,6 +29,9 @@ address to add one through allauth, and retain recent authentication, CSRF,
 rate limits and expiring signed confirmation links. Allauth 65.20.1 requires
 mandatory verification for code mode, so optional verification uses link mode. Loading Profile never sends mail.
 Do not introduce email as a second factor or mark existing addresses verified.
+Completed login synchronizes a legacy user email missing its allauth address
+record, leaving it unverified and sending no mail. This preserves the explicit
+verification path without a data migration.
 
 Password resets and other intentionally requested transactional mail continue
 to use the repaired Postmark backend (ADR-0054). No database migration or

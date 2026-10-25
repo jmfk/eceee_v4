@@ -65,6 +65,8 @@ describe('AccountSecurityPanel provider callback', () => {
         fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'new@example.invalid' } })
         fireEvent.click(send)
         await waitFor(() => expect(requireAuthResult).toHaveBeenCalledWith('/account/email', { method: 'POST', data: { email: 'new@example.invalid' } }))
+        expect(await screen.findByRole('status')).toHaveTextContent('Email address added. Check your inbox')
+        expect(screen.getByRole('status')).not.toHaveTextContent('Verification link sent')
     })
 
     it('enables factor setup after refreshing a completed email verification', async () => {
