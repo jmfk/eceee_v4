@@ -161,7 +161,15 @@ def place_card(card, column, position):
         normalize_positions(Card, card.tenant, column_id=previous_column)
 
 
-SHARED_CARD_FIELDS = ("title", "description", "checklist", "external_references", "deadline", "cover_color")
+SHARED_CARD_FIELDS = (
+    "title",
+    "description",
+    "checklist",
+    "external_references",
+    "deadline",
+    "cover_color",
+    "cover_attachment_id",
+)
 
 
 def duplicate_card(tenant, actor, source, column, mirror=False):
@@ -208,6 +216,20 @@ def update_card(tenant, actor, card, data):
     check_revision(card, data.pop("revision"))
     if card.mirror_of_id and set(data) - {"column", "position", "archived"}:
         raise ValidationError("Edit shared content through the original card.")
+    if "cover_attachment" in data:
+        attachment_id = data.pop("cover_attachment")
+        if attachment_id is not None:
+            from .models import Attachment
+
+            attachment = get_object_or_404(Attachment, pk=attachment_id, tenant=tenant, card=card)
+            if (
+                attachment.content_type not in {"image/jpeg", "image/png", "image/gif", "image/webp"}
+                or attachment.size > 10 * 1024 * 1024
+            ):
+                raise ValidationError(
+                    "The cover must be a JPEG, PNG, GIF or WebP attachment smaller than 10 MB on this card."
+                )
+        data["cover_attachment_id"] = attachment_id
     undo = {}
     changes = {}
     if "column" in data or "position" in data:
@@ -244,9 +266,11 @@ def update_card(tenant, actor, card, data):
         if old != value:
             if field == "archived":
                 undo[field] = old
+            before = str(old) if old is not None and field in {"deadline", "cover_attachment_id"} else old
+            after = str(value) if value is not None and field in {"deadline", "cover_attachment_id"} else value
             changes[field] = {
-                "before": str(old) if field == "deadline" else old,
-                "after": str(value) if field == "deadline" else value,
+                "before": before,
+                "after": after,
             }
             setattr(card, field, value)
     bump(card)

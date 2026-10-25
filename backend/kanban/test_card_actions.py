@@ -5,8 +5,55 @@ from django.test import TestCase
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from core.models import Tenant
+
 from .models import Board, Card, Column, Label
-from .views import CardViewSet, ColumnViewSet
+from .views import BoardViewSet, CardViewSet, ColumnViewSet
+
+
+class BoardActionsTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user("board-owner")
+        self.member = User.objects.create_user("board-member")
+        self.outsider = User.objects.create_user("other-workspace-user")
+        self.tenant = Tenant.objects.create(name="Board actions", identifier="board-actions", created_by=self.owner)
+        self.tenant.members.add(self.member)
+        self.board = Board.objects.create(tenant=self.tenant, title="Work")
+        self.factory = APIRequestFactory()
+
+    def call(self, user, method, action, data=None):
+        request = getattr(self.factory, method)("/", data or {}, format="json")
+        request.tenant = self.tenant
+        force_authenticate(request, user)
+        return BoardViewSet.as_view({method: action})(request, pk=str(self.board.pk))
+
+    def test_workspace_admin_can_select_any_active_user(self):
+        response = self.call(self.owner, "get", "available_members")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(self.outsider.pk, {item["id"] for item in response.data})
+        response = self.call(
+            self.owner, "post", "set_members", {"revision": self.board.revision, "members": [self.outsider.pk]}
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(self.tenant.members.filter(pk=self.outsider.pk).exists())
+        self.assertTrue(self.board.members.filter(pk=self.outsider.pk).exists())
+
+    def test_ordinary_member_cannot_invite_user_outside_workspace(self):
+        response = self.call(self.member, "get", "available_members")
+        self.assertNotIn(self.outsider.pk, {item["id"] for item in response.data})
+        response = self.call(
+            self.member, "post", "set_members", {"revision": self.board.revision, "members": [self.outsider.pk]}
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(self.tenant.members.filter(pk=self.outsider.pk).exists())
+        self.assertFalse(self.board.members.filter(pk=self.outsider.pk).exists())
+
+    def test_inactive_users_cannot_be_added(self):
+        self.outsider.is_active = False
+        self.outsider.save(update_fields=["is_active"])
+        response = self.call(
+            self.owner, "post", "set_members", {"revision": self.board.revision, "members": [self.outsider.pk]}
+        )
+        self.assertEqual(response.status_code, 400)
 
 
 class CardActionsTests(TestCase):

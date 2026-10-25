@@ -12,6 +12,10 @@ The card menu opens the card, edits labels/assignees/deadlines, chooses a palett
 
 ## Attachments and import
 
+The board action menu opens Members and Edit board dialogs. Workspace administrators can select any active system user as a board member; adding a user outside the workspace also grants that user workspace membership so they can open the board. Removing someone from a board does not revoke workspace membership. Other users may select existing workspace members. Edit board changes its name and uploads or removes a private background image. Board backgrounds and card covers accept JPEG, PNG, GIF or WebP up to 10 MiB. Card covers are card attachments and use the existing private download ticket.
+
+Users with the workspace `ai.use` permission can generate either image from a prompt or explicitly from board/card content. Board generation sends its title, active list names and up to 30 active card titles; card generation sends its title, the first 2,500 description characters and up to eight checklist items. These inputs go to OpenAI using the existing `OPENAI_API_KEY`; generation is limited to five requests per user per day. When the key or provider is unavailable, generation returns HTTP 503 without exposing provider details.
+
 Uploads go to the existing **private checkpoint bucket**, under `tenants/<tenant UUID>/kanban/`. They are persistent and do not enter the pending-media expiry workflow. The bucket must already be provisioned by the normal checkpoint-storage setup and remain distinct from the public media bucket. Authorized downloads stream S3 ranges for the built-in video player, including asynchronous streaming under ASGI without buffering the entire response. Signed, 15-minute, read-only browser tickets support JWT logins; every use rechecks membership. Do not log ticket query strings or WebSocket protocol headers.
 
 Existing file validation applies: images 50 MiB, documents/audio 100 MiB, MP4/WebM 500 MiB. Validation scans bounded chunks rather than buffering videos in memory. Unsupported formats, empty files and unsafe content are rejected. SVG is downloaded rather than rendered inline. Video is played natively without transcoding; actual browser codec support still applies. Reverse proxies must permit the advertised upload size if operators choose to expose 500 MiB uploads.
@@ -34,12 +38,15 @@ All endpoints are under `/api/v1/kanban/`, use the existing authentication and t
 
 - `boards/`: GET list, POST `{title}`; `boards/<uuid>/`: GET detail, PATCH `{revision,title?,archived?}`.
 - `boards/<uuid>/columns/`: POST `{revision,title}`; `reorder-columns/`: POST `{revision,columnIds}` including every column exactly once.
+- `boards/<uuid>/available-members/`: GET candidates; `members/`: POST `{revision,members}`. Adding someone outside the workspace requires `tenant.admin` and grants workspace membership.
+- `boards/<uuid>/background/`: authenticated GET, multipart POST `{revision,file}` or DELETE `{revision}`; `generate-background/`: POST `{revision,prompt}` or `{revision,fromContent:true}`.
 - `columns/<uuid>/duplicate/`: POST `{revision}`; atomically copies the list and active cards in the same board. Required list roles are not copied.
 - `columns/<uuid>/`: PATCH `{revision,title?,archived?}`.
 - `cards/`: paginated GET and POST `{title,column,...}`. `cards/<uuid>/`: GET detail and PATCH `{revision,...}`. Editable fields: title, description, checklist (`id,text,done`), externalReferences (`system,issueId,url`), assignees (user IDs), labels (label UUIDs), deadline (ISO timestamp/null), coverColor (empty, slate, red, amber, green, blue or purple), archived, column and position. Read-only mirrorOf/contentRevision identify the canonical content and revision; edits to shared mirror content must target that canonical card.
 - `cards/<uuid>/duplicate/`: POST `{revision,column,mirror?}`; creates an independent copy or a linked mirror in an active destination inside the tenant.
 - `cards/<uuid>/comments/`: POST `{revision,body}` using the card revision; `comments/<uuid>/`: PATCH `{revision,body}` using the comment revision.
 - `cards/<uuid>/attachments/`: multipart POST; `attachments/`: GET search (`q`, optional `approved=true`); `attachments/<uuid>/download/`: GET with byte ranges.
+- `cards/<uuid>/generate-cover/`: POST `{revision,prompt}` or `{revision,fromContent:true}`; creates a private image attachment and sets it as the cover. `cards/<uuid>/` also accepts `coverAttachment` (image attachment UUID/null).
 - `attachments/<uuid>/approve/`: POST `{revision}` using the card revision; `import/`: POST `{revision,destination,...}`. Media requires namespace and tagIds; Designer requires themeId, assetKey and draftVersion, with optional targetBreakpoint.
 - `workspace/`: GET members/boards/columns/labels/notifications/upload policy; `workspace/access/`: GET ephemeral browser read ticket; `labels/`: POST `{name}`; `activity/`: GET with optional board; `undo/`: POST `{activityId}`; `read-notification/`: POST `{id}`.
 

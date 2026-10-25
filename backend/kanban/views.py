@@ -2,6 +2,7 @@ import re
 from pathlib import PurePath
 
 from asgiref.sync import sync_to_async
+from django.contrib.auth.models import User
 from django.core.handlers.asgi import ASGIRequest
 from django.db.models import Max, Q
 from django.http import StreamingHttpResponse
@@ -14,9 +15,11 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
+from rest_framework.throttling import SimpleRateThrottle
 
 from . import files
 from .access import AttachmentTicketAuthentication, issue_ticket
+from .image_generation import board_context, card_context, generate_image
 from .models import Activity, Attachment, Board, Card, Column, Comment, Label, Notification
 from .search import search_cards
 from .serializers import (
@@ -25,10 +28,11 @@ from .serializers import (
     BoardSerializer,
     CardInput,
     CardSerializer,
-    DuplicateInput,
     ColumnSerializer,
     CommentInput,
     CommentSerializer,
+    DuplicateInput,
+    GenerateImageInput,
     ImportInput,
     ImportSerializer,
     LabelSerializer,
@@ -41,8 +45,8 @@ from .services import (
     bump,
     can_access,
     check_revision,
-    enqueue_index,
     duplicate_card,
+    enqueue_index,
     ensure_required_columns,
     event,
     get_record,
@@ -59,6 +63,25 @@ def validated(schema, data):
     instance = schema(data=data)
     instance.is_valid(raise_exception=True)
     return instance.validated_data
+
+
+class ImageGenerationThrottle(SimpleRateThrottle):
+    scope = "kanban_image"
+
+    def get_rate(self):
+        return "5/day"
+
+    def get_cache_key(self, request, view):
+        if not request.user.is_authenticated:
+            return None
+        return self.cache_format % {"scope": self.scope, "ident": request.user.pk}
+
+
+def require_image_generation(request):
+    from core.roles import permissions_for
+
+    if "ai.use" not in permissions_for(request.user, request.tenant):
+        raise PermissionDenied("AI image generation requires the AI permission in this workspace.")
 
 
 class TenantPermission(permissions.BasePermission):
@@ -125,12 +148,105 @@ class BoardViewSet(BaseViewSet):
         with locked_tenant(request) as tenant:
             board = get_record(Board, tenant, pk)
             check_revision(board, revision)
-            if set(members(tenant).filter(pk__in=ids).values_list("pk", flat=True)) != set(ids):
-                raise ValidationError("Board members must belong to this tenant.")
+            selected = set(User.objects.filter(pk__in=ids, is_active=True).values_list("pk", flat=True))
+            if selected != set(ids):
+                raise ValidationError("Board members must be active users.")
+            existing = set(members(tenant).filter(pk__in=ids).values_list("pk", flat=True))
+            new_to_tenant = selected - existing
+            if new_to_tenant:
+                from core.roles import permissions_for
+
+                if "tenant.admin" not in permissions_for(request.user, tenant):
+                    raise PermissionDenied("Only workspace administrators can add users from outside the workspace.")
+                tenant.members.add(*new_to_tenant)
             board.members.set(ids)
             bump(board)
             event(tenant, request.user, board, "board.members", "Updated board members")
         return Response(BoardSerializer(board).data)
+
+    @action(detail=True, methods=["get"], url_path="available-members")
+    def available_members(self, request, pk=None):
+        get_record(Board, request.tenant, pk)
+        from core.roles import permissions_for
+
+        candidates = (
+            User.objects.filter(is_active=True).order_by("username", "pk")
+            if "tenant.admin" in permissions_for(request.user, request.tenant)
+            else members(request.tenant).order_by("username", "pk")
+        )
+        return Response(MemberSerializer(candidates, many=True).data)
+
+    @action(detail=True, methods=["get", "post", "delete"], url_path="background")
+    def background(self, request, pk=None):
+        board = get_record(Board, request.tenant, pk)
+        if request.method == "GET":
+            if not board.background_path:
+                return Response(status=404)
+            result = files.attachment_storage.client.get_object(
+                Bucket=files.attachment_storage.bucket_name,
+                Key=files.attachment_storage._get_key(board.background_path),
+            )
+            body = result["Body"]
+
+            def chunks():
+                try:
+                    yield from body.iter_chunks(chunk_size=65536)
+                finally:
+                    body.close()
+
+            async def async_chunks():
+                try:
+                    while chunk := await sync_to_async(body.read, thread_sensitive=False)(65536):
+                        yield chunk
+                finally:
+                    await sync_to_async(body.close, thread_sensitive=False)()
+
+            response = StreamingHttpResponse(
+                async_chunks() if isinstance(request._request, ASGIRequest) else chunks(),
+                content_type=board.background_content_type,
+            )
+            response._resource_closers.append(body.close)
+            response["Cache-Control"] = "private, no-store"
+            response["X-Content-Type-Options"] = "nosniff"
+            return response
+        revision = validated(RevisionInput, request.data)["revision"]
+        upload = request.FILES.get("file") if request.method == "POST" else None
+        if request.method == "POST":
+            files.validate_image(upload)
+        return self._save_background(request, pk, revision, upload)
+
+    def _save_background(self, request, pk, revision, upload):
+        path = files.save_upload(request.tenant, upload) if upload else ""
+        try:
+            with locked_tenant(request) as tenant:
+                board = get_record(Board, tenant, pk)
+                check_revision(board, revision)
+                old_path = board.background_path
+                board.background_path = path
+                board.background_content_type = upload.content_type if upload else ""
+                bump(board)
+                event(tenant, request.user, board, "board.background", "Updated board background")
+        except Exception:
+            if path:
+                files.attachment_storage.delete(path)
+            raise
+        if old_path:
+            try:
+                files.attachment_storage.delete(old_path)
+            except Exception:
+                pass  # Preserve the successful board update if storage cleanup is unavailable.
+        return Response(BoardSerializer(board).data)
+
+    @action(detail=True, methods=["post"], url_path="generate-background", throttle_classes=[ImageGenerationThrottle])
+    def generate_background(self, request, pk=None):
+        require_image_generation(request)
+        data = validated(GenerateImageInput, request.data)
+        board = get_record(Board, request.tenant, pk)
+        check_revision(board, data["revision"])
+        prompt = board_context(board) if data["from_content"] else data["prompt"]
+        upload = generate_image("board", prompt)
+        files.validate_image(upload)
+        return self._save_background(request, pk, data["revision"], upload)
 
     @action(detail=True, methods=["post"], url_path="reorder-columns")
     def reorder_columns(self, request, pk=None):
@@ -356,6 +472,45 @@ class CardViewSet(BaseViewSet):
             raise
         return Response(AttachmentSerializer(attachment).data, status=201)
 
+    @action(detail=True, methods=["post"], url_path="generate-cover", throttle_classes=[ImageGenerationThrottle])
+    def generate_cover(self, request, pk=None):
+        require_image_generation(request)
+        data = validated(GenerateImageInput, request.data)
+        card = get_record(Card, request.tenant, pk)
+        check_revision(card, data["revision"])
+        if card.mirror_of_id:
+            raise ValidationError("Generate the cover on the original card.")
+        prompt = card_context(card) if data["from_content"] else data["prompt"]
+        upload = generate_image("card", prompt)
+        files.validate_image(upload)
+        path = files.save_upload(request.tenant, upload)
+        try:
+            with locked_tenant(request) as tenant:
+                card = get_record(Card, tenant, pk)
+                check_revision(card, data["revision"])
+                attachment = Attachment.objects.create(
+                    tenant=tenant,
+                    card=card,
+                    filename=upload.name,
+                    path=path,
+                    content_type=upload.content_type,
+                    size=upload.size,
+                    uploaded_by=request.user,
+                )
+                card = update_card(
+                    tenant,
+                    request.user,
+                    card,
+                    {
+                        "revision": data["revision"],
+                        "cover_attachment": attachment.pk,
+                    },
+                )
+        except Exception:
+            files.attachment_storage.delete(path)
+            raise
+        return Response(CardSerializer(card).data)
+
 
 class CommentViewSet(BaseViewSet):
     serializer_class = CommentSerializer
@@ -511,6 +666,8 @@ class WorkspaceViewSet(BaseViewSet):
     serializer_class = BoardSerializer
 
     def list(self, request):
+        from core.roles import permissions_for
+
         return Response(
             {
                 "tenant_id": str(request.tenant.pk),
@@ -523,6 +680,7 @@ class WorkspaceViewSet(BaseViewSet):
                 ).data,
                 "file_types": files.ALLOWED_TYPES,
                 "file_limits": files.FileUploadValidator.MAX_FILE_SIZES,
+                "can_generate_images": "ai.use" in permissions_for(request.user, request.tenant),
             }
         )
 

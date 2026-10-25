@@ -24,6 +24,7 @@ from .upload_validation import CHUNK_SIZE, KanbanUploadValidator
 
 # Private bucket; no URL is ever returned to clients.
 attachment_storage = checkpoint_storage
+IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 ALLOWED_TYPES = {
     mime: extensions
     for mime, extensions in FileUploadValidator.ALLOWED_MIME_TYPES.items()
@@ -45,6 +46,14 @@ def validate_upload(upload):
         raise ValidationError("Unsupported file format. Videos must be MP4 or WebM.")
     upload.content_type = actual
     return result
+
+
+def validate_image(upload):
+    if not upload or upload.size > 10 * 1024 * 1024:
+        raise ValidationError("Choose an image smaller than 10 MB.")
+    validate_upload(upload)
+    if upload.content_type not in IMAGE_TYPES:
+        raise ValidationError("Choose a JPEG, PNG, GIF or WebP image.")
 
 
 def save_upload(tenant, upload):

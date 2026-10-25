@@ -30,7 +30,7 @@ async function mockWorkspace(page, { conflict = false, extraCards = [] } = {}) {
     const allCards = [card, ...extraCards.map((extra) => ({ ...card, ...extra }))]
     const workspace = {
         tenantId,
-        boards: [{ id: boardId, title: 'Website', revision: 1, archived: false }],
+        boards: [{ id: boardId, title: 'Website', revision: 1, archived: false, members: [1], hasBackground: false }],
         columns: [
             {
                 id: columnId,
@@ -73,6 +73,16 @@ async function mockWorkspace(page, { conflict = false, extraCards = [] } = {}) {
             }
         else if (path.endsWith('/kanban/workspace/')) data = workspace
         else if (path.endsWith('/kanban/workspace/access/')) data = { ticket: 'test-browser-ticket' }
+        else if (path.endsWith(`/boards/${boardId}/available-members/`)) data = [...workspace.members, { id: 2, name: 'Alex', username: 'alex' }]
+        else if (path.endsWith(`/boards/${boardId}/members/`)) {
+            workspace.boards[0].members = request.postDataJSON().members
+            workspace.boards[0].revision++
+            data = workspace.boards[0]
+        } else if (path.endsWith(`/boards/${boardId}/`) && request.method() === 'PATCH') {
+            workspace.boards[0].title = request.postDataJSON().title
+            workspace.boards[0].revision++
+            data = workspace.boards[0]
+        }
         else if (path.endsWith(`/cards/${cardId}/comments/`)) {
             const body = request.postDataJSON()
             const comment = {
@@ -119,6 +129,26 @@ async function mockWorkspace(page, { conflict = false, extraCards = [] } = {}) {
     )
     return { card, workspace }
 }
+
+test('board menu opens member and edit dialogs without breaking the toolbar', async ({ page }) => {
+    await mockWorkspace(page)
+    await page.goto(`/kanban/boards/${boardId}`)
+    await expect(page.getByRole('heading', { name: 'Website' })).toBeVisible()
+    await page.getByRole('button', { name: 'Tavelåtgärder' }).click()
+    await page.getByRole('button', { name: 'Medlemmar', exact: true }).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await page.getByRole('textbox', { name: 'Sök användare' }).fill('Alex')
+    await page.getByRole('checkbox', { name: 'Alex' }).check()
+    await expect(page.getByRole('checkbox', { name: 'Alex' })).toBeChecked()
+    await page.getByRole('button', { name: 'Stäng dialog' }).click()
+    await page.getByRole('button', { name: 'Tavelåtgärder' }).click()
+    await page.getByRole('button', { name: 'Redigera tavlan' }).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await page.getByRole('textbox', { name: 'Tavelnamn' }).fill('New website')
+    await page.getByRole('button', { name: 'Spara', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'New website' })).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy()
+})
 
 test('board navigation, accessible movement, Markdown and comments', async ({ page }, testInfo) => {
     await mockWorkspace(page)
