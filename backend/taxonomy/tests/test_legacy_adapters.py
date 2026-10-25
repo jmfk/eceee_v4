@@ -1,9 +1,21 @@
 import pytest
+from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
-from taxonomy.models import LegacyTagMapping
+from content.models import Namespace
+from taxonomy.legacy import definition_for
+from taxonomy.models import ClassificationType, LegacyTagMapping
 
 pytestmark = pytest.mark.django_db
+
+
+def test_legacy_default_type_respects_unique_name_in_namespace(scope):
+    owner, _, _, definition = scope
+    namespace = Namespace.objects.create(tenant=definition.tenant, name="Extra", slug="extra", created_by=owner)
+    ClassificationType.objects.create(tenant=definition.tenant, namespace=namespace, key="custom", name="Allmänt")
+    with pytest.raises(ValidationError, match="already exists"):
+        definition_for(namespace, owner)
+    assert ClassificationType.objects.filter(namespace=namespace).count() == 1
 
 
 def test_legacy_content_create_obeys_structure_rights_and_delete_archives(scope):

@@ -6,7 +6,7 @@ from rest_framework.test import APIClient
 
 from content.models import Namespace
 from core.models import Tenant
-from taxonomy.models import ClassificationGrant, ClassificationType, LegacyTagMapping, Tag
+from taxonomy.models import ClassificationGrant, ClassificationOperation, ClassificationType, LegacyTagMapping, Tag
 from taxonomy.services import (
     ClassificationConflict,
     change_type,
@@ -97,6 +97,29 @@ def test_unused_leaf_can_change_type_without_changing_identity(scope):
     assert operation.action == "change_type"
     assert operation.before[str(term.pk)]["classification_type_id"] == str(source.pk)
     assert operation.after[str(term.pk)]["classification_type_id"] == str(target.pk)
+    incoming = ClassificationOperation.objects.get(classification_type=target, action="change_type")
+    assert incoming.before == operation.before
+    assert incoming.after == operation.after
+    target.refresh_from_db()
+    assert incoming.type_revision == target.revision
+
+
+@pytest.mark.parametrize("name", ["allmänt", " Allmänt "])
+def test_import_rejects_duplicate_type_name_in_destination_namespace(scope, name):
+    from taxonomy.transfer import import_definition
+
+    owner, _, _, definition = scope
+    with pytest.raises(ValidationError, match="already exists"):
+        import_definition(definition.namespace, "second", name, owner)
+    assert not ClassificationType.objects.filter(namespace=definition.namespace, key="second").exists()
+
+
+def test_import_rejects_blank_type_name(scope):
+    from taxonomy.transfer import import_definition
+
+    owner, _, _, definition = scope
+    with pytest.raises(ValidationError, match="Enter a tag type name"):
+        import_definition(definition.namespace, "second", "  ", owner)
 
 
 def test_type_change_rejects_children_legacy_links_and_collisions(scope):
@@ -120,6 +143,30 @@ def test_type_change_rejects_children_legacy_links_and_collisions(scope):
         change_type(owner, collision, target.pk, revision=collision.revision)
     collision.refresh_from_db()
     assert collision.classification_type_id == source.pk
+
+
+def test_merge_target_cannot_change_type_while_sources_redirect_to_it(scope):
+    owner, _, _, source = scope
+    target_type = ClassificationType.objects.create(
+        tenant=source.tenant, namespace=source.namespace, key="topic", name="Topic"
+    )
+    merged_source = create(owner, source, "Old")
+    target = create(owner, source, "Current")
+    mutate(
+        owner,
+        source,
+        "merge",
+        term=merged_source,
+        revision=merged_source.revision,
+        payload={"target_id": str(target.pk), "target_revision": target.revision},
+    )
+    target.refresh_from_db()
+    with pytest.raises(ValidationError, match="merge target"):
+        change_type(owner, target, target_type.pk, revision=target.revision)
+    target.refresh_from_db()
+    merged_source.refresh_from_db()
+    assert target.classification_type_id == source.pk
+    assert resolve_term(merged_source).pk == target.pk
 
 
 @override_settings(
@@ -335,6 +382,28 @@ def test_type_api_rejects_duplicate_name_in_namespace(scope):
     assert response.status_code == 400
     other.refresh_from_db()
     assert other.name == "Other"
+
+
+@override_settings(
+    ROOT_URLCONF="taxonomy.urls", CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
+def test_type_create_rechecks_name_after_serializer_validation(scope, monkeypatch):
+    from taxonomy.serializers import ClassificationTypeSerializer
+
+    owner, _, _, definition = scope
+    # Simulate a name becoming unavailable after the serializer's first check.
+    monkeypatch.setattr(ClassificationTypeSerializer, "validate", lambda self, attrs: attrs)
+    client = APIClient()
+    client.force_authenticate(owner)
+    response = client.post(
+        "/types/",
+        {"namespace": definition.namespace_id, "key": "copy", "name": definition.name, "allowed_uses": []},
+        format="json",
+        HTTP_X_TENANT_ID=str(definition.tenant_id),
+    )
+    assert response.status_code == 400
+    assert "name" in response.data
+    assert not ClassificationType.objects.filter(key="copy", namespace=definition.namespace).exists()
 
 
 def test_archived_term_can_be_reactivated_after_other_changes(scope):

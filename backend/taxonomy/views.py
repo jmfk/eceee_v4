@@ -64,12 +64,21 @@ class ClassificationTypeViewSet(
 
     @transaction.atomic
     def perform_create(self, serializer):
+        from content.models import Namespace
+
         tenant = self.request.tenant
         if not (self.request.user.is_superuser or tenant.created_by_id == self.request.user.pk):
             raise PermissionDenied("Only tenant owners may create classification types.")
         namespace = serializer.validated_data["namespace"]
         if namespace.tenant_id != tenant.pk:
             raise ValidationError({"namespace": "Namespace belongs to another tenant."})
+        # Serializer validation happens before this transaction. Recheck after
+        # locking the namespace so simultaneous creates cannot reuse a name.
+        Namespace.objects.select_for_update().get(pk=namespace.pk)
+        if ClassificationType.objects.filter(
+            tenant=tenant, namespace=namespace, name__iexact=serializer.validated_data["name"]
+        ).exists():
+            raise ValidationError({"name": "A tag type with this name already exists in this namespace."})
         instance = ClassificationType(tenant=tenant, **serializer.validated_data)
         try:
             instance.full_clean()
