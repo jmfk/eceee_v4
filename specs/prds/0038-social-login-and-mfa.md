@@ -7,6 +7,7 @@ created: 2026-10-23
 related_adrs:
   - ADR-0053
   - ADR-0054
+  - ADR-0055
 ---
 
 # PRD-0038: Apple and Google sign-in with optional MFA
@@ -42,10 +43,18 @@ Implementation started 2026-10-23. Preserve unrelated workspace messaging, role 
 - The production confirmation template also omitted allauth's verification code;
   it now renders the code while retaining confirmation-link compatibility.
 
+### Optional verification clarification (2026-10-25)
+
+The owner clarified that ordinary login must not require or send email verification.
+ADR-0055 moves verification to an explicit Profile action before optional MFA
+enrollment; an email address is required only when that action is requested.
+Password-reset mail and other transactional mail remain available.
+
 ## Linked ADRs
 
 - [ADR-0053](../adrs/active/0053-browser-sessions-social-login-and-mfa.md)
 - [ADR-0054](../adrs/active/0054-postmark-authentication-email-backend.md)
+- [ADR-0055](../adrs/active/0055-explicit-email-verification-before-mfa.md)
 
 ## Completion Evidence
 

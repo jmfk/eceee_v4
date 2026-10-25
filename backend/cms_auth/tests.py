@@ -2,13 +2,15 @@ import json
 import time
 from types import SimpleNamespace
 from unittest.mock import patch
+from urllib.parse import quote
 
-from allauth.account.models import EmailAddress
+from allauth.account.models import EmailAddress, EmailConfirmationHMAC
 from allauth.mfa.models import Authenticator
 from allauth.mfa.totp.internal.auth import format_hotp_value, hotp_value
 from allauth.socialaccount.models import SocialAccount, SocialLogin
 from cryptography.fernet import Fernet
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.core.cache import cache
 from django.test import Client, TestCase, TransactionTestCase, override_settings
 from rest_framework.authtoken.models import Token
@@ -84,7 +86,8 @@ class BrowserAuthenticationTests(TestCase):
         self.assertEqual(self.client.post("/protected/", {}).status_code, 403)
         self.assertTrue(self.client.cookies["sessionid"]["httponly"])
 
-    def test_unverified_login_sends_through_production_mail_backend(self):
+    @override_settings(ACCOUNT_EMAIL_VERIFICATION="mandatory", ACCOUNT_EMAIL_VERIFICATION_BY_CODE_ENABLED=True)
+    def test_explicit_mandatory_policy_uses_production_mail_backend(self):
         config = production_mail_settings()
         EmailAddress.objects.filter(user=self.user).update(verified=False)
         with (
@@ -326,16 +329,81 @@ class BrowserAuthenticationTests(TestCase):
         self.assertGreater(security_version(self.user), before)
         self.assertEqual(self.client.get("/protected/").status_code, 401)
 
-    def test_unverified_existing_account_verifies_email_before_access(self):
+    def test_unverified_account_login_does_not_send_mail(self):
+        self.assertEqual(production_mail_settings()["ACCOUNT_EMAIL_VERIFICATION"], "optional")
         EmailAddress.objects.filter(user=self.user).update(verified=False)
-        result = self.login()
-        self.assertEqual(result.status_code, 401)
-        self.assertEqual(self.client.get("/protected/").status_code, 401)
-        state = self.client.session["account_email_verification_code"]
-        result = self.write(BASE + "/auth/email/verify", {"key": state["code"]})
-        self.assertEqual(result.status_code, 200, result.content)
-        self.assertTrue(EmailAddress.objects.get(user=self.user).verified)
+        self.assertEqual(self.login().status_code, 200)
         self.assertEqual(self.client.get("/protected/").status_code, 200)
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertFalse(EmailAddress.objects.get(user=self.user).verified)
+        self.reauthenticate()
+        self.assertEqual(self.client.get(BASE + "/account/authenticators/totp").status_code, 409)
+        self.assertEqual(self.client.get(BASE + "/account/authenticators/webauthn").status_code, 409)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_account_without_email_can_login_without_mail(self):
+        EmailAddress.objects.filter(user=self.user).delete()
+        self.user.email = ""
+        self.user.save(update_fields=["email"])
+        self.assertEqual(self.login().status_code, 200)
+        self.assertEqual(self.client.get("/protected/").status_code, 200)
+        self.assertEqual(len(mail.outbox), 0)
+        self.reauthenticate()
+        self.assertEqual(self.write(BASE + "/account/email", {"email": ""}, method="put").status_code, 400)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_explicit_email_verification_before_mfa_uses_production_backend(self):
+        EmailAddress.objects.filter(user=self.user).update(verified=False)
+        self.assertEqual(self.login().status_code, 200)
+        self.assertEqual(self.reauthenticate().status_code, 200)
+        config = production_mail_settings()
+        with (
+            override_settings(
+                EMAIL_BACKEND=config["EMAIL_BACKEND"], ANYMAIL=config["ANYMAIL"], TEMPLATES=config["TEMPLATES"]
+            ),
+            patch("requests.sessions.Session.request", return_value=postmark_success()) as request,
+        ):
+            sent = self.write(BASE + "/account/email", {"email": self.user.email}, method="put")
+        self.assertEqual(sent.status_code, 200, sent.content)
+        request.assert_called_once()
+        key = EmailConfirmationHMAC(EmailAddress.objects.get(user=self.user)).key
+        self.assertIn(
+            "http://testserver/login?emailKey=" + quote(key, safe=""),
+            json.loads(request.call_args.kwargs["data"])["TextBody"],
+        )
+        self.assertEqual(self.write(BASE + "/auth/email/verify", {"key": "wrong"}).status_code, 400)
+        self.assertEqual(self.write(BASE + "/auth/email/verify", {"key": key}).status_code, 200)
+        self.assertTrue(EmailAddress.objects.get(user=self.user).verified)
+        self.assertEqual(self.client.get(BASE + "/account/authenticators/totp").status_code, 404)
+
+    def test_missing_email_is_added_only_after_explicit_request(self):
+        EmailAddress.objects.filter(user=self.user).delete()
+        self.user.email = ""
+        self.user.save(update_fields=["email"])
+        self.assertEqual(self.login().status_code, 200)
+        self.assertEqual(self.reauthenticate().status_code, 200)
+        self.assertEqual(len(mail.outbox), 0)
+        response = self.write(BASE + "/account/email", {"email": "new@example.invalid"})
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(len(mail.outbox), 1)
+        address = EmailAddress.objects.get(user=self.user, email="new@example.invalid")
+        self.assertFalse(address.verified)
+        key = EmailConfirmationHMAC(address).key
+        self.assertEqual(self.write(BASE + "/auth/email/verify", {"key": key}).status_code, 200)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, "new@example.invalid")
+        self.assertTrue(EmailAddress.objects.get(pk=address.pk).verified)
+
+    def test_optional_email_verification_does_not_bypass_existing_mfa(self):
+        self.enroll()
+        EmailAddress.objects.filter(user=self.user).update(verified=False)
+        client = Client(enforce_csrf_checks=True)
+        before = len(mail.outbox)
+        result = self.login(client=client)
+        self.assertEqual(result.status_code, 401)
+        self.assertTrue(any(flow["id"] == "mfa_authenticate" for flow in result.json()["data"]["flows"]))
+        self.assertEqual(client.get("/protected/").status_code, 401)
+        self.assertEqual(len(mail.outbox), before)
 
     def test_software_webauthn_key_enrollment_and_second_factor(self):
         """Exercise real fido2 attestation/assertion verification without hardware."""

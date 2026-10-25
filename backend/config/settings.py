@@ -509,7 +509,7 @@ AUTHENTICATION_BACKENDS = [
 # Updated to use new allauth settings format (v0.50+)
 ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
-ACCOUNT_EMAIL_VERIFICATION = "mandatory"  # Require email verification
+ACCOUNT_EMAIL_VERIFICATION = "optional"  # Requested explicitly in Profile before MFA enrollment
 ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 3  # Confirmation links expire after 3 days
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True  # Auto-login after email confirmation
 

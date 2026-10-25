@@ -12,6 +12,10 @@ legacy `EMAIL_BACKEND` override to the backend above.
 not validate the real server token or deliver mail. `POSTMARK_TRACK_OPENS` keeps
 its existing configurable preference. API request/payload debugging is disabled.
 
+Ordinary CMS login does not send verification email. Verification is requested
+explicitly in Profile before optional 2FA enrollment; users without an address
+must supply one first. Password-reset requests still send transactional mail.
+
 Authentication tests exercise the production configuration and actual backend
 with a mocked HTTPS transport, including verification and password-reset mail.
 Real delivery must be checked separately with a verified sender and an authorized
