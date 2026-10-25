@@ -6,6 +6,7 @@ locked: true
 created: 2026-10-23
 related_adrs:
   - ADR-0053
+  - ADR-0054
 ---
 
 # PRD-0038: Apple and Google sign-in with optional MFA
@@ -31,9 +32,20 @@ React uses allauth browser sessions, CSRF and shared login/reauthentication comp
 
 Implementation started 2026-10-23. Preserve unrelated workspace messaging, role and diagnostics changes already in the working tree.
 
+### Authentication email repair (2026-10-25)
+
+- Read-only production diagnostics identified a missing mail-backend module during
+  sign-in. The configured module is absent from the installed Python 2-era package.
+- ADR-0054 replaces that dependency without changing Postmark credentials or account
+  policy. Regression coverage executes production settings/templates and mocks only
+  HTTPS delivery, covering email-code sign-in completion and reset requests.
+- The production confirmation template also omitted allauth's verification code;
+  it now renders the code while retaining confirmation-link compatibility.
+
 ## Linked ADRs
 
 - [ADR-0053](../adrs/active/0053-browser-sessions-social-login-and-mfa.md)
+- [ADR-0054](../adrs/active/0054-postmark-authentication-email-backend.md)
 
 ## Completion Evidence
 

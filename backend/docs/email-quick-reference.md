@@ -114,10 +114,10 @@ Override the email backend:
 
 ```bash
 # Set environment variable
-export EMAIL_BACKEND=postmark.django_backend.EmailBackend
+export EMAIL_BACKEND=anymail.backends.postmark.EmailBackend
 
 # Or add to .env file
-EMAIL_BACKEND=postmark.django_backend.EmailBackend
+EMAIL_BACKEND=anymail.backends.postmark.EmailBackend
 ```
 
 ### Test User Registration
@@ -206,7 +206,7 @@ Should match your actual domain (e.g., `example.com`).
 | `DEFAULT_FROM_EMAIL` | Default sender address | `noreply@example.com` |
 | `SERVER_EMAIL` | System error emails | `server@example.com` |
 | `ADMIN_EMAIL` | Admin notifications | `admin@example.com` |
-| `EMAIL_BACKEND` | Override email backend | `postmark.django_backend.EmailBackend` |
+| `EMAIL_BACKEND` | Override email backend | `anymail.backends.postmark.EmailBackend` |
 
 ## Useful Commands
 

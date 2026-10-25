@@ -155,6 +155,8 @@ DJANGO_APPS = [
 ]
 
 THIRD_PARTY_APPS = [
+    # Transactional email over Postmark's HTTPS API.
+    "anymail",
     # Database-backed scheduler used by the celery-beat production service.
     "django_celery_beat",
     # API and serialization
@@ -521,7 +523,7 @@ EMAIL_BACKEND = config(
     default=(
         "django.core.mail.backends.console.EmailBackend"  # Console in dev
         if DEBUG
-        else "postmark.django_backend.EmailBackend"
+        else "anymail.backends.postmark.EmailBackend"
     ),  # Postmark in production
 )
 POSTMARK_API_KEY = config("POSTMARK_API_KEY", default="")
@@ -536,6 +538,11 @@ MANAGERS = ADMINS
 
 POSTMARK_TEST_MODE = config("POSTMARK_TEST_MODE", default=False, cast=bool)
 POSTMARK_TRACK_OPENS = config("POSTMARK_TRACK_OPENS", default=True, cast=bool)
+ANYMAIL = {
+    "POSTMARK_SERVER_TOKEN": "POSTMARK_API_TEST" if POSTMARK_TEST_MODE else POSTMARK_API_KEY,
+    "SEND_DEFAULTS": {"track_opens": POSTMARK_TRACK_OPENS},
+    "DEBUG_API_REQUESTS": False,
+}
 
 # Development Tools Configuration
 if DEBUG:
@@ -762,7 +769,7 @@ FM_USERNAME = config("FM_USERNAME", default="")
 FM_PASSWORD = config("FM_PASSWORD", default="")
 
 # EMAIL_BACKEND = "email_log.backends.EmailBackend"
-# EMAIL_LOG_BACKEND = "postmark.django_backend.EmailBackend"
+# EMAIL_LOG_BACKEND = "anymail.backends.postmark.EmailBackend"
 
 # Private inbox media must never share the public media/checkpoint bucket.
 SUPPORT_STORAGE_BUCKET_NAME = config("SUPPORT_STORAGE_BUCKET_NAME", default="")

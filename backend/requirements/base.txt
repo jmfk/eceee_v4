@@ -38,7 +38,7 @@ cryptography>=42.0.0
 django-allauth[mfa,socialaccount]==65.20.1
 
 # Email backend
-django-postmark>=0.1.6
+django-anymail[postmark]==14.0
 
 # Background tasks
 celery>=5.3.0

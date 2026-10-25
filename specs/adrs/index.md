@@ -4,6 +4,7 @@
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
+| ADR-0054 | [Compatible Postmark delivery for authentication email](active/0054-postmark-authentication-email-backend.md) | accepted | PRD-0038 |
 | ADR-0053 | [Browser sessions, explicit social identities and optional MFA](active/0053-browser-sessions-social-login-and-mfa.md) | accepted | PRD-0038 |
 | ADR-0051 | [Tenant recipient snapshots and stable board list roles](active/0051-workspace-messaging-and-roles.md) | accepted | PRD-0036 |
 | ADR-0050 | [Klassificeringens aktivering och medieintegritet](active/0050-classification-cutover-and-media-integrity.md) | accepted | PRD-0035, PRD-0031 |
