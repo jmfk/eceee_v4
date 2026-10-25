@@ -25,6 +25,7 @@ from .serializers import (
     BoardSerializer,
     CardInput,
     CardSerializer,
+    DuplicateInput,
     ColumnSerializer,
     CommentInput,
     CommentSerializer,
@@ -41,6 +42,7 @@ from .services import (
     can_access,
     check_revision,
     enqueue_index,
+    duplicate_card,
     ensure_required_columns,
     event,
     get_record,
@@ -166,6 +168,33 @@ class ColumnViewSet(BaseViewSet):
             bump(column.board)
         return Response(ColumnSerializer(column).data)
 
+    @action(detail=True, methods=["post"])
+    def duplicate(self, request, pk=None):
+        data = validated(RevisionInput, request.data)
+        with locked_tenant(request) as tenant:
+            source = get_record(Column, tenant, pk)
+            check_revision(source, data["revision"])
+            if source.board.archived:
+                raise ValidationError("Restore the board before copying a list.")
+            column = Column.objects.create(
+                tenant=tenant,
+                board=source.board,
+                title=f"{source.title[:192]} (kopia)",
+                position=source.board.columns.count(),
+            )
+            for card in source.cards.filter(archived=False).select_related("mirror_of"):
+                duplicate_card(tenant, request.user, card, column)
+            bump(source.board)
+            event(
+                tenant,
+                request.user,
+                column,
+                "column.copied",
+                f"Copied {source.title}",
+                undo={"model": "column", "id": str(column.pk), "revision": column.revision, "archived": True},
+            )
+        return Response(ColumnSerializer(column).data, status=201)
+
 
 class CardPagination(PageNumberPagination):
     page_size = 100
@@ -177,7 +206,7 @@ class CardViewSet(BaseViewSet):
     serializer_class = CardSerializer
 
     def list(self, request):
-        cards = self.scoped(Card).select_related("column__board").prefetch_related("assignees", "labels")
+        cards = self.scoped(Card).select_related("column__board", "mirror_of").prefetch_related("assignees", "labels")
         params = request.query_params
         for key, lookup in [
             ("board", "column__board_id"),
@@ -254,6 +283,16 @@ class CardViewSet(BaseViewSet):
         with locked_tenant(request) as tenant:
             card = update_card(tenant, request.user, get_record(Card, tenant, pk), data)
         return Response(CardSerializer(card).data)
+
+    @action(detail=True, methods=["post"])
+    def duplicate(self, request, pk=None):
+        data = validated(DuplicateInput, request.data)
+        with locked_tenant(request) as tenant:
+            source = get_record(Card, tenant, pk)
+            check_revision(source, data["revision"])
+            column = get_record(Column, tenant, data["column"])
+            card = duplicate_card(tenant, request.user, source, column, data["mirror"])
+        return Response(CardSerializer(card).data, status=201)
 
     @action(detail=True, methods=["post"])
     def comments(self, request, pk=None):

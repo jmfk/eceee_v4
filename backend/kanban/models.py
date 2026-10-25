@@ -52,6 +52,8 @@ class Label(TenantRecord):
 
 
 class Card(TenantRecord):
+    cover_color = models.CharField(max_length=16, blank=True, default="")
+    mirror_of = models.ForeignKey("self", null=True, blank=True, on_delete=models.PROTECT, related_name="mirrors")
     number = models.PositiveIntegerField()
     column = models.ForeignKey(Column, on_delete=models.CASCADE, related_name="cards")
     title = models.CharField(max_length=250)

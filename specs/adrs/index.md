@@ -63,3 +63,6 @@
 | ADR-0012 | [Validate the publisher through an isolated hostname alias](archive/0012-isolated-publisher-test-host.md) | superseded | PRD-0010, PRD-0011 |
 | ADR-0013 | [Gate the legacy News migration through canonical golden samples](archive/0013-legacy-news-golden-sample-gate.md) | superseded | PRD-0012 |
 | ADR-0024 | [Deployment-installed tenant plugins with typed extension points](archive/0024-deployment-installed-tenant-plugins.md) | superseded | PRD-0020 |
+
+| ADR-0054 | [Kanban card presentation and mirrors](active/0054-kanban-card-presentation.md) | accepted | PRD-0039 |
+| ADR-0055 | [Contextual Kanban card overlay](active/0055-contextual-kanban-card-overlay.md) | accepted | PRD-0040 |
