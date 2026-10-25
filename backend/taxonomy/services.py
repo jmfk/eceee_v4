@@ -269,6 +269,69 @@ def mutate(user, definition, action, *, term=None, revision=None, payload=None):
 
 
 @transaction.atomic
+def change_type(user, term, target_id, *, revision=None, payload=None):
+    """Move an unused leaf to another type in its namespace without changing its ID."""
+    from content.models import Namespace
+
+    if not term.classification_type_id:
+        raise ValidationError("Reconcile this legacy tag before changing its type.")
+    Namespace.objects.select_for_update().get(pk=term.namespace_id)
+    try:
+        target = ClassificationType.objects.get(pk=target_id, tenant_id=term.tenant_id, namespace_id=term.namespace_id)
+    except (ClassificationType.DoesNotExist, ModelValidationError, ValueError, TypeError) as exc:
+        raise ValidationError({"classification_type": "Choose a tag type in the same namespace."}) from exc
+    if target.pk == term.classification_type_id:
+        raise ValidationError({"classification_type": "Choose a different tag type."})
+    definitions = {
+        item.pk: item
+        for item in ClassificationType.objects.select_for_update()
+        .filter(pk__in=[term.classification_type_id, target.pk])
+        .order_by("pk")
+    }
+    source = definitions[term.classification_type_id]
+    target = definitions[target.pk]
+    require(user, source, "edit")
+    require(user, target, "create")
+    term = _related(source, term.pk)
+    _review(term, revision)
+    if term.status != "approved":
+        raise ValidationError("Only approved tags may change type.")
+    _validate_payload("edit", payload or {})
+    if term.children.exists():
+        raise ValidationError("Move or archive child tags before changing this tag's type.")
+    if (
+        term.page_version_links.exists()
+        or term.object_version_links.exists()
+        or term.media_file_classification_links.exists()
+        or term.collection_classification_links.exists()
+        or term.legacy_mappings.exists()
+    ):
+        raise ValidationError("A tag with assignments or legacy links cannot change type.")
+    if ClassificationProposal.objects.filter(classification_type=source, status="pending").exists():
+        raise ValidationError("Resolve pending proposals for this type before changing the tag's type.")
+    before = {**snapshot(term), "classification_type_id": str(source.pk), "tag_type": source.key}
+    for key, value in (payload or {}).items():
+        setattr(term, key, value)
+    term.classification_type = target
+    term.tag_type = target.key
+    term.parent = None
+    term.revision += 1
+    validate_and_save(term)
+    source.revision += 1
+    source.save(update_fields=["revision"])
+    target.revision += 1
+    target.save(update_fields=["revision"])
+    return ClassificationOperation.objects.create(
+        classification_type=source,
+        action="change_type",
+        actor=user,
+        before={str(term.pk): before},
+        after={str(term.pk): {**snapshot(term), "classification_type_id": str(target.pk), "tag_type": target.key}},
+        type_revision=source.revision,
+    )
+
+
+@transaction.atomic
 def propose(user, definition, action, *, term=None, revision=None, payload=None):
     definition = locked_definition(definition)
     require(user, definition, "propose")

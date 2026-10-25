@@ -1,6 +1,7 @@
 import CompactSelect from './CompactSelect'
 import React, { useEffect, useId, useRef, useState } from 'react'
-import { ListFilterPlus, Search, X } from 'lucide-react'
+import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
+import { ChevronDown, ListFilterPlus, Search, X } from 'lucide-react'
 import './classification.css'
 import ClassificationTypeForm from './ClassificationTypeForm'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -27,12 +28,16 @@ export default function ClassificationManager({ namespace } = {}) {
     const client = useQueryClient()
     const [typeId, setTypeId] = useState('')
     const [legacyTagType, setLegacyTagType] = useState('')
+    const [selectedTypeId, setSelectedTypeId] = useState('')
+    const [typeMode, setTypeMode] = useState('detail')
+    const [typeSearch, setTypeSearch] = useState('')
     const [showEditor, setShowEditor] = useState(false)
     const [filterOpen, setFilterOpen] = useState(false)
     const filterRef = useRef(null)
     const filterButtonRef = useRef(null)
     const filterSelectRef = useRef(null)
     const searchId = useId()
+    const typeSearchId = useId()
     const filterId = useId()
     useEffect(() => {
         if (!filterOpen) return
@@ -51,6 +56,7 @@ export default function ClassificationManager({ namespace } = {}) {
     const [historyPage, setHistoryPage] = useState(1)
     const [customPermissions, setCustomPermissions] = useState(['use', 'propose'])
     const [action, setAction] = useState('create')
+    const [editTypeId, setEditTypeId] = useState('')
     const [name, setName] = useState('')
     const [description, setDescription] = useState('')
     const [aliases, setAliases] = useState('')
@@ -62,7 +68,24 @@ export default function ClassificationManager({ namespace } = {}) {
     const [undoId, setUndoId] = useState(null)
     const [grantUser, setGrantUser] = useState('')
     const [grantRole, setGrantRole] = useState('proposer')
-    const types = useQuery({ queryKey: ['classification', tenant, 'types', namespace], queryFn: async () => await taxonomyApi.types({ ...scope, page_size: 200, ordering: 'name' }) })
+    const types = useQuery({ queryKey: ['classification', tenant, 'types', namespace], queryFn: async () => {
+        let pageNumber = 1
+        let response
+        const results = []
+        do {
+            response = await taxonomyApi.types({ ...scope, page: pageNumber, page_size: 200 })
+            results.push(...(response.results || []))
+            pageNumber += 1
+        } while (response.next)
+        return { ...response, results }
+    } })
+    const typeDefinitions = types.data?.results || []
+    const selectedType = typeDefinitions.find(type => type.id === selectedTypeId) || typeDefinitions[0]
+    const matchingTypes = typeDefinitions.filter(type => `${type.name} ${type.key} ${type.description || ''}`.toLocaleLowerCase().includes(typeSearch.trim().toLocaleLowerCase()))
+    const namespaces = useQuery({ queryKey: ['classification', tenant, 'namespaces'], queryFn: async () => await taxonomyApi.namespaces(), enabled: view === 'types' })
+    const objectTypes = useQuery({ queryKey: ['classification', tenant, 'objectTypes'], queryFn: async () => await taxonomyApi.objectTypes(), enabled: view === 'types' })
+    const useLabels = { pages: 'Pages', media_files: 'Media files', media_collections: 'Media collections' }
+    for (const item of objectTypes.data?.results || []) useLabels[`object:${item.id}`] = item.label || item.name
     const hasTypes = (types.data?.results || []).length > 0
     const setupPending = types.isSuccess && !hasTypes
     const legacyTypes = useQuery({ queryKey: ['classification', tenant, 'legacyTypes', namespace], queryFn: async () => await taxonomyApi.legacyTypes(scope), enabled: setupPending })
@@ -82,8 +105,20 @@ export default function ClassificationManager({ namespace } = {}) {
     const choose = term => {
         setShowEditor(true); setPage(1)
         if (term.classificationType) setTypeId(term.classificationType)
-        setSelected(term); setAction(term.status === 'archived' ? 'reactivate' : 'edit'); setName(term.name); setDescription(term.description || '')
+        setSelected(term); setAction(null); setName(term.name); setDescription(term.description || '')
+        setEditTypeId(term.classificationType || '')
         setAliases((term.alternativeNames || []).join('\n')); setDestination(''); setError('')
+    }
+    const startAction = nextAction => {
+        setAction(nextAction); setName(selected.name); setDescription(selected.description || '')
+        setEditTypeId(selected.classificationType || '')
+        setAliases((selected.alternativeNames || []).join('\n')); setDestination(''); setError('')
+    }
+    const cancelAction = () => {
+        if (!selected) { setShowEditor(false); setAction('create'); return }
+        setAction(null); setName(selected.name); setDescription(selected.description || '')
+        setEditTypeId(selected.classificationType || '')
+        setAliases((selected.alternativeNames || []).join('\n')); setDestination(''); setError('')
     }
     const save = event => {
         event.preventDefault()
@@ -95,13 +130,16 @@ export default function ClassificationManager({ namespace } = {}) {
                 const target = (terms.data?.results || []).find(term => term.id === destination)
                 payload = { target_id: destination, target_revision: target?.revision }
             }
+            const changingType = action === 'edit' && selected && editTypeId !== selected.classificationType
             if (permissions.includes(action === 'reactivate' ? 'restore' : action)) {
-                const result = action === 'create' ? await taxonomyApi.create(typeId, payload) : await taxonomyApi.change(selected, action, payload)
-                setUndoId(result.operation?.id || result.id); setNotice('Tag saved.')
-                setSelected(null); setAction('create'); setName(''); setDescription(''); setAliases('')
+                const result = changingType ? await taxonomyApi.changeType(selected, editTypeId, payload)
+                    : action === 'create' ? await taxonomyApi.create(typeId, payload) : await taxonomyApi.change(selected, action, payload)
+                setUndoId(changingType ? null : result.operation?.id || result.id); setNotice('Tag saved.')
+                setShowEditor(false); setSelected(null); setAction('create'); setName(''); setDescription(''); setAliases('')
             } else {
                 await taxonomyApi.propose(typeId, action, payload, selected)
                 setNotice('Proposal submitted. It will take effect after approval.')
+                if (selected) setAction(null)
             }
         })
     }
@@ -114,13 +152,17 @@ export default function ClassificationManager({ namespace } = {}) {
         setTypeId(value); setSelected(null); setShowEditor(false); setAction('create'); setPage(1); setHistoryPage(1)
         setName(''); setDescription(''); setAliases(''); setFilterOpen(false)
     }
-    const filterOptions = hasTypes ? types.data.results : (legacyTypes.data || []).map(key => ({ id: key, name: key }))
+    const filterOptions = hasTypes ? typeDefinitions : (legacyTypes.data || []).map(key => ({ id: key, name: key }))
     const activeFilter = hasTypes ? definition : filterOptions.find(type => type.id === legacyTagType)
     const visibleTerms = terms.data?.results || []
     const showTypeColumn = !typeId && new Set(visibleTerms.map(term => term.classificationType)).size > 1
+    const termActions = (selected?.status === 'archived' ? ['reactivate'] : selected?.status === 'approved' ? ['edit', 'move', 'merge', 'archive'] : [])
+        .filter(item => permissions.includes(item === 'reactivate' ? 'restore' : item) || (item !== 'reactivate' && permissions.includes('propose')))
+    const canChangeType = action === 'edit' && selected && editTypeId !== selected.classificationType
+    const targetType = typeDefinitions.find(type => type.id === editTypeId)
     return <div className="classification-manager user-tools-content min-w-0 space-y-4 text-gray-900" aria-busy={busy}>
         <nav aria-label="Tag views" className="classification-tabs">
-            {['terms', 'types', 'proposals', 'history', ...(permissions.includes('administer') ? ['rights'] : [])].map(item => <button type="button" key={item} className={buttonClass} aria-pressed={view === item} aria-current={view === item ? 'page' : undefined} onClick={() => { setView(item); setError('') }}>{({ terms: 'Tags', types: 'Types', proposals: 'Proposals', history: 'History', rights: 'Rights' })[item]}</button>)}
+            {['terms', 'types', 'proposals', 'history', ...(permissions.includes('administer') ? ['rights'] : [])].map(item => <button type="button" key={item} className={buttonClass} aria-pressed={view === item} aria-current={view === item ? 'page' : undefined} onClick={() => { setView(item); setError(''); if (item === 'types') setTypeMode('detail') }}>{({ terms: 'Tags', types: 'Types', proposals: 'Proposals', history: 'History', rights: 'Rights' })[item]}</button>)}
         </nav>
         {types.isPending && <p role="status">Loading tag types…</p>}
         {types.error && <p role="alert">{classificationError(types.error)}</p>}
@@ -151,9 +193,9 @@ export default function ClassificationManager({ namespace } = {}) {
                 </label>
             </div>}
         </div>}
-        {hasTypes && ['types', 'history'].includes(view) && <label className="classification-field max-w-sm"><span>Tag type</span>
+        {hasTypes && view === 'history' && <label className="classification-field max-w-sm"><span>Tag type</span>
             <CompactSelect label="Tag type" className={inputClass} value={typeId} onChange={event => selectType(event.target.value)}>
-                <option value="">{view === 'types' ? 'New tag type' : 'Choose a type'}</option>{(types.data?.results || []).map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
+                <option value="">Choose a type</option>{typeDefinitions.map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
             </CompactSelect>
         </label>}
         {!types.isPending && !types.error && ((view === 'terms' && !showEditor) || (view === 'history' && !definition)) && <div className="space-y-3">
@@ -202,21 +244,58 @@ export default function ClassificationManager({ namespace } = {}) {
                     </div>
                 </section> : <>
                     <p className="text-gray-600">No tag types yet. Add a type to start organizing your tags.</p>
-                    <button type="button" className="user-tools-primary" onClick={() => setView('types')}>Add tag type</button>
+                    <button type="button" className="user-tools-primary" onClick={() => { setView('types'); setTypeMode('new') }}>Add tag type</button>
                 </>)}
             </>}
         </div>}
         {notice && <p role="status" className="text-green-700">{notice} {undoId && <button type="button" disabled={busy} className="underline px-2 py-1" onClick={() => run(async () => { await taxonomyApi.undo(undoId); setUndoId(null); setNotice('Change undone.'); setSelected(null) })}>Undo</button>}</p>}
         {error && <p role="alert" className="text-red-700">{error}</p>}
-        {view === 'types' && <>
-            {definition && !permissions.includes('administer') ? <p>Type administration requires administrator rights.</p> :
-                <ClassificationTypeForm key={typeId || 'new'} definition={definition} tenant={tenant} namespaceScope={namespace} busy={busy}
+        {view === 'types' && !types.isPending && !types.error && <div className="grid grid-cols-1 lg:grid-cols-[minmax(220px,1fr)_2fr] gap-8">
+            <section aria-label="Tag types" className="min-w-0 space-y-3">
+                <div className="classification-search" data-filled={Boolean(typeSearch)}>
+                    <label className="classification-search-label" htmlFor={typeSearchId}>Search types</label>
+                    <div className="classification-search-content">
+                        <Search size={16} aria-hidden="true" className="shrink-0 text-gray-400" />
+                        <input id={typeSearchId} type="search" placeholder=" " data-filled={Boolean(typeSearch)} value={typeSearch} onChange={event => setTypeSearch(event.target.value)} />
+                    </div>
+                </div>
+                <button type="button" className="user-tools-primary" onClick={() => setTypeMode('new')}>New type</button>
+                {matchingTypes.length ? <ul className="divide-y divide-gray-200">
+                    {matchingTypes.map(type => <li key={type.id}>
+                        <button type="button" className="classification-row" aria-current={typeMode !== 'new' && type.id === selectedType?.id ? 'true' : undefined}
+                            onClick={() => { setSelectedTypeId(type.id); setTypeMode('detail'); setError('') }}>
+                            <span className="min-w-0 font-semibold break-words">{type.name}</span>
+                        </button>
+                    </li>)}
+                </ul> : <p className="text-gray-600">{typeSearch ? 'No types match your search.' : 'No tag types yet.'}</p>}
+            </section>
+            <section aria-label="Tag type details" className="min-w-0 space-y-5">
+                {typeMode === 'detail' && selectedType && <>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                        <h2 className="text-xl font-semibold">{selectedType.name}</h2>
+                        <div className="flex gap-2">
+                            {selectedType.permissions?.includes('administer') && <button type="button" onClick={() => setTypeMode('edit')}>Edit</button>}
+                            <button type="button" onClick={() => setTypeMode('clone')}>Clone</button>
+                        </div>
+                    </div>
+                    <dl className="classification-tag-details">
+                        <div><dt>Stable key</dt><dd className="break-words">{selectedType.key}</dd></div>
+                        <div><dt>Namespace</dt><dd>{(namespaces.data?.results || []).find(item => String(item.id) === String(selectedType.namespace))?.name || selectedType.namespace}</dd></div>
+                        <div><dt>Description</dt><dd className="whitespace-pre-wrap break-words">{selectedType.description || '—'}</dd></div>
+                        <div><dt>Allowed uses</dt><dd>{selectedType.allowedUses?.length ? selectedType.allowedUses.map(use => useLabels[use] || use).join(', ') : '—'}</dd></div>
+                    </dl>
+                </>}
+                {typeMode === 'detail' && !selectedType && <p className="text-gray-600">Select New type to create your first tag type.</p>}
+                {typeMode !== 'detail' && <ClassificationTypeForm key={`${typeMode}-${selectedType?.id || 'new'}`} mode={typeMode}
+                    definition={typeMode === 'new' ? null : selectedType} tenant={tenant} namespaceScope={namespace} busy={busy} existingTypes={typeDefinitions}
+                    onCancel={() => { setTypeMode('detail'); setError('') }}
                     onSave={values => run(async () => {
-                        if (definition) await taxonomyApi.configure(definition, values)
-                        else await taxonomyApi.createType(values)
-                        setNotice('Tag type saved.')
+                        const result = typeMode === 'edit' ? await taxonomyApi.configure(selectedType, values) : await taxonomyApi.createType(values)
+                        if (result?.id) setSelectedTypeId(result.id)
+                        setTypeMode('detail'); setNotice('Tag type saved.')
                     })} />}
-        </>}
+            </section>
+        </div>}
         {view === 'terms' && definition && showEditor && <div className="grid grid-cols-1 lg:grid-cols-[minmax(220px,1fr)_2fr] gap-8">
             <section aria-label="Tag tree" className="min-w-0 space-y-3">
                 <button type="button" onClick={() => { setShowEditor(false); setSelected(null) }}>Back to tags</button>
@@ -228,8 +307,25 @@ export default function ClassificationManager({ namespace } = {}) {
                 <button type="button" className={buttonClass} onClick={() => { setSelected(null); setAction('create'); setName(''); setDescription(''); setAliases('') }}>New tag</button>
             </section>
             <section className="min-w-0 space-y-5">
-                <h2 className="text-xl font-semibold">{selected?.name || 'New tag'}</h2>
-                {selected && <p className="text-xs text-gray-500">{selected.status}</p>}
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h2 className="text-xl font-semibold">{selected?.name || 'New tag'}</h2>
+                        {selected && <p className="text-xs text-gray-500">{selected.status}</p>}
+                    </div>
+                    {selected && !action && termActions.length > 0 && <Menu as="div" className="classification-action-menu">
+                        <MenuButton className="classification-action-trigger" disabled={busy}>Actions <ChevronDown size={14} aria-hidden="true" /></MenuButton>
+                        <MenuItems anchor="bottom end" className="classification-action-options">
+                            {termActions.map(item => <MenuItem key={item}>
+                                <button type="button" onClick={() => startAction(item)}>{({ edit: 'Edit', move: 'Move', merge: 'Merge', archive: 'Archive', reactivate: 'Reactivate' })[item]}</button>
+                            </MenuItem>)}
+                        </MenuItems>
+                    </Menu>}
+                </div>
+                {selected && !action && <dl className="classification-tag-details">
+                    <div><dt>Location</dt><dd className="break-words">{selected.path || `${typeDefinitions.find(type => type.id === selected.classificationType)?.name || selected.tagType} / ${selected.name}`}</dd></div>
+                    <div><dt>Description</dt><dd className="whitespace-pre-wrap break-words">{selected.description || '—'}</dd></div>
+                    <div><dt>Alternative names</dt><dd className="whitespace-pre-wrap break-words">{selected.alternativeNames?.length ? selected.alternativeNames.join(', ') : '—'}</dd></div>
+                </dl>}
                 {selected && <section className="space-y-3" aria-label="Term usage">
                     <h3 className="font-medium">Usage</h3>
                     {usage.isPending && <p role="status">Loading usage…</p>}
@@ -239,9 +335,17 @@ export default function ClassificationManager({ namespace } = {}) {
                         <ul className="text-sm space-y-1">{group.results.map(item => <li key={item.id}><a className="underline" href={item.url}>{item.name}</a></li>)}</ul>
                     </div>)}
                 </section>}
-                <form onSubmit={save} className="space-y-4 max-w-xl">
-                    <label className="block"><span className="classification-field-label">Action</span><CompactSelect label="Action" className={inputClass} value={action} onChange={event => { setAction(event.target.value); setDestination('') }}>{(selected ? (selected.status === 'archived' ? ['reactivate'] : ['edit', 'move', 'merge', 'archive']) : ['create']).map(item => <option key={item} value={item}>{item}</option>)}</CompactSelect></label>
+                {(!selected || action) && <form onSubmit={save} className="space-y-4 max-w-xl" aria-label={selected ? `${action[0].toUpperCase()}${action.slice(1)} tag` : 'Create tag'}>
+                    {selected && <h3 className="font-medium">{({ edit: 'Edit', move: 'Move', merge: 'Merge', archive: 'Archive', reactivate: 'Reactivate' })[action]} tag</h3>}
                     {['create', 'edit'].includes(action) && <>
+                        <label className="block"><span className="classification-field-label">Tag type</span><CompactSelect label="Tag type" required className={inputClass}
+                            value={selected ? editTypeId : typeId} onChange={event => selected ? setEditTypeId(event.target.value) : setTypeId(event.target.value)}>
+                            {typeDefinitions.filter(type => selected
+                                ? type.id === selected.classificationType || (String(type.namespace) === String(selected.namespace) && permissions.includes('edit') && type.permissions?.includes('create'))
+                                : type.id === typeId || type.permissions?.includes('create') || type.permissions?.includes('propose')).map(type =>
+                                <option key={type.id} value={type.id}>{type.name}</option>)}
+                        </CompactSelect></label>
+                        {canChangeType && <p className="text-gray-600">Changing type makes this tag a root tag. Tags with children, assignments, legacy links or pending proposals cannot change type.</p>}
                         <label className="block"><span className="classification-field-label">Name</span><input placeholder=" " required maxLength={50} className={inputClass} data-filled={String(name ?? '').length > 0} value={name} onChange={event => setName(event.target.value)} /></label>
                         <label className="block"><span className="classification-field-label">Description</span><textarea placeholder=" " className={inputClass} data-filled={String(description ?? '').length > 0} value={description} onChange={event => setDescription(event.target.value)} /></label>
                         <label className="block"><span className="classification-field-label">Alternative names (one per line)</span><textarea placeholder=" " className={inputClass} data-filled={String(aliases ?? '').length > 0} value={aliases} onChange={event => setAliases(event.target.value)} /></label>
@@ -251,8 +355,11 @@ export default function ClassificationManager({ namespace } = {}) {
                         <p className="text-sm">{action === 'merge' ? 'The source keeps its identity and redirects to the target. Its children move to the target. Existing version assignments are preserved.' : 'The term and its subtree move together. Existing assignments keep their identities.'}</p>
                     </>}
                     {action === 'archive' && <p>Existing assignments remain visible. New assignments will be blocked. Active children must be moved or archived first.</p>}
-                    <button type="submit" disabled={busy || (!permissions.includes(action === 'reactivate' ? 'restore' : action) && (!permissions.includes('propose') || action === 'reactivate')) || (selected && !['approved', 'archived'].includes(selected.status))} className="user-tools-primary">{permissions.includes(action === 'reactivate' ? 'restore' : action) ? 'Apply change' : 'Submit proposal'}</button>
-                </form>
+                    <div className="flex flex-wrap gap-2">
+                        <button type="submit" disabled={busy || (!permissions.includes(action === 'reactivate' ? 'restore' : action) && (!permissions.includes('propose') || action === 'reactivate')) || (selected && !['approved', 'archived'].includes(selected.status)) || (canChangeType && !targetType?.permissions?.includes('create'))} className="user-tools-primary">{permissions.includes(action === 'reactivate' ? 'restore' : action) ? 'Apply' : 'Submit proposal'}</button>
+                        <button type="button" disabled={busy} onClick={cancelAction}>Cancel</button>
+                    </div>
+                </form>}
             </section>
         </div>}
         {view === 'proposals' && <section className="space-y-6">

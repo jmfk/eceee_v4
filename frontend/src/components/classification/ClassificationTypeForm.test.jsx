@@ -22,7 +22,7 @@ describe('scoped tag type creation', () => {
         await waitFor(() => expect(screen.getByRole('combobox', { name: 'Namespace' })).toHaveTextContent('Main'))
         fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Topics' } })
         fireEvent.change(screen.getByLabelText('Stable key'), { target: { value: 'topics' } })
-        fireEvent.click(screen.getByRole('button', { name: 'Save type' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
         expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ namespace: 1 }))
         expect(onSave.mock.calls[0][0]).not.toHaveProperty('sort_order')
         expect(screen.queryByText('Sort order')).not.toBeInTheDocument()

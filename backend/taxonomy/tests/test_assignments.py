@@ -8,7 +8,7 @@ from object_storage.models import ObjectInstance, ObjectTypeDefinition
 from object_storage.services.version_workflow import ObjectVersionWorkflow
 from taxonomy.assignments import assert_publishable, classification_ids, replace_assignments
 from taxonomy.models import LegacyTagMapping, MediaFileClassification, Tag, TagBackfillRun
-from taxonomy.services import decide, mutate, propose
+from taxonomy.services import change_type, decide, mutate, propose
 from webpages.models import PageVersion, WebPage
 
 from .test_governance import create
@@ -69,6 +69,22 @@ def test_same_term_all_content_and_independent_order(scope, resources):
     replace_assignments(resources[2], [str(first.pk)], member)
     assert classification_ids(resources[1]) == [str(second.pk), str(first.pk)]
     assert classification_ids(resources[2]) == [str(first.pk)]
+
+
+def test_assigned_tag_cannot_change_type(scope, resources):
+    from taxonomy.models import ClassificationType
+
+    owner, member, _, source = scope
+    target = ClassificationType.objects.create(
+        tenant=source.tenant, namespace=source.namespace, key="topic", name="Topic"
+    )
+    term = create(owner, source, "Assigned")
+    replace_assignments(resources[1], [str(term.pk)], member)
+    with pytest.raises(ValidationError, match="assignments or legacy links"):
+        change_type(owner, term, target.pk, revision=term.revision)
+    term.refresh_from_db()
+    assert term.classification_type_id == source.pk
+    assert classification_ids(resources[1]) == [str(term.pk)]
 
 
 def test_draft_proposal_blocks_publish_but_media_cannot_assign(scope, resources):

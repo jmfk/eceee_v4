@@ -17,6 +17,9 @@ export const taxonomyApi = {
     createType: async values => data(await api.post(`${base}types/`, values)),
     create: async (typeId, payload) => data(await api.post(`${base}terms/`, { classification_type: typeId, payload })),
     change: async (term, action, payload = {}) => data(await api.post(`${base}terms/${term.id}/${action}/`, { revision: term.revision, payload })),
+    changeType: async (term, classificationType, payload = {}) => data(await api.post(`${base}terms/${term.id}/change-type/`, {
+        revision: term.revision, classification_type: classificationType, payload,
+    })),
     propose: async (typeId, action, payload, term) => data(await api.post(`${base}proposals/`, {
         classification_type: typeId, action, payload, term: term?.id, revision: term?.revision,
     })),

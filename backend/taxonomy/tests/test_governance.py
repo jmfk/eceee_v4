@@ -1,13 +1,15 @@
 import pytest
 from django.contrib.auth import get_user_model
+from django.test import override_settings
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.test import APIClient
 
 from content.models import Namespace
 from core.models import Tenant
-from taxonomy.models import ClassificationGrant, ClassificationType, Tag
+from taxonomy.models import ClassificationGrant, ClassificationType, LegacyTagMapping, Tag
 from taxonomy.services import (
     ClassificationConflict,
+    change_type,
     decide,
     descendants,
     mutate,
@@ -70,6 +72,79 @@ def test_term_path_identifies_the_type_before_the_term_hierarchy(scope):
     assert TermSerializer(first).data["path"] == "Allmänt / Energy"
     assert TermSerializer(child).data["path"] == "Allmänt / Energy / Buildings"
     assert TermSerializer(second).data["path"] == "Topic / Energy"
+
+
+def test_unused_leaf_can_change_type_without_changing_identity(scope):
+    owner, _, _, source = scope
+    target = ClassificationType.objects.create(
+        tenant=source.tenant, namespace=source.namespace, key="topic", name="Topic"
+    )
+    parent = create(owner, source, "Parent")
+    term = create(owner, source, "Energy", parent_id=str(parent.pk))
+    operation = change_type(
+        owner,
+        term,
+        target.pk,
+        revision=term.revision,
+        payload={"name": "Clean energy", "description": "A topic"},
+    )
+    term.refresh_from_db()
+    assert term.classification_type_id == target.pk
+    assert term.tag_type == "topic"
+    assert term.parent_id is None
+    assert term.name == "Clean energy"
+    assert str(term.pk) in operation.after
+    assert operation.action == "change_type"
+    assert operation.before[str(term.pk)]["classification_type_id"] == str(source.pk)
+    assert operation.after[str(term.pk)]["classification_type_id"] == str(target.pk)
+
+
+def test_type_change_rejects_children_legacy_links_and_collisions(scope):
+    owner, _, _, source = scope
+    target = ClassificationType.objects.create(
+        tenant=source.tenant, namespace=source.namespace, key="topic", name="Topic"
+    )
+    parent = create(owner, source, "Parent")
+    create(owner, source, "Child", parent_id=str(parent.pk))
+    with pytest.raises(ValidationError):
+        change_type(owner, parent, target.pk, revision=parent.revision)
+    term = create(owner, source, "Energy")
+    LegacyTagMapping.objects.create(
+        source_kind="content", source_id="legacy-energy", canonical_tag=term, source_name="Energy"
+    )
+    with pytest.raises(ValidationError):
+        change_type(owner, term, target.pk, revision=term.revision)
+    collision = create(owner, source, "Collision")
+    create(owner, target, "Collision")
+    with pytest.raises(ValidationError):
+        change_type(owner, collision, target.pk, revision=collision.revision)
+    collision.refresh_from_db()
+    assert collision.classification_type_id == source.pk
+
+
+@override_settings(
+    ROOT_URLCONF="taxonomy.urls", CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
+def test_type_change_api_requires_destination_create_right(scope):
+    owner, member, _, source = scope
+    target = ClassificationType.objects.create(
+        tenant=source.tenant, namespace=source.namespace, key="topic", name="Topic"
+    )
+    term = create(owner, source, "Energy")
+    ClassificationGrant.objects.create(classification_type=source, user=member, permissions=["edit"])
+    client = APIClient()
+    client.force_authenticate(member)
+    headers = {"HTTP_X_TENANT_ID": str(source.tenant_id)}
+    body = {"revision": term.revision, "classification_type": str(target.pk), "payload": {"name": "Energy"}}
+    response = client.post(f"/terms/{term.pk}/change-type/", body, format="json", **headers)
+    assert response.status_code == 403
+    term.refresh_from_db()
+    assert term.classification_type_id == source.pk
+    client.force_authenticate(owner)
+    response = client.post(f"/terms/{term.pk}/change-type/", body, format="json", **headers)
+    assert response.status_code == 200, response.data
+    term.refresh_from_db()
+    assert term.classification_type_id == target.pk
 
 
 def test_proposed_identity_survives_approval(scope):
@@ -228,6 +303,38 @@ def test_api_tenant_scope_and_no_delete(scope):
         ).status_code
         == 403
     )
+
+
+@override_settings(
+    ROOT_URLCONF="taxonomy.urls", CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
+def test_type_api_rejects_duplicate_name_in_namespace(scope):
+    owner, _, _, definition = scope
+    client = APIClient()
+    client.force_authenticate(owner)
+    headers = {"HTTP_X_TENANT_ID": str(definition.tenant_id)}
+    response = client.post(
+        "/types/",
+        {"namespace": definition.namespace_id, "key": "copy", "name": " allmänt ", "allowed_uses": []},
+        format="json",
+        **headers,
+    )
+    assert response.status_code == 400
+    assert "name" in response.data
+    assert not ClassificationType.objects.filter(key="copy", namespace=definition.namespace).exists()
+
+    other = ClassificationType.objects.create(
+        tenant=definition.tenant, namespace=definition.namespace, key="other", name="Other"
+    )
+    response = client.post(
+        f"/types/{other.pk}/configure/",
+        {"revision": other.revision, "name": "Allmänt"},
+        format="json",
+        **headers,
+    )
+    assert response.status_code == 400
+    other.refresh_from_db()
+    assert other.name == "Other"
 
 
 def test_archived_term_can_be_reactivated_after_other_changes(scope):
