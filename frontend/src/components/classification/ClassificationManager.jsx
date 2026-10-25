@@ -73,7 +73,7 @@ export default function ClassificationManager({ namespace } = {}) {
         let response
         const results = []
         do {
-            response = await taxonomyApi.types({ ...scope, page: pageNumber, page_size: 200 })
+            response = await taxonomyApi.types({ ...scope, page: pageNumber, page_size: 200, ordering: 'name' })
             results.push(...(response.results || []))
             pageNumber += 1
         } while (response.next)
@@ -345,7 +345,7 @@ export default function ClassificationManager({ namespace } = {}) {
                                 : type.id === typeId || type.permissions?.includes('create') || type.permissions?.includes('propose')).map(type =>
                                 <option key={type.id} value={type.id}>{type.name}</option>)}
                         </CompactSelect></label>
-                        {canChangeType && <p className="text-gray-600">Changing type makes this tag a root tag. Tags with children, assignments, legacy links or pending proposals cannot change type.</p>}
+                        {canChangeType && <p className="text-gray-600">Changing type makes this tag a root tag. Tags with children, merged sources, assignments, legacy links or pending proposals cannot change type.</p>}
                         <label className="block"><span className="classification-field-label">Name</span><input placeholder=" " required maxLength={50} className={inputClass} data-filled={String(name ?? '').length > 0} value={name} onChange={event => setName(event.target.value)} /></label>
                         <label className="block"><span className="classification-field-label">Description</span><textarea placeholder=" " className={inputClass} data-filled={String(description ?? '').length > 0} value={description} onChange={event => setDescription(event.target.value)} /></label>
                         <label className="block"><span className="classification-field-label">Alternative names (one per line)</span><textarea placeholder=" " className={inputClass} data-filled={String(aliases ?? '').length > 0} value={aliases} onChange={event => setAliases(event.target.value)} /></label>

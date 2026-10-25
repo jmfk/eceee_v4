@@ -36,7 +36,14 @@ def export_term(term, seen=None):
     }
 
 
+@transaction.atomic
 def import_definition(namespace, key, name, user):
+    from content.models import Namespace
+
+    if not isinstance(name, str) or not name.strip():
+        raise ValidationError({"name": "Enter a tag type name."})
+    name = name.strip()
+    Namespace.objects.select_for_update().get(pk=namespace.pk)
     definition = ClassificationType.objects.filter(namespace=namespace, tenant=namespace.tenant, key=key).first()
     if not definition:
         from .services import is_member
@@ -49,6 +56,8 @@ def import_definition(namespace, key, name, user):
             raise PermissionDenied("An owner must initialize the destination classification type before import.")
         from object_storage.models import ObjectTypeDefinition
 
+        if ClassificationType.objects.filter(namespace=namespace, tenant=namespace.tenant, name__iexact=name).exists():
+            raise ValidationError({"name": "A tag type with this name already exists in this namespace."})
         definition = ClassificationType.objects.create(
             tenant=namespace.tenant,
             namespace=namespace,

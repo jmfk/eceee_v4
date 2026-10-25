@@ -15,15 +15,21 @@ from .models import ClassificationType, LegacyTagMapping, Tag
 from .services import is_member, mutate, require
 
 
+@transaction.atomic
 def definition_for(namespace, user):
     if not is_member(user, namespace.tenant):
         raise PermissionDenied("Tenant membership is required for classification.")
+    Namespace.objects.select_for_update().get(pk=namespace.pk)
     definition = ClassificationType.objects.filter(namespace=namespace, tenant=namespace.tenant, key="general").first()
     if definition is None:
         if not (user.is_superuser or namespace.tenant.created_by_id == user.pk):
             raise PermissionDenied("Submit a classification proposal; only an owner may initialize the register.")
         from object_storage.models import ObjectTypeDefinition
 
+        if ClassificationType.objects.filter(
+            namespace=namespace, tenant=namespace.tenant, name__iexact="Allmänt"
+        ).exists():
+            raise ValidationError({"name": "A tag type with this name already exists in this namespace."})
         definition = ClassificationType.objects.create(
             namespace=namespace,
             tenant=namespace.tenant,

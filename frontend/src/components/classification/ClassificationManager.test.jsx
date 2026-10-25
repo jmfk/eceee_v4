@@ -73,7 +73,7 @@ describe('classification management', () => {
         renderManager({ namespace: 'editorial' })
         await chooseType()
         expect(await screen.findByRole('button', { name: 'Reuters' })).toBeInTheDocument()
-        expect(taxonomyApi.types).toHaveBeenCalledWith({ namespace: 'editorial', page: 1, page_size: 200 })
+        expect(taxonomyApi.types).toHaveBeenCalledWith({ namespace: 'editorial', page: 1, page_size: 200, ordering: 'name' })
         expect(taxonomyApi.terms).toHaveBeenCalledWith(expect.objectContaining({ namespace: 'editorial', classification_type: 'type' }))
         fireEvent.click(screen.getByRole('button', { name: 'Proposals' }))
         await waitFor(() => expect(taxonomyApi.proposals).toHaveBeenCalledWith({ namespace: 'editorial', page: 1 }))
@@ -120,7 +120,7 @@ describe('classification management', () => {
         renderManager()
         fireEvent.click(screen.getByRole('button', { name: 'Types' }))
         expect(await screen.findByRole('button', { name: 'Sources' })).toBeInTheDocument()
-        expect(taxonomyApi.types).toHaveBeenCalledWith({ page: 2, page_size: 200 })
+        expect(taxonomyApi.types).toHaveBeenCalledWith({ page: 2, page_size: 200, ordering: 'name' })
     })
     it('clones type settings into a new form but rejects the same name in its namespace', async () => {
         const type = { ...definition, key: 'topics', namespace: 4, description: 'Editorial subjects', allowedUses: ['pages'], revision: 1, permissions: ['administer'] }

@@ -299,6 +299,8 @@ def change_type(user, term, target_id, *, revision=None, payload=None):
     _validate_payload("edit", payload or {})
     if term.children.exists():
         raise ValidationError("Move or archive child tags before changing this tag's type.")
+    if term.merged_sources.exists():
+        raise ValidationError("A merge target cannot change type while merged tags redirect to it.")
     if (
         term.page_version_links.exists()
         or term.object_version_links.exists()
@@ -321,14 +323,24 @@ def change_type(user, term, target_id, *, revision=None, payload=None):
     source.save(update_fields=["revision"])
     target.revision += 1
     target.save(update_fields=["revision"])
-    return ClassificationOperation.objects.create(
+    after = {str(term.pk): {**snapshot(term), "classification_type_id": str(target.pk), "tag_type": target.key}}
+    operation = ClassificationOperation.objects.create(
         classification_type=source,
         action="change_type",
         actor=user,
         before={str(term.pk): before},
-        after={str(term.pk): {**snapshot(term), "classification_type_id": str(target.pk), "tag_type": target.key}},
+        after=after,
         type_revision=source.revision,
     )
+    ClassificationOperation.objects.create(
+        classification_type=target,
+        action="change_type",
+        actor=user,
+        before={str(term.pk): before},
+        after=after,
+        type_revision=target.revision,
+    )
+    return operation
 
 
 @transaction.atomic
