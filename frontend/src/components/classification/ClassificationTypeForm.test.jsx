@@ -24,6 +24,8 @@ describe('scoped tag type creation', () => {
         fireEvent.change(screen.getByLabelText('Stable key'), { target: { value: 'topics' } })
         fireEvent.click(screen.getByRole('button', { name: 'Save type' }))
         expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ namespace: 1 }))
+        expect(onSave.mock.calls[0][0]).not.toHaveProperty('sort_order')
+        expect(screen.queryByText('Sort order')).not.toBeInTheDocument()
     })
     it('keeps the global Tags namespace selector editable', async () => {
         renderForm(undefined, vi.fn())
