@@ -4,6 +4,7 @@
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
+| ADR-0055 | [Explicit email verification before optional MFA](active/0055-explicit-email-verification-before-mfa.md) | accepted | PRD-0038 |
 | ADR-0054 | [Compatible Postmark delivery for authentication email](active/0054-postmark-authentication-email-backend.md) | accepted | PRD-0038 |
 | ADR-0053 | [Browser sessions, explicit social identities and optional MFA](active/0053-browser-sessions-social-login-and-mfa.md) | accepted | PRD-0038 |
 | ADR-0051 | [Tenant recipient snapshots and stable board list roles](active/0051-workspace-messaging-and-roles.md) | accepted | PRD-0036 |

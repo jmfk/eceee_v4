@@ -13,6 +13,7 @@ def security_status(request):
     response = JsonResponse(
         {
             "mfaEnabled": has_mfa(request.user),
+            "accountEmail": request.user.email or "",
             "mfaConfigured": bool(settings.CMS_MFA_ENCRYPTION_KEYS),
             "emailVerified": EmailAddress.objects.filter(
                 user=request.user, email__iexact=request.user.email, verified=True

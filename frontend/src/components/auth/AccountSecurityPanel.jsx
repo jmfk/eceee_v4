@@ -36,6 +36,7 @@ export default function AccountSecurityPanel() {
     const [totp, setTotp] = useState(null)
     const [code, setCode] = useState('')
     const [keyName, setKeyName] = useState('')
+    const [email, setEmail] = useState('')
     const [recoveryCodes, setRecoveryCodes] = useState(null)
     const pendingAction = useRef(null)
     const load = async () => {
@@ -103,7 +104,27 @@ export default function AccountSecurityPanel() {
                 <h3 className="text-lg font-semibold text-gray-900">Two-factor authentication: {state.mfaEnabled ? 'enabled' : 'off'}</h3>
                 <p className="text-sm text-gray-600">When enabled, a second factor is required after password, Apple and Google sign-in.</p>
                 {!state.mfaConfigured && <p className="text-sm text-gray-600">Two-factor authentication needs operator configuration before it can be used.</p>}
-                {!state.emailVerified && <p className="text-sm text-gray-600">Verify your account email before enabling two-factor authentication. Sign out and sign in again to receive a verification code.</p>}
+                {!state.emailVerified && <form className="space-y-3 text-xs" onSubmit={event => {
+                    event.preventDefault()
+                    const address = state.accountEmail || email.trim()
+                    if (!address) return
+                    run(async () => {
+                        const addresses = await requireAuthResult('/account/email')
+                        const exists = addresses.data.some(item => item.email.toLowerCase() === address.toLowerCase())
+                        await requireAuthResult('/account/email', { method: exists ? 'PUT' : 'POST', data: { email: address } })
+                        setMessage('Verification link sent. Open it in your email, then refresh verification status here to continue setting up two-factor authentication.')
+                    })
+                }}>
+                    <p className="text-gray-600">Email verification is needed only to enable two-factor authentication. Request a link when you are ready to set it up.</p>
+                    {state.accountEmail ? <p className="text-gray-700">Account email: {state.accountEmail}</p> : <div className="relative max-w-sm">
+                        <input id="security-email" type="email" autoComplete="email" required value={email} placeholder=" " onChange={event => setEmail(event.target.value)} className="peer h-8 w-full rounded border border-gray-300 bg-white px-3 pt-1 text-xs focus:border-blue-600 focus:outline-none" />
+                        <label htmlFor="security-email" className="pointer-events-none absolute left-3 top-0 -translate-y-1/2 bg-white px-1 text-[10px] text-gray-600 transition-all duration-150 peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-xs peer-focus:top-0 peer-focus:text-[10px] motion-reduce:transition-none">Email address</label>
+                    </div>}
+                    <div className="flex flex-wrap gap-3">
+                        <button type="submit" disabled={busy || (!state.accountEmail && !email.trim())} className="min-h-7 rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">Send verification link for 2FA</button>
+                        <button type="button" disabled={busy} className="min-h-7 rounded border border-gray-300 px-3 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50" onClick={() => run(load)}>Refresh verification status</button>
+                    </div>
+                </form>}
                 {totpEnabled ? <div className="flex flex-wrap items-center gap-3"><span className="text-sm text-gray-700">Authenticator app connected</span>
                     <button disabled={busy} type="button" className={secondaryAuthButtonClass} onClick={() => run(async () => {
                         await requireAuthResult('/account/authenticators/totp', { method: 'DELETE' }); setTotp(null); setRecoveryCodes(null)
