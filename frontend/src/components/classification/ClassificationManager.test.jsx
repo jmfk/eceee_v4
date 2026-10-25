@@ -6,7 +6,7 @@ import ClassificationManager from './ClassificationManager'
 import { taxonomyApi } from '../../api/taxonomy'
 
 vi.mock('../../api/taxonomy', () => ({ taxonomyApi: {
-    types: vi.fn(), terms: vi.fn(), proposals: vi.fn(), history: vi.fn(), usage: vi.fn(), grants: vi.fn(), members: vi.fn(),
+    types: vi.fn(), legacyTypes: vi.fn(), terms: vi.fn(), proposals: vi.fn(), history: vi.fn(), usage: vi.fn(), grants: vi.fn(), members: vi.fn(),
     namespaces: vi.fn(), objectTypes: vi.fn(), create: vi.fn(), propose: vi.fn(), change: vi.fn(), undo: vi.fn(), decide: vi.fn(),
 }, classificationError: error => error.message }))
 vi.mock('../../utils/tenant', () => ({ getCurrentTenantId: () => 'tenant' }))
@@ -24,6 +24,7 @@ async function chooseType() {
 beforeEach(() => {
     vi.clearAllMocks()
     taxonomyApi.types.mockResolvedValue({ results: [definition] })
+    taxonomyApi.legacyTypes.mockResolvedValue(['general', 'topic'])
     taxonomyApi.terms.mockResolvedValue({ results: [] })
     taxonomyApi.usage.mockResolvedValue({ pages: { count: 0, results: [] } })
     taxonomyApi.create.mockResolvedValue({ operation: { id: 'operation' } })
@@ -93,6 +94,33 @@ describe('classification management', () => {
         expect(screen.getByText('Energy')).toBeInTheDocument()
         expect(screen.getByText(/Tag setup is incomplete/)).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Add tag type' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Apply change' })).not.toBeInTheDocument()
+    })
+    it('searches and filters legacy tags together across pages, keeping controls on no matches', async () => {
+        taxonomyApi.types.mockResolvedValue({ results: [] })
+        taxonomyApi.terms.mockImplementation(async ({ search, tag_type: tagType }) => {
+            if (search === 'missing') return { count: 0, results: [] }
+            return { count: 51, next: '/next', results: [{ id: 'energy', name: 'Energy', tagType: tagType || 'general' }] }
+        })
+        renderManager({ namespace: 'editorial' })
+        expect(await screen.findByText('Energy')).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Next tags' }))
+        await waitFor(() => expect(taxonomyApi.terms).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 })))
+        fireEvent.change(screen.getByRole('searchbox', { name: 'Search tags' }), { target: { value: 'energy' } })
+        await waitFor(() => expect(taxonomyApi.terms).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'energy', page: 1 })))
+        fireEvent.click(screen.getByRole('button', { name: 'Add filter' }))
+        fireEvent.click(screen.getByRole('combobox', { name: 'Tag type' }))
+        fireEvent.click(await screen.findByRole('option', { name: 'topic' }))
+        await waitFor(() => expect(taxonomyApi.terms).toHaveBeenLastCalledWith(expect.objectContaining({ namespace: 'editorial', search: 'energy', tag_type: 'topic', page: 1 })))
+        expect(taxonomyApi.legacyTypes).toHaveBeenCalledWith({ namespace: 'editorial' })
+        expect(screen.getByRole('button', { name: 'Add filter' })).toHaveFocus()
+        fireEvent.change(screen.getByRole('searchbox', { name: 'Search tags' }), { target: { value: 'missing' } })
+        expect(await screen.findByText('No matching tags.')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Add tag type' })).not.toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Remove type filter: topic' }))
+        await waitFor(() => expect(taxonomyApi.terms).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'missing', tag_type: '', page: 1 })))
+        fireEvent.change(screen.getByRole('searchbox', { name: 'Search tags' }), { target: { value: '' } })
+        expect(await screen.findByText('Energy')).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Apply change' })).not.toBeInTheDocument()
     })
     it('reports a failed existing-tag check instead of claiming no tags exist', async () => {

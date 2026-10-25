@@ -26,6 +26,7 @@ export default function ClassificationManager({ namespace } = {}) {
     const tenant = getCurrentTenantId()
     const client = useQueryClient()
     const [typeId, setTypeId] = useState('')
+    const [legacyTagType, setLegacyTagType] = useState('')
     const [showEditor, setShowEditor] = useState(false)
     const [filterOpen, setFilterOpen] = useState(false)
     const filterRef = useRef(null)
@@ -64,9 +65,10 @@ export default function ClassificationManager({ namespace } = {}) {
     const types = useQuery({ queryKey: ['classification', tenant, 'types', namespace], queryFn: async () => await taxonomyApi.types({ ...scope, page_size: 200, ordering: 'name' }) })
     const hasTypes = (types.data?.results || []).length > 0
     const setupPending = types.isSuccess && !hasTypes
+    const legacyTypes = useQuery({ queryKey: ['classification', tenant, 'legacyTypes', namespace], queryFn: async () => await taxonomyApi.legacyTypes(scope), enabled: setupPending })
     const definition = types.data?.results?.find(type => type.id === typeId)
     const permissions = definition?.permissions || []
-    const terms = useQuery({ queryKey: ['classification', tenant, 'terms', namespace, typeId, search, page], queryFn: async () => await taxonomyApi.terms({ ...scope, classification_type: typeId, search, page, page_size: 50, ordering: 'name' }), enabled: view === 'terms' || !!typeId || (setupPending && ['terms', 'history'].includes(view)) })
+    const terms = useQuery({ queryKey: ['classification', tenant, 'terms', namespace, typeId, legacyTagType, search, page], queryFn: async () => await taxonomyApi.terms({ ...scope, classification_type: typeId, tag_type: legacyTagType, search, page, page_size: 50, ordering: 'name' }), enabled: view === 'terms' || !!typeId || (setupPending && ['terms', 'history'].includes(view)) })
     const proposals = useQuery({ queryKey: ['classification', tenant, 'proposals', namespace, proposalPage], queryFn: async () => await taxonomyApi.proposals({ ...scope, page: proposalPage }), enabled: view === 'proposals' })
     const history = useQuery({ queryKey: ['classification', tenant, 'history', namespace, typeId, historyPage], queryFn: async () => await taxonomyApi.history({ ...scope, classification_type: typeId, page: historyPage }), enabled: view === 'history' && !!typeId })
     const grants = useQuery({ queryKey: ['classification', tenant, 'grants', typeId], queryFn: async () => await taxonomyApi.grants(typeId), enabled: view === 'rights' && permissions.includes('administer') })
@@ -112,6 +114,8 @@ export default function ClassificationManager({ namespace } = {}) {
         setTypeId(value); setSelected(null); setShowEditor(false); setAction('create'); setPage(1); setHistoryPage(1)
         setName(''); setDescription(''); setAliases(''); setFilterOpen(false)
     }
+    const filterOptions = hasTypes ? types.data.results : (legacyTypes.data || []).map(key => ({ id: key, name: key }))
+    const activeFilter = hasTypes ? definition : filterOptions.find(type => type.id === legacyTagType)
     const visibleTerms = terms.data?.results || []
     const showTypeColumn = !typeId && new Set(visibleTerms.map(term => term.classificationType)).size > 1
     return <div className="classification-manager user-tools-content min-w-0 space-y-4 text-gray-900" aria-busy={busy}>
@@ -120,14 +124,14 @@ export default function ClassificationManager({ namespace } = {}) {
         </nav>
         {types.isPending && <p role="status">Loading tag types…</p>}
         {types.error && <p role="alert">{classificationError(types.error)}</p>}
-        {view === 'terms' && hasTypes && <div className="classification-search-wrap" ref={filterRef}
+        {view === 'terms' && types.isSuccess && <div className="classification-search-wrap" ref={filterRef}
             onKeyDown={event => { if (event.key === 'Escape' && filterOpen) { setFilterOpen(false); filterButtonRef.current?.focus() } }}>
-            <div className="classification-search" data-filled={Boolean(search || definition)}>
+            <div className="classification-search" data-filled={Boolean(search || activeFilter)}>
                 <label className="classification-search-label" htmlFor={searchId}>Search tags</label>
                 <div className="classification-search-content">
                     <Search size={16} aria-hidden="true" className="shrink-0 text-gray-400" />
-                    {definition && <button type="button" className="classification-filter-pill" aria-label={`Remove type filter: ${definition.name}`} onClick={() => selectType('')}>
-                        {definition.name}<X size={12} aria-hidden="true" />
+                    {activeFilter && <button type="button" className="classification-filter-pill" aria-label={`Remove type filter: ${activeFilter.name}`} onClick={() => { if (hasTypes) selectType(''); else { setLegacyTagType(''); setPage(1) } }}>
+                        {activeFilter.name}<X size={12} aria-hidden="true" />
                     </button>}
                     <input id={searchId} type="search" placeholder=" " data-filled={String(search ?? '').length > 0} value={search}
                         onChange={event => { setSearch(event.target.value); setPage(1) }} />
@@ -139,9 +143,11 @@ export default function ClassificationManager({ namespace } = {}) {
             </div>
             {filterOpen && <div id={filterId} role="dialog" aria-label="Add tag filter" className="classification-filter-menu">
                 <label className="classification-field"><span>Tag type</span>
-                    <CompactSelect label="Tag type" ref={filterSelectRef} value={typeId} onChange={event => { selectType(event.target.value); filterButtonRef.current?.focus() }}>
-                        <option value="">All types</option>{(types.data?.results || []).map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
+                    <CompactSelect label="Tag type" ref={filterSelectRef} value={hasTypes ? typeId : legacyTagType} onChange={event => { if (hasTypes) selectType(event.target.value); else { setLegacyTagType(event.target.value); setPage(1); setFilterOpen(false) } filterButtonRef.current?.focus() }}>
+                        <option value="">All types</option>{filterOptions.map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
                     </CompactSelect>
+                    {!hasTypes && legacyTypes.isPending && <p role="status">Loading tag types…</p>}
+                    {!hasTypes && legacyTypes.error && <p role="alert">{classificationError(legacyTypes.error)}</p>}
                 </label>
             </div>}
         </div>}
@@ -177,11 +183,13 @@ export default function ClassificationManager({ namespace } = {}) {
             </section>) : <>
                 {terms.isPending && <p role="status">Checking existing tags…</p>}
                 {terms.error && <p role="alert">{classificationError(terms.error)}</p>}
-                {terms.isSuccess && ((terms.data?.results || []).length > 0 ? <section aria-label="Existing tags" className="space-y-4">
+                {terms.isSuccess && ((terms.data?.results || []).length > 0 || search || legacyTagType || page > 1 ? <section aria-label="Existing tags" className="space-y-4">
                     <div>
                         <h2 className="text-xl font-semibold">Existing tags</h2>
                         <p className="mt-2 text-gray-600">Tag setup is incomplete. A workspace owner needs to finish the migration before these tags can be edited here.</p>
                     </div>
+                    <p className="text-xs text-gray-500">{terms.data.count ?? terms.data.results?.length ?? 0} tags</p>
+                    {!terms.data.results?.length && <p>No matching tags.</p>}
                     <ul className="divide-y divide-gray-200">
                         {terms.data.results.map(term => <li key={term.id} className="py-3">
                             <p className="font-medium break-words">{term.name}</p>
