@@ -35,7 +35,14 @@ class LegacyTagBrowsingTests(TestCase):
     def test_search_and_type_filter_combine_before_pagination(self):
         response = self.client.get(
             "/api/v1/taxonomy/terms/",
-            {"namespace": "editorial", "search": "energy", "tag_type": "topic", "page_size": 1, "ordering": "name", "page": 2},
+            {
+                "namespace": "editorial",
+                "search": "energy",
+                "tag_type": "topic",
+                "page_size": 1,
+                "ordering": "name",
+                "page": 2,
+            },
             **self.headers,
         )
         self.assertEqual(response.status_code, 200)
@@ -52,9 +59,7 @@ class LegacyTagBrowsingTests(TestCase):
             tenant=other_tenant, name="Other", slug="editorial", created_by=self.owner
         )
         Tag.objects.create(tenant=other_tenant, namespace=other_scope, name="Foreign", tag_type="foreign")
-        response = self.client.get(
-            "/api/v1/taxonomy/terms/tag_types/", {"namespace": "editorial"}, **self.headers
-        )
+        response = self.client.get("/api/v1/taxonomy/terms/tag_types/", {"namespace": "editorial"}, **self.headers)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data, ["source", "topic"])
         self.client.force_authenticate(get_user_model().objects.create_user(username="outsider"))
