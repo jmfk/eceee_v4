@@ -28,11 +28,13 @@ export const useSupportIdentity = () => {
 }
 
 export const useSupportContext = () => {
+    const { user } = useAuth()
     const identity = useSupportIdentity()
     const tenant = useSupportTenant()
     return useQuery({
         queryKey: ['support', tenant, identity, 'context'],
         queryFn: () => supportRequest(tenant, 'context/'),
+        enabled: !user?.isKanbanBoardGuest,
         refetchInterval: 60000,
         retry: false,
     })

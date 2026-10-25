@@ -26,10 +26,15 @@ def permissions_for(user, tenant):
     if not user or not user.is_authenticated or not user.is_active or not tenant or not tenant.is_active:
         return set()
     if not tenant.user_has_access(user):
+        from kanban.models import Board
+
+        allowed = (
+            {"kanban.read", "kanban.write"} if Board.objects.filter(tenant=tenant, members=user).exists() else set()
+        )
         assignments = getattr(tenant, "theme_designer_assignments", None)
         if assignments is not None and assignments.filter(user=user).exists():
-            return {"theme.read", "theme.write", "theme.version", "layout.read", "site.read"}
-        return set()
+            allowed.update({"theme.read", "theme.write", "theme.version", "layout.read", "site.read"})
+        return allowed
     if user.is_superuser or tenant.created_by_id == user.pk:
         return (
             (set(ROLE_PERMISSIONS) - {"support.read", "support.publish"})

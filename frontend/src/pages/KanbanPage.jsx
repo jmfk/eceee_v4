@@ -1,4 +1,5 @@
 import Avatar from '../components/Avatar'
+import KanbanMediaImport from '../components/kanban/KanbanMediaImport'
 import { Fragment } from 'react'
 import { Dialog, DialogBackdrop, DialogPanel, DialogTitle, Popover, PopoverButton, PopoverPanel } from '@headlessui/react'
 import { ActionsMenu, CardActions, ColumnActions } from '../components/kanban/KanbanActions'
@@ -130,9 +131,7 @@ function Attachments({ card, workspace, run }) {
                             </p>
                         ))}
                         {file.approvedAt && (
-                            <p className="kb-muted">
-                                Importera via Media Library eller Designer → Importera från Kanban.
-                            </p>
+                            <KanbanMediaImport key={`${card.id}:${file.id}`} file={file} revision={card.revision} />
                         )}
                         {file.contentType.startsWith('image/') && (
                             <button
@@ -1322,13 +1321,13 @@ export default function KanbanPage() {
                                 <DialogPanel className="kb-board-dialog-panel">
                                     <header><DialogTitle>{boardDialog === 'members' ? 'Medlemmar' : 'Redigera tavlan'}</DialogTitle><button type="button" aria-label="Stäng dialog" onClick={() => setBoardDialog('')}><X size={18} /></button></header>
                                     {boardDialog === 'members' ? <>
-                                        <p className="kb-muted">Lägg till eller ta bort användare från tavlan. En administratör kan lägga till alla aktiva användare i systemet. Då får de även tillgång till arbetsytan. Att ta bort någon från tavlan tar inte bort tillgången till arbetsytan.</p>
+                                        <p className="kb-muted">En administratör kan lägga till alla aktiva användare. Inbjudna användare får åtkomst bara till den här tavlan inom Kanban. När de tas bort från sin sista tavla upphör Kanban-åtkomsten. Andra arbetsytemedlemmars åtkomst påverkas inte.</p>
                                         <input aria-label="Sök användare" placeholder="Sök användare" value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)} />
                                         {availableMembers.isPending && <p role="status">Läser användare…</p>}
                                         {availableMembers.error && <p role="alert">{kanbanError(availableMembers.error)}</p>}
                                         <div className="kb-board-member-list">
                                             {(availableMembers.data || []).filter((member) => `${member.name} ${member.username}`.toLocaleLowerCase().includes(memberSearch.toLocaleLowerCase())).map((member) => <label key={member.id}>
-                                                <input type="checkbox" disabled={busy} checked={board.members?.includes(member.id) || false} onChange={(e) => run(async () => await kanbanApi.post(`boards/${board.id}/members/`, { revision: board.revision, members: e.target.checked ? [...(board.members || []), member.id] : board.members.filter((id) => id !== member.id) }))} />
+                                                <input type="checkbox" disabled={busy || !workspace.canManageMembers} checked={board.members?.includes(member.id) || false} onChange={(e) => run(async () => await kanbanApi.post(`boards/${board.id}/members/`, { revision: board.revision, members: e.target.checked ? [...(board.members || []), member.id] : board.members.filter((id) => id !== member.id) }))} />
                                                 <Avatar userId={member.id} name={member.name} /><span>{member.name}</span>
                                             </label>)}
                                         </div>

@@ -1,6 +1,6 @@
 # Tenant Kanban
 
-Kanban is available under `/kanban`. Members of the active tenant and its owner have full access in v1; staff/superuser status alone does not grant access to another tenant's boards. The permission boundary is centralized for later role support. There are no guests or permanent-delete endpoints.
+Kanban is available under `/kanban`. Tenant members with Kanban permissions and the tenant owner can use it; staff/superuser status alone does not grant access to another tenant's boards. Workspace administrators can also invite active system users to individual boards. These guests have Kanban access only to the boards they join and do not become tenant members or gain other CMS permissions. There are no permanent-delete endpoints.
 
 Create a board, customize its columns, then create cards. Drag column headers to reorder and cards to reposition or move between columns. Dropping a card on a board link moves it to that board's first active column. Card ghosts use a card-sized landing placeholder; whole-column ghosts use insertion lines. The board scrolls horizontally and the hovered column scrolls vertically at drag edges. Floating action menus provide arrow buttons and destination selectors as keyboard/touch alternatives. Card links and UUIDs never change on moves; readable `TASK-N` numbers are unique within each tenant. Archive retains descendants and attachments. Use the archive filter to find and restore boards, columns and cards, or undo a recent archive/move from activity. Undo fails safely after a conflicting later change.
 
@@ -12,7 +12,7 @@ The card menu opens the card, edits labels/assignees/deadlines, chooses a palett
 
 ## Attachments and import
 
-The board action menu opens Members and Edit board dialogs. Workspace administrators can select any active system user as a board member; adding a user outside the workspace also grants that user workspace membership so they can open the board. Removing someone from a board does not revoke workspace membership. Other users may select existing workspace members. Edit board changes its name and uploads or removes a private background image. Board backgrounds and card covers accept JPEG, PNG, GIF or WebP up to 10 MiB. Card covers are card attachments and use the existing private download ticket.
+The board action menu opens Members and Edit board dialogs. Workspace administrators can select any active system user as a board member. An outside user's membership grants access only to the selected board within Kanban; removing them from their last board revokes that access immediately. Existing workspace membership is independent of board membership. Users with access to multiple workspaces can choose one from Profile; selecting a board guest workspace does not grant other CMS permissions. Other users can view the member list but cannot change it. Edit board changes its name and uploads or removes a private background image. Board backgrounds and card covers accept JPEG, PNG, GIF or WebP up to 10 MiB. Card covers are card attachments and use the existing private download ticket.
 
 Users with the workspace `ai.use` permission can generate either image from a prompt or explicitly from board/card content. Board generation sends its title, active list names and up to 30 active card titles; card generation sends its title, the first 2,500 description characters and up to eight checklist items. These inputs go to OpenAI using the existing `OPENAI_API_KEY`; generation is limited to five requests per user per day. When the key or provider is unavailable, generation returns HTTP 503 without exposing provider details.
 
@@ -38,7 +38,7 @@ All endpoints are under `/api/v1/kanban/`, use the existing authentication and t
 
 - `boards/`: GET list, POST `{title}`; `boards/<uuid>/`: GET detail, PATCH `{revision,title?,archived?}`.
 - `boards/<uuid>/columns/`: POST `{revision,title}`; `reorder-columns/`: POST `{revision,columnIds}` including every column exactly once.
-- `boards/<uuid>/available-members/`: GET candidates; `members/`: POST `{revision,members}`. Adding someone outside the workspace requires `tenant.admin` and grants workspace membership.
+- `boards/<uuid>/available-members/`: GET candidates; `members/`: POST `{revision,members}`. Changing membership requires `tenant.admin`; outside users gain only selected-board Kanban access.
 - `boards/<uuid>/background/`: authenticated GET, multipart POST `{revision,file}` or DELETE `{revision}`; `generate-background/`: POST `{revision,prompt}` or `{revision,fromContent:true}`.
 - `columns/<uuid>/duplicate/`: POST `{revision}`; atomically copies the list and active cards in the same board. Required list roles are not copied.
 - `columns/<uuid>/`: PATCH `{revision,title?,archived?}`.

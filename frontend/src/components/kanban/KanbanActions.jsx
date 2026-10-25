@@ -90,6 +90,7 @@ export function CardActions({
             labels: card.labels || [],
             deadline: card.deadline ? localDate(card.deadline) : '',
             coverColor: card.coverColor || '',
+            coverAttachment: card.coverAttachment || null,
             column: card.column,
         })
         setPanel(name)
@@ -140,7 +141,8 @@ export function CardActions({
                                                         ? {
                                                               coverColor:
                                                                   draft.coverColor,
-                                                              coverAttachment: null,
+                                                              coverAttachment:
+                                                                  draft.coverAttachment,
                                                           }
                                                         : {
                                                               deadline:
@@ -333,6 +335,7 @@ export function CardActions({
                                                                 ...draft,
                                                                 coverColor:
                                                                     name,
+                                                                coverAttachment: null,
                                                             })
                                                         }
                                                     />
@@ -344,6 +347,8 @@ export function CardActions({
                                         <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" disabled={busy} onChange={(e) => {
                                             const file = e.target.files?.[0]
                                             if (file) run(async () => {
+                                                if (file.size > 10 * 1024 * 1024) throw new Error('Omslagsbilden får vara högst 10 MB.')
+                                                if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type)) throw new Error('Välj en JPEG-, PNG-, GIF- eller WebP-bild.')
                                                 const uploaded = await kanbanApi.upload(contentId, file, card.contentRevision || card.revision)
                                                 const latest = await kanbanApi.get(`cards/${contentId}/`)
                                                 await kanbanApi.patch(`cards/${contentId}/`, { revision: latest.revision, coverAttachment: uploaded.id })

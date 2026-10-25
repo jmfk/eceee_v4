@@ -4,7 +4,9 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from rest_framework.test import APIRequestFactory, force_authenticate
 
+from core.middleware import TenantContextMiddleware
 from core.models import Tenant
+from core.roles import permissions_for
 
 from .models import Board, Card, Column, Label
 from .views import BoardViewSet, CardViewSet, ColumnViewSet
@@ -34,8 +36,78 @@ class BoardActionsTests(TestCase):
             self.owner, "post", "set_members", {"revision": self.board.revision, "members": [self.outsider.pk]}
         )
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertTrue(self.tenant.members.filter(pk=self.outsider.pk).exists())
+        self.assertFalse(self.tenant.members.filter(pk=self.outsider.pk).exists())
+        self.assertFalse(self.tenant.user_has_access(self.outsider))
         self.assertTrue(self.board.members.filter(pk=self.outsider.pk).exists())
+        self.assertEqual(permissions_for(self.outsider, self.tenant), {"kanban.read", "kanban.write"})
+
+    def test_removing_last_board_invite_revokes_kanban_access(self):
+        self.call(self.owner, "post", "set_members", {"revision": self.board.revision, "members": [self.outsider.pk]})
+        self.board.refresh_from_db()
+        response = self.call(self.owner, "post", "set_members", {"revision": self.board.revision, "members": []})
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertFalse(self.tenant.members.filter(pk=self.outsider.pk).exists())
+        self.assertEqual(permissions_for(self.outsider, self.tenant), set())
+        request = self.factory.get("/")
+        request.tenant = self.tenant
+        force_authenticate(request, self.outsider)
+        response = BoardViewSet.as_view({"get": "list"})(request)
+        self.assertEqual(response.status_code, 403)
+
+    def test_board_guest_sees_only_invited_board_and_cards(self):
+        other_board = Board.objects.create(tenant=self.tenant, title="Private")
+        invited_column = Column.objects.create(tenant=self.tenant, board=self.board, title="Todo")
+        other_column = Column.objects.create(tenant=self.tenant, board=other_board, title="Todo")
+        invited_card = Card.objects.create(tenant=self.tenant, column=invited_column, number=1, title="Invited")
+        private_card = Card.objects.create(tenant=self.tenant, column=other_column, number=2, title="Private")
+        self.board.members.add(self.outsider)
+
+        request = self.factory.get("/")
+        request.tenant = self.tenant
+        force_authenticate(request, self.outsider)
+        response = BoardViewSet.as_view({"get": "list"})(request)
+        self.assertEqual([item["id"] for item in response.data], [str(self.board.pk)])
+
+        request = self.factory.get("/")
+        request.tenant = self.tenant
+        force_authenticate(request, self.outsider)
+        response = CardViewSet.as_view({"get": "retrieve"})(request, pk=str(private_card.pk))
+        self.assertEqual(response.status_code, 404)
+
+        request = self.factory.get("/")
+        request.tenant = self.tenant
+        force_authenticate(request, self.outsider)
+        response = CardViewSet.as_view({"get": "retrieve"})(request, pk=str(invited_card.pk))
+        self.assertEqual(response.status_code, 200)
+
+        request = self.factory.patch(
+            "/", {"revision": invited_card.revision, "column": str(other_column.pk)}, format="json"
+        )
+        request.tenant = self.tenant
+        force_authenticate(request, self.outsider)
+        response = CardViewSet.as_view({"patch": "partial_update"})(request, pk=str(invited_card.pk))
+        self.assertEqual(response.status_code, 404)
+
+    def test_board_guest_tenant_header_is_limited_to_kanban_and_account_routes(self):
+        self.board.members.add(self.outsider)
+        middleware = TenantContextMiddleware(lambda request: None)
+        for path in ("/api/v1/kanban/workspace/", "/api/v1/utils/current-workspace/"):
+            request = self.factory.get(path, HTTP_X_TENANT_ID=str(self.tenant.pk))
+            request.user = self.outsider
+            request.session = {}
+            self.assertEqual(middleware.get_tenant(request), self.tenant)
+
+        request = self.factory.get("/api/v1/webpages/pages/", HTTP_X_TENANT_ID=str(self.tenant.pk))
+        request.user = self.outsider
+        request.session = {}
+        with self.assertRaises(TenantContextMiddleware.InvalidTenantSelection):
+            middleware.get_tenant(request)
+
+    def test_removing_board_member_preserves_independent_workspace_membership(self):
+        self.board.members.add(self.member)
+        response = self.call(self.owner, "post", "set_members", {"revision": self.board.revision, "members": []})
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(self.tenant.members.filter(pk=self.member.pk).exists())
 
     def test_ordinary_member_cannot_invite_user_outside_workspace(self):
         response = self.call(self.member, "get", "available_members")
@@ -46,6 +118,12 @@ class BoardActionsTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertFalse(self.tenant.members.filter(pk=self.outsider.pk).exists())
         self.assertFalse(self.board.members.filter(pk=self.outsider.pk).exists())
+
+    def test_ordinary_member_cannot_remove_existing_board_member(self):
+        self.board.members.add(self.owner)
+        response = self.call(self.member, "post", "set_members", {"revision": self.board.revision, "members": []})
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(self.board.members.filter(pk=self.owner.pk).exists())
 
     def test_inactive_users_cannot_be_added(self):
         self.outsider.is_active = False

@@ -49,7 +49,6 @@ from .services import (
     enqueue_index,
     ensure_required_columns,
     event,
-    get_record,
     locked_tenant,
     members,
     mentions,
@@ -94,7 +93,29 @@ class BaseViewSet(viewsets.GenericViewSet):
     permission_classes = [permissions.IsAuthenticated, TenantPermission]
 
     def scoped(self, model):
-        return model.objects.filter(tenant=self.request.tenant)
+        records = model.objects.filter(tenant=self.request.tenant)
+        if self.request.tenant.user_has_access(self.request.user):
+            return records
+        board_lookup = {
+            Board: "id",
+            Column: "board_id",
+            Card: "column__board_id",
+            Comment: "card__column__board_id",
+            Attachment: "card__column__board_id",
+            Activity: "board_id",
+            Notification: "card__column__board_id",
+            Label: "card__column__board_id",
+        }[model]
+        return records.filter(
+            **{
+                f"{board_lookup}__in": Board.objects.filter(
+                    tenant=self.request.tenant, members=self.request.user
+                ).values("pk")
+            }
+        ).distinct()
+
+    def record(self, model, pk):
+        return get_object_or_404(self.scoped(model), pk=pk)
 
 
 class BoardViewSet(BaseViewSet):
@@ -104,6 +125,8 @@ class BoardViewSet(BaseViewSet):
         return Response(BoardSerializer(self.scoped(Board), many=True).data)
 
     def create(self, request):
+        if not request.tenant.user_has_access(request.user):
+            raise PermissionDenied("Board guests cannot create boards.")
         title = serializers.CharField(max_length=200).run_validation(request.data.get("title"))
         with locked_tenant(request) as tenant:
             board = Board.objects.create(tenant=tenant, title=title)
@@ -113,7 +136,7 @@ class BoardViewSet(BaseViewSet):
         return Response(BoardSerializer(board).data, status=201)
 
     def retrieve(self, request, pk=None):
-        board = get_record(Board, request.tenant, pk)
+        board = self.record(Board, pk)
         return Response(
             {
                 **BoardSerializer(board).data,
@@ -124,7 +147,7 @@ class BoardViewSet(BaseViewSet):
     def partial_update(self, request, pk=None):
         data = validated(NamedInput, request.data)
         with locked_tenant(request) as tenant:
-            board = update_named(tenant, request.user, get_record(Board, tenant, pk), data)
+            board = update_named(tenant, request.user, self.record(Board, pk), data)
         return Response(BoardSerializer(board).data)
 
     @action(detail=True, methods=["post"])
@@ -132,7 +155,7 @@ class BoardViewSet(BaseViewSet):
         title = serializers.CharField(max_length=200).run_validation(request.data.get("title"))
         revision = validated(RevisionInput, request.data)["revision"]
         with locked_tenant(request) as tenant:
-            board = get_record(Board, tenant, pk)
+            board = self.record(Board, pk)
             check_revision(board, revision)
             column = Column.objects.create(tenant=tenant, board=board, title=title, position=board.columns.count())
             bump(board)
@@ -146,19 +169,15 @@ class BoardViewSet(BaseViewSet):
         )
         revision = validated(RevisionInput, request.data)["revision"]
         with locked_tenant(request) as tenant:
-            board = get_record(Board, tenant, pk)
+            from core.roles import permissions_for
+
+            if "tenant.admin" not in permissions_for(request.user, tenant):
+                raise PermissionDenied("Only workspace administrators can change board members.")
+            board = self.record(Board, pk)
             check_revision(board, revision)
             selected = set(User.objects.filter(pk__in=ids, is_active=True).values_list("pk", flat=True))
             if selected != set(ids):
                 raise ValidationError("Board members must be active users.")
-            existing = set(members(tenant).filter(pk__in=ids).values_list("pk", flat=True))
-            new_to_tenant = selected - existing
-            if new_to_tenant:
-                from core.roles import permissions_for
-
-                if "tenant.admin" not in permissions_for(request.user, tenant):
-                    raise PermissionDenied("Only workspace administrators can add users from outside the workspace.")
-                tenant.members.add(*new_to_tenant)
             board.members.set(ids)
             bump(board)
             event(tenant, request.user, board, "board.members", "Updated board members")
@@ -166,19 +185,19 @@ class BoardViewSet(BaseViewSet):
 
     @action(detail=True, methods=["get"], url_path="available-members")
     def available_members(self, request, pk=None):
-        get_record(Board, request.tenant, pk)
+        board = self.record(Board, pk)
         from core.roles import permissions_for
 
         candidates = (
-            User.objects.filter(is_active=True).order_by("username", "pk")
+            User.objects.filter(is_active=True)
             if "tenant.admin" in permissions_for(request.user, request.tenant)
-            else members(request.tenant).order_by("username", "pk")
-        )
+            else board.members.filter(is_active=True)
+        ).order_by("username", "pk")
         return Response(MemberSerializer(candidates, many=True).data)
 
     @action(detail=True, methods=["get", "post", "delete"], url_path="background")
     def background(self, request, pk=None):
-        board = get_record(Board, request.tenant, pk)
+        board = self.record(Board, pk)
         if request.method == "GET":
             if not board.background_path:
                 return Response(status=404)
@@ -219,7 +238,7 @@ class BoardViewSet(BaseViewSet):
         path = files.save_upload(request.tenant, upload) if upload else ""
         try:
             with locked_tenant(request) as tenant:
-                board = get_record(Board, tenant, pk)
+                board = self.record(Board, pk)
                 check_revision(board, revision)
                 old_path = board.background_path
                 board.background_path = path
@@ -241,7 +260,7 @@ class BoardViewSet(BaseViewSet):
     def generate_background(self, request, pk=None):
         require_image_generation(request)
         data = validated(GenerateImageInput, request.data)
-        board = get_record(Board, request.tenant, pk)
+        board = self.record(Board, pk)
         check_revision(board, data["revision"])
         prompt = board_context(board) if data["from_content"] else data["prompt"]
         upload = generate_image("board", prompt)
@@ -253,7 +272,7 @@ class BoardViewSet(BaseViewSet):
         revision = validated(RevisionInput, request.data)["revision"]
         ids = serializers.ListField(child=serializers.UUIDField()).run_validation(request.data.get("column_ids"))
         with locked_tenant(request) as tenant:
-            board = get_record(Board, tenant, pk)
+            board = self.record(Board, pk)
             check_revision(board, revision)
             current = set(board.columns.values_list("pk", flat=True))
             if len(ids) != len(current) or set(ids) != current:
@@ -279,7 +298,7 @@ class ColumnViewSet(BaseViewSet):
     def partial_update(self, request, pk=None):
         data = validated(NamedInput, request.data)
         with locked_tenant(request) as tenant:
-            column = get_record(Column, tenant, pk)
+            column = self.record(Column, pk)
             update_named(tenant, request.user, column, data)
             bump(column.board)
         return Response(ColumnSerializer(column).data)
@@ -288,7 +307,7 @@ class ColumnViewSet(BaseViewSet):
     def duplicate(self, request, pk=None):
         data = validated(RevisionInput, request.data)
         with locked_tenant(request) as tenant:
-            source = get_record(Column, tenant, pk)
+            source = self.record(Column, pk)
             check_revision(source, data["revision"])
             if source.board.archived:
                 raise ValidationError("Restore the board before copying a list.")
@@ -369,10 +388,10 @@ class CardViewSet(BaseViewSet):
         if not data.get("title") or not data.get("column"):
             raise ValidationError("Title and column are required.")
         with locked_tenant(request) as tenant:
-            column = get_record(Column, tenant, data.pop("column"))
+            column = self.record(Column, data.pop("column"))
             if column.archived or column.board.archived:
                 raise ValidationError("Restore the board and column before creating a card.")
-            number = (self.scoped(Card).aggregate(number=Max("number"))["number"] or 0) + 1
+            number = (Card.objects.filter(tenant=tenant).aggregate(number=Max("number"))["number"] or 0) + 1
             card = Card.objects.create(
                 tenant=tenant, column=column, title=data.pop("title"), number=number, position=column.cards.count()
             )
@@ -384,7 +403,7 @@ class CardViewSet(BaseViewSet):
         return Response(CardSerializer(card).data, status=201)
 
     def retrieve(self, request, pk=None):
-        card = get_record(Card, request.tenant, pk)
+        card = self.record(Card, pk)
         return Response(
             {
                 **CardSerializer(card).data,
@@ -397,16 +416,18 @@ class CardViewSet(BaseViewSet):
     def partial_update(self, request, pk=None):
         data = validated(CardInput, request.data)
         with locked_tenant(request) as tenant:
-            card = update_card(tenant, request.user, get_record(Card, tenant, pk), data)
+            if "column" in data:
+                self.record(Column, data["column"])
+            card = update_card(tenant, request.user, self.record(Card, pk), data)
         return Response(CardSerializer(card).data)
 
     @action(detail=True, methods=["post"])
     def duplicate(self, request, pk=None):
         data = validated(DuplicateInput, request.data)
         with locked_tenant(request) as tenant:
-            source = get_record(Card, tenant, pk)
+            source = self.record(Card, pk)
             check_revision(source, data["revision"])
-            column = get_record(Column, tenant, data["column"])
+            column = self.record(Column, data["column"])
             card = duplicate_card(tenant, request.user, source, column, data["mirror"])
         return Response(CardSerializer(card).data, status=201)
 
@@ -414,7 +435,7 @@ class CardViewSet(BaseViewSet):
     def comments(self, request, pk=None):
         data = validated(CommentInput, request.data)
         with locked_tenant(request) as tenant:
-            card = get_record(Card, tenant, pk)
+            card = self.record(Card, pk)
             check_revision(card, data["revision"])
             comment = Comment.objects.create(tenant=tenant, card=card, author=request.user, body=data["body"])
             bump(card)
@@ -433,7 +454,7 @@ class CardViewSet(BaseViewSet):
     @action(detail=True, methods=["post"])
     def attachments(self, request, pk=None):
         revision = validated(RevisionInput, request.data)["revision"]
-        card = get_record(Card, request.tenant, pk)
+        card = self.record(Card, pk)
         upload = request.FILES.get("file")
         if not upload:
             raise ValidationError("Choose a file to upload.")
@@ -445,7 +466,7 @@ class CardViewSet(BaseViewSet):
         path = files.save_upload(request.tenant, upload)
         try:
             with locked_tenant(request) as tenant:
-                card = get_record(Card, tenant, pk)
+                card = self.record(Card, pk)
                 check_revision(card, revision)
                 attachment = Attachment.objects.create(
                     tenant=tenant,
@@ -476,7 +497,7 @@ class CardViewSet(BaseViewSet):
     def generate_cover(self, request, pk=None):
         require_image_generation(request)
         data = validated(GenerateImageInput, request.data)
-        card = get_record(Card, request.tenant, pk)
+        card = self.record(Card, pk)
         check_revision(card, data["revision"])
         if card.mirror_of_id:
             raise ValidationError("Generate the cover on the original card.")
@@ -486,7 +507,7 @@ class CardViewSet(BaseViewSet):
         path = files.save_upload(request.tenant, upload)
         try:
             with locked_tenant(request) as tenant:
-                card = get_record(Card, tenant, pk)
+                card = self.record(Card, pk)
                 check_revision(card, data["revision"])
                 attachment = Attachment.objects.create(
                     tenant=tenant,
@@ -518,7 +539,7 @@ class CommentViewSet(BaseViewSet):
     def partial_update(self, request, pk=None):
         data = validated(CommentInput, request.data)
         with locked_tenant(request) as tenant:
-            comment = get_record(Comment, tenant, pk)
+            comment = self.record(Comment, pk)
             check_revision(comment, data["revision"])
             before = comment.body
             comment.body = data["body"]
@@ -548,7 +569,7 @@ class AttachmentViewSet(BaseViewSet):
             attachments = attachments.filter(approved_at__isnull=False)
         query = request.query_params.get("q", "").strip()[:500]
         if query:
-            cards, _ = search_cards(Card.objects.filter(tenant=request.tenant), query)
+            cards, _ = search_cards(self.scoped(Card), query)
             attachments = attachments.filter(Q(filename__icontains=query) | Q(card_id__in=[card.pk for card in cards]))
         return Response(
             [
@@ -561,7 +582,7 @@ class AttachmentViewSet(BaseViewSet):
     def approve(self, request, pk=None):
         revision = validated(RevisionInput, request.data)["revision"]
         with locked_tenant(request) as tenant:
-            attachment = get_record(Attachment, tenant, pk)
+            attachment = self.record(Attachment, pk)
             check_revision(attachment.card, revision)
             if not attachment.approved_at:
                 attachment.approved_at = timezone.now()
@@ -581,6 +602,8 @@ class AttachmentViewSet(BaseViewSet):
 
     @action(detail=True, methods=["post"], url_path="import")
     def import_file(self, request, pk=None):
+        if not request.tenant.user_has_access(request.user):
+            raise PermissionDenied("Board guests cannot import files into CMS libraries.")
         data = validated(ImportInput, request.data)
         from core.machine_api_keys import MEDIA_WRITE, SERVER_FULL_ACCESS, THEME_WRITE
         from core.models import MachineAPIKey
@@ -589,11 +612,11 @@ class AttachmentViewSet(BaseViewSet):
             required = MEDIA_WRITE if data["destination"] == "media" else THEME_WRITE
             if required not in request.auth.scopes and SERVER_FULL_ACCESS not in request.auth.scopes:
                 raise PermissionDenied("This integration also needs destination write access.")
-        attachment = get_record(Attachment, request.tenant, pk)
+        attachment = self.record(Attachment, pk)
         check_revision(attachment.card, data["revision"])
         with files.prepared_attachment(attachment) as prepared:
             with locked_tenant(request) as tenant:
-                attachment = get_record(Attachment, tenant, pk)
+                attachment = self.record(Attachment, pk)
                 check_revision(attachment.card, data["revision"])
                 record = files.import_attachment(tenant, request.user, attachment, data, prepared=prepared)
                 bump(attachment.card)
@@ -602,7 +625,7 @@ class AttachmentViewSet(BaseViewSet):
 
     @action(detail=True, methods=["get"])
     def download(self, request, pk=None):
-        attachment = get_record(Attachment, request.tenant, pk)
+        attachment = self.record(Attachment, pk)
         start, end = 0, attachment.size - 1
         range_header = request.headers.get("Range")
         if range_header:
@@ -668,11 +691,17 @@ class WorkspaceViewSet(BaseViewSet):
     def list(self, request):
         from core.roles import permissions_for
 
+        visible_boards = self.scoped(Board)
+        visible_members = (
+            User.objects.filter(Q(pk__in=members(request.tenant).values("pk")) | Q(kanban_boards__in=visible_boards))
+            if request.tenant.user_has_access(request.user)
+            else User.objects.filter(kanban_boards__in=visible_boards)
+        )
         return Response(
             {
                 "tenant_id": str(request.tenant.pk),
-                "members": MemberSerializer(members(request.tenant), many=True).data,
-                "boards": BoardSerializer(self.scoped(Board), many=True).data,
+                "members": MemberSerializer(visible_members.filter(is_active=True).distinct(), many=True).data,
+                "boards": BoardSerializer(visible_boards, many=True).data,
                 "columns": ColumnSerializer(self.scoped(Column), many=True).data,
                 "labels": LabelSerializer(self.scoped(Label), many=True).data,
                 "notifications": NotificationSerializer(
@@ -681,6 +710,7 @@ class WorkspaceViewSet(BaseViewSet):
                 "file_types": files.ALLOWED_TYPES,
                 "file_limits": files.FileUploadValidator.MAX_FILE_SIZES,
                 "can_generate_images": "ai.use" in permissions_for(request.user, request.tenant),
+                "can_manage_members": "tenant.admin" in permissions_for(request.user, request.tenant),
             }
         )
 
@@ -692,6 +722,8 @@ class WorkspaceViewSet(BaseViewSet):
 
     @action(detail=False, methods=["post"])
     def labels(self, request):
+        if not request.tenant.user_has_access(request.user):
+            raise PermissionDenied("Board guests cannot create workspace labels.")
         name = serializers.CharField(max_length=80).run_validation(request.data.get("name"))
         with locked_tenant(request) as tenant:
             label, _ = Label.objects.get_or_create(tenant=tenant, name=name)
@@ -707,9 +739,11 @@ class WorkspaceViewSet(BaseViewSet):
 
     @action(detail=False, methods=["post"])
     def undo(self, request):
+        if not request.tenant.user_has_access(request.user):
+            raise PermissionDenied("Board guests cannot undo workspace activity.")
         activity_id = serializers.UUIDField().run_validation(request.data.get("activity_id"))
         with locked_tenant(request) as tenant:
-            entry = get_record(Activity, tenant, activity_id)
+            entry = self.record(Activity, activity_id)
             undo_event(tenant, request.user, entry)
         return Response({"undone": True})
 

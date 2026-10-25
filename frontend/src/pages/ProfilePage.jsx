@@ -33,7 +33,6 @@ const ProfilePage = () => {
     const [isSwitchingWorkspace, setIsSwitchingWorkspace] = useState(false);
 
     useEffect(() => {
-        if (!user?.canSwitchTenant) return;
         const available = user.designerTenants || [];
         const current = user.currentWorkspace?.identifier || getCurrentTenantId();
         const selection = available.find((workspace) => workspace.identifier === current) || available[0];
@@ -215,13 +214,13 @@ const ProfilePage = () => {
                 </div>
             </div>
 
-            {user.canSwitchTenant && user.designerTenants?.length > 0 && (
+            {(user.canSwitchTenant || user.designerTenants?.length > 1) && user.designerTenants?.length > 0 && (
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
                     <div className="flex items-start gap-3">
                         <Building2 className="w-5 h-5 text-blue-500 mt-0.5" />
                         <div className="flex-1">
                             <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">Workspace</div>
-                            <p className="text-sm text-gray-600 mt-1">Choose which workspace to administer in this browser session.</p>
+                            <p className="text-sm text-gray-600 mt-1">Choose which workspace to use in this browser session.</p>
                             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
                                 <label className="flex-1 text-sm font-medium text-gray-700">
                                     Current workspace

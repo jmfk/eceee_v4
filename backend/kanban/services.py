@@ -30,9 +30,14 @@ def members(tenant):
     return User.objects.filter(Q(member_tenants=tenant) | Q(pk=tenant.created_by_id), is_active=True).distinct()
 
 
+def board_members(board):
+    return User.objects.filter(
+        Q(member_tenants=board.tenant) | Q(pk=board.tenant.created_by_id) | Q(kanban_boards=board), is_active=True
+    ).distinct()
+
+
 def can_access(user, tenant):
-    # Kanban has no cross-tenant staff shortcut: only actual members/owner.
-    if not (user and user.is_authenticated and tenant.is_active and members(tenant).filter(pk=user.pk).exists()):
+    if not (user and user.is_authenticated and user.is_active and tenant.is_active):
         return False
     from core.roles import permissions_for
 
@@ -45,7 +50,7 @@ def locked_tenant(request):
     with transaction.atomic():
         tenant = get_object_or_404(Tenant.objects.select_for_update(), pk=request.tenant.pk)
         if not can_access(request.user, tenant):
-            raise PermissionDenied("Tenant membership is required.")
+            raise PermissionDenied("Kanban access is required.")
         yield tenant
 
 
@@ -89,7 +94,7 @@ def bump(obj):
 
 
 def notify(tenant, card, user_ids, key, message, actor=None):
-    allowed = members(tenant).filter(pk__in=user_ids)
+    allowed = board_members(card.column.board).filter(pk__in=user_ids)
     if actor:
         allowed = allowed.exclude(pk=actor.pk)
     for user in allowed:
@@ -241,8 +246,8 @@ def update_card(tenant, actor, card, data):
         changes["move"] = {"board": column.board.title, "column": column.title}
     if "assignees" in data:
         ids = set(data.pop("assignees"))
-        if set(members(tenant).filter(pk__in=ids).values_list("pk", flat=True)) != ids:
-            raise ValidationError("Assignees must belong to this tenant.")
+        if set(board_members(card.column.board).filter(pk__in=ids).values_list("pk", flat=True)) != ids:
+            raise ValidationError("Assignees must have access to this board.")
         added = ids - set(card.assignees.values_list("pk", flat=True))
         card.assignees.set(ids)
         notify(

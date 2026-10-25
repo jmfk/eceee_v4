@@ -4,6 +4,7 @@ from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 
 from core.models import Tenant
 from core.permissions import user_can_switch_tenant
+from kanban.models import Board
 from utils.views import CurrentUserView, UserListView
 from webpages.models import PageTheme, ThemeDesignerAssignment
 
@@ -55,16 +56,23 @@ class UserListQueryTests(TestCase):
         self.assertEqual(response.data["current_workspace"]["identifier"], first.identifier)
         self.assertTrue(response.data["can_switch_tenant"])
 
-    def test_only_superusers_can_switch_workspace_outside_local_dev(self):
+    def test_users_can_select_only_accessible_workspaces(self):
         owner = User.objects.create_user("workspace-owner", password="test")
         superuser = User.objects.create_superuser("workspace-superuser", password="test")
         workspace = Tenant.objects.create(name="Switch target", identifier="switch-target", created_by=owner)
+        other = Tenant.objects.create(name="Unrelated", identifier="unrelated-switch", created_by=superuser)
         client = APIClient()
 
         client.force_authenticate(owner)
-        denied = client.post(
+        allowed = client.post(
             "/api/v1/utils/current-workspace/",
             {"identifier": workspace.identifier},
+            format="json",
+        )
+        self.assertEqual(allowed.status_code, 200)
+        denied = client.post(
+            "/api/v1/utils/current-workspace/",
+            {"identifier": other.identifier},
             format="json",
         )
         self.assertEqual(denied.status_code, 403)
@@ -79,6 +87,27 @@ class UserListQueryTests(TestCase):
         self.assertEqual(response.data["currentWorkspace"]["identifier"], workspace.identifier)
         self.assertEqual(client.session["selected_tenant_identifier"], workspace.identifier)
 
+    def test_board_guest_can_select_board_workspace_without_tenant_access(self):
+        owner = User.objects.create_user("board-workspace-owner", password="test")
+        guest = User.objects.create_user("board-workspace-guest", password="test")
+        tenant = Tenant.objects.create(name="Board workspace", identifier="board-workspace", created_by=owner)
+        board = Board.objects.create(tenant=tenant, title="Shared")
+        board.members.add(guest)
+        client = APIClient()
+        client.force_authenticate(guest)
+
+        response = client.post("/api/v1/utils/current-workspace/", {"identifier": tenant.identifier}, format="json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(tenant.user_has_access(guest))
+        self.assertEqual(client.session["selected_tenant_identifier"], tenant.identifier)
+        request = APIRequestFactory().get("/api/v1/utils/current-user/")
+        request.tenant = tenant
+        force_authenticate(request, user=guest)
+        response = CurrentUserView.as_view()(request)
+        self.assertTrue(response.data["is_kanban_board_guest"])
+        self.assertEqual(response.data["permissions"], ["kanban.read", "kanban.write"])
+
     @override_settings(DEBUG=True)
     def test_dev_auto_user_can_switch_workspace_in_local_debug(self):
         dev_user = User.objects.create_user("dev_auto_user", password="test")
@@ -92,7 +121,7 @@ class UserListQueryTests(TestCase):
         self.assertFalse(user_can_switch_tenant(dev_user))
 
     @override_settings(DEBUG=False)
-    def test_dev_auto_user_cannot_select_workspace_outside_debug(self):
+    def test_dev_auto_user_can_select_own_workspace_outside_debug(self):
         dev_user = User.objects.create_user("dev_auto_user", password="test")
         workspace = Tenant.objects.create(
             name="Production switch target",
@@ -108,7 +137,7 @@ class UserListQueryTests(TestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
 
     def test_workspace_switch_rejects_inactive_workspace(self):
         superuser = User.objects.create_superuser("inactive-workspace-superuser", password="test")
