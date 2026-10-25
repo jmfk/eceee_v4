@@ -1,6 +1,6 @@
 import React from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import ClassificationManager from './ClassificationManager'
@@ -17,9 +17,6 @@ function renderManager(props = {}) {
     render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><ClassificationManager {...props} /></QueryClientProvider>)
 }
 async function chooseType() {
-    fireEvent.click(await screen.findByRole('button', { name: 'Add filter' }))
-    fireEvent.click(screen.getByRole('combobox', { name: 'Tag type' }))
-    fireEvent.click(await screen.findByRole('option', { name: 'Topics' }))
     fireEvent.click(await screen.findByRole('button', { name: 'New tag' }))
 }
 beforeEach(() => {
@@ -36,34 +33,36 @@ beforeEach(() => {
 })
 
 describe('classification management', () => {
-    it('adds a removable filter pill without opening the editor, and dismisses the chooser with Escape', async () => {
+    it('keeps the tag tree open when filtering, and dismisses the chooser with Escape', async () => {
         renderManager()
         const addFilter = await screen.findByRole('button', { name: 'Add filter' })
         fireEvent.click(addFilter)
         expect(screen.getByRole('dialog', { name: 'Add tag filter' })).toBeInTheDocument()
-        fireEvent.keyDown(screen.getByLabelText('Tag type'), { key: 'Escape' })
+        fireEvent.keyDown(within(screen.getByRole('dialog', { name: 'Add tag filter' })).getByRole('combobox', { name: 'Tag type' }), { key: 'Escape' })
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
         expect(addFilter).toHaveFocus()
         fireEvent.click(addFilter)
-        fireEvent.click(screen.getByRole('combobox', { name: 'Tag type' }))
-    fireEvent.click(await screen.findByRole('option', { name: 'Topics' }))
+        fireEvent.click(within(screen.getByRole('dialog', { name: 'Add tag filter' })).getByRole('combobox', { name: 'Tag type' }))
+        fireEvent.click(await screen.findByRole('option', { name: 'Topics' }))
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-        expect(screen.queryByLabelText('Name')).not.toBeInTheDocument()
+        expect(screen.getByRole('region', { name: 'Tag tree' })).toBeInTheDocument()
         await waitFor(() => expect(taxonomyApi.terms).toHaveBeenCalledWith(expect.objectContaining({ classification_type: 'type' })))
         fireEvent.click(screen.getByRole('button', { name: 'Remove type filter: Topics' }))
         await waitFor(() => expect(taxonomyApi.terms).toHaveBeenLastCalledWith(expect.objectContaining({ classification_type: '' })))
     })
 
-    it('opens with all tags, alphabetical ordering and a search before choosing a type', async () => {
+    it('opens the tag tree as the main view with New tag above the tags', async () => {
         taxonomyApi.terms.mockResolvedValue({ count: 1, results: [{ id: 'energy', name: 'Energy', classificationType: 'type', parent: null, status: 'approved' }] })
         renderManager()
-        expect(await screen.findByRole('button', { name: 'Energy' })).toBeInTheDocument()
-        expect(screen.queryByLabelText('Tag type')).not.toBeInTheDocument()
+        const tree = await screen.findByRole('region', { name: 'Tag tree' })
+        expect(within(tree).getByRole('button', { name: 'New tag' })).toBeInTheDocument()
+        expect(await within(tree).findByRole('button', { name: 'Energy' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Back to tags' })).not.toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Add filter' })).toHaveAttribute('aria-expanded', 'false')
-        expect(taxonomyApi.terms).toHaveBeenCalledWith(expect.objectContaining({ classification_type: '', page_size: 50, ordering: 'name' }))
+        await waitFor(() => expect(taxonomyApi.terms).toHaveBeenCalledWith(expect.objectContaining({ classification_type: 'type', page_size: 50, ordering: 'name' })))
         fireEvent.change(screen.getByRole('searchbox', { name: 'Search tags' }), { target: { value: 'Energy' } })
         await waitFor(() => expect(taxonomyApi.terms).toHaveBeenCalledWith(expect.objectContaining({ search: 'Energy', page: 1 })))
-        fireEvent.click(await screen.findByRole('button', { name: 'Energy' }))
+        fireEvent.click(await within(tree).findByRole('button', { name: 'Energy' }))
         expect(await screen.findByRole('heading', { name: 'Energy' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Remove type filter: Topics' })).toBeInTheDocument()
     })
@@ -87,22 +86,25 @@ describe('classification management', () => {
         expect(screen.getByRole('button', { name: 'Types' })).toHaveAttribute('aria-pressed', 'true')
         expect(screen.queryByLabelText('Tag type')).not.toBeInTheDocument()
     })
-    it('lists searchable types and opens a read-only detail before editing', async () => {
+    it('opens editable types in the form and keeps read-only types in detail mode', async () => {
         const type = { ...definition, key: 'topics', namespace: 4, description: 'Editorial subjects', allowedUses: ['pages'], revision: 1, permissions: ['administer'] }
         taxonomyApi.types.mockResolvedValue({ results: [type, { id: 'other', name: 'Media', key: 'media', namespace: 4, allowedUses: [], permissions: [] }] })
         taxonomyApi.namespaces.mockResolvedValue({ results: [{ id: 4, name: 'Editorial' }] })
         taxonomyApi.configure.mockResolvedValue({ ...type, description: 'Updated subjects' })
         renderManager()
         fireEvent.click(screen.getByRole('button', { name: 'Types' }))
-        expect(await screen.findByRole('heading', { name: 'Topics' })).toBeInTheDocument()
-        expect(screen.getByText('Editorial subjects')).toBeInTheDocument()
-        expect(screen.getByText('Editorial')).toBeInTheDocument()
-        expect(screen.queryByLabelText('Name')).not.toBeInTheDocument()
+        expect(await screen.findByRole('heading', { name: 'Edit tag type' })).toBeInTheDocument()
+        expect(within(screen.getByRole('navigation', { name: 'Tag type actions' })).getByRole('button', { name: 'Edit' })).toHaveAttribute('aria-pressed', 'true')
+        expect(screen.getByLabelText('Name')).toHaveValue('Topics')
+        expect(screen.getByLabelText('Description')).toHaveValue('Editorial subjects')
         fireEvent.change(screen.getByRole('searchbox', { name: 'Search types' }), { target: { value: 'Media' } })
         expect(screen.queryByRole('button', { name: 'Topics' })).not.toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Media' })).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Media' }))
+        expect(screen.getByRole('heading', { name: 'Media' })).toBeInTheDocument()
+        expect(screen.queryByLabelText('Name')).not.toBeInTheDocument()
         fireEvent.change(screen.getByRole('searchbox', { name: 'Search types' }), { target: { value: '' } })
-        fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Topics' }))
+        expect(screen.getByRole('heading', { name: 'Edit tag type' })).toBeInTheDocument()
         fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Unsaved' } })
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
         expect(screen.getByText('Editorial subjects')).toBeInTheDocument()
@@ -239,7 +241,7 @@ describe('classification management', () => {
         fireEvent.click(await screen.findByRole('button', { name: 'Undo' }))
         expect(await screen.findByRole('alert')).toHaveTextContent('Later changes prevent undo. Reload.')
     })
-    it('opens an existing tag as read-only details and edits through an action menu', async () => {
+    it('opens an existing tag in Edit and switches actions through tabs', async () => {
         const user = userEvent.setup()
         const term = { id: 'energy', name: 'Energy', description: 'Power sources', alternativeNames: ['Fuel'], classificationType: 'type', parent: null, status: 'approved', revision: 3 }
         taxonomyApi.terms.mockResolvedValue({ count: 1, results: [term] })
@@ -247,21 +249,26 @@ describe('classification management', () => {
         renderManager()
         fireEvent.click(await screen.findByRole('button', { name: /Energy/ }))
         expect(await screen.findByRole('heading', { name: 'Energy' })).toBeInTheDocument()
+        const actions = screen.getByRole('navigation', { name: 'Tag actions' })
+        expect(within(actions).getByRole('button', { name: 'Edit' })).toHaveAttribute('aria-pressed', 'true')
+        expect(screen.getByRole('form', { name: 'Edit tag' })).toBeInTheDocument()
+        expect(screen.getByLabelText('Name')).toHaveValue('Energy')
+        await user.click(within(actions).getByRole('button', { name: 'Details' }))
         expect(screen.getByText('Power sources')).toBeInTheDocument()
         expect(screen.getByText('Fuel')).toBeInTheDocument()
         expect(screen.queryByLabelText('Name')).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Apply' })).not.toBeInTheDocument()
 
-        await user.click(screen.getByRole('button', { name: 'Actions' }))
-        await user.click(await screen.findByRole('menuitem', { name: 'Edit' }))
+        await user.click(within(actions).getByRole('button', { name: 'Move' }))
+        expect(screen.getByRole('form', { name: 'Move tag' })).toBeInTheDocument()
+        await user.click(within(actions).getByRole('button', { name: 'Edit' }))
         expect(screen.getByRole('form', { name: 'Edit tag' })).toBeInTheDocument()
         fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Clean energy' } })
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
         expect(screen.queryByLabelText('Name')).not.toBeInTheDocument()
         expect(taxonomyApi.change).not.toHaveBeenCalled()
 
-        await user.click(screen.getByRole('button', { name: 'Actions' }))
-        await user.click(await screen.findByRole('menuitem', { name: 'Edit' }))
+        await user.click(within(actions).getByRole('button', { name: 'Edit' }))
         expect(screen.getByLabelText('Name')).toHaveValue('Energy')
         fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Clean energy' } })
         fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
@@ -279,9 +286,9 @@ describe('classification management', () => {
         taxonomyApi.changeType.mockResolvedValue({ id: 'operation' })
         renderManager()
         fireEvent.click(await screen.findByRole('button', { name: 'Energy' }))
+        await user.click(within(screen.getByRole('navigation', { name: 'Tag actions' })).getByRole('button', { name: 'Details' }))
         expect(screen.getByText('Topics / Energy')).toBeInTheDocument()
-        await user.click(screen.getByRole('button', { name: 'Actions' }))
-        await user.click(await screen.findByRole('menuitem', { name: 'Edit' }))
+        await user.click(within(screen.getByRole('navigation', { name: 'Tag actions' })).getByRole('button', { name: 'Edit' }))
         await user.click(screen.getByRole('combobox', { name: 'Tag type' }))
         expect(screen.queryByRole('option', { name: 'Foreign' })).not.toBeInTheDocument()
         await user.click(await screen.findByRole('option', { name: 'Subjects' }))
@@ -300,9 +307,9 @@ describe('classification management', () => {
         taxonomyApi.change.mockResolvedValue({ operation: { id: 'operation' } })
         renderManager()
         fireEvent.click(await screen.findByRole('button', { name: /Old tag/ }))
-        await user.click(screen.getByRole('button', { name: 'Actions' }))
-        expect(screen.queryByRole('menuitem', { name: 'Edit' })).not.toBeInTheDocument()
-        await user.click(await screen.findByRole('menuitem', { name: 'Reactivate' }))
+        const actions = screen.getByRole('navigation', { name: 'Tag actions' })
+        expect(within(actions).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+        await user.click(within(actions).getByRole('button', { name: 'Reactivate' }))
         expect(screen.getByRole('form', { name: 'Reactivate tag' })).toBeInTheDocument()
         expect(taxonomyApi.change).not.toHaveBeenCalled()
         fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
