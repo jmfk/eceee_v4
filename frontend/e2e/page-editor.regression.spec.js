@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { defaultTextOutlineStyles } from '../src/utils/textOutlineStyles'
 import { createCollaborativeEditorState, mockCmsApi, seedAuthenticatedSession } from './fixtures/apiMocks'
-import { openCmsPage } from './fixtures/navigation'
+import { openCmsPage, reloadCmsPage } from './fixtures/navigation'
 
 const editorPath = '/pages/101/edit/content'
 
@@ -54,6 +54,20 @@ test.describe('page editor regressions', () => {
     installErrorGuards(page)
   })
 
+  test('reload waits for a delayed editor bootstrap before checking saved content', async ({ page }) => {
+    const editorState = await mockCmsApi(page, { authenticated: true, pageEditor: true })
+    await openEditor(page, editorState)
+    let delayedLoads = 0
+    await page.route('**/src/editorBootstrap.jsx*', async route => {
+      delayedLoads += 1
+      await new Promise(resolve => setTimeout(resolve, 6_000))
+      await route.continue()
+    })
+    await reloadCmsPage(page)
+    await expect(contentEditor(page)).toContainText('Initial editor copy')
+    expect(delayedLoads).toBe(1)
+  })
+
   test('inline rich-text edit persists after save and reload', async ({ page }) => {
     const editorState = await mockCmsApi(page, { authenticated: true, pageEditor: true })
     await openEditor(page, editorState)
@@ -68,7 +82,7 @@ test.describe('page editor regressions', () => {
       isActive: true,
     })
 
-    await page.reload()
+    await reloadCmsPage(page)
     await expect(page.getByTestId('page-editor-surface')).toBeVisible()
     await expect(contentEditor(page)).toContainText('Saved rich text copy')
   })
@@ -131,7 +145,7 @@ test.describe('page editor regressions', () => {
       expect(savedColumns.config.slots.right[0].config).toMatchObject({
         textColor: 'paper', backgroundColor: 'ocean', textOutline: 'dark', textContent: '<p>Stored body</p>',
       })
-      await page.reload()
+      await reloadCmsPage(page)
       await expect(page.getByTestId('page-editor-surface')).toBeVisible({ timeout: 30_000 })
       await expect(editor).toHaveCSS('color', 'rgb(255, 255, 255)')
       await expect(editor).not.toHaveCSS('text-shadow', 'none')
@@ -203,7 +217,7 @@ test.describe('page editor regressions', () => {
       slug: 'unpublished-draft-slug',
     })
     expect(getSavedVersion(editorState).classificationIds).toEqual(['7d38dd31-d831-43d2-a931-d0a06224f42e'])
-    await page.reload()
+    await reloadCmsPage(page)
     await expect(page.getByRole('list', { name: 'Selected tags' })).toContainText('Energy efficiency')
   })
 
@@ -636,7 +650,7 @@ test.describe('stable widget side panel', () => {
     expect(await rich.locator('.highlight').evaluate(element => element.outerHTML)).toBe(untouched)
     await saveCurrentVersion(page)
     expect(getSavedVersion(state).widgets.main[0].config.content).toContain(untouched)
-    await page.reload()
+    await reloadCmsPage(page)
     await page.getByTestId('page-widget-edit-easy-widgets-contentwidget').first().click()
     expect(await rich.locator('.highlight').evaluate(element => element.outerHTML)).toBe(untouched)
     await expect(rich.locator('h2')).toContainText('Pasted')
@@ -710,7 +724,7 @@ test.describe('stable widget side panel', () => {
       await source.press('Escape')
       await saveCurrentVersion(page)
       expect(getSavedVersion(state).widgets.main.find(widget => widget.id === 'headline-main').config.content).toBe(updated)
-      await page.reload()
+      await reloadCmsPage(page)
       await page.getByTestId('page-widget-edit-easy-widgets-headlinewidget').click()
       await page.getByRole('button', { name: 'Open HTML Editor' }).click()
       await expect(page.locator('.html-editor-overlay .cm-content')).toHaveText(updated)
@@ -735,7 +749,7 @@ test.describe('stable widget side panel', () => {
     await saveCurrentVersion(page)
     expect(getSavedVersion(state).widgets.main[0].config.title).toBe('Final panel title')
     await expect(page.getByText('Unsaved changes', { exact: true })).toHaveCount(0)
-    await page.reload()
+    await reloadCmsPage(page)
     await expect(contentEditor(page)).toContainText('Initial editor copy')
     await page.getByTestId('page-widget-edit-easy-widgets-contentwidget').first().click()
     await expect(page.getByRole('textbox', { name: 'Panel title', exact: true })).toHaveValue('Final panel title')
@@ -769,7 +783,7 @@ test.describe('stable widget side panel', () => {
     await saveCurrentVersion(page)
     expect(getSavedVersion(state).widgets.main.find(widget => widget.id === 'headline-main').config.content).toMatch(/<(b|strong)>/)
     await page.screenshot({ path: 'test-results/side-column-richtext.png', fullPage: true })
-    await page.reload()
+    await reloadCmsPage(page)
     await page.getByTestId('page-widget-edit-easy-widgets-headlinewidget').click()
     await expect(page.getByRole('textbox', { name: 'Panel content', exact: true }).locator('b, strong')).toHaveText('Initial headline')
   })
@@ -789,7 +803,7 @@ test.describe('stable widget side panel', () => {
     const widgets = getSavedVersion(state).widgets.main
     expect(widgets[0].config.content).toMatch(/^(<p>)?First widget draft(<\/p>)?$/)
     expect(widgets[1].config.content).toMatch(/^(<p>)?Second widget draft(<\/p>)?$/)
-    await page.reload()
+    await reloadCmsPage(page)
     await expect(contentEditor(page, 'content-intro')).toHaveText('First widget draft')
     await expect(contentEditor(page, 'content-sidebar')).toHaveText('Second widget draft')
   })
