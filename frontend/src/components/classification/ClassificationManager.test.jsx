@@ -67,6 +67,17 @@ describe('classification management', () => {
         expect(screen.getByRole('button', { name: 'Remove type filter: Topics' })).toBeInTheDocument()
     })
 
+    it('keeps the main tag view open when cancelling a new tag', async () => {
+        renderManager()
+        const tree = await screen.findByRole('region', { name: 'Tag tree' })
+        fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'Unfinished' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+        expect(tree).toBeInTheDocument()
+        expect(screen.getByRole('form', { name: 'Create tag' })).toBeInTheDocument()
+        expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('')
+        expect(screen.queryByRole('region', { name: 'Tag list' })).not.toBeInTheDocument()
+    })
+
     it('loads migrated tags and proposals within the media namespace', async () => {
         taxonomyApi.terms.mockResolvedValue({ results: [{ id: 'source', name: 'Reuters', parent: null, status: 'approved' }] })
         renderManager({ namespace: 'editorial' })
