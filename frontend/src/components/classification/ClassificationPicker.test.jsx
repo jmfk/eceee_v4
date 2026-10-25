@@ -46,6 +46,17 @@ describe('classification picker', () => {
         renderPicker()
         expect(await screen.findByRole('alert')).toHaveTextContent('Could not load classifications. Retry.')
     })
+    it('requests name-ordered types for proposals even when stored order differs', async () => {
+        taxonomyApi.types.mockResolvedValue({ results: [
+            { id: 'alpha', name: 'Alpha', sortOrder: 20, allowedUses: ['pages'], permissions: ['propose'] },
+            { id: 'zulu', name: 'Zulu', sortOrder: 1, allowedUses: ['pages'], permissions: ['propose'] },
+        ] })
+        renderPicker({ namespace: 'editorial' })
+        fireEvent.click(screen.getByRole('button', { name: 'Suggest a tag' }))
+        expect(await screen.findByRole('option', { name: 'Alpha' })).toBeInTheDocument()
+        expect(taxonomyApi.types).toHaveBeenCalledWith({ namespace: 'editorial', page_size: 200, ordering: 'name' })
+        expect(screen.getByRole('combobox', { name: 'Tag type' })).toHaveValue('alpha')
+    })
     it('submits a media proposal without treating it as approved tagging', async () => {
         taxonomyApi.types.mockResolvedValue({ results: [{ id: 'type', name: 'Subjects', allowedUses: ['media_files'], permissions: ['use', 'propose'] }] })
         taxonomyApi.propose.mockResolvedValue({ term: { id: 'proposed' } })
