@@ -112,7 +112,9 @@ export default function AccountSecurityPanel() {
                         const addresses = await requireAuthResult('/account/email')
                         const exists = addresses.data.some(item => item.email.toLowerCase() === address.toLowerCase())
                         await requireAuthResult('/account/email', { method: exists ? 'PUT' : 'POST', data: { email: address } })
-                        setMessage('Verification link sent. Open it in your email, then refresh verification status here to continue setting up two-factor authentication.')
+                        setMessage(exists
+                            ? 'Verification link sent. Open it in your email, then refresh verification status here to continue setting up two-factor authentication.'
+                            : 'Email address added. Check your inbox for a verification link. If none arrives, wait a moment and request another link.')
                     })
                 }}>
                     <p className="text-gray-600">Email verification is needed only to enable two-factor authentication. Request a link when you are ready to set it up.</p>

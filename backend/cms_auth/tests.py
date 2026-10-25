@@ -2,7 +2,7 @@ import json
 import time
 from types import SimpleNamespace
 from unittest.mock import patch
-from urllib.parse import quote
+from urllib.parse import parse_qs, urlsplit
 
 from allauth.account.models import EmailAddress, EmailConfirmationHMAC
 from allauth.mfa.models import Authenticator
@@ -341,6 +341,21 @@ class BrowserAuthenticationTests(TestCase):
         self.assertEqual(self.client.get(BASE + "/account/authenticators/webauthn").status_code, 409)
         self.assertEqual(len(mail.outbox), 0)
 
+    def test_legacy_email_is_synchronized_without_mail_before_explicit_verification(self):
+        EmailAddress.objects.filter(user=self.user).delete()
+        self.assertEqual(self.login().status_code, 200)
+        self.assertEqual(len(mail.outbox), 0)
+        addresses = self.client.get(BASE + "/account/email")
+        self.assertEqual(addresses.status_code, 200)
+        self.assertEqual(len(addresses.json()["data"]), 1)
+        address = EmailAddress.objects.get(user=self.user, email=self.user.email)
+        self.assertFalse(address.verified)
+        self.assertEqual(self.reauthenticate().status_code, 200)
+        sent = self.write(BASE + "/account/email", {"email": self.user.email}, method="put")
+        self.assertEqual(sent.status_code, 200, sent.content)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertFalse(EmailAddress.objects.get(pk=address.pk).verified)
+
     def test_account_without_email_can_login_without_mail(self):
         EmailAddress.objects.filter(user=self.user).delete()
         self.user.email = ""
@@ -366,11 +381,11 @@ class BrowserAuthenticationTests(TestCase):
             sent = self.write(BASE + "/account/email", {"email": self.user.email}, method="put")
         self.assertEqual(sent.status_code, 200, sent.content)
         request.assert_called_once()
-        key = EmailConfirmationHMAC(EmailAddress.objects.get(user=self.user)).key
-        self.assertIn(
-            "http://testserver/login?emailKey=" + quote(key, safe=""),
-            json.loads(request.call_args.kwargs["data"])["TextBody"],
-        )
+        body = json.loads(request.call_args.kwargs["data"])["TextBody"]
+        link = next(line for line in body.splitlines() if line.startswith("http://testserver/login?emailKey="))
+        # Use the issued key: generating another timestamped HMAC can cross a
+        # second boundary and make an exact email-content comparison flaky.
+        key = parse_qs(urlsplit(link).query)["emailKey"][0]
         self.assertEqual(self.write(BASE + "/auth/email/verify", {"key": "wrong"}).status_code, 400)
         self.assertEqual(self.write(BASE + "/auth/email/verify", {"key": key}).status_code, 200)
         self.assertTrue(EmailAddress.objects.get(user=self.user).verified)
@@ -393,6 +408,23 @@ class BrowserAuthenticationTests(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.email, "new@example.invalid")
         self.assertTrue(EmailAddress.objects.get(pk=address.pk).verified)
+
+    def test_adding_rate_limited_email_does_not_imply_verification_mail_was_sent(self):
+        EmailAddress.objects.filter(user=self.user).delete()
+        self.user.email = ""
+        self.user.save(update_fields=["email"])
+        self.assertEqual(self.login().status_code, 200)
+        self.assertEqual(self.reauthenticate().status_code, 200)
+        # A prior request can consume the address-specific send limit even when
+        # that unverified address was subsequently removed.
+        data = {"email": "new@example.invalid"}
+        self.assertEqual(self.write(BASE + "/account/email", data).status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+        EmailAddress.objects.filter(user=self.user).delete()
+        response = self.write(BASE + "/account/email", data)
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertFalse(EmailAddress.objects.get(user=self.user).verified)
 
     def test_optional_email_verification_does_not_bypass_existing_mfa(self):
         self.enroll()

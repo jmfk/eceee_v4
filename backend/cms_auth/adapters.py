@@ -1,6 +1,7 @@
 from urllib.parse import urlsplit
 
 from allauth.account.adapter import DefaultAccountAdapter
+from allauth.account.internal.flows.manage_email import sync_user_email_address
 from allauth.core import context
 from allauth.core.exceptions import ImmediateHttpResponse
 from allauth.headless.adapter import DefaultHeadlessAdapter
@@ -37,6 +38,10 @@ class AccountAdapter(DefaultAccountAdapter):
                         status=409,
                     )
                 )
+            # Optional verification skips allauth's mail stage, which normally
+            # repairs legacy User.email values missing an EmailAddress record.
+            # Synchronize only; this neither verifies the address nor sends mail.
+            sync_user_email_address(user)
             super().login(request, user)
             stamp_session(request, user)
 
