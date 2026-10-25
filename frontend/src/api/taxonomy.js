@@ -11,6 +11,7 @@ export const taxonomyApi = {
     objectTypes: async () => data(await api.get('/api/v1/objects/object-types/?page_size=200')),
     types: async params => data(await api.get(`${base}types/?${query(params || {})}`)),
     terms: async params => data(await api.get(`${base}terms/?${query(params || {})}`)),
+    legacyTypes: async params => data(await api.get(`${base}terms/tag_types/?${query(params || {})}`)),
     usage: async id => data(await api.get(`${base}terms/${id}/usage/`)),
     term: async id => data(await api.get(`${base}terms/${id}/`)),
     createType: async values => data(await api.post(`${base}types/`, values)),

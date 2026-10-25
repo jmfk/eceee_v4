@@ -134,6 +134,12 @@ class TermViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, ScopedViewSe
     search_fields = ["name", "alternative_names", "legacy_mappings__source_name", "legacy_mappings__source_id"]
     ordering_fields = ["name", "created_at"]
 
+    @action(detail=False, methods=["get"])
+    def tag_types(self, request):
+        """Return all legacy type keys in scope, independently of list pagination/search."""
+        keys = self.scope(Tag.objects.all()).order_by("tag_type").values_list("tag_type", flat=True).distinct()
+        return Response(list(keys))
+
     def get_queryset(self):
         qs = self.scope(Tag.objects.select_related("classification_type", "parent", "merged_into"))
         for name in ["classification_type", "status", "tag_type"]:
