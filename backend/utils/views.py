@@ -517,7 +517,7 @@ class CurrentUserView(APIView):
         administrative_tenants = Tenant.objects.filter(is_active=True)
         if not user_can_switch_tenant(request.user):
             administrative_tenants = administrative_tenants.filter(
-                Q(created_by=request.user) | Q(members=request.user)
+                Q(created_by=request.user) | Q(members=request.user) | Q(board__members=request.user)
             ).distinct()
         serializer = UserListSerializer(
             request.user,
@@ -532,6 +532,7 @@ class CurrentUserView(APIView):
                     Q(created_by=request.user)
                     | Q(members=request.user)
                     | Q(theme_designer_assignments__user=request.user)
+                    | Q(board__members=request.user)
                 )
                 .distinct()
             )
@@ -540,6 +541,11 @@ class CurrentUserView(APIView):
         from core.roles import permissions_for
 
         data["permissions"] = sorted(permissions_for(request.user, current_workspace))
+        data["is_kanban_board_guest"] = bool(
+            current_workspace
+            and not current_workspace.user_has_access(request.user)
+            and current_workspace.board_set.filter(members=request.user).exists()
+        )
         data["current_workspace"] = (
             {
                 "id": str(current_workspace.id),
@@ -557,13 +563,11 @@ class WorkspaceSelectionSerializer(serializers.Serializer):
 
 
 class CurrentWorkspaceView(APIView):
-    """Validate and remember a privileged user's current workspace."""
+    """Remember an accessible workspace without expanding its permissions."""
 
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        if not user_can_switch_tenant(request.user):
-            return Response({"error": "Workspace switching is not allowed."}, status=status.HTTP_403_FORBIDDEN)
         serializer = WorkspaceSelectionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         tenant = get_object_or_404(
@@ -571,6 +575,13 @@ class CurrentWorkspaceView(APIView):
             identifier=serializer.validated_data["identifier"],
             is_active=True,
         )
+        if not (
+            user_can_switch_tenant(request.user)
+            or tenant.user_has_access(request.user)
+            or tenant.theme_designer_assignments.filter(user=request.user).exists()
+            or tenant.board_set.filter(members=request.user).exists()
+        ):
+            return Response({"error": "Workspace switching is not allowed."}, status=status.HTTP_403_FORBIDDEN)
         request.session["selected_tenant_identifier"] = tenant.identifier
         return Response(
             {"currentWorkspace": {"id": str(tenant.id), "identifier": tenant.identifier, "name": tenant.name}}

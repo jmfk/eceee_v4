@@ -30,6 +30,7 @@ async function mockWorkspace(page, { conflict = false, extraCards = [] } = {}) {
     const allCards = [card, ...extraCards.map((extra) => ({ ...card, ...extra }))]
     const workspace = {
         tenantId,
+        canManageMembers: true,
         boards: [{ id: boardId, title: 'Website', revision: 1, archived: false, members: [1], hasBackground: false }],
         columns: [
             {
@@ -68,6 +69,7 @@ async function mockWorkspace(page, { conflict = false, extraCards = [] } = {}) {
             data = {
                 id: 1,
                 username: 'johan',
+                permissions: ['kanban.read', 'kanban.write', 'media.write'],
                 currentWorkspace: { id: tenantId, identifier: 'test' },
                 designerTenants: [{ id: tenantId, identifier: 'test' }],
             }
@@ -148,6 +150,31 @@ test('board menu opens member and edit dialogs without breaking the toolbar', as
     await page.getByRole('button', { name: 'Spara', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'New website' })).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy()
+})
+
+test('approved card attachments keep the direct media import action', async ({ page }) => {
+    const { card } = await mockWorkspace(page)
+    card.attachments.push({
+        id: '77777777-7777-7777-7777-777777777777',
+        filename: 'brief.pdf',
+        contentType: 'application/pdf',
+        size: 1024,
+        approvedAt: new Date().toISOString(),
+        imports: [],
+        comment: null,
+    })
+    await page.goto(`/kanban/cards/${cardId}`)
+    await expect(page.getByRole('button', { name: 'Importera till media' })).toBeVisible()
+})
+
+test('saving cover options without changing them keeps the existing image', async ({ page }) => {
+    const { card } = await mockWorkspace(page)
+    card.coverAttachment = '88888888-8888-8888-8888-888888888888'
+    await page.goto(`/kanban/boards/${boardId}`)
+    await page.getByLabel('Kortåtgärder för TASK-1', { exact: true }).click()
+    await page.getByRole('button', { name: 'Byt omslag', exact: true }).click()
+    await page.getByRole('button', { name: 'Spara', exact: true }).click()
+    await expect.poll(() => card.coverAttachment).toBe('88888888-8888-8888-8888-888888888888')
 })
 
 test('board navigation, accessible movement, Markdown and comments', async ({ page }, testInfo) => {

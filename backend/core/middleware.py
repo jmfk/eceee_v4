@@ -32,6 +32,13 @@ class TenantContextMiddleware:
         self.get_response = get_response
 
     EXEMPT_PATHS = ("/health/", "/_allauth/", "/accounts/", "/csrf-token/", "/api/v1/auth/")
+    BOARD_GUEST_PATHS = (
+        "/api/v1/kanban/",
+        "/api/v1/utils/current-user/",
+        "/api/v1/utils/current-workspace/",
+        "/api/v1/utils/profile-photos/",
+        "/api/v1/utils/change-password/",
+    )
 
     class InvalidTenantSelection(ValueError):
         pass
@@ -141,18 +148,27 @@ class TenantContextMiddleware:
                     tenant.user_has_access(request.user)
                     or tenant.theme_designer_assignments.filter(user=request.user).exists()
                 )
+                if not has_access and request.path.startswith(self.BOARD_GUEST_PATHS):
+                    has_access = tenant.board_set.filter(members=request.user).exists()
                 if not has_access:
                     raise self.InvalidTenantSelection
             return tenant
 
-        # A privileged profile selection supplies the fallback when clients do
+        # A selected accessible workspace supplies the fallback when clients do
         # not send an explicit workspace header.
         selected_identifier = request.session.get("selected_tenant_identifier")
-        if selected_identifier and user_can_switch_tenant(request.user):
+        if selected_identifier and request.user.is_authenticated:
             try:
-                return Tenant.objects.get(identifier=selected_identifier, is_active=True)
+                selected = Tenant.objects.get(identifier=selected_identifier, is_active=True)
+                if user_can_switch_tenant(request.user) or (
+                    selected.user_has_access(request.user)
+                    or selected.theme_designer_assignments.filter(user=request.user).exists()
+                    or selected.board_set.filter(members=request.user).exists()
+                ):
+                    return selected
             except Tenant.DoesNotExist:
-                request.session.pop("selected_tenant_identifier", None)
+                pass
+            request.session.pop("selected_tenant_identifier", None)
 
         # 2. An omitted header is only unambiguous when the user can access one tenant.
         if request.user.is_authenticated:
@@ -161,15 +177,12 @@ class TenantContextMiddleware:
                 if key_tenants.count() != 1:
                     raise self.InvalidTenantSelection
                 return key_tenants.first()
-            accessible = (
-                Tenant.objects.filter(is_active=True)
-                .filter(
-                    Q(created_by=request.user)
-                    | Q(members=request.user)
-                    | Q(theme_designer_assignments__user=request.user)
-                )
-                .distinct()
+            accessible_filter = (
+                Q(created_by=request.user) | Q(members=request.user) | Q(theme_designer_assignments__user=request.user)
             )
+            if request.path.startswith(self.BOARD_GUEST_PATHS):
+                accessible_filter |= Q(board__members=request.user)
+            accessible = Tenant.objects.filter(is_active=True).filter(accessible_filter).distinct()
             if accessible.count() == 1:
                 return accessible.first()
 

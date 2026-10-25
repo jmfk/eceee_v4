@@ -81,4 +81,14 @@ describe('ProfilePage', () => {
         renderProfile()
         expect(screen.queryByLabelText('Current workspace')).not.toBeInTheDocument()
     })
+
+    it('lets a board guest select an accessible second workspace', () => {
+        mocks.user = { ...mocks.user, canSwitchTenant: false, isKanbanBoardGuest: true }
+        renderProfile()
+        expect(screen.getByLabelText('Current workspace')).toHaveValue('first-workspace')
+        expect(screen.getByRole('option', { name: 'Second workspace' })).toBeInTheDocument()
+        expect(screen.queryByRole('link', { name: /Inbox/ })).not.toBeInTheDocument()
+        expect(screen.queryByRole('link', { name: 'Rapportera fel' })).not.toBeInTheDocument()
+        expect(screen.getByRole('link', { name: 'Kanban' })).toBeInTheDocument()
+    })
 })
