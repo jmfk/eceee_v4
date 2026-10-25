@@ -39,6 +39,8 @@ def board_members(board):
 def can_access(user, tenant):
     if not (user and user.is_authenticated and user.is_active and tenant.is_active):
         return False
+    if not (members(tenant).filter(pk=user.pk).exists() or Board.objects.filter(tenant=tenant, members=user).exists()):
+        return False
     from core.roles import permissions_for
 
     allowed = permissions_for(user, tenant)
