@@ -36,6 +36,28 @@ class ClassificationTypeSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Choose pages, media_files, media_collections or object:<type-id>.")
         return list(dict.fromkeys(value))
 
+    def validate(self, attrs):
+        if "name" in attrs:
+            attrs["name"] = attrs["name"].strip()
+            if not attrs["name"]:
+                raise serializers.ValidationError({"name": "Enter a tag type name."})
+        name = attrs.get("name", self.instance.name if self.instance else None)
+        namespace = attrs.get("namespace", self.instance.namespace if self.instance else None)
+        name_changed = self.instance is None or ("name" in attrs and name.casefold() != self.instance.name.casefold())
+        if name and namespace and name_changed:
+            duplicate = ClassificationType.objects.filter(
+                tenant=self.context["request"].tenant,
+                namespace=namespace,
+                name__iexact=name.strip(),
+            )
+            if self.instance:
+                duplicate = duplicate.exclude(pk=self.instance.pk)
+            if duplicate.exists():
+                raise serializers.ValidationError(
+                    {"name": "A tag type with this name already exists in this namespace."}
+                )
+        return attrs
+
     def get_permissions(self, instance):
         return sorted(permissions_for(self.context["request"].user, instance))
 

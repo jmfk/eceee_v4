@@ -233,6 +233,17 @@ class TermViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, ScopedViewSe
     def edit(self, request, pk=None):
         return self._mutate(request, "edit")
 
+    @action(detail=True, methods=["post"], url_path="change-type")
+    def change_type(self, request, pk=None):
+        operation = services.change_type(
+            request.user,
+            self.get_object(),
+            request.data.get("classification_type"),
+            revision=request.data.get("revision"),
+            payload=request.data.get("payload", {}),
+        )
+        return Response(OperationSerializer(operation).data)
+
     @action(detail=True, methods=["post"])
     def move(self, request, pk=None):
         return self._mutate(request, "move")
