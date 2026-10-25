@@ -125,7 +125,10 @@ export default function ClassificationManager({ namespace } = {}) {
         setAliases((selected.alternativeNames || []).join('\n')); setDestination(''); setError('')
     }
     const cancelAction = () => {
-        if (!selected) { setShowEditor(false); setAction('create'); return }
+        if (!selected) {
+            setAction('create'); setName(''); setDescription(''); setAliases(''); setError('')
+            return
+        }
         setAction(null); setName(selected.name); setDescription(selected.description || '')
         setEditTypeId(selected.classificationType || '')
         setAliases((selected.alternativeNames || []).join('\n')); setDestination(''); setError('')
