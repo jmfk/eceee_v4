@@ -35,7 +35,7 @@ export default function ClassificationPicker({ value = [], onChange, namespace, 
     })
     const definitions = useQuery({
         queryKey: ['classification', tenant, 'proposalTypes', effectiveNamespace, use],
-        queryFn: async () => await taxonomyApi.types({ namespace: effectiveNamespace, page_size: 200 }),
+        queryFn: async () => await taxonomyApi.types({ namespace: effectiveNamespace, page_size: 200, ordering: 'name' }),
         enabled: suggesting && !!effectiveNamespace,
     })
     const proposalTypes = (definitions.data?.results || []).filter(type => type.permissions?.includes('propose') && (!use || type.allowedUses?.includes(use)))
