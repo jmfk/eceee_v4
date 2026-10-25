@@ -2,6 +2,21 @@
 
 This document explains how to configure and use Postmark for transactional emails in the ECEEE v4 application.
 
+The Django backend is `anymail.backends.postmark.EmailBackend`, provided by
+`django-anymail[postmark]==14.0` for the current Django 4.2 stack. The obsolete
+`django-postmark` package is not used. Existing `POSTMARK_API_KEY` values map to
+Anymail's server token; no credential migration is needed. Update any explicit
+legacy `EMAIL_BACKEND` override to the backend above.
+
+`POSTMARK_TEST_MODE=True` selects Postmark's non-delivery API test token; it does
+not validate the real server token or deliver mail. `POSTMARK_TRACK_OPENS` keeps
+its existing configurable preference. API request/payload debugging is disabled.
+
+Authentication tests exercise the production configuration and actual backend
+with a mocked HTTPS transport, including verification and password-reset mail.
+Real delivery must be checked separately with a verified sender and an authorized
+recipient. Do not log API tokens, verification codes or reset-message payloads.
+
 ## Overview
 
 The application uses [Postmark](https://postmarkapp.com/) for sending transactional emails including:
@@ -31,7 +46,7 @@ ADMIN_EMAIL=admin@example.com
 
 You can override the email backend in development by setting:
 ```bash
-EMAIL_BACKEND=postmark.django_backend.EmailBackend
+EMAIL_BACKEND=anymail.backends.postmark.EmailBackend
 ```
 
 ## Getting Your Postmark API Key
@@ -154,7 +169,7 @@ Django will automatically send error emails to the addresses listed in the `ADMI
 
 **"SMTPAuthenticationError"**
 - This means Django is trying to use SMTP instead of Postmark
-- Check that `EMAIL_BACKEND` is set to `postmark.django_backend.EmailBackend`
+- Check that `EMAIL_BACKEND` is set to `anymail.backends.postmark.EmailBackend`
 
 ## Advanced Configuration
 
@@ -214,6 +229,6 @@ This separation ensures better deliverability for both types of emails.
 ## Support
 
 - **Postmark Documentation**: https://postmarkapp.com/developer
-- **Django-Postmark**: https://github.com/themartorana/django-postmark
+- **Anymail Postmark backend**: https://anymail.dev/en/v14.0/esps/postmark/
 - **Django-Allauth**: https://django-allauth.readthedocs.io/
 

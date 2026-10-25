@@ -17,6 +17,7 @@ from . import test_settings as isolated_settings
 from .adapters import AccountAdapter, MFAAdapter, SocialAccountAdapter
 from .models import AccountSecurity
 from .security import SESSION_MFA, SESSION_VERSION, revoke_credentials, security_version, session_is_valid
+from .test_email import postmark_success, production_mail_settings
 
 # Also isolate URLs, mail, cache and synthetic keys when Django's normal project
 # discovery runs this module. Keep the runner's database and installed apps.
@@ -82,6 +83,42 @@ class BrowserAuthenticationTests(TestCase):
         self.assertEqual(self.client.get("/protected/").status_code, 200)
         self.assertEqual(self.client.post("/protected/", {}).status_code, 403)
         self.assertTrue(self.client.cookies["sessionid"]["httponly"])
+
+    def test_unverified_login_sends_through_production_mail_backend(self):
+        config = production_mail_settings()
+        EmailAddress.objects.filter(user=self.user).update(verified=False)
+        with (
+            override_settings(
+                EMAIL_BACKEND=config["EMAIL_BACKEND"], ANYMAIL=config["ANYMAIL"], TEMPLATES=config["TEMPLATES"]
+            ),
+            patch("requests.sessions.Session.request", return_value=postmark_success()) as request,
+        ):
+            response = self.login()
+        self.assertEqual(response.status_code, 401)
+        self.assertTrue(any(flow["id"] == "verify_email" for flow in response.json()["data"]["flows"]))
+        request.assert_called_once()
+        payload = json.loads(request.call_args.kwargs["data"])
+        code = self.client.session["account_email_verification_code"]["code"]
+        self.assertIn(code, payload["TextBody"])
+        self.assertEqual(self.client.get("/protected/").status_code, 401)
+        verified = self.write(BASE + "/auth/email/verify", {"key": code})
+        self.assertEqual(verified.status_code, 200)
+        self.assertEqual(self.client.get("/protected/").status_code, 200)
+
+    def test_password_reset_request_uses_production_mail_backend(self):
+        config = production_mail_settings()
+        with (
+            override_settings(
+                EMAIL_BACKEND=config["EMAIL_BACKEND"], ANYMAIL=config["ANYMAIL"], TEMPLATES=config["TEMPLATES"]
+            ),
+            patch("requests.sessions.Session.request", return_value=postmark_success()) as request,
+        ):
+            response = self.write(BASE + "/auth/password/request", {"email": self.user.email})
+        self.assertEqual(response.status_code, 200)
+        request.assert_called_once()
+        self.assertIn("http://testserver/login?resetKey=", json.loads(request.call_args.kwargs["data"])["TextBody"])
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("password-123"))
 
     def test_signup_and_passwordless_login_are_closed(self):
         result = self.write(
