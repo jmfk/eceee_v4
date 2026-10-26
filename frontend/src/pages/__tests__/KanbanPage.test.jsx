@@ -29,7 +29,7 @@ vi.mock('../../utils/tenant', () => ({
 }))
 vi.mock('../../api/kanban', async (importOriginal) => ({
     ...(await importOriginal()),
-    kanbanApi: { get: vi.fn(), cards: vi.fn(), post: vi.fn(), patch: vi.fn(), upload: vi.fn(), background: vi.fn() },
+    kanbanApi: { get: vi.fn(), cards: vi.fn(), post: vi.fn(), patch: vi.fn(), upload: vi.fn(), blob: vi.fn(), background: vi.fn() },
 }))
 
 const workspace = {
@@ -248,6 +248,40 @@ describe('Kanban card attachments', () => {
             body: `![portrait.jpg](/api/v1/kanban/attachments/${imageId}/download/)`, revision: 1,
         }))
         expect(kanbanApi.upload).not.toHaveBeenCalled()
+    })
+
+    it('reuses an identical image attachment when the same local file is dropped on comments', async () => {
+        const imageId = '11111111-1111-1111-1111-111111111111'
+        const image = new File(['same'], 'portrait.jpg', { type: 'image/jpeg' })
+        const bytes = new TextEncoder().encode('same').buffer
+        Object.defineProperty(image, 'arrayBuffer', { value: async () => bytes })
+        const existing = { ...attachmentCard, attachments: [{ id: imageId, filename: 'portrait.jpg', contentType: 'image/jpeg', size: image.size }] }
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? workspace : path === 'cards/card-1/' ? existing : {})
+        kanbanApi.blob.mockResolvedValue({ arrayBuffer: async () => bytes })
+        kanbanApi.post.mockResolvedValue({ id: 'comment-1' })
+        renderKanban('/kanban/cards/card-1')
+        fireEvent.drop(await screen.findByRole('button', { name: 'Skriv en kommentar…' }), {
+            dataTransfer: { files: [image], types: ['Files'] },
+        })
+        await waitFor(() => expect(kanbanApi.post).toHaveBeenCalledWith('cards/card-1/comments/', {
+            body: `![portrait.jpg](/api/v1/kanban/attachments/${imageId}/download/)`, revision: 1,
+        }))
+        expect(kanbanApi.upload).not.toHaveBeenCalled()
+    })
+
+    it('uploads a different image even when its size matches an attachment', async () => {
+        const image = new File(['new!'], 'portrait.jpg', { type: 'image/jpeg' })
+        Object.defineProperty(image, 'arrayBuffer', { value: async () => new TextEncoder().encode('new!').buffer })
+        const existing = { ...attachmentCard, attachments: [{ id: '11111111-1111-1111-1111-111111111111', filename: 'portrait.jpg', contentType: 'image/jpeg', size: image.size }] }
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? workspace : path === 'cards/card-1/' ? existing : {})
+        kanbanApi.blob.mockResolvedValue({ arrayBuffer: async () => new TextEncoder().encode('old!').buffer })
+        kanbanApi.upload.mockResolvedValue({ id: '22222222-2222-2222-2222-222222222222', filename: 'portrait.jpg', contentType: 'image/jpeg' })
+        kanbanApi.post.mockResolvedValue({ id: 'comment-1' })
+        renderKanban('/kanban/cards/card-1')
+        fireEvent.drop(await screen.findByRole('button', { name: 'Skriv en kommentar…' }), {
+            dataTransfer: { files: [image], types: ['Files'] },
+        })
+        await waitFor(() => expect(kanbanApi.upload).toHaveBeenCalledWith('card-1', image, 1))
     })
 
     it('does not create an empty attachment comment when upload fails', async () => {

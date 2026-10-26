@@ -87,6 +87,31 @@ const editableSignature = (card) =>
         card.externalReferences,
     ])
 
+const matchingImageAttachment = async (file, attachments) => {
+    if (!file.type.startsWith('image/') || typeof file.arrayBuffer !== 'function') return null
+    const candidates = attachments.filter((attachment) =>
+        attachment.contentType?.startsWith('image/') && attachment.size === file.size)
+    if (!candidates.length) return null
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    for (const attachment of candidates) {
+        try {
+            const existing = new Uint8Array(await (await kanbanApi.blob(attachment.id)).arrayBuffer())
+            if (existing.length !== bytes.length) continue
+            let same = true
+            for (let index = 0; index < bytes.length; index += 1) {
+                if (bytes[index] !== existing[index]) {
+                    same = false
+                    break
+                }
+            }
+            if (same) return attachment
+        } catch {
+            // A failed comparison must not block an otherwise valid upload.
+        }
+    }
+    return null
+}
+
 function CardDetail({ card, workspace, run, busy, reload, error }) {
     const ticket = useKanbanAccess()
     const [draft, setDraft] = useState(card)
@@ -109,9 +134,10 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
         const uploaded = []
         try {
             for (const [index, file] of files.entries()) {
-                const attachment = commentId
+                const existing = await matchingImageAttachment(file, [...card.attachments, ...uploaded])
+                const attachment = existing || (commentId
                     ? await kanbanApi.upload(card.id, file, revision, commentId)
-                    : await kanbanApi.upload(card.id, file, revision)
+                    : await kanbanApi.upload(card.id, file, revision))
                 uploaded.push(attachment)
                 if (index < files.length - 1) revision = (await kanbanApi.get(`cards/${card.id}/`)).revision
             }
@@ -1088,7 +1114,8 @@ export default function KanbanPage() {
             const cardId = card.mirrorOf || card.id
             let current = await kanbanApi.get(`cards/${cardId}/`)
             for (const [index, file] of files.entries()) {
-                await kanbanApi.upload(cardId, file, current.revision)
+                if (!await matchingImageAttachment(file, current.attachments || []))
+                    await kanbanApi.upload(cardId, file, current.revision)
                 if (index < files.length - 1) current = await kanbanApi.get(`cards/${cardId}/`)
             }
         })
