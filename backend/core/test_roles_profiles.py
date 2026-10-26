@@ -9,7 +9,7 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 from .models import ProfilePhoto, Tenant, TenantRole
 from .profile_views import ProfilePhotoView
 from .role_views import RolesView, WorkspaceMemberView
-from .roles import allows_request, permissions_for
+from .roles import allows_request, is_tenant_admin, permissions_for
 
 
 class RolesAndProfilesTests(TestCase):
@@ -99,6 +99,11 @@ class RolesAndProfilesTests(TestCase):
         from utils.views import UserListView
 
         self.assertEqual(self.call(UserListView).status_code, 403)
+
+    def test_system_owner_can_run_global_admin_actions_without_selected_workspace(self):
+        system_owner = User.objects.create_superuser("global-system-owner", password="test")
+        self.assertTrue(is_tenant_admin(system_owner, None))
+        self.assertFalse(is_tenant_admin(self.user, None))
 
     def test_system_owner_can_add_existing_account_with_an_explicit_workspace_role(self):
         system_owner = User.objects.create_superuser("system-owner", password="test")
