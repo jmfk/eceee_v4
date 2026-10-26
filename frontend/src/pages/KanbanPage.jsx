@@ -1,5 +1,4 @@
 import Avatar from '../components/Avatar'
-import KanbanMediaImport from '../components/kanban/KanbanMediaImport'
 import { Fragment } from 'react'
 import { Dialog, DialogBackdrop, DialogPanel, DialogTitle, Popover, PopoverButton, PopoverPanel } from '@headlessui/react'
 import { ActionsMenu, CardActions, ColumnActions } from '../components/kanban/KanbanActions'
@@ -7,11 +6,12 @@ import { coverColors } from '../components/kanban/cardPresentation'
 import useBoardDrag from '../components/kanban/useBoardDrag'
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useDropzone } from 'react-dropzone'
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import UserToolsNav from '../components/UserToolsNav'
 import StatusBar from '../components/StatusBar'
-import { Columns3, Plus, MoreHorizontal, SlidersHorizontal, ArrowLeft, X, Tag, Clock, ListChecks, Paperclip, AlignLeft, MessageSquare, Users, Pencil, Archive } from 'lucide-react'
+import { Columns3, Plus, MoreHorizontal, SlidersHorizontal, ArrowLeft, X, Tag, Clock, ListChecks, AlignLeft, MessageSquare, Users, Pencil, Archive, Upload } from 'lucide-react'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import '../components/user-tools.css'
 import { useAuth } from '../contexts/AuthContext'
@@ -28,33 +28,44 @@ const useTenant = () => {
     return tenant
 }
 
-function Attachments({ card, workspace, run }) {
+export function Attachments({ card, workspace, run }) {
     const ticket = useKanbanAccess()
     const [comment, setComment] = useState('')
     const [uploadError, setUploadError] = useState('')
     const [uploading, setUploading] = useState(false)
-    const upload = async (e) => {
-        const file = e.target.files[0]
-        if (!file) return
+    const upload = async (files, rejected) => {
+        if (rejected.length) {
+            setUploadError('Filformatet stöds inte. Välj en filtyp som är tillåten för bilagor.')
+        }
+        if (!files.length) return
         setUploading(true)
-        setUploadError('')
+        if (!rejected.length) setUploadError('')
+        let revision = card.revision
+        let uploaded = 0
         try {
-            await kanbanApi.upload(card.id, file, card.revision, comment)
-            await run(async () => {})
+            for (const [index, file] of files.entries()) {
+                await kanbanApi.upload(card.id, file, revision, comment)
+                uploaded += 1
+                if (index < files.length - 1) {
+                    revision = (await kanbanApi.get(`cards/${card.id}/`)).revision
+                }
+            }
         } catch (error) {
             setUploadError(kanbanError(error))
         } finally {
+            if (uploaded) await run(async () => {})
             setUploading(false)
-            e.target.value = ''
         }
     }
+    const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
+        onDrop: upload,
+        accept: workspace.fileTypes || undefined,
+        disabled: uploading,
+    })
     return (
         <section className="mt-8" aria-label="Bilagor">
             <h2 className="text-xl font-semibold mb-3">Bilagor</h2>
-            <p className="kb-muted mb-3">
-                Bilder högst 50 MB, dokument/ljud 100 MB, MP4/WebM 500 MB. Filerna är interna tills du importerar en
-                kopia.
-            </p>
+            <p className="kb-muted mb-3">Bilder högst 50 MB, dokument/ljud 100 MB, MP4/WebM 500 MB.</p>
             <label>
                 Fäst på{' '}
                 <select value={comment} onChange={(e) => setComment(e.target.value)}>
@@ -66,15 +77,17 @@ function Attachments({ card, workspace, run }) {
                     ))}
                 </select>
             </label>
-            <label className="block my-3">
-                {uploading ? 'Laddar upp…' : 'Ladda upp fil, bild eller video'}
-                <input
-                    type="file"
-                    disabled={uploading}
-                    accept={Object.keys(workspace.fileTypes || {}).join(',')}
-                    onChange={upload}
-                />
-            </label>
+            <div
+                {...getRootProps({
+                    className: `kb-attachment-dropzone${isDragActive ? ' kb-attachment-dropzone-active' : ''}${isDragReject ? ' kb-attachment-dropzone-reject' : ''}`,
+                    role: 'button',
+                    'aria-label': 'Ladda upp bilagor',
+                })}
+            >
+                <input {...getInputProps()} />
+                <Upload size={18} aria-hidden="true" />
+                <span>{uploading ? 'Laddar upp…' : 'Dra filer hit eller klicka för att välja'}</span>
+            </div>
             {uploadError && (
                 <p role="alert" className="text-red-600">
                     {uploadError}
@@ -106,32 +119,6 @@ function Attachments({ card, workspace, run }) {
                             >
                                 <a href={attachmentUrl(file.id, ticket)}>Hämta videon</a>
                             </video>
-                        )}
-                        <div>
-                            {file.approvedAt ? (
-                                <span>Godkänd</span>
-                            ) : (
-                                <button
-                                    onClick={() =>
-                                        run(
-                                            async () =>
-                                                await kanbanApi.post(`attachments/${file.id}/approve/`, {
-                                                    revision: card.revision,
-                                                }),
-                                        )
-                                    }
-                                >
-                                    Godkänn bilaga
-                                </button>
-                            )}
-                        </div>
-                        {file.imports.map((record) => (
-                            <p key={record.id} className="kb-muted">
-                                Importerad till {record.destination}: {record.destinationLabel}
-                            </p>
-                        ))}
-                        {file.approvedAt && (
-                            <KanbanMediaImport key={`${card.id}:${file.id}`} file={file} revision={card.revision} />
                         )}
                         {file.contentType.startsWith('image/') && (
                             <button
@@ -381,7 +368,6 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                                         ['labels', 'Etiketter'],
                                                         ['dates', 'Datum'],
                                                         ['checklist', 'Checklista'],
-                                                        ['attachments', 'Bilaga'],
                                                         ['references', 'Extern koppling'],
                                                     ].map(([name, title]) => (
                                                         <button
@@ -422,14 +408,6 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                     >
                                         <ListChecks size={15} />
                                         Checklista
-                                    </button>
-                                    <button
-                                        type="button"
-                                        aria-expanded={section === 'attachments'}
-                                        onClick={() => reveal('attachments')}
-                                    >
-                                        <Paperclip size={15} />
-                                        Bilaga
                                     </button>
                                 </div>
                                 <div className="kb-detail-metadata">
@@ -734,7 +712,7 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                         </div>
                                     </section>
                                 )}
-                                {!editingDescription && (dirty || (section && section !== 'attachments')) && (
+                                {!editingDescription && (dirty || section) && (
                                     <div className="kb-detail-save">
                                         <button className="user-tools-primary" disabled={busy}>
                                             Spara kort
@@ -743,9 +721,7 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                     </div>
                                 )}
                             </form>
-                            {(section === 'attachments' || card.attachments.length > 0) && (
-                                <Attachments card={card} workspace={workspace} run={run} />
-                            )}
+                            <Attachments card={card} workspace={workspace} run={run} />
                         </div>
                         <aside aria-label="Kommentarer och aktivitet" className="kb-detail-activity">
                             <h2 className="kb-detail-section-heading">

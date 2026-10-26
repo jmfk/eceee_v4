@@ -8,7 +8,7 @@ import { requiresHtmlSource } from '../../utils/richTextFieldHtml'
 /** Own the editor DOM once; local value echoes never reset its content or native undo history. */
 const RichTextEditor = ({ value, defaultValue = '', onChange, onBlur, onFocus, label, description,
     required, disabled = false, validation, rows = 6, placeholder, inlineOnly = false,
-    namespace, context, fieldName }) => {
+    namespace, context, fieldName, allowMediaInsert = true }) => {
     const id = useId()
     const containerRef = useRef(null)
     const editorRef = useRef(null)
@@ -19,6 +19,7 @@ const RichTextEditor = ({ value, defaultValue = '', onChange, onBlur, onFocus, l
     useLayoutEffect(() => {
         const renderer = new ContentWidgetEditorRenderer(containerRef.current, {
             content: DOMPurify.sanitize(lastValueRef.current || ''), fieldMode: true, inlineOnly,
+            allowMediaInsert,
             namespace, pageId: context?.pageId,
             siteRootId: context?.siteRootId || context?.webpageData?.cachedRootId,
             onChange: html => {
@@ -76,7 +77,7 @@ const RichTextEditor = ({ value, defaultValue = '', onChange, onBlur, onFocus, l
             renderer.destroy()
             editorRef.current = null
         }
-    }, [id, inlineOnly])
+    }, [id, inlineOnly, allowMediaInsert])
 
     useEffect(() => {
         if (value !== undefined && value !== lastValueRef.current) {
