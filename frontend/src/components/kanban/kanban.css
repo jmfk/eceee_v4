@@ -114,6 +114,7 @@
 .kb-board-view { overflow: hidden; }
 .kb-board-content { height: 100%; display: flex; flex-direction: column; padding: 1rem 1.5rem 0; }
 .kb-board-content > .user-tools-header { margin-bottom: 0.75rem; }
+.kb-board-header { gap: 12px 20px; min-height: 60px; }
 .kb-board-content .user-tools-title h1 { font-size: 1.25rem; }
 .kb-board-content .user-tools-title > svg { width: 1.25rem; height: 1.25rem; }
 .kb-board-content .user-tools-title { margin-bottom: 0; }
@@ -122,6 +123,10 @@
 .kb-boards a:hover { background: var(--color-primary-100); }
 .kb-board-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; min-width: 0; }
 .kb-board-header-controls { margin-left: auto; }
+.kb-board-header .kb-board-header-controls :is(button, .user-tools-button) { min-height: 36px; padding: 7px 12px; border: 1px solid #b7bec8; border-radius: 4px; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 0.1); color: #334155; font-size: 13px; font-weight: 600; line-height: 1.2; white-space: nowrap; }
+.kb-board-header .kb-board-header-controls .user-tools-button { border-color: #93b4f4; color: #1d4ed8; }
+.kb-board-header .kb-board-header-controls .kb-action-trigger { min-width: 36px; padding-inline: 8px; }
+.kb-board-header .kb-board-header-controls :is(button, .user-tools-button):hover { border-color: #64748b; background: #f8fafc; }
 .kb-lists { display: flex; flex: 1; min-height: 0; gap: 0.75rem; overflow: auto; padding: 0.75rem 0.75rem 1.5rem; margin: 0 -0.75rem; background: var(--color-primary-50); border-radius: 0.75rem 0.75rem 0 0; }
 .kb-column { width: 280px; min-width: min(280px, 80vw); max-height: 100%; overflow-y: auto; padding: 0.5rem; border: 0; border-radius: 0.75rem; background: var(--color-gray-100, #f3f4f6); }
 .kb-column > header { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.25rem 0.5rem 0.5rem; margin: 0; cursor: grab; }
@@ -169,7 +174,7 @@
 .kb-column-count, .kb-card-id { color: #4b5563; }
 .kb-card { background: #fff; border: 1px solid #b7bec8; border-radius: 4px; box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); }
 .kb-card:hover { border-color: #64748b; }
-.kb-board-summary { white-space: nowrap; }
+.kb-board-summary { padding-left: 16px; border-left: 1px solid #aeb8c7; color: #475569; font-size: 13px; font-weight: 600; white-space: nowrap; }
 .kb-board-dialog { position: relative; z-index: 110; color-scheme: light; }
 .kb-board-dialog-backdrop { position: fixed; inset: 0; background: rgb(17 24 39 / 0.45); }
 .kb-board-dialog-panel { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(440px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 18px; border: 1px solid #d1d5db; border-radius: 5px; background: white; box-shadow: 0 20px 50px rgb(0 0 0 / 0.22); font: 12px/1.5 Inter, sans-serif; }
