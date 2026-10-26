@@ -28,7 +28,7 @@ const useTenant = () => {
     return tenant
 }
 
-export function Attachments({ card }) {
+export function Attachments({ card, onDelete, busy = false }) {
     const ticket = useKanbanAccess()
     return (
         <section className="mt-8" aria-label="Bilagor">
@@ -60,14 +60,30 @@ export function Attachments({ card }) {
                                 <a href={attachmentUrl(file.id, ticket)}>Hämta videon</a>
                             </video>
                         )}
-                        {file.contentType.startsWith('image/') && (
-                            <button
-                                onClick={() =>
-                                    navigator.clipboard?.writeText(`![${file.filename}](${attachmentUrl(file.id)})`)
-                                }
-                            >
-                                Kopiera Markdown-bild
-                            </button>
+                        {(file.contentType.startsWith('image/') || onDelete) && (
+                            <div className="kb-attachment-toolbar" role="toolbar" aria-label={`Åtgärder för ${file.filename}`}>
+                                {file.contentType.startsWith('image/') && (
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            navigator.clipboard?.writeText(`![${file.filename}](${attachmentUrl(file.id)})`)
+                                        }
+                                    >
+                                        Kopiera Markdown-bild
+                                    </button>
+                                )}
+                                {onDelete && (
+                                    <button
+                                        type="button"
+                                        className="kb-attachment-delete"
+                                        disabled={busy || file.imports?.length > 0}
+                                        title={file.imports?.length ? 'Importerade bilagor kan inte tas bort' : undefined}
+                                        onClick={() => onDelete(file)}
+                                    >
+                                        Ta bort bilaga
+                                    </button>
+                                )}
+                            </div>
                         )}
                     </li>
                 ))}
@@ -121,15 +137,18 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
     draftRef.current = draft
     const [section, setSection] = useState('')
     const [editingDescription, setEditingDescription] = useState(false)
+    const [descriptionImageId, setDescriptionImageId] = useState(null)
     const [commentOpen, setCommentOpen] = useState(false)
     const [pendingClose, setPendingClose] = useState(false)
     const [uploadError, setUploadError] = useState('')
+    const [uploadNotice, setUploadNotice] = useState('')
     const [uploading, setUploading] = useState(false)
     const upload = async (files, rejected = [], commentId, initialRevision = card.revision) => {
         if (rejected.length) setUploadError('Filformatet stöds inte. Välj en filtyp som är tillåten för bilagor.')
         if (!files.length) return []
         setUploading(true)
         if (!rejected.length) setUploadError('')
+        setUploadNotice('')
         let revision = initialRevision
         const uploaded = []
         try {
@@ -138,6 +157,7 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                 const attachment = existing || (commentId
                     ? await kanbanApi.upload(card.id, file, revision, commentId)
                     : await kanbanApi.upload(card.id, file, revision))
+                if (existing || attachment.duplicate) setUploadNotice('En identisk bilaga finns redan på kortet. Ingen ny kopia lades till.')
                 uploaded.push(attachment)
                 if (index < files.length - 1) revision = (await kanbanApi.get(`cards/${card.id}/`)).revision
             }
@@ -159,6 +179,15 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
         noKeyboard: true,
     })
     const dirty = editableSignature(draft) !== baselineRef.current
+    const deleteAttachment = (file) => {
+        if (!file || !window.confirm(`Ta bort bilagan ”${file.filename}”? Det går inte att ångra. Omslagsbilden kan försvinna och länkar till filen i kortet och kommentarer kan sluta fungera.`)) return false
+        return run(async () => {
+            await kanbanApi.delete(`attachments/${file.id}/`, { revision: card.revision })
+            return true
+        })
+    }
+    const deleteInlineAttachment = (id) => deleteAttachment(card.attachments.find((file) => file.id === id))
+    const canDeleteInlineAttachment = (id) => card.attachments.some((file) => file.id === id && !file.imports?.length)
     const leave = () => navigate(`/kanban/boards/${card.board}`, { state: { focusCard: card.id } })
     const close = () => {
         if (dirty || body.trim()) setPendingClose(true)
@@ -176,6 +205,7 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
     }, [card])
     const [body, setBody] = useState('')
     const [editingComment, setEditingComment] = useState(null)
+    const [commentImageId, setCommentImageId] = useState(null)
     const [activityFilter, setActivityFilter] = useState('all')
     const [checkText, setCheckText] = useState('')
     const [reference, setReference] = useState({
@@ -348,6 +378,7 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                         </p>
                     )}
                     {uploadError && <p role="alert" className="kb-error">{uploadError}</p>}
+                    {uploadNotice && <p role="status" className="kb-upload-notice">{uploadNotice}</p>}
                     {pendingClose && (
                         <div className="kb-unsaved" role="status">
                             <span>
@@ -576,7 +607,7 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                         {!editingDescription && <button
                                             type="button"
                                             aria-label="Redigera beskrivning"
-                                            onClick={() => setEditingDescription(!editingDescription)}
+                                            onClick={() => { setDescriptionImageId(null); setEditingDescription(true) }}
                                         >
                                             Redigera
                                         </button>}
@@ -591,10 +622,16 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                             busy={busy}
                                             onFileDrop={(files) => upload(files)}
                                             onDropComplete={() => run(async () => {})}
+                                            onDeleteAttachment={deleteInlineAttachment}
+                                            canDeleteAttachment={canDeleteInlineAttachment}
+                                            initialImageId={descriptionImageId}
                                             onCancel={() => { setDraft((previous) => ({ ...previous, description: card.description })); setEditingDescription(false) }}
                                         />
                                     ) : draft.description ? (
-                                        <MarkdownView value={draft.description} />
+                                        <MarkdownView value={draft.description} onImageClick={(id) => {
+                                            setDescriptionImageId(id)
+                                            setEditingDescription(true)
+                                        }} />
                                     ) : (
                                         <button
                                             type="button"
@@ -759,7 +796,7 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                     </div>
                                 )}
                             </form>
-                            {card.attachments.length > 0 && <Attachments card={card} />}
+                            {card.attachments.length > 0 && <Attachments card={card} onDelete={deleteAttachment} busy={busy} />}
                         </div>
                         <aside aria-label="Kommentarer och aktivitet" className="kb-detail-activity"
                             onDragOverCapture={(event) => {
@@ -789,7 +826,7 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                 </button>
                             </div>
                             {!commentOpen && !editingComment ? (
-                                <button className="kb-comment-prompt" onClick={() => setCommentOpen(true)}>
+                                <button className="kb-comment-prompt" onClick={() => { setCommentImageId(null); setCommentOpen(true) }}>
                                     Skriv en kommentar…
                                 </button>
                             ) : (
@@ -800,6 +837,9 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                             value={body}
                                             onChange={setBody}
                                             members={workspace.members}
+                                            onDeleteAttachment={deleteInlineAttachment}
+                                            canDeleteAttachment={canDeleteInlineAttachment}
+                                            initialImageId={commentImageId}
                                         />
                                         <button
                                             className="user-tools-primary mt-2"
@@ -844,7 +884,12 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                             </p>
                                             {item.entryType === 'comment' ? (
                                                 <>
-                                                    <MarkdownView value={item.body} />
+                                                    <MarkdownView value={item.body} onImageClick={(id) => {
+                                                        setEditingComment(item)
+                                                        setCommentOpen(true)
+                                                        setBody(item.body)
+                                                        setCommentImageId(id)
+                                                    }} />
                                                     {card.attachments
                                                         .filter((file) => file.comment === item.id)
                                                         .map((file) => (
@@ -861,6 +906,7 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                                                 setEditingComment(item)
                                                                 setCommentOpen(true)
                                                                 setBody(item.body)
+                                                                setCommentImageId(null)
                                                             }}
                                                         >
                                                             Redigera kommentar
@@ -939,13 +985,18 @@ export default function KanbanPage() {
     const [createColumn, setCreateColumn] = useState('')
     const [showNotices, setShowNotices] = useState(false)
     const [showActivity, setShowActivity] = useState(false)
+    const [activityMember, setActivityMember] = useState(null)
     const [rename, setRename] = useState(null)
     const [boardDialog, setBoardDialog] = useState('')
     const [boardTitle, setBoardTitle] = useState('')
     const [backgroundPrompt, setBackgroundPrompt] = useState('')
+    const [generatingBackground, setGeneratingBackground] = useState(false)
+    const generationAbortRef = useRef(null)
     const [memberSearch, setMemberSearch] = useState('')
     const [boardBackground, setBoardBackground] = useState('')
     const searchRef = useRef(null)
+    const filterRef = useRef(null)
+    const filterButtonRef = useRef(null)
     const workspaceQuery = useQuery({
         queryKey: ['kanban', tenant, principal, 'workspace'],
         queryFn: async () => await kanbanApi.get('workspace/'),
@@ -1016,24 +1067,93 @@ export default function KanbanPage() {
         setBusy(true)
         setError('')
         try {
-            await action()
+            const result = await action()
             await client.invalidateQueries({ queryKey: ['kanban', tenant] })
+            return result
         } catch (err) {
             setError(kanbanError(err))
         } finally {
             setBusy(false)
         }
     }
+    const cancelBackgroundGeneration = () => {
+        generationAbortRef.current?.abort()
+        generationAbortRef.current = null
+        setGeneratingBackground(false)
+        setBusy(false)
+    }
+    const confirmLeaveGeneration = () => {
+        if (!generatingBackground) return true
+        if (!window.confirm('En bakgrundsbild genereras. Om du lämnar nu avbryts väntan på resultatet. Servern kan ändå slutföra bilden. Vill du lämna?')) return false
+        cancelBackgroundGeneration()
+        return true
+    }
+    const closeBoardDialog = () => {
+        if (confirmLeaveGeneration()) setBoardDialog('')
+    }
+    const generateBackground = async (data) => {
+        if (busy || generatingBackground) return
+        const controller = new AbortController()
+        generationAbortRef.current = controller
+        setGeneratingBackground(true)
+        setBusy(true)
+        setError('')
+        try {
+            await kanbanApi.post(`boards/${boardId}/generate-background/`, data, { signal: controller.signal })
+            if (!controller.signal.aborted) await client.invalidateQueries({ queryKey: ['kanban', tenant] })
+        } catch (err) {
+            if (!controller.signal.aborted) setError(kanbanError(err))
+        } finally {
+            if (generationAbortRef.current === controller) {
+                generationAbortRef.current = null
+                setGeneratingBackground(false)
+                setBusy(false)
+            }
+        }
+    }
+    useEffect(() => {
+        if (!generatingBackground) return
+        const warn = (e) => {
+            e.preventDefault()
+            e.returnValue = ''
+        }
+        window.addEventListener('beforeunload', warn)
+        return () => window.removeEventListener('beforeunload', warn)
+    }, [generatingBackground])
+    useEffect(() => () => {
+        generationAbortRef.current?.abort()
+        generationAbortRef.current = null
+    }, [])
     useEffect(() => {
         const focusSearch = (e) => {
             if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
                 e.preventDefault()
-                searchRef.current?.focus()
+                setShowFilters(true)
+                requestAnimationFrame(() => searchRef.current?.focus())
             }
         }
         window.addEventListener('keydown', focusSearch)
         return () => window.removeEventListener('keydown', focusSearch)
     }, [])
+    useEffect(() => {
+        if (!showFilters) return
+        searchRef.current?.focus()
+        const closeOnOutside = (e) => {
+            if (!filterRef.current?.contains(e.target)) setShowFilters(false)
+        }
+        const closeOnEscape = (e) => {
+            if (e.key === 'Escape') {
+                setShowFilters(false)
+                filterButtonRef.current?.focus()
+            }
+        }
+        document.addEventListener('pointerdown', closeOnOutside)
+        document.addEventListener('keydown', closeOnEscape)
+        return () => {
+            document.removeEventListener('pointerdown', closeOnOutside)
+            document.removeEventListener('keydown', closeOnEscape)
+        }
+    }, [showFilters])
     useEffect(() => {
         if (!workspace?.tenantId || !ticket) return
         let socket,
@@ -1081,6 +1201,7 @@ export default function KanbanPage() {
     }, [board?.id, board?.hasBackground, board?.revision])
     const columns = (workspace?.columns || []).filter((item) => item.board === boardId)
     const cards = cardsQuery.data?.results || []
+    const activeFilterCount = [search, mine, assignee, label, deadline, archived !== 'false'].filter(Boolean).length
     const visibleColumns = columns.filter((column) => archived === 'all' || archived === 'true' || !column.archived)
     const move = (card, column, position = 0) =>
         run(
@@ -1156,6 +1277,15 @@ export default function KanbanPage() {
     return (
         <KanbanAccessContext.Provider value={ticket}>
             <div className={`user-tools-shell ${boardBackground && board ? 'kb-board-background' : ''}`}
+                onClickCapture={(e) => {
+                    if (!generatingBackground) return
+                    const target = e.target.closest('a[href], .user-tools-logout')
+                    if (!target || target.target === '_blank') return
+                    if (!confirmLeaveGeneration()) {
+                        e.preventDefault()
+                        e.stopPropagation()
+                    }
+                }}
                 style={boardBackground && board ? { backgroundImage: `linear-gradient(rgb(15 23 42 / 0.1), rgb(15 23 42 / 0.1)), url("${boardBackground}")` } : undefined}>
                 <UserToolsNav tenant={tenant} />
                 <GlobalWysiwygToolbar />
@@ -1168,11 +1298,65 @@ export default function KanbanPage() {
                             {!boardId && <p className="user-tools-description">Välj en tavla eller skapa en ny för ditt team.</p>}
                         </div>
                         <div className="kb-board-header-controls flex flex-wrap items-center gap-2">
-                        {boardId && <button onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters}><SlidersHorizontal size={16} />Filter</button>}
+                        {board && !!board.members?.length && <div className="kb-board-members" aria-label="Tavelmedlemmar">
+                            {workspace.members.filter((member) => board.members?.includes(member.id)).map((member) => (
+                                <Popover key={member.id} className="kb-board-member">
+                                    <PopoverButton aria-label={`Visa medlem ${member.name}`} title={member.name}>
+                                        <Avatar userId={member.id} name={member.name} size={28} />
+                                    </PopoverButton>
+                                    <PopoverPanel anchor="bottom end" className="kb-board-member-popup">
+                                        {({ close }) => <div className="kb-board-member-content">
+                                            <button type="button" className="kb-board-member-close" aria-label="Stäng medlem" onClick={close}><X size={16} /></button>
+                                            <div className="kb-board-member-identity">
+                                                <Avatar userId={member.id} name={member.name} size={44} />
+                                                <div><strong>{member.name}</strong><span>@{member.username}</span></div>
+                                            </div>
+                                            <p>Medlem på den här tavlan</p>
+                                            {member.id === user?.id && <Link to="/profile" onClick={close}>Visa min profil</Link>}
+                                            <button type="button" onClick={() => { setActivityMember(member.id); setShowActivity(true); close() }}>Visa aktivitet på tavlan</button>
+                                            {workspace.canManageMembers && <button type="button" onClick={() => { setMemberSearch(member.name); setBoardDialog('members'); close() }}>Hantera medlemmar</button>}
+                                        </div>}
+                                    </PopoverPanel>
+                                </Popover>
+                            ))}
+                        </div>}
+                        {boardId && <div className="kb-filter-anchor" ref={filterRef}>
+                            <button ref={filterButtonRef} aria-label="Filter" aria-controls="kb-filter-popup" aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)}>
+                                <SlidersHorizontal size={16} />Filter{activeFilterCount > 0 && <span className="kb-filter-count" aria-hidden="true">{activeFilterCount}</span>}
+                            </button>
+                            {showFilters && <div id="kb-filter-popup" role="dialog" aria-label="Filtrera kort" className="kb-filter-popup">
+                                <div className="kb-filter-header"><strong>Filtrera</strong><button type="button" aria-label="Stäng filter" onClick={() => { setShowFilters(false); filterButtonRef.current?.focus() }}><X size={16} /></button></div>
+                                <form onSubmit={(e) => { e.preventDefault(); setSearch(query.trim()) }}>
+                                    <label className="kb-filter-search-label" htmlFor="kb-filter-search">Sökord</label>
+                                    <div className="kb-filter-search"><input id="kb-filter-search" ref={searchRef} aria-label="Sök kort" placeholder="Skriv ett nyckelord…" value={query} onChange={(e) => setQuery(e.target.value)} /><button>Sök</button></div>
+                                    <p className="kb-filter-help">Sök efter kortens titel och innehåll.</p>
+                                </form>
+                                <fieldset className="kb-filter-section">
+                                    <legend>Medlemmar</legend>
+                                    <label className="kb-filter-choice"><input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} /><Avatar userId={user?.id} name={user?.name || user?.username || ''} size={22} /> Mina uppgifter</label>
+                                    <label className="kb-filter-choice"><input type="radio" name="kb-assignee" checked={!assignee} onChange={() => setAssignee('')} /> Alla medlemmar</label>
+                                    {workspace.members.map((member) => <label className="kb-filter-choice" key={member.id}><input type="radio" name="kb-assignee" checked={String(assignee) === String(member.id)} onChange={() => setAssignee(member.id)} /><Avatar userId={member.id} name={member.name} size={22} /> {member.name}</label>)}
+                                </fieldset>
+                                <fieldset className="kb-filter-section">
+                                    <legend>Etiketter</legend>
+                                    <label className="kb-filter-choice"><input type="radio" name="kb-label" checked={!label} onChange={() => setLabel('')} /> Alla etiketter</label>
+                                    {workspace.labels.map((item) => <label className="kb-filter-choice" key={item.id}><input type="radio" name="kb-label" checked={label === item.id} onChange={() => setLabel(item.id)} /> {item.name}</label>)}
+                                </fieldset>
+                                <fieldset className="kb-filter-section">
+                                    <legend>Förfallodatum</legend>
+                                    {[["", "Alla datum"], ["overdue", "Försenade"], ["upcoming", "Inom sju dagar"], ["none", "Utan deadline"]].map(([value, title]) => <label className="kb-filter-choice" key={title}><input type="radio" name="kb-deadline" checked={deadline === value} onChange={() => setDeadline(value)} /> {title}</label>)}
+                                </fieldset>
+                                <fieldset className="kb-filter-section">
+                                    <legend>Kort</legend>
+                                    {[["false", "Aktiva"], ["true", "Arkiverade kort"], ["all", "Inklusive arkiv"]].map(([value, title]) => <label className="kb-filter-choice" key={title}><input type="radio" name="kb-archived" checked={archived === value} onChange={() => setArchived(value)} /> {title}</label>)}
+                                </fieldset>
+                                {activeFilterCount > 0 && <button type="button" className="kb-filter-clear" onClick={() => { setQuery(''); setSearch(''); setMine(false); setAssignee(''); setLabel(''); setDeadline(''); setArchived('false') }}>Rensa filter</button>}
+                            </div>}
+                        </div>}
                         <button onClick={() => setShowNotices(!showNotices)} aria-expanded={showNotices}>
                             Aviseringar ({workspace.notifications.filter((item) => !item.read).length})
                         </button>
-                        <button onClick={() => setShowActivity(!showActivity)} aria-expanded={showActivity}>
+                        <button onClick={() => { setActivityMember(null); setShowActivity(!showActivity) }} aria-expanded={showActivity}>
                             Aktivitet / Ångra
                         </button>
                         {board && <ActionsMenu label="Tavelåtgärder">
@@ -1217,7 +1401,11 @@ export default function KanbanPage() {
                     )}
                     {showActivity && (
                         <section aria-label="Aktivitet" className="user-tools-panel mb-6 max-h-64 overflow-auto">
-                            {activities.data?.map((item) => (
+                            {activityMember && <div className="kb-activity-filter">
+                                <span>Aktivitet: {workspace.members.find((member) => member.id === activityMember)?.name}</span>
+                                <button type="button" onClick={() => setActivityMember(null)}>Visa alla</button>
+                            </div>}
+                            {activities.data?.filter((item) => !activityMember || item.actor?.id === activityMember).map((item) => (
                                 <div key={item.id} className="flex flex-wrap gap-2 mb-2">
                                     <span>
                                         {item.actor.name}: {item.message}
@@ -1294,79 +1482,12 @@ export default function KanbanPage() {
                                 <button type="button" onClick={() => setShowCreateBoard(false)}>Avbryt</button>
                             </form>}
                             </>}
-                            <form
-                                className="kb-toolbar user-tools-panel"
-                                hidden={!boardId || !showFilters}
-                                onSubmit={(e) => {
-                                    e.preventDefault()
-                                    setSearch(query)
-                                }}
-                            >
-                                <input
-                                    ref={searchRef}
-                                    aria-label="Sök kort"
-                                    placeholder="Sök kort · ⌘K / Ctrl+K"
-                                    value={query}
-                                    onChange={(e) => setQuery(e.target.value)}
-                                />
-                                <button>Sök</button>
-                                <label>
-                                    <input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} />{' '}
-                                    Mina uppgifter
-                                </label>
-                                <select
-                                    aria-label="Ansvarig"
-                                    value={assignee}
-                                    onChange={(e) => setAssignee(e.target.value)}
-                                >
-                                    <option value="">Alla ansvariga</option>
-                                    {workspace.members.map((member) => (
-                                        <option key={member.id} value={member.id}>
-                                            {member.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                <select aria-label="Etikett" value={label} onChange={(e) => setLabel(e.target.value)}>
-                                    <option value="">Alla etiketter</option>
-                                    {workspace.labels.map((item) => (
-                                        <option key={item.id} value={item.id}>
-                                            {item.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                <select
-                                    aria-label="Deadlinefilter"
-                                    value={deadline}
-                                    onChange={(e) => setDeadline(e.target.value)}
-                                >
-                                    <option value="">Alla deadlines</option>
-                                    <option value="overdue">Försenade</option>
-                                    <option value="upcoming">Inom sju dagar</option>
-                                    <option value="none">Utan deadline</option>
-                                </select>
-                                <select
-                                    aria-label="Arkivfilter"
-                                    value={archived}
-                                    onChange={(e) => setArchived(e.target.value)}
-                                >
-                                    <option value="false">Aktiva</option>
-                                    <option value="true">Arkiverade kort</option>
-                                    <option value="all">Inklusive arkiv</option>
-                                </select>
-                            </form>
-                            {search && (
-                                <p className="kb-muted mb-3">
-                                    {cardsQuery.data?.semanticAvailable
-                                        ? 'Text och semantisk sökning'
-                                        : 'Textsökning · semantisk sökning är inte tillgänglig just nu'}
-                                </p>
-                            )}
                             {cardsQuery.error && <p role="alert">{kanbanError(cardsQuery.error)}</p>}
                             {boardId && !board && <p>Boardet finns inte i den här tenanten.</p>}
-                            {board && <Dialog open={!!boardDialog} onClose={() => setBoardDialog('')} className="kb-board-dialog">
+                            {board && <Dialog open={!!boardDialog} onClose={closeBoardDialog} className="kb-board-dialog">
                                 <DialogBackdrop className="kb-board-dialog-backdrop" />
                                 <DialogPanel className="kb-board-dialog-panel">
-                                    <header><DialogTitle>{boardDialog === 'members' ? 'Medlemmar' : 'Redigera tavlan'}</DialogTitle><button type="button" aria-label="Stäng dialog" onClick={() => setBoardDialog('')}><X size={18} /></button></header>
+                                    <header><DialogTitle>{boardDialog === 'members' ? 'Medlemmar' : 'Redigera tavlan'}</DialogTitle><button type="button" aria-label="Stäng dialog" onClick={closeBoardDialog}><X size={18} /></button></header>
                                     {boardDialog === 'members' ? <>
                                         <p className="kb-muted">En administratör kan lägga till alla aktiva användare. Inbjudna användare får åtkomst bara till den här tavlan inom Kanban. När de tas bort från sin sista tavla upphör Kanban-åtkomsten. Andra arbetsytemedlemmars åtkomst påverkas inte.</p>
                                         <input aria-label="Sök användare" placeholder="Sök användare" value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)} />
@@ -1381,22 +1502,30 @@ export default function KanbanPage() {
                                     </> : <form onSubmit={(e) => { e.preventDefault(); run(async () => { await kanbanApi.patch(`boards/${board.id}/`, { revision: board.revision, title: boardTitle.trim() }); setBoardDialog('') }) }}>
                                         <label htmlFor="kb-board-title">Tavelnamn</label>
                                         <input id="kb-board-title" autoFocus value={boardTitle} onChange={(e) => setBoardTitle(e.target.value)} maxLength={200} required />
-                                        <label htmlFor="kb-board-background">Bakgrundsbild</label>
-                                        {boardBackground && <img className="kb-board-background-preview" src={boardBackground} alt="Aktuell bakgrundsbild" />}
-                                        <input id="kb-board-background" type="file" accept="image/jpeg,image/png,image/gif,image/webp" disabled={busy} onChange={(e) => {
-                                            const file = e.target.files?.[0]
-                                            if (file) run(async () => await kanbanApi.uploadBackground(board.id, file, board.revision))
-                                            e.target.value = ''
-                                        }} />
+                                        <div className="kb-board-upload">
+                                            <label htmlFor="kb-board-background">Ladda upp bakgrundsbild</label>
+                                            {boardBackground && <img className="kb-board-background-preview" src={boardBackground} alt="Aktuell bakgrundsbild" />}
+                                            <input id="kb-board-background" type="file" accept="image/jpeg,image/png,image/gif,image/webp" aria-describedby="kb-board-upload-help" disabled={busy} onChange={(e) => {
+                                                const file = e.target.files?.[0]
+                                                if (file) run(async () => await kanbanApi.uploadBackground(board.id, file, board.revision))
+                                                e.target.value = ''
+                                            }} />
+                                            <p id="kb-board-upload-help">JPG, PNG, GIF eller WebP · bilden laddas upp direkt.</p>
+                                        </div>
                                         {workspace.canGenerateImages && <div className="kb-image-generator">
                                             <label htmlFor="kb-background-prompt">Beskriv bakgrundsbilden</label>
-                                            <textarea id="kb-background-prompt" value={backgroundPrompt} onChange={(e) => setBackgroundPrompt(e.target.value)} maxLength={4000} placeholder="Till exempel kustlandskap med starka färger" />
-                                            <button type="button" disabled={busy || !backgroundPrompt.trim()} onClick={() => run(async () => await kanbanApi.post(`boards/${board.id}/generate-background/`, { revision: board.revision, prompt: backgroundPrompt }))}>Generera från beskrivning</button>
-                                            <button type="button" disabled={busy} onClick={() => run(async () => await kanbanApi.post(`boards/${board.id}/generate-background/`, { revision: board.revision, fromContent: true }))}>Generera från tavlans innehåll</button>
+                                            <textarea id="kb-background-prompt" value={backgroundPrompt} onChange={(e) => setBackgroundPrompt(e.target.value)} maxLength={4000} disabled={generatingBackground} placeholder="Till exempel kustlandskap med starka färger" />
+                                            <button type="button" disabled={busy || !backgroundPrompt.trim()} onClick={() => generateBackground({ revision: board.revision, prompt: backgroundPrompt })}>Generera från beskrivning</button>
+                                            <button type="button" disabled={busy} onClick={() => generateBackground({ revision: board.revision, fromContent: true })}>Generera från tavlans innehåll</button>
+                                            {generatingBackground && <div className="kb-generation-status" role="status" aria-live="polite">
+                                                <span>Genererar bakgrundsbild… Det kan ta någon minut.</span>
+                                                <div className="kb-generation-track" aria-hidden="true"><span /></div>
+                                                <small>Stanna kvar i den här vyn tills bilden är klar.</small>
+                                            </div>}
                                         </div>}
                                         {board.hasBackground && <button type="button" disabled={busy} onClick={() => run(async () => await kanbanApi.delete(`boards/${board.id}/background/`, { revision: board.revision }))}>Ta bort bakgrundsbild</button>}
                                         {error && <p role="alert">{error}</p>}
-                                        <div className="kb-board-dialog-actions"><button type="button" onClick={() => setBoardDialog('')}>Avbryt</button><button className="user-tools-primary" disabled={busy || !boardTitle.trim()}>Spara</button></div>
+                                        <div className="kb-board-dialog-actions"><button type="button" onClick={closeBoardDialog}>Avbryt</button><button className="user-tools-primary" disabled={busy || !boardTitle.trim()}>Spara</button></div>
                                     </form>}
                                 </DialogPanel>
                             </Dialog>}
@@ -1517,11 +1646,13 @@ export default function KanbanPage() {
                                                 !column.archived &&
                                                 (createColumn === column.id ? (
                                                     <form
+                                                        className="kb-card-composer"
                                                         onSubmit={(e) => {
                                                             e.preventDefault()
+                                                            if (!newCard.trim()) return
                                                             run(async () => {
                                                                 await kanbanApi.post('cards/', {
-                                                                    title: newCard,
+                                                                    title: newCard.trim(),
                                                                     column: column.id,
                                                                 })
                                                                 setNewCard('')
@@ -1529,17 +1660,30 @@ export default function KanbanPage() {
                                                             })
                                                         }}
                                                     >
-                                                        <input
+                                                        <textarea
                                                             aria-label="Kortrubrik"
+                                                            placeholder="Ange en titel eller klistra in en länk"
                                                             required
                                                             autoFocus
+                                                            rows={2}
                                                             value={newCard}
                                                             onChange={(e) => setNewCard(e.target.value)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Escape') {
+                                                                    setNewCard('')
+                                                                    setCreateColumn('')
+                                                                } else if (e.key === 'Enter' && !e.shiftKey) {
+                                                                    e.preventDefault()
+                                                                    e.currentTarget.form?.requestSubmit()
+                                                                }
+                                                            }}
                                                         />
-                                                        <button disabled={busy}>Skapa kort</button>
-                                                        <button type="button" onClick={() => setCreateColumn('')}>
-                                                            Avbryt
-                                                        </button>
+                                                        <div className="kb-card-composer-actions">
+                                                            <button className="user-tools-primary" disabled={busy || !newCard.trim()}>Lägg till kort</button>
+                                                            <button type="button" className="kb-card-composer-close" aria-label="Avbryt nytt kort" onClick={() => { setNewCard(''); setCreateColumn('') }}>
+                                                                <X size={16} />
+                                                            </button>
+                                                        </div>
                                                     </form>
                                                 ) : (
                                                     <button className="kb-add-card" onClick={() => setCreateColumn(column.id)}>
@@ -1575,7 +1719,7 @@ export default function KanbanPage() {
                                     ))}
                                 </ul>
                             ) : null}
-                            {boardId && !cardsQuery.isFetching && !cards.length && showFilters && (
+                            {boardId && !cardsQuery.isFetching && !cards.length && activeFilterCount > 0 && (
                                 <p className="kb-empty user-tools-panel mt-3">
                                     Inga kort i den här vyn. Skapa ett kort i ett board eller ändra filtren.
                                 </p>

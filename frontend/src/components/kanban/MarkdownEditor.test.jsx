@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import MarkdownEditor, { MarkdownView } from './MarkdownEditor'
 import { htmlMarkdown, markdownHtml, withAttachmentTickets } from './markdown'
 import { setCmsCopyLanguage } from '../../utils/cmsCopy'
@@ -9,9 +9,21 @@ import { requiresHtmlSource } from '../../utils/richTextFieldHtml'
 beforeEach(() => setCmsCopyLanguage('sv-se'))
 
 vi.mock('../form-fields/RichTextInput', () => ({
-    default: ({ value, onChange, allowMediaInsert }) => (
-        <textarea aria-label="Visual HTML" data-allow-media-insert={allowMediaInsert} value={value} onChange={(e) => onChange(e.target.value)} />
-    ),
+    default: function MockRichTextInput({ value, onChange, allowMediaInsert }) {
+        const editor = useRef(null)
+        const previous = useRef(null)
+        useLayoutEffect(() => {
+            if (value !== previous.current) {
+                editor.current.innerHTML = value
+                previous.current = value
+            }
+        }, [value])
+        return <>
+            <textarea aria-label="Visual HTML" data-allow-media-insert={allowMediaInsert} value={value} onChange={(e) => onChange(e.target.value)} />
+            <div ref={editor} contentEditable suppressContentEditableWarning data-testid="visual-editor"
+                onInput={(event) => { previous.current = event.currentTarget.innerHTML; onChange(previous.current) }} />
+        </>
+    },
 }))
 
 describe('Kanban Markdown', () => {
@@ -71,6 +83,58 @@ it('keeps uploaded images in the visual editor instead of switching to HTML sour
     const id = '11111111-1111-1111-1111-111111111111'
     const html = withAttachmentTickets(markdownHtml(`![photo](/api/v1/kanban/attachments/${id}/download/)`), 'temporary', true)
     expect(requiresHtmlSource(html)).toBe(false)
+})
+
+it('preserves image size, alignment and float through Markdown conversion without storing tickets', () => {
+    const id = '11111111-1111-1111-1111-111111111111'
+    const url = `/api/v1/kanban/attachments/${id}/download/`
+    const text = htmlMarkdown(`<p>Text <img src="${url}?ticket=temporary" alt="photo" data-width="50" data-align="right" data-image-style="float-left" class="kb-image-selected"></p>`)
+    expect(text).toContain('data-width="50"')
+    expect(text).toContain('data-align="right"')
+    expect(text).toContain('data-image-style="float-left"')
+    expect(text).not.toContain('ticket=')
+    expect(text).not.toContain('kb-image-selected')
+    const html = markdownHtml(text)
+    expect(html).toContain('data-width="50"')
+    expect(requiresHtmlSource(withAttachmentTickets(html, 'temporary', true))).toBe(false)
+})
+
+it('selects an image and offers distinct inline removal and attachment deletion', async () => {
+    const id = '11111111-1111-1111-1111-111111111111'
+    const value = `![photo](/api/v1/kanban/attachments/${id}/download/)`
+    const onChange = vi.fn()
+    const onDeleteAttachment = vi.fn().mockResolvedValue(false)
+    render(<MarkdownEditor label="Beskrivning" value={value} onChange={onChange}
+        onDeleteAttachment={onDeleteAttachment} canDeleteAttachment={() => true} />)
+    fireEvent.click(screen.getByTestId('visual-editor').querySelector('img'))
+    expect(screen.getByRole('toolbar', { name: 'Bildinställningar för photo' })).toBeVisible()
+    expect(screen.getByTestId('visual-editor').querySelector('img')).toHaveClass('kb-image-selected')
+    fireEvent.click(screen.getByRole('button', { name: 'Minska' }))
+    expect(onChange).toHaveBeenCalledWith(expect.stringContaining('data-width="75"'))
+    fireEvent.click(within(screen.getByRole('group', { name: 'Textflöde' })).getByRole('button', { name: 'Vänster' }))
+    expect(onChange).toHaveBeenCalledWith(expect.stringContaining('data-image-style="float-left"'))
+    fireEvent.click(within(screen.getByRole('group', { name: 'Justering' })).getByRole('button', { name: 'Mitten' }))
+    expect(onChange).toHaveBeenCalledWith(expect.stringContaining('data-align="center"'))
+    expect(screen.getByTestId('visual-editor').querySelector('img')).not.toHaveAttribute('data-image-style')
+    fireEvent.click(screen.getByRole('button', { name: 'Ta bort bilaga' }))
+    await waitFor(() => expect(onDeleteAttachment).toHaveBeenCalledWith(id))
+    expect(screen.getByTestId('visual-editor').querySelector('img')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Ta bort ur texten' }))
+    expect(screen.getByTestId('visual-editor').querySelector('img')).not.toBeInTheDocument()
+    expect(onDeleteAttachment).toHaveBeenCalledOnce()
+})
+
+it('removes the inline image after attachment deletion succeeds', async () => {
+    const id = '11111111-1111-1111-1111-111111111111'
+    const onDeleteAttachment = vi.fn().mockResolvedValue(true)
+    const onChange = vi.fn()
+    render(<MarkdownEditor value={`![photo](/api/v1/kanban/attachments/${id}/download/)`}
+        onChange={onChange} onDeleteAttachment={onDeleteAttachment} />)
+    fireEvent.contextMenu(screen.getByTestId('visual-editor').querySelector('img'))
+    fireEvent.click(screen.getByRole('button', { name: 'Ta bort bilaga' }))
+    await waitFor(() => expect(screen.getByTestId('visual-editor').querySelector('img')).not.toBeInTheDocument())
+    expect(onDeleteAttachment).toHaveBeenCalledWith(id)
+    expect(onChange).toHaveBeenCalledWith(expect.not.stringContaining('/attachments/'))
 })
 
 

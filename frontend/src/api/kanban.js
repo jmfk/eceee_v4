@@ -24,8 +24,8 @@ export const kanbanApi = {
     async get(path, params = {}) {
         return convertKeysToCamel((await apiClient.get(base + path, { params: snake(params) })).data)
     },
-    async post(path, data = {}) {
-        return convertKeysToCamel((await apiClient.post(base + path, snake(data))).data)
+    async post(path, data = {}, options = {}) {
+        return convertKeysToCamel((await apiClient.post(base + path, snake(data), options)).data)
     },
     async patch(path, data) {
         return convertKeysToCamel((await apiClient.patch(base + path, snake(data))).data)
