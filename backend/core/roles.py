@@ -56,6 +56,8 @@ def can_manage_roles(user, tenant):
 
 def is_tenant_admin(user, tenant):
     """Administrative CMS access is scoped to the selected workspace."""
+    if user and user.is_authenticated and user.is_active and user.is_superuser:
+        return True
     return "tenant.admin" in permissions_for(user, tenant)
 
 
