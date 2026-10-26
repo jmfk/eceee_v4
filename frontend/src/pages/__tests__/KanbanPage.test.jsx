@@ -216,12 +216,38 @@ describe('Kanban card attachments', () => {
         kanbanApi.post.mockResolvedValue({ id: 'comment-1' })
         kanbanApi.upload.mockImplementation(async () => { revision += 1; return { id: '11111111-1111-1111-1111-111111111111', filename: 'photo.png', contentType: 'image/png' } })
         renderKanban('/kanban/cards/card-1')
-        const comments = await screen.findByLabelText('Kommentarer och aktivitet')
-        fireEvent.drop(comments, { dataTransfer: { files: [image], types: ['Files'] } })
+        const prompt = await screen.findByRole('button', { name: 'Skriv en kommentar…' })
+        const dataTransfer = { files: [image], types: ['Files'] }
+        expect(fireEvent.dragOver(prompt, { dataTransfer })).toBe(false)
+        fireEvent.drop(prompt, { dataTransfer })
         await waitFor(() => expect(kanbanApi.post).toHaveBeenCalledWith('cards/card-1/comments/', {
             body: '![photo.png](/api/v1/kanban/attachments/11111111-1111-1111-1111-111111111111/download/)', revision: 2,
         }))
         expect(kanbanApi.upload).toHaveBeenCalledWith('card-1', image, 1)
+    })
+
+    it('adds an existing attachment image as a comment without uploading it again', async () => {
+        const imageId = '11111111-1111-1111-1111-111111111111'
+        const existing = { ...attachmentCard, attachments: [{ id: imageId, filename: 'portrait.jpg', contentType: 'image/jpeg', size: 1024 }] }
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? workspace : path === 'cards/card-1/' ? existing : {})
+        kanbanApi.post.mockResolvedValue({ id: 'comment-1' })
+        renderKanban('/kanban/cards/card-1')
+        const image = await screen.findByAltText('portrait.jpg')
+        const payload = {}
+        const draggedFile = new File(['image'], 'portrait.jpg', { type: 'image/jpeg' })
+        const dataTransfer = {
+            files: [draggedFile], types: ['Files'],
+            setData: (type, value) => { payload[type] = value; dataTransfer.types.push(type) },
+            getData: (type) => payload[type] || '',
+        }
+        fireEvent.dragStart(image, { dataTransfer })
+        const prompt = screen.getByRole('button', { name: 'Skriv en kommentar…' })
+        expect(fireEvent.dragOver(prompt, { dataTransfer })).toBe(false)
+        fireEvent.drop(prompt, { dataTransfer })
+        await waitFor(() => expect(kanbanApi.post).toHaveBeenCalledWith('cards/card-1/comments/', {
+            body: `![portrait.jpg](/api/v1/kanban/attachments/${imageId}/download/)`, revision: 1,
+        }))
+        expect(kanbanApi.upload).not.toHaveBeenCalled()
     })
 
     it('does not create an empty attachment comment when upload fails', async () => {
