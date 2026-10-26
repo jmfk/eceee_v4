@@ -179,7 +179,7 @@ describe('Kanban card attachments', () => {
             types: ['Files'],
         }
         fireEvent.dragEnter(document.querySelector('.kb-detail'), { dataTransfer })
-        expect(await screen.findByText('Släpp filer för att bifoga dem till kortet')).toBeInTheDocument()
+        expect(screen.queryByText('Släpp filer för att bifoga dem till kortet')).not.toBeInTheDocument()
         fireEvent.drop(document.querySelector('.kb-detail'), { dataTransfer })
         await waitFor(() => expect(kanbanApi.upload).toHaveBeenCalledTimes(2))
         expect(kanbanApi.upload).toHaveBeenNthCalledWith(1, 'card-1', first, 1)
