@@ -4,14 +4,14 @@ import { supportRequest, supportError } from '../../api/support'
 import { useSupportContext, useSupportIdentity, useSupportTenant } from '../support/useSupportContext'
 import PrivateVideoPlayer from '../support/PrivateVideoPlayer'
 
-export default function HelpInstructionVideos({ guideId, children }) {
+export default function HelpInstructionVideos({ guideId, language, children }) {
     const tenant = useSupportTenant()
     const identity = useSupportIdentity()
     const context = useSupportContext()
     const query = useInfiniteQuery({
-        queryKey: ['support', tenant, identity, 'help-instructions', guideId],
+        queryKey: ['support', tenant, identity, 'help-instructions', guideId, language],
         initialPageParam: 1,
-        queryFn: ({ pageParam }) => supportRequest(tenant, `instructions/?help_guide_id=${encodeURIComponent(guideId)}&page=${pageParam}`),
+        queryFn: ({ pageParam }) => supportRequest(tenant, `instructions/?help_guide_id=${encodeURIComponent(guideId)}&language=${encodeURIComponent(language)}&page=${pageParam}`),
         getNextPageParam: (lastPage, _pages, lastPageParam) => lastPage.next ? lastPageParam + 1 : undefined,
         enabled: !!tenant,
         retry: false,
@@ -55,7 +55,7 @@ export default function HelpInstructionVideos({ guideId, children }) {
             {context.data?.canPublish && (
                 <Link
                     className="mt-4 inline-flex rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    to={`/inbox/publish?tenant=${tenantQuery}&guide=${encodeURIComponent(guideId)}`}
+                    to={`/inbox/publish?tenant=${tenantQuery}&guide=${encodeURIComponent(guideId)}&lang=${encodeURIComponent(language)}`}
                 >
                     Lägg till instruktionsfilm här
                 </Link>

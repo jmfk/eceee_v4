@@ -16,10 +16,10 @@ vi.mock('../../support/useSupportContext', () => ({
 vi.mock('../../support/PrivateVideoPlayer', () => ({ default: ({ id }) => <div>Private player: {id}</div> }))
 vi.mock('../../../api/support', async (original) => ({ ...(await original()), supportRequest: vi.fn() }))
 
-const renderVideos = () => render(
+const renderVideos = (language = 'sv') => render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <MemoryRouter>
-            <HelpInstructionVideos guideId="pages-create"><div>Existing help video</div></HelpInstructionVideos>
+            <HelpInstructionVideos guideId="pages-create" language={language}><div>Existing help video</div></HelpInstructionVideos>
         </MemoryRouter>
     </QueryClientProvider>,
 )
@@ -37,7 +37,7 @@ describe('instruction films in help articles', () => {
         renderVideos()
         expect(screen.getByText('Existing help video')).toBeInTheDocument()
         expect(await screen.findByText('Existing help video')).toBeInTheDocument()
-        expect(supportRequest).toHaveBeenCalledWith('workspace-a', 'instructions/?help_guide_id=pages-create&page=1')
+        expect(supportRequest).toHaveBeenCalledWith('workspace-a', 'instructions/?help_guide_id=pages-create&language=sv&page=1')
     })
 
     it('shows workspace films with private playback and a stable instruction link', async () => {
@@ -48,7 +48,7 @@ describe('instruction films in help articles', () => {
         expect(screen.getByText('Private player: video-1')).toBeInTheDocument()
         expect(screen.queryByText('Existing help video')).not.toBeInTheDocument()
         expect(screen.getByRole('link', { name: 'Öppna filmen i Inbox' })).toHaveAttribute('href', '/inbox/instructions/film-1?tenant=workspace-a')
-        expect(screen.getByRole('link', { name: 'Lägg till instruktionsfilm här' })).toHaveAttribute('href', '/inbox/publish?tenant=workspace-a&guide=pages-create')
+        expect(screen.getByRole('link', { name: 'Lägg till instruktionsfilm här' })).toHaveAttribute('href', '/inbox/publish?tenant=workspace-a&guide=pages-create&lang=sv')
     })
 
     it('loads linked films beyond the first API page without losing earlier films', async () => {
@@ -61,7 +61,7 @@ describe('instruction films in help articles', () => {
         fireEvent.click(await screen.findByRole('button', { name: 'Visa fler instruktionsfilmer' }))
         expect(await screen.findByRole('heading', { name: 'Äldre länkad film' })).toBeInTheDocument()
         expect(screen.getByRole('heading', { name: 'Film 0' })).toBeInTheDocument()
-        expect(supportRequest).toHaveBeenLastCalledWith('workspace-a', 'instructions/?help_guide_id=pages-create&page=2')
+        expect(supportRequest).toHaveBeenLastCalledWith('workspace-a', 'instructions/?help_guide_id=pages-create&language=sv&page=2')
         await waitFor(() => expect(screen.queryByRole('button', { name: 'Visa fler instruktionsfilmer' })).not.toBeInTheDocument())
     })
 
@@ -71,5 +71,15 @@ describe('instruction films in help articles', () => {
         expect(await screen.findByRole('alert')).toHaveTextContent('Kunde inte hämta arbetsytans filmer')
         expect(screen.getByText('Existing help video')).toBeInTheDocument()
         expect(screen.queryByRole('link', { name: 'Lägg till instruktionsfilm här' })).not.toBeInTheDocument()
+    })
+
+    it('requests English films and preserves that language when publishing', async () => {
+        supportRequest.mockResolvedValue({ results: [] })
+        state.canPublish = true
+        renderVideos('en')
+        expect(await screen.findByRole('link', { name: 'Lägg till instruktionsfilm här' })).toHaveAttribute(
+            'href', '/inbox/publish?tenant=workspace-a&guide=pages-create&lang=en',
+        )
+        expect(supportRequest).toHaveBeenCalledWith('workspace-a', 'instructions/?help_guide_id=pages-create&language=en&page=1')
     })
 })

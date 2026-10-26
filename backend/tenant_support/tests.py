@@ -109,7 +109,28 @@ class SupportAPITests(TestCase):
         )
         self.assertEqual(retry.status_code, 200, retry.data)
         self.assertEqual(retry.data["help_guide_id"], "")
+        self.assertEqual(retry.data["language"], "sv")
         self.assertEqual(Instruction.objects.count(), 1)
+
+    def test_instruction_language_is_saved_validated_and_filters_help_videos(self):
+        english, data = self.publish(language="en", helpGuideId="pages-create")
+        self.assertEqual(english.status_code, 201, english.data)
+        self.assertEqual(english.data["language"], "en")
+        self.assertEqual(Instruction.objects.get(pk=english.data["id"]).language, "en")
+        self.assertEqual(self.call(views.InstructionsView, "post", data, user=self.support).status_code, 200)
+        self.assertEqual(
+            self.call(views.InstructionsView, query="?help_guide_id=pages-create&language=sv").data["count"], 0
+        )
+        self.assertEqual(
+            self.call(views.InstructionsView, query="?help_guide_id=pages-create&language=en").data["count"], 1
+        )
+        changed = self.call(
+            views.InstructionView, "patch", {"language": "sv"}, user=self.support, pk=english.data["id"]
+        )
+        self.assertEqual(changed.status_code, 200, changed.data)
+        self.assertEqual(changed.data["language"], "sv")
+        self.assertEqual(self.publish(language="de")[0].status_code, 400)
+        self.assertEqual(self.call(views.InstructionsView, query="?language=de").status_code, 400)
 
     def test_help_guide_link_can_be_published_changed_and_cleared(self):
         result, data = self.publish(helpGuideId="pages-create")

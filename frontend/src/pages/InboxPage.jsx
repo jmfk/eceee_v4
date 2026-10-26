@@ -28,6 +28,7 @@ import {
 } from '../components/support/useSupportContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { cmsLegacyText, getCmsCopyLanguage } from '../utils/cmsCopy'
+import { helpLanguageFor } from '../utils/cmsLanguage'
 import './InboxPage.css'
 
 const deliveryReason = {
@@ -204,6 +205,7 @@ function Library({ link }) {
                     <div>
                         <p className="support-muted">
                             {dateText(v.publishedAt)}
+                            {' · '}{v.language === 'en' ? 'English' : 'Svenska'}
                             {v.archived && ' · Arkiverad'}
                             {v.withdrawn && ' · Avpublicerad'}
                         </p>
@@ -252,7 +254,21 @@ function InstructionDetail({ id, context, link }) {
                 <>
                     <h2>{v.title}</h2>
                     <p>{v.description}</p>
-                    {v.helpGuideId && <Link to={`/help/how-to/${encodeURIComponent(v.helpGuideId)}`}>Öppna hjälpartikeln</Link>}
+                    {context.canPublish && (
+                        <label>
+                            Instruktionens språk
+                            <select
+                                value={v.language || 'sv'}
+                                disabled={change.isPending}
+                                onChange={(event) => change.mutate({ language: event.target.value })}
+                            >
+                                <option value="sv">Svenska</option>
+                                <option value="en">English</option>
+                            </select>
+                        </label>
+                    )}
+                    {!context.canPublish && <p className="support-muted">{v.language === 'en' ? 'English' : 'Svenska'}</p>}
+                    {v.helpGuideId && <Link to={`/help/how-to/${encodeURIComponent(v.helpGuideId)}?lang=${v.language || 'sv'}`}>Öppna hjälpartikeln</Link>}
                     {context.canPublish && (
                         <HelpGuideSelect
                             value={v.helpGuideId || ''}
@@ -418,6 +434,10 @@ function Compose({ context, link, publish = false }) {
     const [title, setTitle] = useState('')
     const [body, setBody] = useState('')
     const [transcript, setTranscript] = useState('')
+    const [language, setLanguage] = useState(() => {
+        const requested = new URLSearchParams(location.search).get('lang')
+        return ['sv', 'en'].includes(requested) ? requested : helpLanguageFor(getCmsCopyLanguage())
+    })
     const [helpGuideId, setHelpGuideId] = useState(() => new URLSearchParams(location.search).get('guide') || '')
     const [place, setPlace] = useState(() =>
         safeReportLocation(
@@ -470,6 +490,7 @@ function Compose({ context, link, publish = false }) {
                           title,
                           description: body,
                           transcript,
+                          language,
                           helpGuideId,
                           videoId,
                           requestId: requestId.current,
@@ -554,6 +575,15 @@ function Compose({ context, link, publish = false }) {
                             >
                                 <option value="bug">Felrapport</option>
                                 <option value="question">Fråga</option>
+                            </select>
+                        </label>
+                    )}
+                    {publish && (
+                        <label>
+                            Instruktionens språk
+                            <select value={language} onChange={(event) => setLanguage(event.target.value)}>
+                                <option value="sv">Svenska</option>
+                                <option value="en">English</option>
                             </select>
                         </label>
                     )}
