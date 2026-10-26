@@ -149,6 +149,24 @@ describe('Kanban card attachments', () => {
     }
     const attachmentWorkspace = { fileTypes: { 'text/plain': ['.txt'] } }
 
+    it('uploads files dropped on a card in the board without moving it', async () => {
+        let revision = 1
+        const first = new File(['first'], 'first.txt', { type: 'text/plain' })
+        const second = new File(['second'], 'second.txt', { type: 'text/plain' })
+        kanbanApi.cards.mockResolvedValue({ results: [attachmentCard] })
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? workspace : { ...attachmentCard, revision })
+        kanbanApi.upload.mockImplementation(async () => { revision += 1; return {} })
+        renderKanban('/kanban/boards/board-1')
+        const title = await screen.findByRole('link', { name: 'Granska nyhet' })
+        const dataTransfer = { files: [first, second], types: ['Files'] }
+        expect(fireEvent.dragOver(title, { dataTransfer })).toBe(false)
+        fireEvent.drop(title, { dataTransfer })
+        await waitFor(() => expect(kanbanApi.upload).toHaveBeenCalledTimes(2))
+        expect(kanbanApi.upload).toHaveBeenNthCalledWith(1, 'card-1', first, 1)
+        expect(kanbanApi.upload).toHaveBeenNthCalledWith(2, 'card-1', second, 2)
+        expect(kanbanApi.patch).not.toHaveBeenCalled()
+    })
+
     it('shows existing attachments without an upload form below the card', () => {
         render(<Attachments
             card={{ ...attachmentCard, attachments: [{ id: 'file-1', filename: 'note.txt', size: 4, contentType: 'text/plain' }] }}

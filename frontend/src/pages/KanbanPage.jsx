@@ -1076,6 +1076,20 @@ export default function KanbanPage() {
             /* unrelated drag */
         }
     }
+    const dropFilesOnCard = (event, card) => {
+        const files = Array.from(event.dataTransfer?.files || [])
+        if (!files.length) return
+        event.preventDefault()
+        event.stopPropagation()
+        run(async () => {
+            const cardId = card.mirrorOf || card.id
+            let current = await kanbanApi.get(`cards/${cardId}/`)
+            for (const [index, file] of files.entries()) {
+                await kanbanApi.upload(cardId, file, current.revision)
+                if (index < files.length - 1) current = await kanbanApi.get(`cards/${cardId}/`)
+            }
+        })
+    }
     const reorder = (columnId, targetIndex) =>
         run(async () => {
             const visibleIds = visibleColumns.map((item) => item.id).filter((id) => id !== columnId)
@@ -1425,6 +1439,14 @@ export default function KanbanPage() {
                                                         className={`kb-card ${boardDrag.drag?.id === card.id ? 'kb-drag-source' : ''}`}
                                                         draggable={!busy}
                                                         onDragStart={(e) => boardDrag.start(e, { type: 'card', id: card.id, revision: card.revision })}
+                                                        onDragOver={(e) => {
+                                                            if (Array.from(e.dataTransfer?.types || []).includes('Files')) {
+                                                                e.preventDefault()
+                                                                e.stopPropagation()
+                                                                e.dataTransfer.dropEffect = 'copy'
+                                                            }
+                                                        }}
+                                                        onDrop={(e) => dropFilesOnCard(e, card)}
                                                     >
                                                         {card.coverAttachment ? <img className="kb-card-cover kb-card-cover-image" src={attachmentUrl(card.coverAttachment, ticket)} alt="" loading="lazy" /> : card.coverColor && <div className="kb-card-cover" style={{ background: coverColors[card.coverColor] }} />}
                                                         {!!card.labels?.length && <div className="kb-card-labels">{workspace.labels.filter((label) => card.labels.includes(label.id)).map((label) => <span key={label.id}>{label.name}</span>)}</div>}
