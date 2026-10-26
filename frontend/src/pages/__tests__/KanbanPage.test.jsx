@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { useEffect, useRef } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,6 +11,14 @@ vi.unmock('react-router-dom')
 vi.mock('../../components/Navbar', () => ({ default: () => <nav aria-label="CMS">CMS</nav> }))
 vi.mock('../../components/StatusBar', () => ({ default: () => <footer aria-label="Status">Kanban</footer> }))
 vi.mock('../../components/wysiwyg/GlobalWysiwygToolbar', () => ({ default: () => null }))
+vi.mock('../../components/form-fields/RichTextInput', () => ({
+    default: function MockRichTextInput({ value, onChange }) {
+        const ref = useRef(null)
+        useEffect(() => { ref.current.innerHTML = value }, [value])
+        return <div ref={ref} contentEditable suppressContentEditableWarning
+            onInput={(event) => onChange(event.currentTarget.innerHTML)} />
+    },
+}))
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 42 } }) }))
 vi.mock('../../hooks/useDocumentTitle', () => ({ useDocumentTitle: vi.fn() }))
 vi.mock('../../utils/tenant', () => ({
@@ -144,5 +153,75 @@ describe('Kanban card attachments', () => {
     it('does not print a server HTML error page inside the card', () => {
         expect(kanbanError({ response: { status: 500, data: '<!DOCTYPE html><html>error</html>' } }))
             .toBe('Servern kunde inte slutföra åtgärden. Försök igen senare.')
+    })
+
+    it('attaches a file to a new comment when dropped in the comment area', async () => {
+        let revision = 1
+        const image = new File(['image'], 'photo.png', { type: 'image/png' })
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? workspace : path === 'cards/card-1/' ? { ...attachmentCard, revision } : {})
+        kanbanApi.post.mockImplementation(async () => { revision += 1; return { id: 'comment-1' } })
+        kanbanApi.upload.mockResolvedValue({ id: 'attachment-1' })
+        renderKanban('/kanban/cards/card-1')
+        const comments = await screen.findByLabelText('Kommentarer och aktivitet')
+        fireEvent.drop(comments, { dataTransfer: { files: [image], types: ['Files'] } })
+        await waitFor(() => expect(kanbanApi.upload).toHaveBeenCalledWith('card-1', image, 2, 'comment-1'))
+        expect(kanbanApi.post).toHaveBeenCalledWith('cards/card-1/comments/', { body: 'photo.png', revision: 1 })
+    })
+
+    it('uploads an image dropped into the description editor and saves it inline', async () => {
+        const image = new File(['image'], 'photo.png', { type: 'image/png' })
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? workspace : path === 'cards/card-1/' ? attachmentCard : {})
+        kanbanApi.upload.mockResolvedValue({ id: '11111111-1111-1111-1111-111111111111', filename: 'photo.png', contentType: 'image/png' })
+        kanbanApi.patch.mockResolvedValue(attachmentCard)
+        renderKanban('/kanban/cards/card-1')
+        fireEvent.click(await screen.findByRole('button', { name: 'Redigera beskrivning' }))
+        const visual = document.querySelector('.kb-detail-description .kb-editor-visual')
+        fireEvent.drop(visual, { dataTransfer: { files: [image], types: ['Files'] } })
+        await waitFor(() => expect(kanbanApi.upload).toHaveBeenCalledWith('card-1', image, 1))
+        await waitFor(() => expect(visual.querySelector('img')).toHaveAttribute('alt', 'photo.png'))
+        fireEvent.click(screen.getByRole('button', { name: 'Spara', exact: true }))
+        await waitFor(() => expect(kanbanApi.patch).toHaveBeenCalledWith('cards/card-1/', expect.objectContaining({
+            description: expect.stringContaining('![photo.png](/api/v1/kanban/attachments/11111111-1111-1111-1111-111111111111/download/)'),
+        })))
+    })
+
+    it('moves an existing inline image to another position in the editor', async () => {
+        const description = '![first](/api/v1/kanban/attachments/11111111-1111-1111-1111-111111111111/download/)\n\nEnd'
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? workspace : path === 'cards/card-1/' ? { ...attachmentCard, description } : {})
+        kanbanApi.patch.mockResolvedValue({ ...attachmentCard, description })
+        renderKanban('/kanban/cards/card-1')
+        fireEvent.click(await screen.findByRole('button', { name: 'Redigera beskrivning' }))
+        const visual = document.querySelector('.kb-detail-description .kb-editor-visual')
+        const editor = visual.querySelector('[contenteditable="true"]')
+        const image = editor.querySelector('img')
+        document.caretRangeFromPoint = vi.fn(() => {
+            const range = document.createRange()
+            range.selectNodeContents(editor)
+            range.collapse(false)
+            return range
+        })
+        fireEvent.dragStart(image, { dataTransfer: { setData: vi.fn(), effectAllowed: '' } })
+        fireEvent.drop(visual, { dataTransfer: { files: [], types: ['application/x-kanban-inline-image'] } })
+        fireEvent.click(screen.getByRole('button', { name: 'Spara', exact: true }))
+        await waitFor(() => expect(kanbanApi.patch).toHaveBeenCalled())
+        const saved = kanbanApi.patch.mock.calls[0][1].description
+        expect(saved.indexOf('End')).toBeLessThan(saved.indexOf('![first]'))
+        delete document.caretRangeFromPoint
+    })
+
+    it('adds an existing editor image to a comment when dropped in the activity area', async () => {
+        const description = '![first](/api/v1/kanban/attachments/11111111-1111-1111-1111-111111111111/download/)'
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? workspace : path === 'cards/card-1/' ? { ...attachmentCard, description } : {})
+        kanbanApi.post.mockResolvedValue({ id: 'comment-1' })
+        renderKanban('/kanban/cards/card-1')
+        fireEvent.click(await screen.findByRole('button', { name: 'Redigera beskrivning' }))
+        const image = document.querySelector('.kb-detail-description .kb-editor-visual img')
+        const dataTransfer = { files: [], types: ['application/x-kanban-inline-image'], setData: vi.fn(), getData: () => JSON.stringify({ id: '11111111-1111-1111-1111-111111111111', name: 'first' }) }
+        fireEvent.dragStart(image, { dataTransfer })
+        fireEvent.drop(screen.getByLabelText('Kommentarer och aktivitet'), { dataTransfer })
+        await waitFor(() => expect(kanbanApi.post).toHaveBeenCalledWith('cards/card-1/comments/', {
+            body: description, revision: 1,
+        }))
+        expect(kanbanApi.upload).not.toHaveBeenCalled()
     })
 })

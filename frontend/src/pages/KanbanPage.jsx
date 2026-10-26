@@ -100,28 +100,34 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
     const [pendingClose, setPendingClose] = useState(false)
     const [uploadError, setUploadError] = useState('')
     const [uploading, setUploading] = useState(false)
-    const upload = async (files, rejected) => {
+    const [dropDestination, setDropDestination] = useState('card')
+    const upload = async (files, rejected = [], commentId, initialRevision = card.revision) => {
         if (rejected.length) setUploadError('Filformatet stöds inte. Välj en filtyp som är tillåten för bilagor.')
-        if (!files.length) return
+        if (!files.length) return []
         setUploading(true)
         if (!rejected.length) setUploadError('')
-        let revision = card.revision
-        let uploaded = 0
+        let revision = initialRevision
+        const uploaded = []
         try {
             for (const [index, file] of files.entries()) {
-                await kanbanApi.upload(card.id, file, revision)
-                uploaded += 1
+                const attachment = commentId
+                    ? await kanbanApi.upload(card.id, file, revision, commentId)
+                    : await kanbanApi.upload(card.id, file, revision)
+                uploaded.push(attachment)
                 if (index < files.length - 1) revision = (await kanbanApi.get(`cards/${card.id}/`)).revision
             }
         } catch (uploadFailure) {
             setUploadError(kanbanError(uploadFailure))
         } finally {
-            if (uploaded) await run(async () => {})
             setUploading(false)
         }
+        return uploaded
     }
     const { getRootProps, getInputProps, open, isDragActive, isDragReject } = useDropzone({
-        onDrop: upload,
+        onDrop: async (files, rejected) => {
+            await upload(files, rejected)
+            if (files.length) await run(async () => {})
+        },
         accept: workspace.fileTypes || undefined,
         disabled: uploading,
         noClick: true,
@@ -197,6 +203,32 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
             setCommentOpen(false)
         })
     }
+    const dropCommentFiles = async (event) => {
+        const files = Array.from(event.dataTransfer?.files || [])
+        let inlineImage = null
+        if (!files.length) {
+            try {
+                inlineImage = JSON.parse(event.dataTransfer?.getData('application/x-kanban-inline-image') || 'null')
+            } catch {
+                return
+            }
+            if (!/^[a-f0-9-]{36}$/.test(inlineImage?.id || '')) return
+        }
+        event.preventDefault()
+        event.stopPropagation()
+        await run(async () => {
+            const current = await kanbanApi.get(`cards/${card.id}/`)
+            const comment = await kanbanApi.post(`cards/${card.id}/comments/`, {
+                body: inlineImage
+                    ? `![${(inlineImage.name || 'Bild').replaceAll(']', '\\]')}](${attachmentUrl(inlineImage.id)})`
+                    : files.map((file) => file.name).join(', '),
+                revision: current.revision,
+            })
+            if (!files.length) return
+            const afterComment = await kanbanApi.get(`cards/${card.id}/`)
+            await upload(files, [], comment.id, afterComment.revision)
+        })
+    }
     const timeline = [
         ...card.comments.map((item) => ({ ...item, entryType: 'comment' })),
         ...(activityFilter === 'all'
@@ -207,12 +239,27 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
         <Dialog open onClose={close} className="kb-detail-dialog">
             <DialogBackdrop className="kb-detail-backdrop" />
             <div className="kb-detail-position">
-                <DialogPanel {...getRootProps({ className: 'kb kb-detail user-tools-content' })}>
+                <DialogPanel {...getRootProps({ className: 'kb kb-detail user-tools-content',
+                    onDragStartCapture: (event) => {
+                        const image = event.target.closest?.('img')
+                        const id = image?.getAttribute('src')?.match(/^\/api\/v1\/kanban\/attachments\/([a-f0-9-]+)\/download\//)?.[1]
+                        if (id) event.dataTransfer.setData('application/x-kanban-inline-image', JSON.stringify({ id, name: image.alt }))
+                    },
+                    onDragOverCapture: (event) => {
+                        const target = event.target
+                        setDropDestination(target.closest('.kb-detail-activity') ? 'comments'
+                            : target.closest('.kb-editor-visual, .kb-editor-source') ? 'description' : 'card')
+                    },
+                })}>
                     <DialogTitle className="sr-only">{card.title}</DialogTitle>
                     <input {...getInputProps({ 'aria-label': 'Välj bilagor' })} />
                     {isDragActive && (
                         <div className={`kb-detail-drop-overlay${isDragReject ? ' kb-detail-drop-overlay-reject' : ''}`} aria-hidden="true">
-                            {isDragReject ? 'Filtypen stöds inte' : 'Släpp filer för att bifoga dem till kortet'}
+                            {isDragReject ? 'Filtypen stöds inte' : dropDestination === 'comments'
+                                ? 'Släpp filer för att lägga till en kommentar'
+                                : dropDestination === 'description'
+                                  ? 'Släpp filer för att lägga till dem i texten'
+                                  : 'Släpp filer för att bifoga dem till kortet'}
                         </div>
                     )}
                     {card.coverAttachment ? <img className="kb-detail-cover kb-detail-cover-image" src={attachmentUrl(card.coverAttachment, ticket)} alt="" /> : card.coverColor && (
@@ -533,6 +580,8 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                             members={workspace.members}
                                             onSave={save}
                                             busy={busy}
+                                            onFileDrop={(files) => upload(files)}
+                                            onDropComplete={() => run(async () => {})}
                                             onCancel={() => { setDraft((previous) => ({ ...previous, description: card.description })); setEditingDescription(false) }}
                                         />
                                     ) : draft.description ? (
@@ -703,7 +752,11 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                             </form>
                             {card.attachments.length > 0 && <Attachments card={card} />}
                         </div>
-                        <aside aria-label="Kommentarer och aktivitet" className="kb-detail-activity">
+                        <aside aria-label="Kommentarer och aktivitet" className="kb-detail-activity"
+                            onDragOverCapture={(event) => {
+                                if (Array.from(event.dataTransfer?.types || []).includes('Files')) event.preventDefault()
+                            }}
+                            onDropCapture={dropCommentFiles}>
                             <h2 className="kb-detail-section-heading">
                                 <MessageSquare size={18} />
                                 Kommentarer och aktivitet

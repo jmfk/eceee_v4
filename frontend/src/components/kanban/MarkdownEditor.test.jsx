@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MarkdownEditor, { MarkdownView } from './MarkdownEditor'
 import { htmlMarkdown, markdownHtml } from './markdown'
@@ -86,4 +86,16 @@ it('exposes editor save/cancel and toggles formatting help without submitting a 
     expect(screen.getByText(/Markera text/)).toBeVisible()
     fireEvent.click(help)
     expect(screen.queryByText(/Markera text/)).not.toBeInTheDocument()
+})
+
+it('inserts a dropped file at the cursor in Markdown mode', async () => {
+    const onChange = vi.fn()
+    const onFileDrop = vi.fn().mockResolvedValue([{ id: '11111111-1111-1111-1111-111111111111', filename: 'note.txt', contentType: 'text/plain' }])
+    render(<MarkdownEditor label="Beskrivning" value="Before After" onChange={onChange} onFileDrop={onFileDrop} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Markdown' }))
+    const source = screen.getByRole('textbox', { name: 'Beskrivning' })
+    source.setSelectionRange(7, 7)
+    const file = new File(['note'], 'note.txt', { type: 'text/plain' })
+    fireEvent.drop(source, { dataTransfer: { files: [file], types: ['Files'] } })
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith('Before [note.txt](/api/v1/kanban/attachments/11111111-1111-1111-1111-111111111111/download/)After'))
 })
