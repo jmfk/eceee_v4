@@ -12,11 +12,14 @@ vi.mock('../../components/Navbar', () => ({ default: () => <nav aria-label="CMS"
 vi.mock('../../components/StatusBar', () => ({ default: () => <footer aria-label="Status">Kanban</footer> }))
 vi.mock('../../components/wysiwyg/GlobalWysiwygToolbar', () => ({ default: () => null }))
 vi.mock('../../components/form-fields/RichTextInput', () => ({
-    default: function MockRichTextInput({ value, onChange }) {
+    default: function MockRichTextInput({ value, onChange, onImageUpload }) {
         const ref = useRef(null)
         useEffect(() => { ref.current.innerHTML = value }, [value])
-        return <div ref={ref} contentEditable suppressContentEditableWarning
-            onInput={(event) => onChange(event.currentTarget.innerHTML)} />
+        return <>
+            {onImageUpload && <button type="button" onClick={onImageUpload}>Ladda upp bild</button>}
+            <div ref={ref} contentEditable suppressContentEditableWarning
+                onInput={(event) => onChange(event.currentTarget.innerHTML)} />
+        </>
     },
 }))
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 42 } }) }))
@@ -183,6 +186,21 @@ describe('Kanban card attachments', () => {
         await waitFor(() => expect(kanbanApi.patch).toHaveBeenCalledWith('cards/card-1/', expect.objectContaining({
             description: expect.stringContaining('![photo.png](/api/v1/kanban/attachments/11111111-1111-1111-1111-111111111111/download/)'),
         })))
+    })
+
+    it('opens the file picker from the editor image button and inserts the upload', async () => {
+        const image = new File(['image'], 'picked.png', { type: 'image/png' })
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? workspace : path === 'cards/card-1/' ? attachmentCard : {})
+        kanbanApi.upload.mockResolvedValue({ id: '11111111-1111-1111-1111-111111111111', filename: 'picked.png', contentType: 'image/png' })
+        renderKanban('/kanban/cards/card-1')
+        fireEvent.click(await screen.findByRole('button', { name: 'Redigera beskrivning' }))
+        const picker = screen.getByLabelText('Ladda upp bild i Beskrivning')
+        const click = vi.spyOn(picker, 'click')
+        fireEvent.click(screen.getByRole('button', { name: 'Ladda upp bild' }))
+        expect(click).toHaveBeenCalledOnce()
+        fireEvent.change(picker, { target: { files: [image] } })
+        await waitFor(() => expect(kanbanApi.upload).toHaveBeenCalledWith('card-1', image, 1))
+        await waitFor(() => expect(document.querySelector('.kb-detail-description .kb-editor-visual img')).toHaveAttribute('alt', 'picked.png'))
     })
 
     it('moves an existing inline image to another position in the editor', async () => {

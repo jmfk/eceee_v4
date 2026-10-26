@@ -1,8 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MarkdownEditor, { MarkdownView } from './MarkdownEditor'
-import { htmlMarkdown, markdownHtml } from './markdown'
+import { htmlMarkdown, markdownHtml, withAttachmentTickets } from './markdown'
 import { setCmsCopyLanguage } from '../../utils/cmsCopy'
+import { requiresHtmlSource } from '../../utils/richTextFieldHtml'
 
 beforeEach(() => setCmsCopyLanguage('sv-se'))
 
@@ -54,6 +55,12 @@ it('does not persist temporary attachment tickets from the visual editor', () =>
     const text = htmlMarkdown(`<img src="/api/v1/kanban/attachments/${id}/download/?ticket=temporary" alt="Draft">`)
     expect(text).not.toContain('ticket=')
     expect(text).toContain(`/attachments/${id}/download/`)
+})
+
+it('keeps uploaded images in the visual editor instead of switching to HTML source', () => {
+    const id = '11111111-1111-1111-1111-111111111111'
+    const html = withAttachmentTickets(markdownHtml(`![photo](/api/v1/kanban/attachments/${id}/download/)`), 'temporary', true)
+    expect(requiresHtmlSource(html)).toBe(false)
 })
 
 
