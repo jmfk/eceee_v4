@@ -13,6 +13,8 @@ from django.core import signing
 from django.core.files.uploadedfile import UploadedFile
 from rest_framework import permissions
 
+from core.roles import is_tenant_admin
+
 logger = logging.getLogger(__name__)
 
 PENDING_PREVIEW_SIGNING_SALT = "file-manager.pending-preview"
@@ -63,7 +65,7 @@ def user_can_access_namespace(user, namespace):
     """Apply the stricter access boundary used by system-owned namespaces."""
     if namespace.is_hidden:
         return user_can_access_theme_media(user, namespace.tenant)
-    if user.is_staff or namespace.created_by == user:
+    if is_tenant_admin(user, namespace.tenant) or namespace.created_by == user:
         return True
     return namespace.is_active
 
@@ -80,7 +82,7 @@ def filter_media_files_for_user(queryset, user, tenant=None, include_theme_media
         include_theme_media = False
     if not include_theme_media:
         queryset = queryset.exclude(namespace__is_hidden=True)
-    if user.is_staff:
+    if is_tenant_admin(user, tenant):
         return queryset
 
     accessible_namespaces = Namespace.objects.filter(Q(created_by=user) | Q(is_active=True))
@@ -119,7 +121,7 @@ class MediaFilePermission(permissions.BasePermission):
             return True
 
         # Staff users have full access
-        if request.user.is_staff:
+        if is_tenant_admin(request.user, obj.namespace.tenant):
             return True
 
         # Check namespace access
@@ -130,14 +132,14 @@ class MediaFilePermission(permissions.BasePermission):
         if obj.access_level == "private":
             return obj.created_by == request.user
         elif obj.access_level == "staff":
-            return request.user.is_staff
+            return is_tenant_admin(request.user, obj.namespace.tenant)
         elif obj.access_level == "members":
             return request.user.is_authenticated
         # 'public' files are accessible to all authenticated users
 
         # For write operations, check ownership or staff status
         if request.method in ["PUT", "PATCH", "DELETE"]:
-            return obj.created_by == request.user or request.user.is_staff
+            return obj.created_by == request.user or is_tenant_admin(request.user, obj.namespace.tenant)
 
         return True
 
@@ -611,7 +613,7 @@ class SecureFileAccess:
             return False
 
         # Staff users have full access
-        if user.is_staff:
+        if is_tenant_admin(user, media_file.namespace.tenant):
             return True
 
         # Check namespace access
@@ -622,7 +624,7 @@ class SecureFileAccess:
         if media_file.access_level == "private":
             return media_file.created_by == user
         elif media_file.access_level == "staff":
-            return user.is_staff
+            return is_tenant_admin(user, media_file.namespace.tenant)
         elif media_file.access_level == "members":
             return user.is_authenticated
 
@@ -669,7 +671,7 @@ class SecurityAuditLogger:
             bool: True if user has access, False otherwise
         """
         # Staff users have access to all namespaces
-        if user.is_staff:
+        if is_tenant_admin(user, namespace.tenant):
             return True
 
         # Users have access to namespaces they created

@@ -55,7 +55,7 @@ class AnalyticsViewSet(viewsets.ViewSet):
             queryset = queryset.filter(model_name=model_name)
 
         # User filtering (non-admin users can only see their own data)
-        if not request.user.is_staff:
+        if not request.user.is_superuser:
             queryset = queryset.filter(user=request.user)
         else:
             user_id = request.query_params.get("user")
@@ -89,9 +89,11 @@ class AnalyticsViewSet(viewsets.ViewSet):
         )
 
         # Calculate success rate
-        total_logs = AIUsageLog.objects.filter(
-            created_at__gte=request.query_params.get("date_from")
-            or timezone.now() - timedelta(days=30)
+        total_logs_queryset = AIUsageLog.objects
+        if not request.user.is_superuser:
+            total_logs_queryset = total_logs_queryset.filter(user=request.user)
+        total_logs = total_logs_queryset.filter(
+            created_at__gte=request.query_params.get("date_from") or timezone.now() - timedelta(days=30)
         ).count()
 
         success_rate = 100.0
@@ -104,8 +106,7 @@ class AnalyticsViewSet(viewsets.ViewSet):
             "total_calls": aggregates["agg_total_calls"] or 0,
             "total_input_tokens": aggregates["agg_total_input_tokens"] or 0,
             "total_output_tokens": aggregates["agg_total_output_tokens"] or 0,
-            "total_tokens": (aggregates["agg_total_input_tokens"] or 0)
-            + (aggregates["agg_total_output_tokens"] or 0),
+            "total_tokens": (aggregates["agg_total_input_tokens"] or 0) + (aggregates["agg_total_output_tokens"] or 0),
             "avg_cost_per_call": aggregates["agg_avg_cost_per_call"] or Decimal("0"),
             "avg_duration_ms": aggregates["agg_avg_duration_ms"] or 0,
             "success_rate": success_rate,
@@ -121,10 +122,8 @@ class AnalyticsViewSet(viewsets.ViewSet):
 
         Admin only. Returns top users by cost.
         """
-        if not request.user.is_staff:
-            return Response(
-                {"detail": "Admin access required"}, status=status.HTTP_403_FORBIDDEN
-            )
+        if not request.user.is_superuser:
+            return Response({"detail": "Admin access required"}, status=status.HTTP_403_FORBIDDEN)
 
         queryset = self._get_base_queryset(request)
 

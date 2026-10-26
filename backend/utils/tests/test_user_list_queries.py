@@ -6,10 +6,35 @@ from core.models import Tenant
 from core.permissions import user_can_switch_tenant
 from kanban.models import Board
 from utils.views import CurrentUserView, UserListView
+from utils.serializers import CreateUserSerializer, UpdateUserSerializer
 from webpages.models import PageTheme, ThemeDesignerAssignment
 
 
 class UserListQueryTests(TestCase):
+    def test_account_serializers_do_not_accept_staff_as_a_cms_permission(self):
+        create = CreateUserSerializer(
+            data={
+                "username": "role-member",
+                "password": "password123",
+                "confirm_password": "password123",
+                "is_staff": True,
+            }
+        )
+        self.assertTrue(create.is_valid(), create.errors)
+        member = create.save()
+        self.assertFalse(member.is_staff)
+        update = UpdateUserSerializer(member, data={"is_staff": True}, partial=True)
+        self.assertTrue(update.is_valid(), update.errors)
+        update.save()
+        member.refresh_from_db()
+        self.assertFalse(member.is_staff)
+        owner = UpdateUserSerializer(member, data={"is_superuser": True}, partial=True)
+        self.assertTrue(owner.is_valid(), owner.errors)
+        owner.save()
+        member.refresh_from_db()
+        self.assertTrue(member.is_staff)
+        self.assertTrue(member.is_superuser)
+
     def test_user_list_access_fields_use_bounded_queries(self):
         admin = User.objects.create_superuser("designer-query-admin", password="test")
         designer = User.objects.create_user("designer-query-user", password="test")

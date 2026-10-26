@@ -15,6 +15,8 @@ from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
 from core.models import Tenant
+from core.permissions import IsTenantAdmin
+from core.roles import is_tenant_admin
 
 from ..filters import PageVersionFilter
 from ..models import PageVersion, WebPage
@@ -174,7 +176,7 @@ class PageVersionViewSet(
             if not tenant.user_has_access(self.request.user):
                 return queryset.none()
 
-        if not self.request.user.is_staff and not tenant:
+        if not self.request.user.is_superuser and not tenant:
             now = timezone.now()
             published_versions = Q(effective_date__lte=now) & (Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
             queryset = queryset.filter(Q(created_by=self.request.user) | published_versions)
@@ -205,7 +207,7 @@ class PageVersionViewSet(
             try:
                 page = get_object_or_404(self._page_queryset(), id=page_id)
                 # For non-staff users requesting latest, only return latest if it's published
-                if not self.request.user.is_staff:
+                if not is_tenant_admin(self.request.user, tenant):
                     latest_version = page.get_current_published_version()
                 else:
                     latest_version = page.get_latest_version()
@@ -223,8 +225,10 @@ class PageVersionViewSet(
     def _page_queryset(self):
         queryset = WebPage.objects.all()
         tenant = getattr(self.request, "tenant", None)
-        if self.request.user.is_staff:
+        if is_tenant_admin(self.request.user, tenant):
             return queryset.filter(tenant=tenant) if tenant else queryset
+        if tenant is None and self.request.user.is_superuser:
+            return queryset
         if tenant:
             if not tenant.user_has_access(self.request.user):
                 return queryset.none()
@@ -776,7 +780,7 @@ class PageVersionViewSet(
         detail=False,
         methods=["post"],
         url_path="pack-aggressive",
-        permission_classes=[permissions.IsAdminUser],
+        permission_classes=[IsTenantAdmin],
     )
     def pack_aggressive(self, request):
         """Remove old drafts while retaining every version that was ever published."""
@@ -914,7 +918,7 @@ class PageVersionViewSet(
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if request.user.is_staff:
+        if is_tenant_admin(request.user, getattr(request, "tenant", None)):
             latest_version = page.get_latest_version()
         else:
             latest_version = page.get_current_published_version()
@@ -929,7 +933,7 @@ class PageVersionViewSet(
         detail=False,
         methods=["post"],
         url_path="pack-drafts",
-        permission_classes=[permissions.IsAdminUser],
+        permission_classes=[IsTenantAdmin],
     )
     def pack_drafts(self, request):
         """Remove only draft versions older than current published"""

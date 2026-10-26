@@ -27,6 +27,7 @@ from rest_framework.renderers import BrowsableAPIRenderer
 from rest_framework.response import Response
 
 from core.models import Tenant
+from core.roles import is_tenant_admin
 from file_manager.storage import system_storage
 from webpages.text_outline_styles import default_text_outline_styles, validate_text_outline_styles
 
@@ -283,7 +284,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["post"])
     def create_defaults(self, request):
         """Create default themes for demonstration"""
-        if not request.user.is_staff:
+        if not is_tenant_admin(request.user, getattr(request, "tenant", None)):
             return Response(
                 {"error": "Only staff users can create default themes"},
                 status=status.HTTP_403_FORBIDDEN,

@@ -17,3 +17,12 @@ class HasTenantAccess(permissions.BasePermission):
     def has_permission(self, request, view):
         tenant = getattr(request, "tenant", None)
         return bool(tenant and tenant.user_has_access(request.user))
+
+
+class IsTenantAdmin(permissions.BasePermission):
+    """Require workspace administration without accepting global Django staff status."""
+
+    def has_permission(self, request, view):
+        from .roles import is_tenant_admin
+
+        return is_tenant_admin(request.user, getattr(request, "tenant", None))

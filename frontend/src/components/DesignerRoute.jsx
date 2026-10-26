@@ -11,7 +11,7 @@ const DesignerRoute = ({ children }) => {
     if (!isAuthenticated) {
         return <Navigate to="/login" replace />
     }
-    if (!user?.isDesignerOnly && !user?.hasTenantAdminAccess && !user?.isStaff && !user?.isSuperuser) {
+    if (!user?.isDesignerOnly && !user?.permissions?.includes('theme.read') && !user?.isSuperuser) {
         return <Navigate to="/pages" replace />
     }
     return children

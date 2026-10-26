@@ -13,6 +13,8 @@ from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle, UserRateThrottle
 
+from core.permissions import IsTenantAdmin
+
 from ..error_page_defaults import exclude_legacy_error_subtrees
 from ..filters import WebPageFilter
 from ..models import PageVersion, WebPage
@@ -149,7 +151,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
             # A selected tenant is an administrative context that has already
             # passed membership authorization above. Only tenant-less readers
             # are restricted to currently published pages.
-            if not self.request.user.is_staff and tenant is None:
+            if not self.request.user.is_superuser and tenant is None:
                 # Use database-level filtering to avoid N+1 queries
                 # This uses the same logic as WebPageFilter.filter_is_published
                 now = timezone.now()
@@ -707,7 +709,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         detail=False,
         methods=["get"],
         url_path="deleted",
-        permission_classes=[permissions.IsAdminUser],
+        permission_classes=[IsTenantAdmin],
     )
     def list_deleted(self, request):
         """
@@ -744,7 +746,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         detail=True,
         methods=["post"],
         url_path="restore",
-        permission_classes=[permissions.IsAdminUser],
+        permission_classes=[IsTenantAdmin],
     )
     def restore_page(self, request, pk=None):
         """
@@ -779,7 +781,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         detail=False,
         methods=["post"],
         url_path="bulk-restore",
-        permission_classes=[permissions.IsAdminUser],
+        permission_classes=[IsTenantAdmin],
     )
     def bulk_restore(self, request):
         """
@@ -840,7 +842,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         detail=True,
         methods=["delete"],
         url_path="permanent-delete",
-        permission_classes=[permissions.IsAdminUser],
+        permission_classes=[IsTenantAdmin],
     )
     def permanent_delete(self, request, pk=None):
         """
@@ -884,7 +886,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         detail=False,
         methods=["post"],
         url_path="bulk-permanent-delete",
-        permission_classes=[permissions.IsAdminUser],
+        permission_classes=[IsTenantAdmin],
     )
     def bulk_permanent_delete(self, request):
         """
@@ -946,7 +948,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         detail=False,
         methods=["post"],
         url_path="permanent-delete-all",
-        permission_classes=[permissions.IsAdminUser],
+        permission_classes=[IsTenantAdmin],
     )
     def permanent_delete_all(self, request):
         """

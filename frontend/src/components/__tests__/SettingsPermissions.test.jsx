@@ -19,8 +19,8 @@ describe('Settings permissions', () => {
         render(<QueryClientProvider client={client}><MemoryRouter>
             <SettingsSidebar /><SettingsDashboard />
         </MemoryRouter></QueryClientProvider>)
-        expect(screen.getAllByRole('link', { name: /Roles and permissions/ })).toHaveLength(2)
-        for (const name of ['All Themes', 'Object Types', 'Manage Users', 'Create New Page', 'Data Connections']) {
+        expect(screen.getAllByRole('link', { name: /Användare och behörigheter/ })).toHaveLength(2)
+        for (const name of ['All Themes', 'Object Types', 'System accounts', 'Create New Page', 'Data Connections']) {
             expect(screen.queryByRole('link', { name })).not.toBeInTheDocument()
         }
         expect(themesApi.list).not.toHaveBeenCalled()

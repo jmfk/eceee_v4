@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import Navbar from './Navbar'
 import SettingsSidebar from './SettingsSidebar'
 import StatusBar from './StatusBar'
@@ -8,6 +8,9 @@ import { cmsText, getCmsCopyLanguage } from '../utils/cmsCopy'
 const SettingsLayout = ({ children, statusContent }) => {
     const location = useLocation()
     const language = getCmsCopyLanguage()
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+    const menuLabel = language === 'sv-se' ? 'Inställningsmeny' : 'Settings menu'
+    const closeMenuLabel = language === 'sv-se' ? 'Stäng inställningsmenyn' : 'Close settings menu'
 
     // Determine status content based on path if not provided
     const getStatusContent = () => {
@@ -35,9 +38,13 @@ const SettingsLayout = ({ children, statusContent }) => {
         <div className="fixed inset-0 bg-gray-50 flex flex-col">
             <Navbar />
             <div className="flex-1 flex overflow-hidden">
-                <SettingsSidebar />
-                <main className="flex-1 overflow-y-auto bg-gray-50">
-                    <div className="px-6 py-8 sm:px-10">
+                {mobileMenuOpen && <button type="button" aria-label={closeMenuLabel} className="fixed inset-0 z-20 bg-black/20 md:hidden" onClick={() => setMobileMenuOpen(false)} />}
+                <div className={`${mobileMenuOpen ? 'fixed left-0 top-16 bottom-8 z-30 shadow-lg' : 'hidden'} md:static md:block md:h-full md:shadow-none`}>
+                    <SettingsSidebar onNavigate={() => setMobileMenuOpen(false)} />
+                </div>
+                <main className="min-w-0 flex-1 overflow-y-auto bg-gray-50">
+                    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
+                        <button type="button" className="mb-4 rounded border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700 md:hidden" aria-expanded={mobileMenuOpen} aria-controls="settings-navigation" onClick={() => setMobileMenuOpen((open) => !open)}>{mobileMenuOpen ? closeMenuLabel : menuLabel}</button>
                         {children}
                     </div>
                 </main>

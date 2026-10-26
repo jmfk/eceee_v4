@@ -25,7 +25,6 @@ const UserManagementPage = () => {
         lastName: '',
         password: '',
         confirmPassword: '',
-        isStaff: false,
         isSuperuser: false,
     });
     const [createErrors, setCreateErrors] = useState({});
@@ -156,7 +155,6 @@ const UserManagementPage = () => {
                 lastName: '',
                 password: '',
                 confirmPassword: '',
-                isStaff: false,
                 isSuperuser: false,
             });
             setShowCreateModal(false);
@@ -191,7 +189,6 @@ const UserManagementPage = () => {
             lastName: '',
             password: '',
             confirmPassword: '',
-            isStaff: false,
             isSuperuser: false,
         });
         setCreateErrors({});
@@ -233,7 +230,6 @@ const UserManagementPage = () => {
             email: userToEdit.email || '',
             firstName: userToEdit.firstName || '',
             lastName: userToEdit.lastName || '',
-            isStaff: userToEdit.isStaff,
             isSuperuser: userToEdit.isSuperuser,
         });
         setShowEditModal(true);
@@ -281,7 +277,6 @@ const UserManagementPage = () => {
                 email: editFormData.email,
                 firstName: editFormData.firstName,
                 lastName: editFormData.lastName,
-                isStaff: editFormData.isStaff,
                 isSuperuser: editFormData.isSuperuser,
             };
 
@@ -350,9 +345,9 @@ const UserManagementPage = () => {
                     <div>
                         <div className="text-3xl font-bold text-gray-900 flex items-center space-x-3" role="heading" aria-level="1">
                             <Users className="w-8 h-8" />
-                            <span>User Management</span>
+                            <span>System accounts</span>
                         </div>
-                        <div className="text-gray-600 mt-2">Manage user accounts and password resets</div>
+                        <div className="text-gray-600 mt-2">Create accounts, manage system owners, and reset passwords. Workspace roles are managed in Users and permissions.</div>
                     </div>
                     <button
                         onClick={() => setShowCreateModal(true)}
@@ -381,7 +376,7 @@ const UserManagementPage = () => {
                                         Email
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Role
+                                        System access
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Last Login
@@ -427,12 +422,7 @@ const UserManagementPage = () => {
                                                         Superuser
                                                     </span>
                                                 )}
-                                                {u.isStaff && !u.isSuperuser && (
-                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                        Staff
-                                                    </span>
-                                                )}
-                                                {!u.isStaff && !u.isSuperuser && (
+                                                {!u.isSuperuser && (
                                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                                                         User
                                                     </span>
@@ -718,20 +708,9 @@ const UserManagementPage = () => {
                             {/* Permissions */}
                             <div className="border-t border-gray-200 pt-4">
                                 <label className="block text-sm font-medium text-gray-700 mb-3">
-                                    Permissions
+                                    Global system access
                                 </label>
                                 <div className="space-y-2">
-                                    <label className="flex items-center">
-                                        <input
-                                            type="checkbox"
-                                            name="isStaff"
-                                            checked={createFormData.isStaff}
-                                            onChange={handleCreateInputChange}
-                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                            disabled={isCreating}
-                                        />
-                                        <span className="ml-2 text-sm text-gray-700">Staff (Crew) - Can access admin area</span>
-                                    </label>
                                     <label className="flex items-center">
                                         <input
                                             type="checkbox"
@@ -741,7 +720,7 @@ const UserManagementPage = () => {
                                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                             disabled={isCreating}
                                         />
-                                        <span className="ml-2 text-sm text-gray-700">Superuser status - Full permissions</span>
+                                        <span className="ml-2 text-sm text-gray-700">System owner - Global account access</span>
                                     </label>
                                 </div>
                             </div>
@@ -846,20 +825,9 @@ const UserManagementPage = () => {
                             {/* Permissions */}
                             <div className="border-t border-gray-200 pt-4">
                                 <label className="block text-sm font-medium text-gray-700 mb-3">
-                                    Permissions
+                                    Global system access
                                 </label>
                                 <div className="space-y-2">
-                                    <label className="flex items-center">
-                                        <input
-                                            type="checkbox"
-                                            name="isStaff"
-                                            checked={editFormData.isStaff}
-                                            onChange={handleEditInputChange}
-                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                            disabled={isUpdating}
-                                        />
-                                        <span className="ml-2 text-sm text-gray-700">Staff (Crew) - Can access admin area</span>
-                                    </label>
                                     <label className="flex items-center">
                                         <input
                                             type="checkbox"
@@ -869,7 +837,7 @@ const UserManagementPage = () => {
                                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                             disabled={isUpdating}
                                         />
-                                        <span className="ml-2 text-sm text-gray-700">Superuser - Full permissions</span>
+                                        <span className="ml-2 text-sm text-gray-700">System owner - Global account access</span>
                                     </label>
                                 </div>
                             </div>

@@ -6,7 +6,7 @@ from django.urls import include, path, re_path
 from rest_framework.routers import DefaultRouter
 
 from core.profile_views import ProfilePhotoView
-from core.role_views import RolesView
+from core.role_views import RolesView, WorkspaceMemberView
 
 from . import views
 
@@ -56,6 +56,7 @@ urlpatterns = [
     ),
     path("profile-photos/<int:user_id>/", ProfilePhotoView.as_view()),
     path("roles/", RolesView.as_view()),
+    path("roles/members/", WorkspaceMemberView.as_view()),
     # User Management
     path("current-user/", views.CurrentUserView.as_view(), name="current_user"),
     path("current-workspace/", views.CurrentWorkspaceView.as_view(), name="current_workspace"),

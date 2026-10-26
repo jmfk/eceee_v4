@@ -16,6 +16,7 @@ from rest_framework.views import APIView
 from core.machine_api_keys import MachineAPIKeyAuthentication
 from core.models import MachineAPIKey, Tenant
 from core.permissions import HasTenantAccess
+from core.roles import is_tenant_admin
 from file_manager.storage import S3MediaStorage
 from webpages.models import PageTheme, RemoteSiteBinding, SitePackageJob, ThemeRemoteAccessKey, WebPage
 from webpages.models.theme_remote import SITE_TRANSFER_CAPABILITY
@@ -458,7 +459,7 @@ def _get_job_queryset(request, kind):
         queryset = queryset.filter(root_page__tenant=tenant)
     else:
         queryset = queryset.filter(options__tenant_id=str(tenant.id))
-    if not request.user.is_staff:
+    if not is_tenant_admin(request.user, tenant):
         queryset = queryset.filter(created_by=request.user)
 
     now = timezone.now()

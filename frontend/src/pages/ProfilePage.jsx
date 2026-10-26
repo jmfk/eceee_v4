@@ -231,13 +231,13 @@ const ProfilePage = () => {
                         </div>
                     )}
 
-                    {(user.isStaff || user.isSuperuser) && (
+                    {(user.isSuperuser || user.permissions?.includes('tenant.admin')) && (
                         <div className="flex items-center space-x-3">
                             <Shield className="w-5 h-5 text-blue-500" />
                             <div>
                                 <div className="text-sm text-gray-500">{t('Permissions')}</div>
                                 <div className="font-medium text-gray-900">
-                                    {user.isSuperuser ? 'Superuser' : t('Staff')}
+                                    {user.isSuperuser ? 'System owner' : 'Workspace administrator'}
                                 </div>
                             </div>
                         </div>

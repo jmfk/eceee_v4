@@ -22,7 +22,7 @@ import { themesApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
 import { cmsText } from '../utils/cmsCopy'
 
-export default function SettingsSidebar() {
+export default function SettingsSidebar({ onNavigate }) {
     const location = useLocation()
     const { user, language } = useAuth()
     const [isCollapsed, setIsCollapsed] = useState(false)
@@ -72,6 +72,7 @@ export default function SettingsSidebar() {
                 {item.href ? (
                     <Link
                         to={item.href}
+                        onClick={onNavigate}
                         className={`flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors ${active
                             ? 'bg-blue-50 text-blue-700'
                             : 'text-gray-700 hover:bg-gray-100'
@@ -127,12 +128,12 @@ export default function SettingsSidebar() {
             icon: Cog,
             items: [
                 { id: 'support', label: 'Support', icon: Users, href: '/settings/support' },
-                { id: 'roles', label: 'Roller och behörigheter', icon: Users, href: '/settings/roles' },
-                ...(user?.isSuperuser ? [{ id: 'users', label: 'Users', icon: Users, href: '/settings/users' }] : []),
+                { id: 'roles', label: 'Användare och behörigheter', icon: Users, href: '/settings/roles' },
+                ...(user?.isSuperuser ? [{ id: 'users', label: 'System accounts', icon: Users, href: '/settings/users' }] : []),
                 { id: 'versions', label: 'Versions', icon: Cog, href: '/settings/versions' },
                 { id: 'publishing', label: 'Publishing', icon: Calendar, href: '/settings/publishing' },
                 { id: 'namespaces', label: 'Namespaces', icon: FolderOpen, href: '/settings/namespaces' },
-                ...((user?.hasTenantAdminAccess || user?.isStaff || user?.isSuperuser)
+                ...((user?.permissions?.includes('integrations.manage') || user?.isSuperuser)
                     ? [{ id: 'remote-sites', label: 'Remote Sites', icon: Globe2, href: '/settings/remote-sites' }]
                     : []),
             ]

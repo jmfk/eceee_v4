@@ -22,12 +22,15 @@ class MediaFileSoftDeleteTests(TestCase):
 
     def setUp(self):
         """Set up test data."""
-        from core.models import Tenant
+        from core.models import Tenant, TenantRole
 
         self.client = APIClient()
         self.user = User.objects.create_user(username="testuser", password="testpass")
         self.staff_user = User.objects.create_user(username="staffuser", password="testpass", is_staff=True)
         self.tenant = Tenant.objects.create(name="Test Tenant", identifier="test-tenant-soft", created_by=self.user)
+        self.tenant.members.add(self.staff_user)
+        admin_role = TenantRole.objects.create(tenant=self.tenant, name="Workspace admin", permissions=["tenant.admin"])
+        admin_role.users.add(self.staff_user)
         self.namespace = Namespace.objects.create(
             name="Test Namespace", slug="test-namespace", created_by=self.user, tenant=self.tenant
         )
@@ -81,15 +84,22 @@ class MediaFileSoftDeleteTests(TestCase):
         self.assertIsNone(file.deleted_at)
         self.assertIsNone(file.deleted_by)
 
-    def test_force_delete_staff_only(self):
-        """Test that only staff users can force delete files."""
-        # Regular user can't force delete
+    def test_force_delete_workspace_admin_only(self):
+        """Workspace administration, rather than the staff flag, controls force delete."""
+        regular = User.objects.create_user(username="regular-media-user")
+        self.tenant.members.add(regular)
+        from core.models import TenantRole
+
+        writer = TenantRole.objects.create(tenant=self.tenant, name="Media writer", permissions=["media.write"])
+        writer.users.add(regular)
+        self.client.force_authenticate(user=regular)
+        # A media writer can't force delete
         url = f"/api/v1/media/files/{self.file.id}/force_delete/"
         url += f"?namespace={self.namespace.slug}"
         response = self.client.post(url)
         self.assertEqual(response.status_code, 403)
 
-        # Staff user can force delete
+        # Workspace administrator can force delete
         self.client.force_authenticate(user=self.staff_user)
         response = self.client.post(url)
         self.assertEqual(response.status_code, 204)

@@ -20,7 +20,7 @@ vi.mock('react-router-dom', async () => {
 
 const mocks = vi.hoisted(() => ({ language: 'en-us' }))
 vi.mock('../../contexts/AuthContext', () => ({
-    useAuth: () => ({ user: { username: 'editor', hasTenantAdminAccess: true, isSuperuser: false }, language: mocks.language }),
+    useAuth: () => ({ user: { username: 'editor', permissions: ['tenant.admin', 'integrations.manage', 'theme.read'], isSuperuser: false }, language: mocks.language }),
 }))
 
 vi.mock('../../api', () => ({

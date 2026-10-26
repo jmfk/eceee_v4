@@ -7,7 +7,8 @@ API endpoints for managing AI model prices.
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.permissions import IsAuthenticated
+from core.api_views import IsSuperUser
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 
@@ -45,10 +46,10 @@ class AIModelPriceViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         """Only admins can create/update/delete prices."""
         if self.action in ["create", "update", "partial_update", "destroy", "refresh"]:
-            return [IsAdminUser()]
+            return [IsSuperUser()]
         return [IsAuthenticated()]
 
-    @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
+    @action(detail=False, methods=["post"], permission_classes=[IsSuperUser])
     def refresh(self, request):
         """
         Trigger manual price check for all models.
@@ -67,7 +68,7 @@ class AIModelPriceViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
-    @action(detail=True, methods=["post"], permission_classes=[IsAdminUser])
+    @action(detail=True, methods=["post"], permission_classes=[IsSuperUser])
     def verify(self, request, pk=None):
         """
         Mark a specific price as verified.
