@@ -1139,7 +1139,6 @@ export default function KanbanPage() {
                             {!boardId && <p className="user-tools-description">Välj en tavla eller skapa en ny för ditt team.</p>}
                         </div>
                         <div className="kb-board-header-controls flex flex-wrap items-center gap-2">
-                        {boardId && <Link to="/kanban" className="user-tools-button"><ArrowLeft size={16} />Byt tavla</Link>}
                         {boardId && <button onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters}><SlidersHorizontal size={16} />Filter</button>}
                         <button onClick={() => setShowNotices(!showNotices)} aria-expanded={showNotices}>
                             Aviseringar ({workspace.notifications.filter((item) => !item.read).length})
@@ -1149,6 +1148,7 @@ export default function KanbanPage() {
                         </button>
                         {board && <ActionsMenu label="Tavelåtgärder">
                             {(close) => <>
+                                <Link to="/kanban" className="kb-menu-link" onClick={close}><ArrowLeft size={15} />Byt tavla</Link>
                                 {!board.archived && <button onClick={() => { close(); setAddingList(true) }}><Plus size={15} />Lägg till lista</button>}
                                 <button onClick={() => { close(); setBoardDialog('members') }}><Users size={15} />Medlemmar</button>
                                 <button onClick={() => { close(); setBoardTitle(board.title); setBoardDialog('edit') }}><Pencil size={15} />Redigera tavlan</button>
