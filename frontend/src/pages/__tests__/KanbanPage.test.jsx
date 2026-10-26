@@ -29,7 +29,7 @@ vi.mock('../../utils/tenant', () => ({
 }))
 vi.mock('../../api/kanban', async (importOriginal) => ({
     ...(await importOriginal()),
-    kanbanApi: { get: vi.fn(), cards: vi.fn(), post: vi.fn(), patch: vi.fn(), upload: vi.fn() },
+    kanbanApi: { get: vi.fn(), cards: vi.fn(), post: vi.fn(), patch: vi.fn(), upload: vi.fn(), background: vi.fn() },
 }))
 
 const workspace = {
@@ -112,6 +112,30 @@ describe('Kanban application navigation', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Lägg till lista' }))
         await waitFor(() => expect(kanbanApi.post).toHaveBeenCalledWith('boards/board-1/columns/', expect.objectContaining({ title: 'Pågår' })))
         expect(screen.queryByRole('textbox', { name: 'Listnamn' })).not.toBeInTheDocument()
+    })
+
+    it('places a board background behind the full screen instead of only the lists', async () => {
+        const createObjectURL = URL.createObjectURL
+        const revokeObjectURL = URL.revokeObjectURL
+        URL.createObjectURL = vi.fn(() => 'blob:board-background')
+        URL.revokeObjectURL = vi.fn()
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? {
+            ...workspace,
+            boards: [{ ...workspace.boards[0], hasBackground: true, revision: 1 }],
+        } : {})
+        kanbanApi.background.mockResolvedValue(new Blob(['image'], { type: 'image/png' }))
+        const view = renderKanban('/kanban/boards/board-1')
+        try {
+            const lists = await screen.findByLabelText('Kanban-kolumner')
+            const shell = lists.closest('.user-tools-shell')
+            await waitFor(() => expect(shell.style.backgroundImage).toContain('blob:board-background'))
+            expect(shell).toHaveClass('kb-board-background')
+            expect(lists.style.backgroundImage).toBe('')
+        } finally {
+            view.unmount()
+            URL.createObjectURL = createObjectURL
+            URL.revokeObjectURL = revokeObjectURL
+        }
     })
 
 })

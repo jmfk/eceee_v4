@@ -1120,7 +1120,8 @@ export default function KanbanPage() {
     }
     return (
         <KanbanAccessContext.Provider value={ticket}>
-            <div className="user-tools-shell">
+            <div className={`user-tools-shell ${boardBackground && board ? 'kb-board-background' : ''}`}
+                style={boardBackground && board ? { backgroundImage: `linear-gradient(rgb(15 23 42 / 0.1), rgb(15 23 42 / 0.1)), url("${boardBackground}")` } : undefined}>
                 <UserToolsNav tenant={tenant} />
                 <GlobalWysiwygToolbar />
                 <main className={`kb user-tools-main user-tools-content ${boardId ? 'kb-board-view' : ''}`}>
@@ -1393,7 +1394,7 @@ export default function KanbanPage() {
                                 </form>
                             )}
                             {board ? (
-                                <div className="kb-lists" aria-label="Kanban-kolumner" ref={boardDrag.boardRef} style={boardBackground ? { backgroundImage: `linear-gradient(rgb(15 23 42 / 0.1), rgb(15 23 42 / 0.1)), url("${boardBackground}")` } : undefined}
+                                <div className="kb-lists" aria-label="Kanban-kolumner" ref={boardDrag.boardRef}
                                     onDrop={(e) => {
                                         const target = boardDrag.targetRef.current
                                         if (!boardDrag.drag || !target) return
@@ -1542,7 +1543,7 @@ export default function KanbanPage() {
                     {cardId && (cardQuery.data ? <CardDetail key={`${tenant}:${principal}:${cardId}`} card={cardQuery.data} workspace={workspace} run={run} busy={busy} reload={() => cardQuery.refetch()} error={error} /> : <p role={cardQuery.error ? 'alert' : 'status'}>{cardQuery.error ? kanbanError(cardQuery.error) : 'Läser kortet…'}</p>)}
                     </div>
                 </main>
-                <StatusBar customStatusContent={<span>Kanban</span>} />
+                <StatusBar className={boardBackground && board ? 'kb-board-status' : ''} customStatusContent={<span>Kanban</span>} />
             </div>
         </KanbanAccessContext.Provider>
     )
