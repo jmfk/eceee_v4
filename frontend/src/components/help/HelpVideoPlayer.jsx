@@ -36,7 +36,7 @@ const HelpVideoPlayer = ({
     mp4Url,
     captionsUrl,
     videoSources,
-    language = 'sv',
+    language = 'en',
     youtubeId,
     youtubeUrl,
     title

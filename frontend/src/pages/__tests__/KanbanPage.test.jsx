@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import KanbanPage from '../KanbanPage'
 import { kanbanApi } from '../../api/kanban'
+import { setCmsCopyLanguage } from '../../utils/cmsCopy'
 
 vi.unmock('react-router-dom')
 vi.mock('../../components/Navbar', () => ({ default: () => <nav aria-label="CMS">CMS</nav> }))
@@ -38,6 +39,7 @@ const renderKanban = (route = '/kanban') => render(
 )
 
 beforeEach(() => {
+    setCmsCopyLanguage('sv-se')
     vi.clearAllMocks()
     kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? workspace : {})
     kanbanApi.cards.mockResolvedValue({ results: [card] })

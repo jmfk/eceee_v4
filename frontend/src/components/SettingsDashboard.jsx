@@ -21,27 +21,31 @@ import { Link } from 'react-router-dom'
 import { themesApi } from '../api'
 import { objectTypesApi } from '../api/objectStorage'
 import { api } from '../api/client'
+import { cmsText } from '../utils/cmsCopy'
 
-const StatCard = ({ title, count, icon: Icon, color, link, description }) => (
+const StatCard = ({ title, count, icon: Icon, color, link, description }) => {
+    const { language } = useAuth()
+    return (
     <Link
         to={link}
         className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow group"
     >
         <div className="flex items-start justify-between">
             <div>
-                <p className="text-sm font-medium text-gray-500">{title}</p>
+                <p className="text-sm font-medium text-gray-500">{cmsText(title, language)}</p>
                 <h3 className="text-3xl font-bold mt-1 text-gray-900">{count}</h3>
-                <p className="text-xs text-gray-400 mt-1">{description}</p>
+                <p className="text-xs text-gray-400 mt-1">{cmsText(description, language)}</p>
             </div>
             <div className={`p-3 rounded-lg ${color} bg-opacity-10 text-opacity-100`}>
                 <Icon className={`w-6 h-6 ${color.replace('bg-', 'text-')}`} />
             </div>
         </div>
         <div className="mt-4 flex items-center text-sm text-blue-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-            Manage {title} <ArrowRight className="w-4 h-4 ml-1" />
+            {cmsText('Manage', language)} {cmsText(title, language)} <ArrowRight className="w-4 h-4 ml-1" />
         </div>
     </Link>
-)
+    )
+}
 
 const SettingsDashboard = () => {
     const { user } = useAuth()

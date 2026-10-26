@@ -3,9 +3,11 @@ import Navbar from './Navbar'
 import SettingsSidebar from './SettingsSidebar'
 import StatusBar from './StatusBar'
 import { useLocation } from 'react-router-dom'
+import { cmsText, getCmsCopyLanguage } from '../utils/cmsCopy'
 
 const SettingsLayout = ({ children, statusContent }) => {
     const location = useLocation()
+    const language = getCmsCopyLanguage()
 
     // Determine status content based on path if not provided
     const getStatusContent = () => {
@@ -40,7 +42,7 @@ const SettingsLayout = ({ children, statusContent }) => {
                     </div>
                 </main>
             </div>
-            <StatusBar customStatusContent={<span>{getStatusContent()}</span>} />
+            <StatusBar customStatusContent={<span>{cmsText(getStatusContent(), language)}</span>} />
         </div>
     )
 }

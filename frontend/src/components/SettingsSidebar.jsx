@@ -20,10 +20,11 @@ import {
 } from 'lucide-react'
 import { themesApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
+import { cmsText } from '../utils/cmsCopy'
 
 export default function SettingsSidebar() {
     const location = useLocation()
-    const { user } = useAuth()
+    const { user, language } = useAuth()
     const [isCollapsed, setIsCollapsed] = useState(false)
     const [expandedSections, setExpandedSections] = useState({
         themes: true,
@@ -78,7 +79,7 @@ export default function SettingsSidebar() {
                         style={{ paddingLeft: `${(depth + 1) * 1}rem` }}
                     >
                         {Icon && <Icon className={`w-4 h-4 mr-3 ${active ? 'text-blue-600' : 'text-gray-400'}`} />}
-                        <span className="truncate">{item.label}</span>
+                        <span className="truncate">{item.translate === false ? item.label : cmsText(item.label, language)}</span>
                     </Link>
                 ) : (
                     <button
@@ -88,7 +89,7 @@ export default function SettingsSidebar() {
                     >
                         <div className="flex items-center">
                             {Icon && <Icon className="w-4 h-4 mr-3" />}
-                            <span>{item.label}</span>
+                            <span>{cmsText(item.label, language)}</span>
                         </div>
                         {hasChildren && (
                             isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />
@@ -145,6 +146,7 @@ export default function SettingsSidebar() {
                 ...themes.map(theme => ({
                     id: `theme-${theme.id}`,
                     label: theme.name,
+                    translate: false,
                     icon: Palette,
                     href: `/settings/themes/${theme.id}`
                 }))
@@ -186,10 +188,10 @@ export default function SettingsSidebar() {
                 <button
                     type="button"
                     onClick={() => setIsCollapsed((collapsed) => !collapsed)}
-                    aria-label={isCollapsed ? 'Expand settings menu' : 'Collapse settings menu'}
+                    aria-label={cmsText(isCollapsed ? 'Expand settings menu' : 'Collapse settings menu', language)}
                     aria-expanded={!isCollapsed}
                     aria-controls="settings-navigation"
-                    title={isCollapsed ? 'Expand settings menu' : 'Collapse settings menu'}
+                    title={cmsText(isCollapsed ? 'Expand settings menu' : 'Collapse settings menu', language)}
                     className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                 >
                     {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronRight className="h-4 w-4 rotate-180" />}

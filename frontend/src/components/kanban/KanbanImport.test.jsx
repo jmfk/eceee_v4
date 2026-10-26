@@ -1,9 +1,12 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
-import { expect, it, vi } from 'vitest'
+import { beforeEach, expect, it, vi } from 'vitest'
 import KanbanImport from './KanbanImport'
 import { kanbanApi } from '../../api/kanban'
+import { setCmsCopyLanguage } from '../../utils/cmsCopy'
+
+beforeEach(() => setCmsCopyLanguage('sv-se'))
 
 const session = vi.hoisted(() => ({ user: { id: 1 } }))
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => session }))

@@ -5,12 +5,14 @@ import { History, Loader2, Pencil, RotateCcw, Save, X } from 'lucide-react'
 import { themesApi } from '../../api/themes'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 import { extractErrorMessage } from '../../utils/errorHandling'
+import { cmsText, getCmsCopyLanguage } from '../../utils/cmsCopy'
 
-const formatDate = (value) => value
-    ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
-    : 'Unknown date'
+const formatDate = (value, language) => value
+    ? new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+    : cmsText('Unknown date', language)
 
 const ThemeVersionsTab = ({ themeId, hasUnsavedChanges }) => {
+    const language = getCmsCopyLanguage()
     const queryClient = useQueryClient()
     const { addNotification } = useGlobalNotifications()
     const [checkpointName, setCheckpointName] = useState('')
@@ -111,7 +113,7 @@ const ThemeVersionsTab = ({ themeId, hasUnsavedChanges }) => {
                     </div> : <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-xs text-gray-500">v{version.versionNumber}</span><span className="font-medium text-gray-900">{version.name || 'Unnamed version'}</span>{version.isCurrent && <span className="rounded bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Current</span>}</div>
-                            <p className="mt-1 text-xs text-gray-500">{formatDate(version.createdAt)} · {version.sourceLabel || version.source}{version.createdBy ? ` · ${version.createdBy}` : ''}</p>
+                            <p className="mt-1 text-xs text-gray-500">{formatDate(version.createdAt, language)} · {version.sourceLabel || version.source}{version.createdBy ? ` · ${version.createdBy}` : ''}</p>
                         </div>
                         <div className="flex shrink-0 gap-2">
                             <button type="button" onClick={() => { setEditingVersionId(version.id); setVersionName(version.name || '') }} className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700"><Pencil className="h-3.5 w-3.5" />{version.name ? 'Rename' : 'Name'}</button>

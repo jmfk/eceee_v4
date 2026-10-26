@@ -5,6 +5,7 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import KanbanMediaImport from './KanbanMediaImport'
 import { taxonomyApi } from '../../api/taxonomy'
 import { kanbanApi } from '../../api/kanban'
+import { setCmsCopyLanguage } from '../../utils/cmsCopy'
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 1, permissions: ['media.write'] } }) }))
 vi.mock('../../utils/tenant', () => ({ getCurrentTenantId: () => 'tenant' }))
 vi.mock('../../api/taxonomy', () => ({ taxonomyApi: { namespaces: vi.fn() }, classificationError: error => error.message }))
@@ -20,6 +21,7 @@ function renderImport(attachment = file) {
     return invalidate
 }
 beforeEach(() => {
+    setCmsCopyLanguage('sv-se')
     vi.clearAllMocks()
     taxonomyApi.namespaces.mockResolvedValue({ results: [{ id: 1, name: 'Main', kind: 'content' }, { id: 2, name: 'Other', kind: 'content' }] })
     kanbanApi.post.mockResolvedValue({})

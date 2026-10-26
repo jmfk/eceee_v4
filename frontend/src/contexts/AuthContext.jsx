@@ -3,6 +3,8 @@ import { clearReportDiagnostics } from '../utils/reportDiagnostics'
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 
 import { reconcileCurrentTenantId, setCurrentTenantId } from '../utils/tenant';
+import { getBrowserLanguages, resolveCmsLanguage } from '../utils/cmsLanguage';
+import { setCmsCopyLanguage } from '../utils/cmsCopy';
 
 const AuthContext = createContext();
 
@@ -18,6 +20,12 @@ export const AuthProvider = ({ children }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [user, setUser] = useState(null);
+    const language = resolveCmsLanguage(user?.preferredLanguage, getBrowserLanguages());
+    setCmsCopyLanguage(language);
+
+    useEffect(() => {
+        document.documentElement.lang = language;
+    }, [language]);
     const [sessionExpired, setSessionExpired] = useState(false);
     const requestQueueRef = useRef([]);
 
@@ -147,6 +155,8 @@ export const AuthProvider = ({ children }) => {
         isAuthenticated,
         isLoading,
         user,
+        language,
+        setUser,
         sessionExpired,
         setSessionExpired,
         queueRequest,
@@ -157,7 +167,7 @@ export const AuthProvider = ({ children }) => {
 
     return (
         <AuthContext.Provider value={value}>
-            {children}
+            <React.Fragment key={language}>{children}</React.Fragment>
         </AuthContext.Provider>
     );
 };

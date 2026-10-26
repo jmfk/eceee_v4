@@ -524,6 +524,11 @@ class CurrentUserView(APIView):
             context={"additional_designer_tenants": list(administrative_tenants.order_by("name"))},
         )
         data = dict(serializer.data)
+        from cms_auth.models import UserLanguagePreference
+
+        data["preferredLanguage"] = (
+            UserLanguagePreference.objects.filter(user=request.user).values_list("language", flat=True).first() or ""
+        )
         current_workspace = getattr(request, "tenant", None)
         if current_workspace and not user_can_switch_tenant(request.user):
             accessible_tenants = (
@@ -556,6 +561,20 @@ class CurrentUserView(APIView):
             else None
         )
         return Response(data)
+
+    def patch(self, request):
+        from cms_auth.models import UserLanguagePreference
+
+        serializer = LanguagePreferenceSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        preference, _ = UserLanguagePreference.objects.update_or_create(
+            user=request.user, defaults={"language": serializer.validated_data["preferredLanguage"]}
+        )
+        return Response({"preferredLanguage": preference.language})
+
+
+class LanguagePreferenceSerializer(serializers.Serializer):
+    preferredLanguage = serializers.ChoiceField(choices=["", "en-us", "sv-se"])
 
 
 class WorkspaceSelectionSerializer(serializers.Serializer):

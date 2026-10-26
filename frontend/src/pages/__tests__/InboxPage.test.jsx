@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import InboxPage from '../InboxPage'
 import { supportRequest, validateBugVideo } from '../../api/support'
+import { setCmsCopyLanguage } from '../../utils/cmsCopy'
 
 vi.unmock('react-router-dom')
 
@@ -67,6 +68,7 @@ const renderInbox = (route = '/inbox/?tenant=a') => {
 }
 
 beforeEach(() => {
+    setCmsCopyLanguage('sv-se')
     vi.clearAllMocks()
     supportRequest.mockImplementation(async (_tenant, path, method) => {
         if (path === 'context/') return context

@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import HelpInstructionVideos from '../HelpInstructionVideos'
 import { supportRequest } from '../../../api/support'
+import { setCmsCopyLanguage } from '../../../utils/cmsCopy'
 
 vi.unmock('react-router-dom')
 const state = vi.hoisted(() => ({ tenant: 'workspace-a', canPublish: false }))
@@ -24,6 +25,7 @@ const renderVideos = () => render(
 )
 
 beforeEach(() => {
+    setCmsCopyLanguage('sv-se')
     vi.clearAllMocks()
     state.tenant = 'workspace-a'
     state.canPublish = false

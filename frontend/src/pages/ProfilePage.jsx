@@ -5,16 +5,19 @@ import UserToolsNav from '../components/UserToolsNav';
 import { useSupportContext, useSupportTenant } from '../components/support/useSupportContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
-import { changePassword, switchCurrentWorkspace } from '../api/users';
+import { changePassword, switchCurrentWorkspace, updatePreferredLanguage } from '../api/users';
 import { Lock, User, Mail, Shield, AlertCircle, CheckCircle, Building2 } from 'lucide-react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { getCurrentTenantId, setCurrentTenantId } from '../utils/tenant';
+import { cmsText } from '../utils/cmsCopy';
+import CompactSelect from '../components/classification/CompactSelect';
+import '../components/classification/classification.css';
 
 const ProfilePage = () => {
-    // Set document title
-    useDocumentTitle('Profile');
-
-    const { user } = useAuth();
+    const { user, setUser, language } = useAuth();
+    const t = (key) => cmsText(key, language);
+    useDocumentTitle(t('Profile'));
+    const [isSavingLanguage, setIsSavingLanguage] = useState(false);
     const tenant = useSupportTenant();
     const support = useSupportContext();
     const unreadCount = support.data?.unreadCount || 0;
@@ -48,8 +51,21 @@ const ProfilePage = () => {
             setCurrentTenantId(identifier);
             window.location.assign('/profile');
         } catch (error) {
-            addNotification(error.response?.data?.error || 'Failed to switch workspace', 'error');
+            addNotification(error.response?.data?.error || t('Failed to switch workspace'), 'error');
             setIsSwitchingWorkspace(false);
+        }
+    };
+
+    const handleLanguageChange = async (event) => {
+        const preferredLanguage = event.target.value === 'default' ? '' : event.target.value;
+        setIsSavingLanguage(true);
+        try {
+            await updatePreferredLanguage(preferredLanguage);
+            setUser(current => current ? { ...current, preferredLanguage } : current);
+        } catch {
+            addNotification(t('Failed to save language preference'), 'error');
+        } finally {
+            setIsSavingLanguage(false);
         }
     };
 
@@ -74,24 +90,24 @@ const ProfilePage = () => {
         const newErrors = {};
 
         if (!passwordData.oldPassword) {
-            newErrors.oldPassword = 'Current password is required';
+            newErrors.oldPassword = t('Current password is required');
         }
 
         if (!passwordData.newPassword) {
-            newErrors.newPassword = 'New password is required';
+            newErrors.newPassword = t('New password is required');
         } else if (passwordData.newPassword.length < 8) {
-            newErrors.newPassword = 'Password must be at least 8 characters';
+            newErrors.newPassword = t('Password must be at least 8 characters');
         }
 
         if (!passwordData.confirmPassword) {
-            newErrors.confirmPassword = 'Please confirm your new password';
+            newErrors.confirmPassword = t('Please confirm your new password');
         } else if (passwordData.newPassword !== passwordData.confirmPassword) {
-            newErrors.confirmPassword = 'Passwords do not match';
+            newErrors.confirmPassword = t('Passwords do not match');
         }
 
         if (passwordData.oldPassword && passwordData.newPassword && 
             passwordData.oldPassword === passwordData.newPassword) {
-            newErrors.newPassword = 'New password must be different from current password';
+            newErrors.newPassword = t('New password must be different from current password');
         }
 
         setErrors(newErrors);
@@ -112,7 +128,7 @@ const ProfilePage = () => {
             await changePassword(passwordData);
             
             setSuccess(true);
-            addNotification('Password changed successfully', 'success');
+            addNotification(t('Password changed successfully'), 'success');
             
             // Clear form
             setPasswordData({
@@ -134,10 +150,10 @@ const ProfilePage = () => {
                 } else if (error.response.data.newPassword) {
                     addNotification(error.response.data.newPassword, 'error');
                 } else {
-                    addNotification('Failed to change password', 'error');
+                    addNotification(t('Failed to change password'), 'error');
                 }
             } else {
-                addNotification('Failed to change password', 'error');
+                addNotification(t('Failed to change password'), 'error');
             }
         } finally {
             setIsSubmitting(false);
@@ -158,22 +174,36 @@ const ProfilePage = () => {
             <div className="mb-6">
                 <div className="flex items-center gap-3">
                     <User aria-hidden="true" className="h-8 w-8 text-primary-600" />
-                    <h1 className="text-3xl font-bold text-gray-900">Profile</h1>
+                    <h1 className="text-3xl font-bold text-gray-900">{t('Profile')}</h1>
                 </div>
-                <div className="text-gray-600 mt-2">Manage your account settings</div>
+                <div className="text-gray-600 mt-2">{t('Manage your account settings')}</div>
             </div>
 
             <ProfilePhotoEditor user={user} />
+            <section className="mb-6 rounded border border-gray-200 bg-white p-5 shadow-sm" aria-labelledby="language-heading">
+                <h2 id="language-heading" className="text-lg font-semibold text-gray-900">{t('Language')}</h2>
+                <p className="mt-1 text-xs text-gray-600">{t('Choose the language for the CMS and help pages. Default follows your browser.')}</p>
+                <div className="classification-manager mt-3 max-w-xs">
+                    <label className="classification-field">
+                        <span className="classification-field-label">{t('Preferred language')}</span>
+                        <CompactSelect label={t('Preferred language')} value={user.preferredLanguage || 'default'} onChange={handleLanguageChange} disabled={isSavingLanguage}>
+                            <option value="default">{t('Default (browser language)')}</option>
+                            <option value="en-us">{t('English')}</option>
+                            <option value="sv-se">{t('Svenska')}</option>
+                        </CompactSelect>
+                    </label>
+                </div>
+            </section>
             <AccountSecurityPanel />
             {/* User Information */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-                <div className="text-xl font-semibold text-gray-900 mb-4" role="heading" aria-level="2">Account Information</div>
+                <div className="text-xl font-semibold text-gray-900 mb-4" role="heading" aria-level="2">{t('Account Information')}</div>
                 
                 <div className="space-y-4">
                     <div className="flex items-center space-x-3">
                         <User className="w-5 h-5 text-gray-400" />
                         <div>
-                            <div className="text-sm text-gray-500">Username</div>
+                            <div className="text-sm text-gray-500">{t('Username')}</div>
                             <div className="font-medium text-gray-900">{user.username}</div>
                         </div>
                     </div>
@@ -182,7 +212,7 @@ const ProfilePage = () => {
                         <div className="flex items-center space-x-3">
                             <Mail className="w-5 h-5 text-gray-400" />
                             <div>
-                                <div className="text-sm text-gray-500">Email</div>
+                                <div className="text-sm text-gray-500">{t('Email')}</div>
                                 <div className="font-medium text-gray-900">{user.email}</div>
                             </div>
                         </div>
@@ -192,7 +222,7 @@ const ProfilePage = () => {
                         <div className="flex items-center space-x-3">
                             <User className="w-5 h-5 text-gray-400" />
                             <div>
-                                <div className="text-sm text-gray-500">Name</div>
+                                <div className="text-sm text-gray-500">{t('Name')}</div>
                                 <div className="font-medium text-gray-900">
                                     {user.firstName} {user.lastName}
                                 </div>
@@ -204,9 +234,9 @@ const ProfilePage = () => {
                         <div className="flex items-center space-x-3">
                             <Shield className="w-5 h-5 text-blue-500" />
                             <div>
-                                <div className="text-sm text-gray-500">Permissions</div>
+                                <div className="text-sm text-gray-500">{t('Permissions')}</div>
                                 <div className="font-medium text-gray-900">
-                                    {user.isSuperuser ? 'Superuser' : 'Staff'}
+                                    {user.isSuperuser ? 'Superuser' : t('Staff')}
                                 </div>
                             </div>
                         </div>
@@ -219,13 +249,13 @@ const ProfilePage = () => {
                     <div className="flex items-start gap-3">
                         <Building2 className="w-5 h-5 text-blue-500 mt-0.5" />
                         <div className="flex-1">
-                            <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">Workspace</div>
-                            <p className="text-sm text-gray-600 mt-1">Choose which workspace to use in this browser session.</p>
+                            <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">{t('Workspace')}</div>
+                            <p className="text-sm text-gray-600 mt-1">{t('Choose which workspace to use in this browser session.')}</p>
                             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
                                 <label className="flex-1 text-sm font-medium text-gray-700">
-                                    Current workspace
+                                    {t('Current workspace')}
                                     <select
-                                        aria-label="Current workspace"
+                                        aria-label={t('Current workspace')}
                                         value={selectedWorkspace}
                                         onChange={(event) => setSelectedWorkspace(event.target.value)}
                                         className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -241,7 +271,7 @@ const ProfilePage = () => {
                                     disabled={!selectedWorkspace || isSwitchingWorkspace}
                                     className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
-                                    {isSwitchingWorkspace ? 'Switching…' : 'Switch workspace'}
+                                    {isSwitchingWorkspace ? t('Switching…') : t('Switch workspace')}
                                 </button>
                             </div>
                         </div>
@@ -251,12 +281,12 @@ const ProfilePage = () => {
 
             {/* Change Password */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="text-xl font-semibold text-gray-900 mb-4" role="heading" aria-level="2">Change Password</div>
+                <div className="text-xl font-semibold text-gray-900 mb-4" role="heading" aria-level="2">{t('Change Password')}</div>
 
                 {success && (
                     <div className="mb-4 bg-green-50 border border-green-200 rounded-md p-4 flex items-center space-x-3">
                         <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                        <div className="text-sm text-green-700">Your password has been changed successfully.</div>
+                        <div className="text-sm text-green-700">{t('Your password has been changed successfully.')}</div>
                     </div>
                 )}
 
@@ -264,7 +294,7 @@ const ProfilePage = () => {
                     {/* Current Password */}
                     <div>
                         <label htmlFor="oldPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                            Current Password
+                            {t('Current Password')}
                         </label>
                         <div className="relative">
                             <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -291,7 +321,7 @@ const ProfilePage = () => {
                     {/* New Password */}
                     <div>
                         <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                            New Password
+                            {t('New Password')}
                         </label>
                         <div className="relative">
                             <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />

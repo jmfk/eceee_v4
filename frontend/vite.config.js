@@ -2274,7 +2274,7 @@ const howToScriptEditorPlugin = () => ({
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react(), howToScriptEditorPlugin()],
+  plugins: [react({ babel: { plugins: ['./scripts/cms-i18n-babel.cjs'] } }), howToScriptEditorPlugin()],
 
   // Path aliases for cleaner imports
   resolve: {
