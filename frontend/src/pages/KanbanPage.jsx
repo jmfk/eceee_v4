@@ -16,6 +16,7 @@ import '../components/user-tools.css'
 import { useAuth } from '../contexts/AuthContext'
 import GlobalWysiwygToolbar from '../components/wysiwyg/GlobalWysiwygToolbar'
 import MarkdownEditor, { MarkdownView } from '../components/kanban/MarkdownEditor'
+import { fileMarkdown } from '../components/kanban/markdown'
 import { kanbanApi, kanbanError, attachmentUrl, kanbanSocketUrl } from '../api/kanban'
 import { getCurrentTenantId, subscribeToCurrentTenantId } from '../utils/tenant'
 import '../components/kanban/kanban.css'
@@ -215,17 +216,16 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
         }
         event.preventDefault()
         event.stopPropagation()
+        const uploaded = files.length ? await upload(files) : []
+        if (files.length && !uploaded.length) return
         await run(async () => {
             const current = await kanbanApi.get(`cards/${card.id}/`)
-            const comment = await kanbanApi.post(`cards/${card.id}/comments/`, {
+            await kanbanApi.post(`cards/${card.id}/comments/`, {
                 body: inlineImage
-                    ? `![${(inlineImage.name || 'Bild').replaceAll(']', '\\]')}](${attachmentUrl(inlineImage.id)})`
-                    : files.map((file) => file.name).join(', '),
+                    ? fileMarkdown({ id: inlineImage.id, filename: inlineImage.name || 'Bild', contentType: 'image/png' })
+                    : uploaded.map(fileMarkdown).join('\n\n'),
                 revision: current.revision,
             })
-            if (!files.length) return
-            const afterComment = await kanbanApi.get(`cards/${card.id}/`)
-            await upload(files, [], comment.id, afterComment.revision)
         })
     }
     const timeline = [
