@@ -380,6 +380,7 @@
 .kb-editor-visual { position: relative; }
 .kb-detail .prose, .kb-editor-frame [contenteditable='true'] { display: flow-root; }
 .kb-detail :is(.prose, .kb-editor-visual) img { max-width: 100%; height: auto; }
+.kb-detail :is(.prose, .kb-editor-visual) img:not([data-image-style^='float-']) { display: block; clear: both; margin-block: 8px; }
 .kb-detail :is(.prose, .kb-editor-visual) img[data-width='25'] { width: 25%; }
 .kb-detail :is(.prose, .kb-editor-visual) img[data-width='50'] { width: 50%; }
 .kb-detail :is(.prose, .kb-editor-visual) img[data-width='75'] { width: 75%; }
