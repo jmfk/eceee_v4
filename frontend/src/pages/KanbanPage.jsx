@@ -121,11 +121,14 @@ const matchingImageAttachment = async (file, attachments) => {
 function CardDetail({ card, workspace, run, busy, reload, error }) {
     const ticket = useKanbanAccess()
     const [draft, setDraft] = useState(card)
+    const boardMemberIds = workspace.boards.find((board) => board.id === card.board)?.members
     const navigate = useNavigate()
     const baselineRef = useRef(editableSignature(card))
     const draftRef = useRef(draft)
     draftRef.current = draft
     const [section, setSection] = useState('')
+    const [memberSearch, setMemberSearch] = useState('')
+    const memberButtonRef = useRef(null)
     const [editingDescription, setEditingDescription] = useState(false)
     const [descriptionImageId, setDescriptionImageId] = useState(null)
     const [commentOpen, setCommentOpen] = useState(false)
@@ -427,7 +430,8 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                                             key={name}
                                                             type="button"
                                                             onClick={() => {
-                                                                reveal(name)
+                                                                if (name === 'members') memberButtonRef.current?.click()
+                                                                else reveal(name)
                                                                 close()
                                                             }}
                                                         >
@@ -474,20 +478,46 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                             {workspace.members
                                                 .filter((member) => draft.assignees.includes(member.id))
                                                 .map((member) => (
-                                                    <Avatar
-                                                        key={member.id}
-                                                        userId={member.id}
-                                                        name={member.name}
-                                                    />
+                                                    <Avatar key={member.id} userId={member.id} name={member.name} />
                                                 ))}
-                                            <button
-                                                type="button"
-                                                aria-label="Ändra medlemmar"
-                                                aria-expanded={section === 'members'}
-                                                onClick={() => reveal('members')}
-                                            >
-                                                <Plus size={16} />
-                                            </button>
+                                            <Popover className="kb-member-anchor">
+                                                <PopoverButton ref={memberButtonRef} type="button" aria-label="Ändra medlemmar"
+                                                    onClick={() => setMemberSearch('')}>
+                                                    <Plus size={16} />
+                                                </PopoverButton>
+                                                <PopoverPanel anchor="bottom start" className="kb-member-picker">
+                                                    {({ close }) => {
+                                                        const query = memberSearch.trim().toLocaleLowerCase()
+                                                        const matches = (member) => `${member.name} ${member.username || ''}`.toLocaleLowerCase().includes(query)
+                                                        const selected = workspace.members.filter((member) => draft.assignees.includes(member.id) && matches(member))
+                                                        const available = workspace.members.filter((member) =>
+                                                            (!boardMemberIds || boardMemberIds.includes(member.id)) &&
+                                                            !draft.assignees.includes(member.id) && matches(member))
+                                                        return <>
+                                                            <div className="kb-member-picker-header">
+                                                                <strong>Ändra medlemmar</strong>
+                                                                <button type="button" aria-label="Stäng medlemsväljaren" onClick={() => close()}><X size={15} /></button>
+                                                            </div>
+                                                            <input autoFocus type="search" aria-label="Sök medlem" placeholder="Sök medlem"
+                                                                value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} />
+                                                            <div className="kb-member-picker-list">
+                                                                <h4>Kortmedlemmar</h4>
+                                                                {selected.length ? selected.map((member) => <button type="button" key={member.id}
+                                                                    aria-label={`Ta bort ${member.name} från kortet`} onClick={() => toggle('assignees', member.id)}>
+                                                                    <Avatar userId={member.id} name={member.name} size={28} />
+                                                                    <span>{member.name}</span><X size={15} aria-hidden="true" />
+                                                                </button>) : <p>Inga kortmedlemmar</p>}
+                                                                <h4>Tavlemedlemmar</h4>
+                                                                {available.length ? available.map((member) => <button type="button" key={member.id}
+                                                                    aria-label={`Lägg till ${member.name} på kortet`} onClick={() => toggle('assignees', member.id)}>
+                                                                    <Avatar userId={member.id} name={member.name} size={28} />
+                                                                    <span>{member.name}</span>
+                                                                </button>) : <p>Inga fler medlemmar</p>}
+                                                            </div>
+                                                        </>
+                                                    }}
+                                                </PopoverPanel>
+                                            </Popover>
                                         </div>
                                     </div>
                                     {!!draft.labels.length && (
@@ -529,23 +559,6 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                             />
                                         </label>
                                     </div>
-                                )}
-                                {section === 'members' && (
-                                    <fieldset className="kb-detail-field-group">
-                                        <legend className="font-medium mb-2">Ansvariga</legend>
-                                        <div className="flex flex-wrap gap-4">
-                                            {workspace.members.map((member) => (
-                                                <label key={member.id}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={draft.assignees.includes(member.id)}
-                                                        onChange={() => toggle('assignees', member.id)}
-                                                    />{' '}
-                                                    {member.name}
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </fieldset>
                                 )}
                                 {section === 'labels' && (
                                     <div className="kb-detail-field-group">

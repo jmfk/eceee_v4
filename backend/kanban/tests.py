@@ -585,19 +585,31 @@ class KanbanTests(TestCase):
 
     def test_identical_attachment_upload_reuses_existing_file(self):
         from io import BytesIO
+
         from django.core.files.uploadedfile import SimpleUploadedFile
+
         from webpages.services.designer_theme import generate_placeholder_png
 
         content = generate_placeholder_png("same", "portrait", 16, 16)
         existing = Attachment.objects.create(
-            tenant=self.tenant, card=self.card, filename="old.png", path="existing",
-            content_type="image/png", size=len(content), uploaded_by=self.user,
+            tenant=self.tenant,
+            card=self.card,
+            filename="old.png",
+            path="existing",
+            content_type="image/png",
+            size=len(content),
+            uploaded_by=self.user,
         )
         with patch("kanban.files.attachment_storage") as storage:
             storage.client.get_object.return_value = {"Body": BytesIO(content)}
-            request = self.factory.post("/", {
-                "revision": 1, "file": SimpleUploadedFile("new.png", content, content_type="image/png"),
-            }, format="multipart")
+            request = self.factory.post(
+                "/",
+                {
+                    "revision": 1,
+                    "file": SimpleUploadedFile("new.png", content, content_type="image/png"),
+                },
+                format="multipart",
+            )
             force_authenticate(request, user=self.user)
             request.tenant = self.tenant
             response = CardViewSet.as_view({"post": "attachments"})(request, pk=str(self.card.pk))
@@ -611,8 +623,13 @@ class KanbanTests(TestCase):
 
     def test_delete_attachment_requires_current_revision_and_removes_file_after_commit(self):
         attachment = Attachment.objects.create(
-            tenant=self.tenant, card=self.card, filename="portrait.png", path="portrait",
-            content_type="image/png", size=4, uploaded_by=self.user,
+            tenant=self.tenant,
+            card=self.card,
+            filename="portrait.png",
+            path="portrait",
+            content_type="image/png",
+            size=4,
+            uploaded_by=self.user,
         )
         with patch("kanban.files.attachment_storage") as storage:
             stale = self.call(AttachmentViewSet, "destroy", {"revision": 2}, pk=attachment.pk, method="delete")
@@ -630,12 +647,21 @@ class KanbanTests(TestCase):
         from .models import AttachmentImport
 
         attachment = Attachment.objects.create(
-            tenant=self.tenant, card=self.card, filename="guide.txt", path="guide",
-            content_type="text/plain", size=4, uploaded_by=self.user,
+            tenant=self.tenant,
+            card=self.card,
+            filename="guide.txt",
+            path="guide",
+            content_type="text/plain",
+            size=4,
+            uploaded_by=self.user,
         )
         AttachmentImport.objects.create(
-            tenant=self.tenant, attachment=attachment, destination="media",
-            destination_id="media-1", destination_label="Guide", imported_by=self.user,
+            tenant=self.tenant,
+            attachment=attachment,
+            destination="media",
+            destination_id="media-1",
+            destination_label="Guide",
+            imported_by=self.user,
         )
         with patch("kanban.files.attachment_storage") as storage:
             response = self.call(AttachmentViewSet, "destroy", {"revision": 1}, pk=attachment.pk, method="delete")
