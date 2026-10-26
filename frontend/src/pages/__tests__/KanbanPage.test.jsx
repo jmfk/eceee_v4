@@ -235,6 +235,40 @@ describe('Kanban card attachments', () => {
     }
     const attachmentWorkspace = { fileTypes: { 'text/plain': ['.txt'] } }
 
+    it('selects card members from a searchable board member popup and saves assignees', async () => {
+        const members = [
+            { id: 42, name: 'Johan Berg', username: 'johan' },
+            { id: 43, name: 'Ylva Blume', username: 'ylva' },
+            { id: 44, name: 'Outside Member', username: 'outside' },
+        ]
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? {
+            ...workspace, boards: [{ ...workspace.boards[0], members: [42, 43] }], members,
+        } : { ...attachmentCard, assignees: [42] })
+        kanbanApi.patch.mockResolvedValue({ ...attachmentCard, assignees: [43] })
+        renderKanban('/kanban/cards/card-1')
+        fireEvent.click(await screen.findByRole('button', { name: 'Ändra medlemmar' }))
+        expect(screen.getByRole('heading', { name: 'Kortmedlemmar' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Tavlemedlemmar' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Ta bort Johan Berg från kortet' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Lägg till Outside Member på kortet' })).not.toBeInTheDocument()
+        fireEvent.change(screen.getByRole('searchbox', { name: 'Sök medlem' }), { target: { value: 'ylva' } })
+        expect(screen.queryByRole('button', { name: 'Ta bort Johan Berg från kortet' })).not.toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Lägg till Ylva Blume på kortet' }))
+        expect(screen.getByRole('button', { name: 'Ta bort Ylva Blume från kortet' })).toBeInTheDocument()
+        fireEvent.change(screen.getByRole('searchbox', { name: 'Sök medlem' }), { target: { value: '' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Ta bort Johan Berg från kortet' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Spara kort' }))
+        await waitFor(() => expect(kanbanApi.patch).toHaveBeenCalledWith('cards/card-1/', expect.objectContaining({ assignees: [43] })))
+    })
+
+    it('opens the member popup from the card add menu', async () => {
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? workspace : attachmentCard)
+        renderKanban('/kanban/cards/card-1')
+        fireEvent.click(await screen.findByRole('button', { name: 'Lägg till' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Medlemmar' }))
+        expect(await screen.findByRole('searchbox', { name: 'Sök medlem' })).toBeVisible()
+    })
+
     it('opens a clicked description image selected in the visual editor', async () => {
         const id = '11111111-1111-1111-1111-111111111111'
         const image = { id, filename: 'portrait.png', size: 4, contentType: 'image/png', imports: [] }
