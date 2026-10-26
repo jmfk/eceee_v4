@@ -272,12 +272,7 @@ export const AppRoutes = () => {
         <Route path="/profile" element={
           <PrivateRoute>
             <div className="fixed inset-0 bg-gray-50 flex flex-col">
-              <Navbar />
-              <main className="flex-1 overflow-hidden">
-                <div className="h-full overflow-y-auto">
-                  <ProfilePage />
-                </div>
-              </main>
+              <ProfilePage />
               <StatusBar customStatusContent={<span>Profile - Ready</span>} />
             </div>
           </PrivateRoute>

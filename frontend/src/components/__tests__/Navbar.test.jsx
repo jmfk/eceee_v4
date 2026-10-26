@@ -67,6 +67,7 @@ describe('Navbar', () => {
     expect(screen.getByRole('link', { name: 'Designer' })).toHaveAttribute('href', '/designer/themes')
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
     expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/profile')
+    expect(screen.queryByRole('button', { name: 'Logout' })).not.toBeInTheDocument()
     for (const name of ['Inbox', 'Kanban']) {
       expect(screen.queryByRole('link', { name })).not.toBeInTheDocument()
     }

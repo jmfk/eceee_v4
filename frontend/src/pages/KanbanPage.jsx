@@ -8,7 +8,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDropzone } from 'react-dropzone'
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
-import Navbar from '../components/Navbar'
 import UserToolsNav from '../components/UserToolsNav'
 import StatusBar from '../components/StatusBar'
 import { Columns3, Plus, MoreHorizontal, SlidersHorizontal, ArrowLeft, X, Tag, Clock, ListChecks, Paperclip, AlignLeft, MessageSquare, Users, Pencil, Archive } from 'lucide-react'
@@ -1101,7 +1100,7 @@ export default function KanbanPage() {
     if (workspaceQuery.isPending || workspaceQuery.error) {
         return (
             <div className="user-tools-shell">
-                <Navbar />
+                <UserToolsNav tenant={tenant} />
                 <main className="user-tools-main user-tools-content container mx-auto px-4 py-8">
                     <header className="user-tools-header">
                         <div className="user-tools-title"><Columns3 aria-hidden="true" /><h1>Kanban</h1></div>
@@ -1122,11 +1121,10 @@ export default function KanbanPage() {
     return (
         <KanbanAccessContext.Provider value={ticket}>
             <div className="user-tools-shell">
-                <Navbar />
+                <UserToolsNav tenant={tenant} />
                 <GlobalWysiwygToolbar />
                 <main className={`kb user-tools-main user-tools-content ${boardId ? 'kb-board-view' : ''}`}>
                     <div className={`kb-content ${boardId ? 'kb-board-content' : 'container mx-auto px-4 py-8'}`}>
-                    <UserToolsNav tenant={tenant} />
                     <header className="user-tools-header">
                         <div>
                             <div className="user-tools-title"><Columns3 aria-hidden="true" /><h1>{board?.title || (boardId ? 'Tavla' : 'Dina tavlor')}</h1></div>

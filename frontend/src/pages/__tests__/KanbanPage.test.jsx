@@ -8,7 +8,6 @@ import { kanbanApi, kanbanError } from '../../api/kanban'
 import { setCmsCopyLanguage } from '../../utils/cmsCopy'
 
 vi.unmock('react-router-dom')
-vi.mock('../../components/Navbar', () => ({ default: () => <nav aria-label="CMS">CMS</nav> }))
 vi.mock('../../components/StatusBar', () => ({ default: () => <footer aria-label="Status">Kanban</footer> }))
 vi.mock('../../components/wysiwyg/GlobalWysiwygToolbar', () => ({ default: () => null }))
 vi.mock('../../components/form-fields/RichTextInput', () => ({
@@ -62,7 +61,8 @@ describe('Kanban application navigation', () => {
     it('keeps app navigation available while the workspace loads', () => {
         kanbanApi.get.mockReturnValue(new Promise(() => {}))
         renderKanban()
-        expect(screen.getByRole('navigation', { name: 'CMS' })).toBeInTheDocument()
+        expect(screen.getByRole('navigation', { name: 'Personliga verktyg' })).toBeInTheDocument()
+        expect(screen.getByRole('link', { name: 'Till CMS' })).toHaveAttribute('href', '/pages')
         expect(screen.getByRole('status')).toHaveTextContent('Läser arbetsytan')
         expect(screen.getByRole('contentinfo', { name: 'Status' })).toBeInTheDocument()
     })
@@ -72,7 +72,7 @@ describe('Kanban application navigation', () => {
         renderKanban()
         expect(await screen.findByRole('alert')).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Försök igen' })).toBeInTheDocument()
-        expect(screen.getByRole('navigation', { name: 'CMS' })).toBeInTheDocument()
+        expect(screen.getByRole('navigation', { name: 'Personliga verktyg' })).toBeInTheDocument()
     })
 
     it('identifies the selected board and preserves card links and keyboard move actions', async () => {

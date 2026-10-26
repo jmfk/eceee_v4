@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
     switchCurrentWorkspace: vi.fn(),
     updatePreferredLanguage: vi.fn(),
     setUser: vi.fn(),
+    logout: vi.fn(),
 }))
 
 vi.mock('react-router-dom', async (importOriginal) => await importOriginal())
@@ -22,7 +23,7 @@ vi.mock('../../components/support/useSupportContext', () => ({
     useSupportContext: () => ({ data: { unreadCount: mocks.unreadCount } }),
 }))
 
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: mocks.user, language: 'en-us', setUser: mocks.setUser }) }))
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: mocks.user, language: 'en-us', setUser: mocks.setUser, logout: mocks.logout }) }))
 vi.mock('../../contexts/GlobalNotificationContext', () => ({ useGlobalNotifications: () => ({ addNotification: mocks.addNotification }) }))
 vi.mock('../../api/users', () => ({ changePassword: mocks.changePassword, switchCurrentWorkspace: mocks.switchCurrentWorkspace, updatePreferredLanguage: mocks.updatePreferredLanguage }))
 vi.mock('../../components/auth/AccountSecurityPanel', () => ({ default: () => <section>Account security</section> }))
@@ -56,6 +57,10 @@ describe('ProfilePage', () => {
 
     it('provides personal tools with workspace scope, unread count and report source', () => {
         renderProfile({ reportFrom: 'https://cms.example/pages/42?private=value#section' })
+        expect(screen.getByRole('link', { name: 'Till CMS' })).toHaveAttribute('href', '/pages')
+        expect(screen.getByRole('button', { name: 'Logout' })).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Logout' }))
+        expect(mocks.logout).toHaveBeenCalledOnce()
         expect(screen.getByRole('link', { name: 'Inbox (3)' })).toHaveAttribute('href', '/inbox?tenant=first-workspace')
         expect(screen.getByRole('link', { name: 'Kanban' })).toHaveAttribute('href', '/kanban')
         const reportUrl = new URL(screen.getByRole('link', { name: 'Rapportera fel' }).href)
@@ -92,6 +97,7 @@ describe('ProfilePage', () => {
         expect(screen.queryByRole('link', { name: /Inbox/ })).not.toBeInTheDocument()
         expect(screen.queryByRole('link', { name: 'Rapportera fel' })).not.toBeInTheDocument()
         expect(screen.getByRole('link', { name: 'Kanban' })).toBeInTheDocument()
+        expect(screen.queryByRole('link', { name: 'Till CMS' })).not.toBeInTheDocument()
     })
 
     it('saves a language override from Profile', async () => {

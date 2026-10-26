@@ -168,9 +168,10 @@ const ProfilePage = () => {
         );
     }
 
-    return (
-        <div className="container mx-auto px-4 py-8">
-            <UserToolsNav tenant={tenant} unreadCount={unreadCount} />
+    return (<>
+        <UserToolsNav tenant={tenant} unreadCount={unreadCount} />
+        <main className="flex-1 min-h-0 overflow-y-auto">
+            <div className="container mx-auto px-4 py-8">
             <div className="mb-6">
                 <div className="flex items-center gap-3">
                     <User aria-hidden="true" className="h-8 w-8 text-primary-600" />
@@ -389,7 +390,9 @@ const ProfilePage = () => {
                     </div>
                 </form>
             </div>
-        </div>
+            </div>
+        </main>
+    </>
     );
 };
 

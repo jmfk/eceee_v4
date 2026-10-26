@@ -11,9 +11,6 @@ vi.unmock('react-router-dom')
 vi.mock('../../components/StatusBar', () => ({
     default: () => <footer aria-label="Status">Inbox</footer>,
 }))
-vi.mock('../../components/Navbar', () => ({
-    default: () => <nav aria-label="CMS">CMS</nav>,
-}))
 vi.mock('../../contexts/AuthContext', () => ({
     useAuth: () => ({ user: { id: 42, username: 'anna' } }),
 }))
@@ -103,6 +100,8 @@ describe('tenant inbox journey', () => {
     it('marks Inbox as selected on a direct URL without a trailing slash', async () => {
         renderInbox('/inbox?tenant=a')
         await screen.findByRole('heading', { name: 'Din inbox' })
+        expect(screen.getByRole('navigation', { name: 'Personliga verktyg' })).toBeInTheDocument()
+        expect(screen.getByRole('link', { name: 'Till CMS' })).toHaveAttribute('href', '/pages')
         expect(screen.getByRole('link', { name: 'Inbox (1 olästa)' })).toHaveAttribute('aria-current', 'page')
     })
 
