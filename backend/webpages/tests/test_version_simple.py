@@ -4,6 +4,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 
+from core.models import TenantRole
 from webpages.models import PageVersion, WebPage
 
 
@@ -204,13 +205,17 @@ class PageVersionAPISimpleTest(APITestCase):
         self.assertIn("version2", response.data)
         self.assertIn("changes", response.data)
 
-    def test_latest_version_for_page_returns_latest_draft_for_staff(self):
+    def test_latest_version_for_page_returns_latest_draft_for_workspace_admin(self):
         """Test latest-version endpoint returns latest version without requiring publication."""
         staff_user = User.objects.create_user(
             username="staff_latest",
             email="staff-latest@example.com",
             password="testpass123",
             is_staff=True,
+        )
+        self.tenant.members.add(staff_user)
+        TenantRole.objects.create(tenant=self.tenant, name="Version admin", permissions=["tenant.admin"]).users.add(
+            staff_user
         )
         self.client.force_authenticate(user=staff_user)
         latest_draft = self.page.create_version(staff_user, "Latest draft")
@@ -229,6 +234,10 @@ class PageVersionAPISimpleTest(APITestCase):
             email="staff-empty-latest@example.com",
             password="testpass123",
             is_staff=True,
+        )
+        self.tenant.members.add(staff_user)
+        TenantRole.objects.create(tenant=self.tenant, name="Version admin", permissions=["tenant.admin"]).users.add(
+            staff_user
         )
         self.client.force_authenticate(user=staff_user)
         empty_page = WebPage.objects.create(
