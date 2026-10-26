@@ -257,7 +257,6 @@
 .kb-detail-section-heading h2 { display: flex; align-items: center; gap: 10px; }
 .kb-detail-section-heading > button { margin-left: auto; font-weight: 500; }
 .kb-detail-description .prose { font-size: 14px; line-height: 1.7; }
-.kb-detail-description .prose :first-child { margin-top: 0; }
 .kb-detail-field-group { display: flex; flex-direction: column; gap: 12px; padding-block: 12px; border-block: 1px solid #e5e7eb; }
 .kb-detail-form section > .flex > input:not([type='checkbox']) { min-width: 0; flex: 1; }
 .kb-detail-form section > .flex { flex-wrap: wrap; }
@@ -286,7 +285,7 @@
 .kb-detail-description .prose h1 { font-size: 22px; }
 .kb-detail-description .prose h2 { font-size: 18px; }
 .kb-detail-description .prose h3 { font-size: 16px; }
-.kb-detail-description .prose p { margin-block: 0.75em; }
+.kb-detail-description .prose p { margin-block: 0; }
 .kb-detail-description .prose :is(ul, ol) { padding-left: 24px; margin-block: 0.75em; }
 .kb-detail-description .prose ul { list-style: disc; }
 .kb-detail-description .prose ol { list-style: decimal; }
