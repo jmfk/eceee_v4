@@ -56,7 +56,7 @@ export default function MarkdownEditor({
                     />
                 ) : (
                     <div className="kb-editor-visual" aria-label={label}>
-                        <RichTextInput value={html} onChange={editVisual} rows={10} fieldName={label} />
+                        <RichTextInput value={html} onChange={editVisual} rows={10} fieldName={label} allowMediaInsert={false} />
                     </div>
                 )}
                 <div className="kb-editor-modebar" aria-label={`${label}: redigeringsläge`}>

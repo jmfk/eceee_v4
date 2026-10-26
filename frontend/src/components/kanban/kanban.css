@@ -262,6 +262,11 @@
 .kb-detail-form section > .flex { flex-wrap: wrap; }
 .kb-detail-save { display: flex; align-items: center; gap: 12px; position: sticky; bottom: -28px; padding-block: 12px; background: white; }
 .kb-detail .kb-description-empty, .kb-detail .kb-comment-prompt { justify-content: flex-start; text-align: left; width: 100%; min-height: 48px; color: #4b5563; background: #f9fafb; }
+.kb-attachment-dropzone { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 84px; margin: 12px 0 20px; padding: 16px; border: 1px dashed #9ca3af; border-radius: 4px; background: #f9fafb; color: #374151; font-size: 12px; text-align: center; cursor: pointer; }
+.kb-attachment-dropzone:hover, .kb-attachment-dropzone:focus-visible, .kb-attachment-dropzone-active { border-color: #2563eb; background: #eff6ff; color: #1d4ed8; }
+.kb-attachment-dropzone:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.kb-attachment-dropzone-reject { border-color: #dc2626; background: #fef2f2; color: #b91c1c; }
+.kb-attachment-dropzone[aria-disabled='true'] { opacity: 0.6; cursor: wait; }
 .kb-detail .kb-comment-prompt { margin-bottom: 24px; background: white; border-color: #b7bec8; }
 .kb-detail-comment { margin-block: 12px 24px; }
 .kb-detail-activity > ol > li { padding-block: 12px; border-top: 1px solid #d1d5db; }

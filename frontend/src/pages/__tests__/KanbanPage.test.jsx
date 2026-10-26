@@ -1,9 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import KanbanPage from '../KanbanPage'
-import { kanbanApi } from '../../api/kanban'
+import KanbanPage, { Attachments } from '../KanbanPage'
+import { kanbanApi, kanbanError } from '../../api/kanban'
 import { setCmsCopyLanguage } from '../../utils/cmsCopy'
 
 vi.unmock('react-router-dom')
@@ -18,7 +18,7 @@ vi.mock('../../utils/tenant', () => ({
 }))
 vi.mock('../../api/kanban', async (importOriginal) => ({
     ...(await importOriginal()),
-    kanbanApi: { get: vi.fn(), cards: vi.fn(), post: vi.fn(), patch: vi.fn() },
+    kanbanApi: { get: vi.fn(), cards: vi.fn(), post: vi.fn(), patch: vi.fn(), upload: vi.fn() },
 }))
 
 const workspace = {
@@ -94,4 +94,50 @@ describe('Kanban application navigation', () => {
         expect(screen.getByRole('textbox', { name: 'Listnamn' })).toHaveFocus()
     })
 
+})
+
+describe('Kanban card attachments', () => {
+    const attachmentCard = { id: 'card-1', revision: 1, comments: [], attachments: [] }
+    const attachmentWorkspace = { fileTypes: { 'text/plain': ['.txt'] } }
+
+    it('opens the file picker when the drop zone is clicked', () => {
+        render(<Attachments
+            card={{ ...attachmentCard, attachments: [{ id: 'file-1', filename: 'note.txt', size: 4, contentType: 'text/plain' }] }}
+            workspace={attachmentWorkspace}
+            run={vi.fn()}
+        />)
+        const input = screen.getByLabelText('Ladda upp bilagor').querySelector('input[type="file"]')
+        const click = vi.spyOn(input, 'click')
+        fireEvent.click(screen.getByRole('button', { name: 'Ladda upp bilagor' }))
+        expect(click).toHaveBeenCalledOnce()
+        fireEvent.keyDown(screen.getByRole('button', { name: 'Ladda upp bilagor' }), { key: 'Enter' })
+        expect(click).toHaveBeenCalledTimes(2)
+        expect(screen.queryByRole('button', { name: 'Godkänn bilaga' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Importera till media' })).not.toBeInTheDocument()
+    })
+
+    it('uploads dropped files in order using each new card revision', async () => {
+        const run = vi.fn(async (action) => action())
+        const first = new File(['first'], 'first.txt', { type: 'text/plain' })
+        const second = new File(['second'], 'second.txt', { type: 'text/plain' })
+        kanbanApi.upload.mockResolvedValue({})
+        kanbanApi.get.mockResolvedValue({ revision: 2 })
+        render(<Attachments card={attachmentCard} workspace={attachmentWorkspace} run={run} />)
+        fireEvent.drop(screen.getByRole('button', { name: 'Ladda upp bilagor' }), {
+            dataTransfer: {
+                files: [first, second],
+                items: [first, second].map((file) => ({ kind: 'file', type: file.type, getAsFile: () => file })),
+                types: ['Files'],
+            },
+        })
+        await waitFor(() => expect(kanbanApi.upload).toHaveBeenCalledTimes(2))
+        expect(kanbanApi.upload).toHaveBeenNthCalledWith(1, 'card-1', first, 1, '')
+        expect(kanbanApi.upload).toHaveBeenNthCalledWith(2, 'card-1', second, 2, '')
+        await waitFor(() => expect(run).toHaveBeenCalledOnce())
+    })
+
+    it('does not print a server HTML error page inside the card', () => {
+        expect(kanbanError({ response: { status: 500, data: '<!DOCTYPE html><html>error</html>' } }))
+            .toBe('Servern kunde inte slutföra åtgärden. Försök igen senare.')
+    })
 })

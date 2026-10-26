@@ -70,6 +70,8 @@ export const attachmentUrl = (id, ticket = '') =>
 export const kanbanError = (error) =>
     error.response?.status === 409
         ? 'Någon har ändrat innehållet. Ladda om och försök igen. Din osparade text finns kvar.'
+        : error.response?.status >= 500 || /^\s*<!?\w[^>]*>/i.test(error.response?.data || '')
+          ? 'Servern kunde inte slutföra åtgärden. Försök igen senare.'
         : typeof error.response?.data === 'string'
           ? error.response.data
           : error.response?.data?.detail ||

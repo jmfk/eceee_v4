@@ -554,6 +554,7 @@ class ContentWidgetEditorRenderer {
         this.disabled = options.disabled || false
         this.fieldMode = options.fieldMode || false
         this.inlineOnly = options.inlineOnly || false
+        this.allowMediaInsert = options.allowMediaInsert !== false
 
         // DOM elements
         this.rootElement = null
@@ -704,12 +705,12 @@ class ContentWidgetEditorRenderer {
         this.toolbarElement.appendChild(this.createSeparator())
 
         // Insert Image button
-        const imageButton = this.createImageInsertButton()
-        this.toolbarButtons.set('insertImage', imageButton)
-        this.toolbarElement.appendChild(imageButton)
-
-        // Separator
-        this.toolbarElement.appendChild(this.createSeparator())
+        if (this.allowMediaInsert) {
+            const imageButton = this.createImageInsertButton()
+            this.toolbarButtons.set('insertImage', imageButton)
+            this.toolbarElement.appendChild(imageButton)
+            this.toolbarElement.appendChild(this.createSeparator())
+        }
 
         // Undo button
         const undoButton = this.createToolbarButton('undo', 'Undo', ICONS.undo)
@@ -2012,6 +2013,7 @@ class ContentWidgetEditorRenderer {
      * Open media insert modal
      */
     async openMediaInsertModal() {
+        if (!this.allowMediaInsert) return
         // Dynamically import React and the modal component
         const React = await import('react')
         const ReactDOM = await import('react-dom/client')
@@ -2146,6 +2148,7 @@ class ContentWidgetEditorRenderer {
      * Handle click on media insert (open edit modal)
      */
     async handleMediaInsertClick(e) {
+        if (!this.allowMediaInsert) return
         const mediaElement = e.currentTarget
         if (!mediaElement || !mediaElement.hasAttribute('data-media-insert')) return
 
@@ -2176,6 +2179,7 @@ class ContentWidgetEditorRenderer {
      * Open media edit modal
      */
     async openMediaEditModal(mediaElement, initialConfig, mediaData, mediaLoadError = null) {
+        if (!this.allowMediaInsert) return
         const React = await import('react')
         const ReactDOM = await import('react-dom/client')
         const { default: MediaInsertModal } = await import('@/components/media/MediaInsertModal.jsx')

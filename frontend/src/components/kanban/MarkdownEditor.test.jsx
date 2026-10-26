@@ -7,8 +7,8 @@ import { setCmsCopyLanguage } from '../../utils/cmsCopy'
 beforeEach(() => setCmsCopyLanguage('sv-se'))
 
 vi.mock('../form-fields/RichTextInput', () => ({
-    default: ({ value, onChange }) => (
-        <textarea aria-label="Visual HTML" value={value} onChange={(e) => onChange(e.target.value)} />
+    default: ({ value, onChange, allowMediaInsert }) => (
+        <textarea aria-label="Visual HTML" data-allow-media-insert={allowMediaInsert} value={value} onChange={(e) => onChange(e.target.value)} />
     ),
 }))
 
@@ -36,6 +36,7 @@ describe('Kanban Markdown', () => {
         const onChange = vi.fn()
         render(<MarkdownEditor label="Description" value="**Bold**" onChange={onChange} />)
         expect(screen.getByLabelText('Visual HTML').value).toContain('<strong>Bold</strong>')
+        expect(screen.getByLabelText('Visual HTML')).toHaveAttribute('data-allow-media-insert', 'false')
         fireEvent.click(screen.getByRole('button', { name: 'Markdown' }))
         fireEvent.change(screen.getByRole('textbox', { name: 'Description' }), {
             target: { value: '# New' },
