@@ -10,6 +10,7 @@ DIAGNOSTICS_LOG_SIGNING_KEY = ""
 MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
     "core.middleware.TenantContextMiddleware",
 ]
 REST_FRAMEWORK = {"DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"]}

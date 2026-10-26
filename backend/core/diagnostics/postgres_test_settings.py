@@ -25,7 +25,6 @@ DATABASES = {
 # Include the real CMS model registry/migrations, including indirect ownership views.
 INSTALLED_APPS = [
     *INSTALLED_APPS,  # noqa: F405
-    "django.contrib.sites",
     "rest_framework.authtoken",
     "django_celery_beat",
     "mptt",
