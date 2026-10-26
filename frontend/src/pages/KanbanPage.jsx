@@ -1126,12 +1126,13 @@ export default function KanbanPage() {
                 <GlobalWysiwygToolbar />
                 <main className={`kb user-tools-main user-tools-content ${boardId ? 'kb-board-view' : ''}`}>
                     <div className={`kb-content ${boardId ? 'kb-board-content' : 'container mx-auto px-4 py-8'}`}>
-                    <header className="user-tools-header">
-                        <div>
+                    <header className={`user-tools-header ${board ? 'kb-board-header' : ''}`}>
+                        <div className={board ? 'kb-board-heading' : undefined}>
                             <div className="user-tools-title"><Columns3 aria-hidden="true" /><h1>{board?.title || (boardId ? 'Tavla' : 'Dina tavlor')}</h1></div>
+                            {board && <span className="kb-muted kb-board-summary">{visibleColumns.length} listor · {cards.length} kort{board.archived ? ' · Arkiverad tavla' : ''}</span>}
                             {!boardId && <p className="user-tools-description">Välj en tavla eller skapa en ny för ditt team.</p>}
                         </div>
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="kb-board-header-controls flex flex-wrap items-center gap-2">
                         {boardId && <Link to="/kanban" className="user-tools-button"><ArrowLeft size={16} />Byt tavla</Link>}
                         {boardId && <button onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters}><SlidersHorizontal size={16} />Filter</button>}
                         <button onClick={() => setShowNotices(!showNotices)} aria-expanded={showNotices}>
@@ -1140,6 +1141,14 @@ export default function KanbanPage() {
                         <button onClick={() => setShowActivity(!showActivity)} aria-expanded={showActivity}>
                             Aktivitet / Ångra
                         </button>
+                        {board && <ActionsMenu label="Tavelåtgärder">
+                            {(close) => <>
+                                {!board.archived && <button onClick={() => { close(); setAddingList(true) }}><Plus size={15} />Lägg till lista</button>}
+                                <button onClick={() => { close(); setBoardDialog('members') }}><Users size={15} />Medlemmar</button>
+                                <button onClick={() => { close(); setBoardTitle(board.title); setBoardDialog('edit') }}><Pencil size={15} />Redigera tavlan</button>
+                                <button disabled={busy} onClick={() => { close(); run(async () => await kanbanApi.patch(`boards/${board.id}/`, { revision: board.revision, archived: !board.archived })) }}><Archive size={15} />{board.archived ? 'Återställ tavla' : 'Arkivera tavla'}</button>
+                            </>}
+                        </ActionsMenu>}
                         </div>
                     </header>
                     {error && !cardId && (
@@ -1319,17 +1328,6 @@ export default function KanbanPage() {
                             )}
                             {cardsQuery.error && <p role="alert">{kanbanError(cardsQuery.error)}</p>}
                             {boardId && !board && <p>Boardet finns inte i den här tenanten.</p>}
-                            {board && <div className="kb-board-actions">
-                                <span className="kb-muted kb-board-summary">{visibleColumns.length} listor · {cards.length} kort{board.archived ? ' · Arkiverad tavla' : ''}</span>
-                                <ActionsMenu label="Tavelåtgärder">
-                                    {(close) => <>
-                                        {!board.archived && <button onClick={() => { close(); setAddingList(true) }}><Plus size={15} />Lägg till lista</button>}
-                                        <button onClick={() => { close(); setBoardDialog('members') }}><Users size={15} />Medlemmar</button>
-                                        <button onClick={() => { close(); setBoardTitle(board.title); setBoardDialog('edit') }}><Pencil size={15} />Redigera tavlan</button>
-                                        <button disabled={busy} onClick={() => { close(); run(async () => await kanbanApi.patch(`boards/${board.id}/`, { revision: board.revision, archived: !board.archived })) }}><Archive size={15} />{board.archived ? 'Återställ tavla' : 'Arkivera tavla'}</button>
-                                    </>}
-                                </ActionsMenu>
-                            </div>}
                             {board && <Dialog open={!!boardDialog} onClose={() => setBoardDialog('')} className="kb-board-dialog">
                                 <DialogBackdrop className="kb-board-dialog-backdrop" />
                                 <DialogPanel className="kb-board-dialog-panel">

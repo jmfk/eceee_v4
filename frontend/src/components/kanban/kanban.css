@@ -120,7 +120,8 @@
 .kb-boards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); padding: 0; gap: 1rem; }
 .kb-boards a { display: flex; align-items: flex-end; min-height: 120px; padding: 1.25rem; border: 1px solid var(--color-primary-200); background: var(--color-primary-50); color: var(--kb-text); font-size: 1.125rem; font-weight: 600; }
 .kb-boards a:hover { background: var(--color-primary-100); }
-.kb-board-actions { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
+.kb-board-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; min-width: 0; }
+.kb-board-header-controls { margin-left: auto; }
 .kb-lists { display: flex; flex: 1; min-height: 0; gap: 0.75rem; overflow: auto; padding: 0.75rem 0.75rem 1.5rem; margin: 0 -0.75rem; background: var(--color-primary-50); border-radius: 0.75rem 0.75rem 0 0; }
 .kb-column { width: 280px; min-width: min(280px, 80vw); max-height: 100%; overflow-y: auto; padding: 0.5rem; border: 0; border-radius: 0.75rem; background: var(--color-gray-100, #f3f4f6); }
 .kb-column > header { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.25rem 0.5rem 0.5rem; margin: 0; cursor: grab; }
@@ -162,15 +163,13 @@
 .kb-board-background .kb-lists { background: transparent; }
 .kb-board-background .user-tools-nav,
 .kb-board-background .kb-board-status { background: rgb(255 255 255 / 0.88); backdrop-filter: blur(8px); }
-.kb-board-background .kb-board-content > .user-tools-header,
-.kb-board-background .kb-board-actions { padding: 8px 12px; border-radius: 4px; background: rgb(255 255 255 / 0.82); }
+.kb-board-background .kb-board-content > .user-tools-header { padding: 8px 12px; border-radius: 4px; background: rgb(255 255 255 / 0.82); }
 .kb-column { background: #e2e5e9; border: 1px solid #b7bec8; border-radius: 4px; scrollbar-width: thin; }
 .kb-column > header { color: #111827; }
 .kb-column-count, .kb-card-id { color: #4b5563; }
 .kb-card { background: #fff; border: 1px solid #b7bec8; border-radius: 4px; box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); }
 .kb-card:hover { border-color: #64748b; }
-.kb-board-actions { gap: 12px; justify-content: flex-end; }
-.kb-board-summary { margin-right: auto; }
+.kb-board-summary { white-space: nowrap; }
 .kb-board-dialog { position: relative; z-index: 110; color-scheme: light; }
 .kb-board-dialog-backdrop { position: fixed; inset: 0; background: rgb(17 24 39 / 0.45); }
 .kb-board-dialog-panel { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(440px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 18px; border: 1px solid #d1d5db; border-radius: 5px; background: white; box-shadow: 0 20px 50px rgb(0 0 0 / 0.22); font: 12px/1.5 Inter, sans-serif; }
@@ -184,7 +183,6 @@
 .kb-board-member-list { max-height: min(360px, 50dvh); overflow-y: auto; border-top: 1px solid #e5e7eb; }
 .kb-board-member-list label { display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 6px 2px; border-bottom: 1px solid #e5e7eb; cursor: pointer; }
 .kb-board-member-list label span:last-child { min-width: 0; overflow-wrap: anywhere; }
-.kb-board-actions > .kb-menu > summary { width: auto; padding: 0 8px; white-space: nowrap; }
 .kb-card-cover { height: 32px; margin: -12px -12px 10px !important; border-radius: 3px 3px 0 0; }
 .kb-card-cover-image { display: block; width: calc(100% + 24px); height: 110px; object-fit: cover; }
 .kb-detail-cover.kb-detail-cover-image { display: block; width: 100%; height: 190px; object-fit: cover; }
