@@ -113,7 +113,6 @@
 /* The board is a work surface; overview and creation stay outside it. */
 .kb-board-view { overflow: hidden; }
 .kb-board-content { height: 100%; display: flex; flex-direction: column; padding: 1rem 1.5rem 0; }
-.kb-board-content > .user-tools-nav { margin-bottom: 1rem; flex-shrink: 0; }
 .kb-board-content > .user-tools-header { margin-bottom: 0.75rem; }
 .kb-board-content .user-tools-title h1 { font-size: 1.25rem; }
 .kb-board-content .user-tools-title > svg { width: 1.25rem; height: 1.25rem; }
@@ -159,6 +158,12 @@
 
 /* Neutral board: distinct column edges and white content cards. */
 .kb-lists { background: #fff; border-top: 1px solid #d1d5db; border-radius: 0; gap: 16px; padding-top: 16px; }
+.kb-board-background { background-size: cover; background-position: center; background-repeat: no-repeat; }
+.kb-board-background .kb-lists { background: transparent; }
+.kb-board-background .user-tools-nav,
+.kb-board-background .kb-board-status { background: rgb(255 255 255 / 0.88); backdrop-filter: blur(8px); }
+.kb-board-background .kb-board-content > .user-tools-header,
+.kb-board-background .kb-board-actions { padding: 8px 12px; border-radius: 4px; background: rgb(255 255 255 / 0.82); }
 .kb-column { background: #e2e5e9; border: 1px solid #b7bec8; border-radius: 4px; scrollbar-width: thin; }
 .kb-column > header { color: #111827; }
 .kb-column-count, .kb-card-id { color: #4b5563; }
@@ -189,7 +194,6 @@
 .kb-image-generator button { width: fit-content; padding: 5px 10px; border: 1px solid #9ca3af; border-radius: 3px; background: #fff; }
 .kb-image-generator button:disabled { opacity: 0.5; }
 .kb-cover-upload { display: grid; gap: 5px; margin: 12px 0; }
-.kb-lists[style*="background-image"] { background-size: cover; background-position: center; }
 .kb-card:has(.kb-card-cover) .kb-action-trigger { background: white; }
 .kb-actions { position: relative; flex-shrink: 0; }
 .kb-actions .kb-action-trigger { display: flex; align-items: center; justify-content: center; min-width: 28px; min-height: 28px; padding: 4px; border: 0; background: transparent; border-radius: 3px; }

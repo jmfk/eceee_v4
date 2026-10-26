@@ -35,8 +35,9 @@ def generate_image(kind, description):
     from openai import OpenAI
 
     framing = (
-        "Create a wide background image for a Kanban board. Use rich colors and clear contrast "
-        "with opaque white task lists. Keep the composition calm enough to read cards above it."
+        "Create a wide scenic background image for a Kanban board. Use rich colors and clear contrast. "
+        "Keep the composition calm enough to read task cards placed on top by the application. "
+        "Do not draw panels, columns, lists, cards, windows, or other interface elements."
         if kind == "board"
         else "Create a wide cover illustration for one Kanban task card. Keep it visually clear at small sizes."
     )
