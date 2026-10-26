@@ -5,7 +5,7 @@ description: Investigate ECEEE errors and masked database records through the ex
 
 # ECEEE diagnostics
 
-Run `scripts/diagnostics.py` from the repository root. Use `--profile dev|production`
+Run `skills/eceee-diagnostics/scripts/diagnostics.py` from the repository root. Use `--profile dev|production`
 and an ignored mode-0600 `--env-file`. Credentials are separate from CMS/import keys:
 `ECEEE_DIAGNOSTICS_DEV_API_KEY` and `ECEEE_DIAGNOSTICS_PROD_API_KEY`.
 Never print them, copy browser credentials, or pass keys as arguments.
