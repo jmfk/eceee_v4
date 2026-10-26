@@ -25,6 +25,9 @@ import { isRootPage, sanitizePageData } from '../utils/apiValidation.js'
 import Tooltip from './Tooltip'
 import { useNotificationContext } from './NotificationManager'
 import pageTreeUtils from '../utils/pageTreeUtils'
+import { cmsText, getCmsCopyLanguage } from '../utils/cmsCopy'
+
+const pageTreeText = text => cmsText(text, getCmsCopyLanguage())
 
 // Separate component for publication status icon that only re-renders when status changes
 const PublicationStatusIcon = memo(({
@@ -170,13 +173,13 @@ const PageActionOverflowMenu = ({ page, pageTestId, actions }) => {
 
     return (
         <>
-            <Tooltip text="More page actions" position="top">
+            <Tooltip text={pageTreeText('More page actions')} position="top">
                 <button
                     ref={buttonRef}
                     type="button"
                     data-testid={`page-tree-actions-${pageTestId}`}
                     onClick={openMenu}
-                    aria-label={`More actions for ${page.title}`}
+                    aria-label={`${pageTreeText('More actions for')} ${page.title}`}
                     aria-haspopup="menu"
                     aria-expanded={isOpen}
                     className="flex min-h-11 min-w-11 items-center justify-center rounded text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 xl:hidden"
@@ -188,7 +191,7 @@ const PageActionOverflowMenu = ({ page, pageTestId, actions }) => {
                 <div
                     ref={menuRef}
                     role="menu"
-                    aria-label={`Actions for ${page.title}`}
+                    aria-label={`${pageTreeText('Actions for')} ${page.title}`}
                     data-testid={`page-tree-actions-menu-${pageTestId}`}
                     className="fixed z-[10020] max-h-[calc(100vh-1rem)] w-60 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-xl"
                     style={position}
@@ -614,13 +617,13 @@ const PageTreeNode = memo(({
 
     const secondaryActions = [
         {
-            label: 'Publishing & history',
+            label: pageTreeText('Publishing & history'),
             icon: Globe,
             onClick: handlePublishing,
             testId: `page-tree-publishing-menu-${pageTestId}`,
         },
         {
-            label: 'Move up',
+            label: pageTreeText('Move up'),
             icon: ChevronUp,
             onClick: handleMoveUp,
             disabled: !canMoveUp,
@@ -628,34 +631,34 @@ const PageTreeNode = memo(({
             testId: `page-tree-move-up-menu-${pageTestId}`,
         },
         {
-            label: 'Move down',
+            label: pageTreeText('Move down'),
             icon: ChevronDown,
             onClick: handleMoveDown,
             disabled: !canMoveDown,
             desktopTestId: `page-tree-move-down-${pageTestId}`,
             testId: `page-tree-move-down-menu-${pageTestId}`,
         },
-        { label: 'Cut', icon: Scissors, onClick: handleCut, testId: `page-tree-cut-menu-${pageTestId}` },
+        { label: pageTreeText('Cut'), icon: Scissors, onClick: handleCut, testId: `page-tree-cut-menu-${pageTestId}` },
         {
-            label: 'Import as child',
+            label: pageTreeText('Import as child'),
             icon: Upload,
             onClick: handleImport,
-            ariaLabel: `Import external site under ${page.title}`,
+            ariaLabel: `${pageTreeText('Import external site under')} ${page.title}`,
             testId: `page-tree-import-menu-${pageTestId}`,
         },
         ...(level === 0 && onExport ? [{
-            label: 'Export site package',
+            label: pageTreeText('Export site package'),
             icon: Download,
             onClick: handleExport,
-            ariaLabel: `Export root site package for ${page.title}`,
+            ariaLabel: `${pageTreeText('Export root site package for')} ${page.title}`,
             testId: `page-tree-export-menu-${pageTestId}`,
         }] : []),
         ...((cutPageIds.length > 0 || copyPageIds.length > 0) ? [
-            { label: 'Paste above', icon: FileText, onClick: () => onPaste?.(page, 'above') },
-            { label: 'Paste below', icon: FileText, onClick: () => onPaste?.(page, 'below') },
-            { label: 'Paste as child', icon: FileText, onClick: () => onPaste?.(page, 'child') },
+            { label: pageTreeText('Paste above'), icon: FileText, onClick: () => onPaste?.(page, 'above') },
+            { label: pageTreeText('Paste below'), icon: FileText, onClick: () => onPaste?.(page, 'below') },
+            { label: pageTreeText('Paste as child'), icon: FileText, onClick: () => onPaste?.(page, 'child') },
         ] : []),
-        { label: 'Delete', icon: Trash2, onClick: handleDelete, danger: true, testId: `page-tree-delete-menu-${pageTestId}` },
+        { label: pageTreeText('Delete'), icon: Trash2, onClick: handleDelete, danger: true, testId: `page-tree-delete-menu-${pageTestId}` },
     ]
 
     return (
@@ -808,7 +811,7 @@ const PageTreeNode = memo(({
 
                 {/* Primary actions stay visible; secondary actions collapse below xl. */}
                 <div data-testid={`page-tree-primary-actions-${pageTestId}`} className="flex shrink-0 items-center justify-end gap-1">
-                    <Tooltip text="Edit" position="top">
+                    <Tooltip text={pageTreeText('Edit')} position="top">
                         <button
                             type="button"
                             data-testid={`page-tree-edit-${pageTestId}`}
@@ -816,14 +819,14 @@ const PageTreeNode = memo(({
                                 e.stopPropagation()
                                 handleEdit()
                             }}
-                            aria-label={`Edit ${page.title}`}
+                            aria-label={`${pageTreeText('Edit')} ${page.title}`}
                             className="flex min-h-11 min-w-11 items-center justify-center rounded text-gray-500 transition-colors hover:bg-gray-200 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 xl:min-h-8 xl:min-w-8"
                         >
                             <Edit className="w-4 h-4" />
                         </button>
                     </Tooltip>
 
-                    <Tooltip text="Add child page" position="top">
+                    <Tooltip text={pageTreeText('Add child page')} position="top">
                         <button
                             type="button"
                             data-testid={`page-tree-add-child-${pageTestId}`}
@@ -831,7 +834,7 @@ const PageTreeNode = memo(({
                                 e.stopPropagation()
                                 handleAddPageBelow()
                             }}
-                            aria-label={`Add child page under ${page.title}`}
+                            aria-label={`${pageTreeText('Add child page under')} ${page.title}`}
                             className="flex min-h-11 min-w-11 items-center justify-center rounded text-gray-500 transition-colors hover:bg-green-100 hover:text-green-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 xl:min-h-8 xl:min-w-8"
                         >
                             <Plus className="w-4 h-4" />

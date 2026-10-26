@@ -1,6 +1,6 @@
 import { authRequest, clearLegacyTokens } from '../api/auth';
 import { clearReportDiagnostics } from '../utils/reportDiagnostics'
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 
 import { reconcileCurrentTenantId, setCurrentTenantId } from '../utils/tenant';
 import { getBrowserLanguages, resolveCmsLanguage } from '../utils/cmsLanguage';
@@ -167,7 +167,7 @@ export const AuthProvider = ({ children }) => {
 
     return (
         <AuthContext.Provider value={value}>
-            <React.Fragment key={language}>{children}</React.Fragment>
+            {children}
         </AuthContext.Provider>
     );
 };

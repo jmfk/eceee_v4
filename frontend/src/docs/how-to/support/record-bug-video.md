@@ -1,20 +1,20 @@
 ---
 id: record-bug-video
-title: Spela in en femsekunders buggrapport
-summary: Visa felet kort och bifoga filmen i ett meddelande.
+title: Record a five-second bug report
+summary: Show the problem briefly and attach the video to a message.
 order: 1
 sectionId: support
-sectionTitle: Inbox och support
-sectionSummary: Skicka meddelanden och rapportera fel i din arbetsyta.
+sectionTitle: Inbox and support
+sectionSummary: Send messages and report problems in your workspace.
 sectionOrder: 12
 ---
 
-# Spela in en femsekunders buggrapport
+# Record a five-second bug report
 
-1. Öppna sidan där felet uppstår och välj Rapportera fel. Sidans länk fylls i automatiskt.
-2. Förbered det steg som visar felet. Dölj personuppgifter och känsligt innehåll.
-3. Spela in högst fem sekunder med datorns skärminspelning. Exportera till MP4 med H.264 eller WebM och trimma vid behov.
-4. Välj Filer, bilder eller video i meddelandet och bifoga filmen. Högst 25 MB per fil.
-5. Skriv vad du förväntade dig och vad som hände, välj mottagare och skicka.
+1. Open the page where the problem occurs and select Report a problem. The page link is filled in automatically.
+2. Prepare the step that shows the problem. Hide personal data and sensitive information.
+3. Record no more than five seconds with your computer's screen recorder. Export as H.264 MP4 or WebM and trim if needed.
+4. Select Files, images or video in the message and attach the recording. The limit is 25 MB per file.
+5. Describe what you expected and what happened, choose a recipient, and send the message.
 
-En publicerare kan ladda upp instruktionsfilmen i Inbox → Publicera instruktion och välja denna hjälpartikel. Instruktionsfilmen kan vara längre än fem sekunder.
+A publisher can upload an instruction video in Inbox → Publish instruction and link it to this help article. The instruction video may be longer than five seconds.

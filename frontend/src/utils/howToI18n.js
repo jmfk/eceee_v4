@@ -38,6 +38,10 @@ const UI_TEXT = {
 
 const SECTION_TRANSLATIONS = {
     sv: {
+        support: {
+            title: 'Inbox och support',
+            summary: 'Skicka meddelanden och rapportera fel i din arbetsyta.'
+        },
         pages: {
             title: 'Sidor',
             summary: 'Skapa, organisera, redigera och publicera sidor i sidträdet.'
