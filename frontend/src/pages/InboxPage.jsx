@@ -129,7 +129,7 @@ function InboxList({ link }) {
             <div className="mail-rows">
             {query.data?.results.map((entry) => (
                 <article className={`mail-row ${entry.readAt ? '' : 'mail-unread'}`} key={entry.id}>
-                    <span className="mail-sender">{entry.senderName || (entry.kind === 'instruction' ? 'Instruktion' : 'Meddelande')}</span>
+                    <span className="mail-sender">{entry.senderName || cmsLegacyText(entry.kind === 'instruction' ? 'Instruktion' : 'Meddelande', getCmsCopyLanguage())}</span>
                     <Link className="mail-subject" to={link(entry.instructionId ? `instructions/${entry.instructionId}` : `threads/${entry.threadId}`)}>
                         {!entry.readAt && <span className="sr-only">Oläst · </span>}<span>{entry.title}</span><span className="mail-preview"> — {entry.preview || (entry.status ? cmsLegacyText(statusText[entry.status], getCmsCopyLanguage()) : '')}</span>
                     </Link>

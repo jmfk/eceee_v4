@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AuthProvider, useAuth } from '../AuthContext'
@@ -70,5 +71,30 @@ describe('AuthProvider workspace synchronization', () => {
             expect(getCurrentTenantId()).toBe('eceee-production-copy')
             expect(localStorage.getItem('eceee_tenant_id')).toBeNull()
         })
+    })
+
+    it('updates language without discarding an unsaved form draft', async () => {
+        vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+            ok: true,
+            json: async () => ({ username: 'editor', preferredLanguage: 'en-us' }),
+        })
+        const Draft = () => {
+            const { language, setUser } = useAuth()
+            const [draft, setDraft] = useState('')
+            return <>
+                <span>{language}</span>
+                <input aria-label="Unsaved draft" value={draft} onChange={event => setDraft(event.target.value)} />
+                <button onClick={() => setUser(user => ({ ...user, preferredLanguage: 'sv-se' }))}>Change language</button>
+            </>
+        }
+
+        render(<AuthProvider><Draft /></AuthProvider>)
+        expect(await screen.findByText('en-us')).toBeInTheDocument()
+        fireEvent.change(screen.getByRole('textbox', { name: 'Unsaved draft' }), { target: { value: 'Keep this' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Change language' }))
+
+        expect(await screen.findByText('sv-se')).toBeInTheDocument()
+        expect(screen.getByRole('textbox', { name: 'Unsaved draft' })).toHaveValue('Keep this')
+        await waitFor(() => expect(document.documentElement.lang).toBe('sv-se'))
     })
 })

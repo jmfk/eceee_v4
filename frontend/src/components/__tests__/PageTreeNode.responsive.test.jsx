@@ -1,9 +1,10 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import PageTreeNode from '../PageTreeNode'
 import { NotificationProvider } from '../NotificationManager'
+import { setCmsCopyLanguage } from '../../utils/cmsCopy'
 
 vi.mock('../../utils/apiValidation.js', () => ({
     getPageDisplayUrl: vi.fn(() => '/responsive-page'),
@@ -46,6 +47,7 @@ const renderNode = props => {
 }
 
 describe('PageTreeNode responsive actions and metadata', () => {
+    afterEach(() => setCmsCopyLanguage('en-us'))
     beforeEach(() => {
         vi.clearAllMocks()
     })
@@ -91,6 +93,18 @@ describe('PageTreeNode responsive actions and metadata', () => {
         await user.click(screen.getByRole('menuitem', { name: 'Cut' }))
         expect(onCut).toHaveBeenCalledWith(42)
         expect(menu).not.toBeInTheDocument()
+    })
+
+    it('translates page tree actions when Swedish is selected', async () => {
+        setCmsCopyLanguage('sv-se')
+        const user = userEvent.setup()
+        renderNode({ onCut: vi.fn() })
+
+        await user.click(screen.getByRole('button', { name: `Fler åtgärder för ${responsivePage.title}` }))
+        expect(screen.getByRole('menuitem', { name: 'Publicering och historik' })).toBeVisible()
+        expect(screen.getByRole('menuitem', { name: 'Importera som undersida' })).toBeVisible()
+        expect(screen.getByRole('menuitem', { name: 'Klipp ut' })).toBeVisible()
+        setCmsCopyLanguage('en-us')
     })
 
     it('opens page settings for root hostnames instead of editing public routing inline', async () => {

@@ -94,6 +94,12 @@ beforeEach(() => {
 })
 
 describe('tenant inbox journey', () => {
+    it('shows an English sender fallback in English mode', async () => {
+        setCmsCopyLanguage('en-us')
+        renderInbox()
+        expect(await screen.findByText('Message')).toBeInTheDocument()
+    })
+
     it('marks Inbox as selected on a direct URL without a trailing slash', async () => {
         renderInbox('/inbox?tenant=a')
         await screen.findByRole('heading', { name: 'Din inbox' })
