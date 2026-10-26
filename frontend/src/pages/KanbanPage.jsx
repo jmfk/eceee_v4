@@ -820,7 +820,7 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                                     : item.actor.name
                                             }
                                         />
-                                        <div>
+                                        <div className="kb-activity-content">
                                             <p className="text-sm kb-muted">
                                                 {item.entryType === 'comment'
                                                     ? item.author.name
@@ -831,15 +831,6 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                             {item.entryType === 'comment' ? (
                                                 <>
                                                     <MarkdownView value={item.body} />
-                                                    <button
-                                                        onClick={() => {
-                                                            setEditingComment(item)
-                                                            setCommentOpen(true)
-                                                            setBody(item.body)
-                                                        }}
-                                                    >
-                                                        Redigera kommentar
-                                                    </button>
                                                     {card.attachments
                                                         .filter((file) => file.comment === item.id)
                                                         .map((file) => (
@@ -849,27 +840,42 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                                                 </a>
                                                             </p>
                                                         ))}
+                                                    <div className="kb-activity-actions">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setEditingComment(item)
+                                                                setCommentOpen(true)
+                                                                setBody(item.body)
+                                                            }}
+                                                        >
+                                                            Redigera kommentar
+                                                        </button>
+                                                    </div>
                                                 </>
                                             ) : (
                                                 <>
                                                     <p>{item.message}</p>
                                                     {item.canUndo && (
-                                                        <button
-                                                            disabled={busy}
-                                                            onClick={() =>
-                                                                run(
-                                                                    async () =>
-                                                                        await kanbanApi.post(
-                                                                            'workspace/undo/',
-                                                                            {
-                                                                                activityId: item.id,
-                                                                            },
-                                                                        ),
-                                                                )
-                                                            }
-                                                        >
-                                                            Ångra
-                                                        </button>
+                                                        <div className="kb-activity-actions">
+                                                            <button
+                                                                type="button"
+                                                                disabled={busy}
+                                                                onClick={() =>
+                                                                    run(
+                                                                        async () =>
+                                                                            await kanbanApi.post(
+                                                                                'workspace/undo/',
+                                                                                {
+                                                                                    activityId: item.id,
+                                                                                },
+                                                                            ),
+                                                                    )
+                                                                }
+                                                            >
+                                                                Ångra
+                                                            </button>
+                                                        </div>
                                                     )}
                                                 </>
                                             )}
