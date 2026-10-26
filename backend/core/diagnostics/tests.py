@@ -7,9 +7,10 @@ import tempfile
 import uuid
 from datetime import timedelta
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
+from django.core.management.base import CommandError
 from django.core.cache import cache
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
@@ -27,6 +28,29 @@ from core.roles import DEFAULT_PERMISSIONS, ROLE_PERMISSIONS
 from .catalog import inventory
 from .collector import atomic_json, bounded_lines, collect, legacy_event, protected_key
 from .events import PREFIX, TENANT, DiagnosticHandler, canonical, decode_signed, sanitize_event
+from .view_lifecycle import drop_diagnostic_views
+
+
+class DiagnosticViewLifecycleTests(SimpleTestCase):
+    def test_rejects_objects_outside_the_dedicated_view_owner(self):
+        cursor = MagicMock()
+        cursor.fetchone.return_value = ("eceee_diagnostics_views",)
+        cursor.fetchall.return_value = [("unexpected", "r", "eceee_diagnostics_views")]
+        with self.assertRaises(CommandError):
+            drop_diagnostic_views(cursor)
+        self.assertEqual(cursor.execute.call_count, 2)
+
+    def test_removes_every_owned_view_without_cascade(self):
+        cursor = MagicMock()
+        cursor.fetchone.return_value = ("eceee_diagnostics_views",)
+        cursor.fetchall.return_value = [
+            ("current", "v", "eceee_diagnostics_views"),
+            ("retired", "v", "eceee_diagnostics_views"),
+        ]
+        self.assertEqual(drop_diagnostic_views(cursor), 2)
+        self.assertEqual(cursor.execute.call_count, 4)
+        for call in cursor.execute.call_args_list[2:]:
+            self.assertNotIn("CASCADE", repr(call.args[0]))
 
 
 class SanitizationTests(SimpleTestCase):

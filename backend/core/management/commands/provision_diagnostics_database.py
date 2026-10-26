@@ -9,6 +9,7 @@ from psycopg2 import sql
 
 from core.diagnostics.catalog import projections
 from core.diagnostics.database import OWNER_ROLE, READ_ROLE, SCHEMA
+from core.diagnostics.view_lifecycle import drop_diagnostic_views
 
 
 class Command(BaseCommand):
@@ -115,6 +116,9 @@ class Command(BaseCommand):
                 sql.SQL("GRANT USAGE ON SCHEMA {} TO {}").format(sql.Identifier(SCHEMA), sql.Identifier(READ_ROLE))
             )
             cursor.execute(sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(sql.Identifier(OWNER_ROLE)))
+            # Replace the whole reviewed set atomically. CREATE OR REPLACE leaves
+            # retired views readable and cannot change existing column types.
+            drop_diagnostic_views(cursor)
             reviewed = projections()
             for table, projection in reviewed.items():
                 model = projection["model"]

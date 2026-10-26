@@ -122,8 +122,10 @@ is not an authorization or a replacement for `make prod-deploy`.
    `eceee_diagnostics_reader` login, and prints only status. It is transactional
    and repeatable and refuses unsafe inherited raw-table privileges, role
    memberships, persistent data ownership or unexpected schema ownership.
-   It must run with a sufficiently privileged database operator connection, not
-   the diagnostic login. No automatic deploy hook runs it. A failure rolls back
+   Reprovisioning atomically replaces the dedicated views, including removal of
+   views no longer in the reviewed catalog. It must run with a sufficiently
+   privileged database operator connection, not the diagnostic login. No automatic
+   deploy hook runs it. A failure rolls back
    provisioning; investigate under a fresh gate rather than widening privileges.
 4. Install the collector's `core/__init__.py` and diagnostic `__init__.py`,
    `events.py`, `collector.py` from this reviewed release under
@@ -196,3 +198,11 @@ and stop the timer through the appropriate gates. Keep existing application data
 and backups intact. Views, grants and sanitized files can remain inert while
 investigating; do not improvise restoration or destructive cleanup. Any persistent
 schema/projection change requires renewed review and explicit reprovisioning.
+Before a migration that drops, renames or changes the type of a column used by a
+diagnostic view, explicitly run `prepare_diagnostics_schema_change` under its
+own owner gate with a privileged database operator connection. The command
+transactionally removes only views owned by the diagnostic role in its dedicated
+schema, without `CASCADE`; unexpected schema objects or dependencies stop it.
+Diagnostic data queries will fail closed until the reviewed migration succeeds
+and `provision_diagnostics_database` recreates the current approved views under
+a separate gate. Do not run either command automatically in migrations or deploy.
