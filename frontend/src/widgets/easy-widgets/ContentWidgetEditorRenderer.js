@@ -555,6 +555,7 @@ class ContentWidgetEditorRenderer {
         this.fieldMode = options.fieldMode || false
         this.inlineOnly = options.inlineOnly || false
         this.allowMediaInsert = options.allowMediaInsert !== false
+        this.onImageUpload = options.onImageUpload || null
 
         // DOM elements
         this.rootElement = null
@@ -705,7 +706,7 @@ class ContentWidgetEditorRenderer {
         this.toolbarElement.appendChild(this.createSeparator())
 
         // Insert Image button
-        if (this.allowMediaInsert) {
+        if (this.allowMediaInsert || this.onImageUpload) {
             const imageButton = this.createImageInsertButton()
             this.toolbarButtons.set('insertImage', imageButton)
             this.toolbarElement.appendChild(imageButton)
@@ -1993,12 +1994,13 @@ class ContentWidgetEditorRenderer {
         const button = document.createElement('button')
         button.type = 'button'
         button.className = 'p-1 hover:bg-gray-200 rounded'
-        button.title = 'Insert Image or Collection'
+        button.title = this.onImageUpload ? 'Ladda upp bild' : 'Insert Image or Collection'
         button.innerHTML = ICONS.image
 
         const clickHandler = (e) => {
             e.preventDefault()
-            this.openMediaInsertModal()
+            if (this.onImageUpload) this.onImageUpload()
+            else this.openMediaInsertModal()
         }
 
         button.addEventListener('click', clickHandler)

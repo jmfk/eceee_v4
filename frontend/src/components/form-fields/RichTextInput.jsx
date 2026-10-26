@@ -8,18 +8,20 @@ import { requiresHtmlSource } from '../../utils/richTextFieldHtml'
 /** Own the editor DOM once; local value echoes never reset its content or native undo history. */
 const RichTextEditor = ({ value, defaultValue = '', onChange, onBlur, onFocus, label, description,
     required, disabled = false, validation, rows = 6, placeholder, inlineOnly = false,
-    namespace, context, fieldName, allowMediaInsert = true }) => {
+    namespace, context, fieldName, allowMediaInsert = true, onImageUpload }) => {
     const id = useId()
     const containerRef = useRef(null)
     const editorRef = useRef(null)
-    const callbacksRef = useRef({ onChange, onBlur, onFocus })
-    callbacksRef.current = { onChange, onBlur, onFocus }
+    const callbacksRef = useRef({ onChange, onBlur, onFocus, onImageUpload })
+    callbacksRef.current = { onChange, onBlur, onFocus, onImageUpload }
     const lastValueRef = useRef(value ?? defaultValue)
+    const hasImageUpload = Boolean(onImageUpload)
 
     useLayoutEffect(() => {
         const renderer = new ContentWidgetEditorRenderer(containerRef.current, {
             content: DOMPurify.sanitize(lastValueRef.current || ''), fieldMode: true, inlineOnly,
             allowMediaInsert,
+            onImageUpload: hasImageUpload ? () => callbacksRef.current.onImageUpload?.() : null,
             namespace, pageId: context?.pageId,
             siteRootId: context?.siteRootId || context?.webpageData?.cachedRootId,
             onChange: html => {
@@ -77,7 +79,7 @@ const RichTextEditor = ({ value, defaultValue = '', onChange, onBlur, onFocus, l
             renderer.destroy()
             editorRef.current = null
         }
-    }, [id, inlineOnly, allowMediaInsert])
+    }, [id, inlineOnly, allowMediaInsert, hasImageUpload])
 
     useEffect(() => {
         if (value !== undefined && value !== lastValueRef.current) {

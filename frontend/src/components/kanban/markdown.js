@@ -24,14 +24,14 @@ export const htmlMarkdown = (html) => {
     })
     return converter.turndown(root.innerHTML)
 }
-export const withAttachmentTickets = (html, ticket) => {
+export const withAttachmentTickets = (html, ticket, forEditor = false) => {
     const root = document.createElement('div')
     root.innerHTML = html
     root.querySelectorAll('img').forEach((image) => {
         const src = image.getAttribute('src') || ''
         if (ticket && /^\/api\/v1\/kanban\/attachments\/[a-f0-9-]+\/download\/$/.test(src))
             image.setAttribute('src', `${src}?ticket=${encodeURIComponent(ticket)}`)
-        image.referrerPolicy = 'no-referrer'
+        if (!forEditor) image.referrerPolicy = 'no-referrer'
     })
     return root.innerHTML
 }

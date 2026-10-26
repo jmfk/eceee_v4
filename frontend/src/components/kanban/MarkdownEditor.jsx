@@ -33,7 +33,6 @@ const fileNode = (file, ticket) => {
         const image = document.createElement('img')
         image.src = attachmentUrl(file.id, ticket)
         image.alt = file.filename
-        image.referrerPolicy = 'no-referrer'
         return image
     }
     const link = document.createElement('a')
@@ -67,6 +66,8 @@ export default function MarkdownEditor({
     const [localEdit, setLocalEdit] = useState(null)
     const visualRef = useRef(null)
     const draggedImage = useRef(null)
+    const imagePickerRef = useRef(null)
+    const pickerRange = useRef(null)
     const ticket = useKanbanAccess()
     // Echo the editor's own HTML unchanged to preserve its DOM, caret and undo
     // history. Canonicalize only external Markdown updates or a mode switch.
@@ -74,7 +75,7 @@ export default function MarkdownEditor({
         () =>
             localEdit && localEdit.markdown === value && localEdit.ticket === ticket
                 ? localEdit.html
-                : withAttachmentTickets(markdownHtml(value), ticket),
+                : withAttachmentTickets(markdownHtml(value), ticket, true),
         [value, ticket, localEdit],
     )
     const editVisual = (content) => {
@@ -100,30 +101,17 @@ export default function MarkdownEditor({
             event.dataTransfer.dropEffect = draggedImage.current ? 'move' : 'copy'
         }
     }
-    const onDrop = async (event) => {
+    const insertFiles = async (files, range, source, start) => {
         const editor = visualRef.current?.querySelector('[contenteditable="true"]')
-        if (draggedImage.current) {
-            event.preventDefault()
-            event.stopPropagation()
-            const image = draggedImage.current
-            draggedImage.current = null
-            if (!editor || !editor.contains(image)) return
-            const range = dropRange(event, editor)
-            if (image.contains(range.startContainer) || range.startContainer === image) return
-            range.insertNode(image)
-            editor.dispatchEvent(new Event('input', { bubbles: true }))
-            return
-        }
-        const files = Array.from(event.dataTransfer?.files || [])
-        if (!files.length || !onFileDrop) return
-        event.preventDefault()
-        event.stopPropagation()
-        const source = event.target.closest?.('textarea')
-        const start = source?.selectionStart
         const marker = editor && !source ? document.createElement('span') : null
         if (marker) {
             marker.dataset.kanbanUpload = 'pending'
-            dropRange(event, editor).insertNode(marker)
+            const insertionRange = range && editor.contains(range.startContainer) ? range : document.createRange()
+            if (insertionRange !== range) {
+                insertionRange.selectNodeContents(editor)
+                insertionRange.collapse(false)
+            }
+            insertionRange.insertNode(marker)
         }
         try {
             const uploaded = await onFileDrop(files)
@@ -144,8 +132,50 @@ export default function MarkdownEditor({
             onDropComplete?.()
         }
     }
+    const openImagePicker = () => {
+        const editor = visualRef.current?.querySelector('[contenteditable="true"]')
+        if (!editor) return
+        const selection = window.getSelection()
+        if (selection?.rangeCount && editor.contains(selection.getRangeAt(0).startContainer)) {
+            pickerRange.current = selection.getRangeAt(0).cloneRange()
+        } else {
+            pickerRange.current = document.createRange()
+            pickerRange.current.selectNodeContents(editor)
+            pickerRange.current.collapse(false)
+        }
+        imagePickerRef.current?.click()
+    }
+    const onDrop = async (event) => {
+        const editor = visualRef.current?.querySelector('[contenteditable="true"]')
+        if (draggedImage.current) {
+            event.preventDefault()
+            event.stopPropagation()
+            const image = draggedImage.current
+            draggedImage.current = null
+            if (!editor || !editor.contains(image)) return
+            const range = dropRange(event, editor)
+            if (image.contains(range.startContainer) || range.startContainer === image) return
+            range.insertNode(image)
+            editor.dispatchEvent(new Event('input', { bubbles: true }))
+            return
+        }
+        const files = Array.from(event.dataTransfer?.files || [])
+        if (!files.length || !onFileDrop) return
+        event.preventDefault()
+        event.stopPropagation()
+        const source = event.target.closest?.('textarea')
+        const start = source?.selectionStart
+        await insertFiles(files, editor && !source ? dropRange(event, editor) : null, source, start)
+    }
     return (
         <div className="kb-editor">
+            {onFileDrop && <input ref={imagePickerRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp"
+                multiple className="sr-only" aria-label={`Ladda upp bild i ${label}`}
+                onChange={async (event) => {
+                    const files = Array.from(event.target.files || [])
+                    event.target.value = ''
+                    if (files.length) await insertFiles(files, pickerRange.current)
+                }} />}
             <div className="kb-editor-frame">
                 {mode === 'source' ? (
                     <textarea
@@ -160,7 +190,8 @@ export default function MarkdownEditor({
                     <div className="kb-editor-visual" aria-label={label} ref={visualRef}
                         onDragStartCapture={onDragStart} onDragEndCapture={() => { draggedImage.current = null }}
                         onDragOverCapture={onDragOver} onDropCapture={onDrop}>
-                        <RichTextInput value={html} onChange={editVisual} rows={10} fieldName={label} allowMediaInsert={false} />
+                        <RichTextInput value={html} onChange={editVisual} rows={10} fieldName={label}
+                            allowMediaInsert={false} onImageUpload={onFileDrop ? openImagePicker : undefined} />
                     </div>
                 )}
                 <div className="kb-editor-modebar" aria-label={`${label}: redigeringsläge`}>
