@@ -97,14 +97,21 @@ describe('Kanban application navigation', () => {
         expect(screen.queryByRole('textbox', { name: 'Tavelnamn' })).not.toBeInTheDocument()
     })
 
-    it('opens filters and the list composer only when requested', async () => {
+    it('opens filters and creates a list from the board actions menu', async () => {
+        kanbanApi.post.mockResolvedValue({})
         renderKanban('/kanban/boards/board-1')
         await screen.findByRole('heading', { name: 'Redaktionen' })
         expect(screen.queryByRole('textbox', { name: 'Sök kort' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Lägg till lista' })).not.toBeInTheDocument()
         fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
         expect(screen.getByRole('textbox', { name: 'Sök kort' })).toBeVisible()
-        fireEvent.click(screen.getByRole('button', { name: 'Lägg till lista' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Tavelåtgärder' }))
+        fireEvent.click(await screen.findByRole('button', { name: 'Lägg till lista' }))
         expect(screen.getByRole('textbox', { name: 'Listnamn' })).toHaveFocus()
+        fireEvent.change(screen.getByRole('textbox', { name: 'Listnamn' }), { target: { value: 'Pågår' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Lägg till lista' }))
+        await waitFor(() => expect(kanbanApi.post).toHaveBeenCalledWith('boards/board-1/columns/', expect.objectContaining({ title: 'Pågår' })))
+        expect(screen.queryByRole('textbox', { name: 'Listnamn' })).not.toBeInTheDocument()
     })
 
 })
