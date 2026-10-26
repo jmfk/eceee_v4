@@ -10,8 +10,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
-from django.core.management.base import CommandError
 from django.core.cache import cache
+from django.core.management.base import CommandError
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
