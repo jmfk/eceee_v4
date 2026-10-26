@@ -265,8 +265,8 @@ class LayoutAPIPermissionsTests(APITestCase):
             response = self.client.get(f"/api/v1/webpages/layouts/{layout_name}/template/")
             self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_reload_endpoint_requires_staff(self):
-        """Test that reload endpoint requires staff permissions"""
+    def test_reload_endpoint_rejects_staff_flag_without_admin_access(self):
+        """The global staff flag alone does not grant CMS administration."""
         # Without authentication
         response = self.client.post("/api/v1/webpages/layouts/reload/")
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -276,8 +276,14 @@ class LayoutAPIPermissionsTests(APITestCase):
         response = self.client.post("/api/v1/webpages/layouts/reload/")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-        # With staff user
+        # The legacy staff flag alone does not grant access.
         self.client.force_authenticate(user=self.staff_user)
+        response = self.client.post("/api/v1/webpages/layouts/reload/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        # A system owner may reload layouts across workspaces.
+        self.staff_user.is_superuser = True
+        self.staff_user.save(update_fields=["is_superuser"])
         response = self.client.post("/api/v1/webpages/layouts/reload/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 

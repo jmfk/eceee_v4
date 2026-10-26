@@ -374,7 +374,7 @@ class CodeLayoutViewSet(viewsets.ViewSet):
     def reload(self, request):
         """Reload all layouts (admin/dev use)"""
         if not is_tenant_admin(request.user, getattr(request, "tenant", None)):
-            error_data = {"error": "Only staff can reload layouts"}
+            error_data = {"error": "Only workspace admins can reload layouts"}
             return self._create_formatted_response(error_data, request, status.HTTP_403_FORBIDDEN)
 
         # Log metrics for admin operations
