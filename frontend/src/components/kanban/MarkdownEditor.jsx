@@ -1,5 +1,5 @@
 import { markdownHtml, htmlMarkdown, withAttachmentTickets, fileMarkdown } from './markdown'
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useKanbanAccess } from './AccessContext'
 import RichTextInput from '../form-fields/RichTextInput'
 import { attachmentUrl } from '../../api/kanban'
@@ -84,7 +84,9 @@ export default function MarkdownEditor({
     const [localEdit, setLocalEdit] = useState(null)
     const [selectedImage, setSelectedImage] = useState(null)
     const [imageMenuPosition, setImageMenuPosition] = useState({ top: 0, left: 0 })
+    const [imageMenuSpace, setImageMenuSpace] = useState(0)
     const visualRef = useRef(null)
+    const imageMenuRef = useRef(null)
     const latestValue = useRef(value || '')
     latestValue.current = value || ''
     const draggedImage = useRef(null)
@@ -99,6 +101,7 @@ export default function MarkdownEditor({
         selectedImage?.classList.remove('kb-image-selected')
         if (!image) {
             setSelectedImage(null)
+            setImageMenuSpace(0)
             return
         }
         image.classList.add('kb-image-selected')
@@ -110,6 +113,30 @@ export default function MarkdownEditor({
         })
         setSelectedImage(image)
     }
+    useLayoutEffect(() => {
+        const visual = visualRef.current
+        const content = visual?.firstElementChild
+        const menu = imageMenuRef.current
+        if (!selectedImage?.isConnected || !content || !menu) return
+        const placeMenu = () => {
+            const imageBounds = selectedImage.getBoundingClientRect()
+            const visualBounds = visual.getBoundingClientRect()
+            const top = imageBounds.bottom - visualBounds.top + 6
+            const left = Math.max(8, Math.min(imageBounds.left - visualBounds.left, visual.clientWidth - 328))
+            setImageMenuPosition((previous) => previous.top === top && previous.left === left ? previous : { top, left })
+            setImageMenuSpace(Math.max(0, Math.ceil(imageBounds.bottom + 6 + menu.offsetHeight - content.getBoundingClientRect().bottom + 8)))
+        }
+        placeMenu()
+        const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(placeMenu)
+        observer?.observe(selectedImage)
+        observer?.observe(content)
+        observer?.observe(menu)
+        window.addEventListener('resize', placeMenu)
+        return () => {
+            observer?.disconnect()
+            window.removeEventListener('resize', placeMenu)
+        }
+    }, [selectedImage, mode])
     useEffect(() => {
         if (!initialImageId || mode !== 'visual') return
         const image = visualRef.current?.querySelector(`img[src^="/api/v1/kanban/attachments/${initialImageId}/download/"]`)
@@ -289,7 +316,7 @@ export default function MarkdownEditor({
                         onDropCapture={onDrop}
                     />
                 ) : (
-                    <div className="kb-editor-visual" aria-label={label} ref={visualRef}
+                    <div className="kb-editor-visual" aria-label={label} ref={visualRef} style={{ paddingBottom: imageMenuSpace }}
                         onClickCapture={(event) => {
                             if (event.target.closest?.('.kb-image-menu')) return
                             const image = event.target.closest?.('img')
@@ -306,7 +333,7 @@ export default function MarkdownEditor({
                         onDragOverCapture={onDragOver} onDropCapture={onDrop}>
                         <RichTextInput value={html} onChange={editVisual} rows={10} fieldName={label}
                             allowMediaInsert={false} onImageUpload={onFileDrop ? openImagePicker : undefined} />
-                        {selectedImage?.isConnected && <div className="kb-image-menu" role="toolbar" aria-label={`Bildinställningar för ${selectedImage.alt || 'bild'}`}
+                        {selectedImage?.isConnected && <div className="kb-image-menu" ref={imageMenuRef} role="toolbar" aria-label={`Bildinställningar för ${selectedImage.alt || 'bild'}`}
                             style={imageMenuPosition}>
                             <div className="kb-image-menu-row">
                                 <span id={`${helpId}-image-size`}>Storlek</span>

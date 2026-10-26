@@ -124,6 +124,29 @@ it('selects an image and offers distinct inline removal and attachment deletion'
     expect(onDeleteAttachment).toHaveBeenCalledOnce()
 })
 
+it('keeps the image menu inside the editor layout when it extends below the image', () => {
+    const bounds = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function () {
+        if (this.tagName === 'IMG') return { top: 20, bottom: 420, left: 20 }
+        if (this.classList.contains('kb-editor-visual')) return { top: 0, bottom: 400, left: 0 }
+        return { top: 0, bottom: 400, left: 0 }
+    })
+    const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function () {
+        return this.classList.contains('kb-image-menu') ? 180 : 0
+    })
+    try {
+        const id = '11111111-1111-1111-1111-111111111111'
+        render(<MarkdownEditor label="Beskrivning" value={`![photo](/api/v1/kanban/attachments/${id}/download/)`} onChange={() => {}} />)
+        const visual = document.querySelector('.kb-editor-visual')
+        fireEvent.click(screen.getByTestId('visual-editor').querySelector('img'))
+        expect(visual.style.paddingBottom).toBe('214px')
+        fireEvent.click(visual)
+        expect(visual.style.paddingBottom).toBe('0px')
+    } finally {
+        bounds.mockRestore()
+        height.mockRestore()
+    }
+})
+
 it('removes the inline image after attachment deletion succeeds', async () => {
     const id = '11111111-1111-1111-1111-111111111111'
     const onDeleteAttachment = vi.fn().mockResolvedValue(true)
