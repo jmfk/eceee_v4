@@ -300,6 +300,9 @@
 .kb-detail-description .prose a { color: #1d4ed8; text-decoration: underline; }
 .kb-detail-description .prose blockquote { border-left: 2px solid #9ca3af; padding-left: 12px; }
 .kb-activity-entry { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; }
+.kb-activity-content { min-width: 0; }
+.kb-activity-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.kb-activity-actions > button { min-height: 30px; }
 
 /* Kanban editing uses the existing rich-text commands inside one quiet frame. */
 .kb-editor-frame { border: 2px solid #c7cbd1; border-radius: 6px; background: white; }
