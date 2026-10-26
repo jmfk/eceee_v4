@@ -13,6 +13,7 @@ from django.db import DatabaseError, connections
 from django.test import TransactionTestCase
 from rest_framework.test import APIClient
 
+from core.diagnostics.catalog import projections
 from core.machine_api_keys import DIAGNOSTICS_DATA_READ, DIAGNOSTICS_GLOBAL_READ, generate_machine_api_key
 from core.models import MachineAPIKey, Tenant
 
@@ -174,3 +175,34 @@ class PostgreSQLDiagnosticTests(TransactionTestCase):
         finally:
             with connections["default"].cursor() as cursor:
                 cursor.execute("REVOKE SELECT ON public.core_tenant FROM PUBLIC")
+
+    def test_reprovision_removes_retired_views_and_columns(self):
+        reviewed = projections()
+        reviewed.pop("auth_user")
+        tenant = reviewed["core_tenant"].copy()
+        tenant["columns"] = {key: value for key, value in tenant["columns"].items() if key != "is_active"}
+        reviewed["core_tenant"] = tenant
+        with (
+            patch("core.management.commands.provision_diagnostics_database.projections", return_value=reviewed),
+            patch.dict(os.environ, {"DIAGNOSTICS_DB_PASSWORD": "test-diagnostics-only-password-00000000"}),
+        ):
+            call_command("provision_diagnostics_database", stdout=StringIO())
+        with connections["default"].cursor() as cursor:
+            cursor.execute("SELECT to_regclass('eceee_diagnostics.auth_user')")
+            self.assertIsNone(cursor.fetchone()[0])
+            cursor.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema='eceee_diagnostics' AND table_name='core_tenant'"
+            )
+            self.assertNotIn("is_active", [row[0] for row in cursor.fetchall()])
+        with self.assertRaises(DatabaseError):
+            with connections["diagnostics"].cursor() as cursor:
+                cursor.execute("SELECT id FROM eceee_diagnostics.auth_user")
+
+    def test_prepare_schema_change_removes_only_diagnostic_views(self):
+        call_command("prepare_diagnostics_schema_change", stdout=StringIO())
+        with connections["default"].cursor() as cursor:
+            cursor.execute("SELECT to_regclass('eceee_diagnostics.core_tenant')")
+            self.assertIsNone(cursor.fetchone()[0])
+            cursor.execute("SELECT to_regclass('public.core_tenant')")
+            self.assertIsNotNone(cursor.fetchone()[0])
