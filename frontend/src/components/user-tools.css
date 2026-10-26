@@ -63,7 +63,7 @@
         justify-content: center;
         gap: 0.5rem;
         min-height: 1.75rem;
-        padding: 0.25rem 0.625rem;
+        padding: 0.25rem 0.75rem;
         border: 1px solid var(--color-gray-300, #d1d5db);
         border-radius: 0.25rem;
         background: white;
@@ -96,7 +96,7 @@
     .user-tools-content :where(input:not([type='checkbox']):not([type='radio']):not([type='file']), select, textarea) {
         max-width: 100%;
         min-height: 1.75rem;
-        padding: 0.25rem 0.625rem;
+        padding: 0.25rem 0.75rem;
         border: 1px solid var(--color-gray-300, #d1d5db);
         border-radius: 0.25rem;
         background: white;
@@ -109,7 +109,7 @@
         margin-top: 0.5rem;
     }
     .user-tools-content :where(input[type='file'])::file-selector-button {
-        padding: 0.25rem 0.625rem;
+        padding: 0.25rem 0.75rem;
         margin-right: 0.75rem;
         border: 1px solid var(--color-gray-300, #d1d5db);
         border-radius: 0.25rem;
@@ -141,6 +141,26 @@
     }
 }
 
+/* Native CMS selects need a reserved icon lane and a consistent edge inset. */
+.user-tools-content select:not([multiple]),
+.cms-native-select {
+    appearance: none;
+    color-scheme: light;
+    padding-inline: 0.75rem 2.5rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-position: right 0.75rem center;
+    background-repeat: no-repeat;
+    background-size: 1rem 1rem;
+}
+
+@media (forced-colors: active) {
+    .user-tools-content select:not([multiple]),
+    .cms-native-select {
+        appearance: auto;
+        background-image: none;
+    }
+}
+
 .user-tools-nav {
     display: flex;
     flex-wrap: wrap;
@@ -156,7 +176,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.25rem 0.625rem;
+    padding: 0.25rem 0.75rem;
     border-radius: 0.1875rem;
     color: var(--color-gray-600, #4b5563);
     font-weight: 500;

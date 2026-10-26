@@ -9,7 +9,7 @@ export default function HelpGuideSelect({ value, onChange, disabled = false }) {
     return (
         <label>
             Koppla till hjälpartikel
-            <select value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
+            <select className="cms-native-select" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
                 <option value="">Ingen hjälpartikel – endast i instruktionsbiblioteket</option>
                 {value && !known && <option value={value}>{value} (artikeln finns inte i denna version)</option>}
                 {howToDocs.map((section) => (
