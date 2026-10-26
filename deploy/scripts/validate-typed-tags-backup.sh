@@ -77,6 +77,12 @@ if ! docker exec "$DB_CONTAINER" pg_isready -U postgres -d eceee_v4 >/dev/null 2
     exit 1
 fi
 
+echo "[backup-validation] Creating disposable publisher roles..."
+docker exec -i "$DB_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d eceee_v4 >/dev/null <<'SQL'
+CREATE ROLE eceee_publisher NOLOGIN;
+CREATE ROLE eceee_publisher_forms NOLOGIN;
+SQL
+
 echo "[backup-validation] Restoring into the disposable database (dump output is suppressed)..."
 if ! gzip -dc "$BACKUP_FILE" | docker exec -i "$DB_CONTAINER" \
     psql -v ON_ERROR_STOP=1 -U postgres -d eceee_v4 >/dev/null 2>&1; then
