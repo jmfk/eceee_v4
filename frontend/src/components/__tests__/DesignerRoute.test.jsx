@@ -25,7 +25,7 @@ describe('DesignerRoute', () => {
     })
 
     it('allows a tenant administrator', () => {
-        auth.value = { isAuthenticated: true, isLoading: false, user: { hasTenantAdminAccess: true } }
+        auth.value = { isAuthenticated: true, isLoading: false, user: { permissions: ['tenant.admin', 'theme.read'] } }
         renderRoute()
         expect(screen.getByText('Designer workspace')).toBeInTheDocument()
     })
