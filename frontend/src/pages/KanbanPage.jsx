@@ -31,35 +31,25 @@ const useTenant = () => {
 export function Attachments({ card, onDelete, busy = false }) {
     const ticket = useKanbanAccess()
     return (
-        <section className="mt-8" aria-label="Bilagor">
+        <section className="kb-attachments mt-8" aria-label="Bilagor">
             <h2 className="text-xl font-semibold mb-3">Bilagor</h2>
-            <ul className="space-y-6">
+            <ul className="kb-attachment-grid">
                 {card.attachments.map((file) => (
-                    <li key={file.id}>
-                        <a href={attachmentUrl(file.id, ticket)} target="_blank" rel="noreferrer">
-                            {file.filename}
+                    <li key={file.id} className="kb-attachment-card">
+                        <a className="kb-attachment-open" href={attachmentUrl(file.id, ticket)} target="_blank" rel="noreferrer"
+                            aria-label={file.filename} aria-describedby={`kb-attachment-meta-${file.id}`}>
+                            <span className="kb-attachment-thumb" aria-hidden="true">
+                                {file.contentType.startsWith('image/') && file.contentType !== 'image/svg+xml'
+                                    ? <img src={attachmentUrl(file.id, ticket)} alt={file.filename} loading="lazy" />
+                                    : <Paperclip size={22} />}
+                            </span>
+                            <span className="kb-attachment-info">
+                                <span className="kb-attachment-name" title={file.filename}>{file.filename}</span>
+                                <span className="kb-attachment-meta" id={`kb-attachment-meta-${file.id}`}>
+                                    {(file.size / 1024 / 1024).toFixed(1)} MB{file.comment ? ' · Kommentarsbilaga' : ''}
+                                </span>
+                            </span>
                         </a>
-                        <span className="kb-muted ml-3">
-                            {(file.size / 1024 / 1024).toFixed(1)} MB {file.comment ? '· Kommentarsbilaga' : ''}
-                        </span>
-                        {file.contentType.startsWith('image/') && file.contentType !== 'image/svg+xml' && (
-                            <img
-                                src={attachmentUrl(file.id, ticket)}
-                                alt={file.filename}
-                                loading="lazy"
-                                className="max-h-64 max-w-full mt-2"
-                            />
-                        )}
-                        {file.contentType.startsWith('video/') && (
-                            <video
-                                controls
-                                preload="metadata"
-                                className="max-h-80 max-w-full mt-2"
-                                src={attachmentUrl(file.id, ticket)}
-                            >
-                                <a href={attachmentUrl(file.id, ticket)}>Hämta videon</a>
-                            </video>
-                        )}
                         {(file.contentType.startsWith('image/') || onDelete) && (
                             <div className="kb-attachment-toolbar" role="toolbar" aria-label={`Åtgärder för ${file.filename}`}>
                                 {file.contentType.startsWith('image/') && (

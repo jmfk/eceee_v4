@@ -282,6 +282,7 @@ describe('Kanban card attachments', () => {
             card={{ ...attachmentCard, attachments: [{ id: 'file-1', filename: 'note.txt', size: 4, contentType: 'text/plain' }] }}
         />)
         expect(screen.getByRole('link', { name: 'note.txt' })).toBeInTheDocument()
+        expect(screen.getByRole('link', { name: 'note.txt' }).closest('li')).toHaveClass('kb-attachment-card')
         expect(screen.queryByRole('button', { name: 'Ladda upp bilagor' })).not.toBeInTheDocument()
         expect(screen.queryByRole('combobox', { name: 'Fäst på' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Godkänn bilaga' })).not.toBeInTheDocument()
@@ -295,6 +296,10 @@ describe('Kanban card attachments', () => {
         }] }} onDelete={remove} />)
         const toolbar = screen.getByRole('toolbar', { name: 'Åtgärder för portrait.png' })
         expect(toolbar).toHaveClass('kb-attachment-toolbar')
+        const card = screen.getByRole('link', { name: 'portrait.png' }).closest('li')
+        expect(card).toHaveClass('kb-attachment-card')
+        expect(card.querySelectorAll('img')).toHaveLength(1)
+        expect(card.querySelector('img').closest('.kb-attachment-thumb')).toBeInTheDocument()
         expect(toolbar.querySelectorAll('button')).toHaveLength(2)
         fireEvent.click(screen.getByRole('button', { name: 'Ta bort bilaga' }))
         expect(remove).toHaveBeenCalledWith(expect.objectContaining({ id: 'file-1' }))
