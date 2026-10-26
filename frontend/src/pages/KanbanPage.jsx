@@ -100,7 +100,6 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
     const [pendingClose, setPendingClose] = useState(false)
     const [uploadError, setUploadError] = useState('')
     const [uploading, setUploading] = useState(false)
-    const [dropDestination, setDropDestination] = useState('card')
     const upload = async (files, rejected = [], commentId, initialRevision = card.revision) => {
         if (rejected.length) setUploadError('Filformatet stöds inte. Välj en filtyp som är tillåten för bilagor.')
         if (!files.length) return []
@@ -123,7 +122,7 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
         }
         return uploaded
     }
-    const { getRootProps, getInputProps, open, isDragActive, isDragReject } = useDropzone({
+    const { getRootProps, getInputProps, open } = useDropzone({
         onDrop: async (files, rejected) => {
             await upload(files, rejected)
             if (files.length) await run(async () => {})
@@ -244,23 +243,9 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                         const id = image?.getAttribute('src')?.match(/^\/api\/v1\/kanban\/attachments\/([a-f0-9-]+)\/download\//)?.[1]
                         if (id) event.dataTransfer.setData('application/x-kanban-inline-image', JSON.stringify({ id, name: image.alt }))
                     },
-                    onDragOverCapture: (event) => {
-                        const target = event.target
-                        setDropDestination(target.closest('.kb-detail-activity') ? 'comments'
-                            : target.closest('.kb-editor-visual, .kb-editor-source') ? 'description' : 'card')
-                    },
                 })}>
                     <DialogTitle className="sr-only">{card.title}</DialogTitle>
                     <input {...getInputProps({ 'aria-label': 'Välj bilagor' })} />
-                    {isDragActive && (
-                        <div className={`kb-detail-drop-overlay${isDragReject ? ' kb-detail-drop-overlay-reject' : ''}`} aria-hidden="true">
-                            {isDragReject ? 'Filtypen stöds inte' : dropDestination === 'comments'
-                                ? 'Släpp filer för att lägga till en kommentar'
-                                : dropDestination === 'description'
-                                  ? 'Släpp filer för att lägga till dem i texten'
-                                  : 'Släpp filer för att bifoga dem till kortet'}
-                        </div>
-                    )}
                     {card.coverAttachment ? <img className="kb-detail-cover kb-detail-cover-image" src={attachmentUrl(card.coverAttachment, ticket)} alt="" /> : card.coverColor && (
                         <div
                             className="kb-detail-cover"
