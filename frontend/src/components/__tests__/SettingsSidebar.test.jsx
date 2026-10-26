@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import SettingsSidebar from '../SettingsSidebar'
 
@@ -18,8 +18,9 @@ vi.mock('react-router-dom', async () => {
     }
 })
 
+const mocks = vi.hoisted(() => ({ language: 'en-us' }))
 vi.mock('../../contexts/AuthContext', () => ({
-    useAuth: () => ({ user: { username: 'editor', hasTenantAdminAccess: true, isSuperuser: false } }),
+    useAuth: () => ({ user: { username: 'editor', hasTenantAdminAccess: true, isSuperuser: false }, language: mocks.language }),
 }))
 
 vi.mock('../../api', () => ({
@@ -41,6 +42,7 @@ const renderSidebar = () => {
 }
 
 describe('SettingsSidebar', () => {
+    beforeEach(() => { mocks.language = 'en-us' })
     it('shows A/B Testing as an active first-level Settings destination', () => {
         renderSidebar()
 
@@ -76,5 +78,12 @@ describe('SettingsSidebar', () => {
         renderSidebar()
 
         expect(screen.getByRole('link', { name: 'Remote Sites' })).toHaveAttribute('href', '/settings/remote-sites')
+    })
+
+    it('translates menu labels without changing their routes', () => {
+        mocks.language = 'sv-se'
+        renderSidebar()
+        expect(screen.getByRole('link', { name: 'A/B-testning' })).toHaveAttribute('href', '/settings/experiments')
+        expect(screen.getByRole('link', { name: 'Alla teman' })).toHaveAttribute('href', '/settings/themes')
     })
 })

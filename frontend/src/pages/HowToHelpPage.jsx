@@ -1,6 +1,6 @@
 import { Link, Navigate, Route, Routes, useParams, useSearchParams } from 'react-router-dom'
 import { BookOpen, ChevronLeft, ChevronRight, ListChecks, Menu } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import HelpVideoPlayer from '../components/help/HelpVideoPlayer'
 import HelpInstructionVideos from '../components/help/HelpInstructionVideos'
 import { howToDocs } from '../data/howToDocs'
@@ -14,6 +14,9 @@ import {
 } from '../utils/howToI18n'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import HowToScriptEditorPage from './HowToScriptEditorPage'
+import { useAuth } from '../contexts/AuthContext'
+import { helpLanguageFor } from '../utils/cmsLanguage'
+import { cmsText } from '../utils/cmsCopy'
 
 const getAllGuides = () => howToDocs.flatMap(doc => doc.guides.map(guide => ({ ...guide, section: doc })))
 
@@ -99,7 +102,7 @@ const HelpShell = ({ title, subtitle, children, language }) => {
                 </div>
 
                 <nav
-                    aria-label="Help sections"
+                    aria-label={cmsText('Help sections', language === 'sv' ? 'sv-se' : 'en-us')}
                     className={`border-t border-gray-100 px-3 py-3 ${isMenuExpanded ? 'max-h-[60vh] overflow-y-auto lg:max-h-[calc(100vh-4rem)]' : 'hidden'}`}
                 >
                     <div className="space-y-2">
@@ -244,7 +247,7 @@ const HelpGuidePage = ({ language }) => {
                         language={videoConfig.language}
                         youtubeId={guide.youtubeId}
                         youtubeUrl={guide.youtubeUrl}
-                        title={`${localizedGuide.title} video`}
+                        title={language === 'sv' ? `Video: ${localizedGuide.title}` : `${localizedGuide.title} video`}
                     />
                 </HelpInstructionVideos>
 
@@ -272,7 +275,18 @@ const HelpGuidePage = ({ language }) => {
 
 const HowToHelpPage = () => {
     const [searchParams] = useSearchParams()
-    const language = normalizeHelpLanguage(searchParams.get('lang'))
+    const { language: cmsLanguage } = useAuth()
+    const requestedLanguage = searchParams.get('lang')
+    const language = normalizeHelpLanguage(
+        HELP_LANGUAGES.some(candidate => candidate.code === requestedLanguage)
+            ? requestedLanguage
+            : helpLanguageFor(cmsLanguage)
+    )
+
+    useEffect(() => {
+        document.documentElement.lang = language === 'sv' ? 'sv-se' : 'en-us'
+        return () => { document.documentElement.lang = cmsLanguage }
+    }, [cmsLanguage, language])
 
     return (
         <Routes>

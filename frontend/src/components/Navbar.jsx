@@ -5,6 +5,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Menu, X, Settings, Grid3X3, FolderOpen, Database, Hash, User as UserIcon, BarChart2, Palette, Flag } from 'lucide-react'
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { cmsText } from '../utils/cmsCopy'
 
 const navigation = [
   { name: 'Pages', href: '/pages', icon: Grid3X3 },
@@ -23,7 +24,8 @@ const Navbar = () => {
   const location = useLocation()
   const support = useSupportContext()
   const inboxCount = support.data?.unreadCount || 0
-  const { logout, user } = useAuth()
+  const { logout, user, language } = useAuth()
+  const t = (key) => cmsText(key, language)
   const visibleNavigation = navigation.filter((item) => canAccessCmsPath(user, item.href))
   const navRef = useRef(null)
   const navContainerRef = useRef(null)
@@ -99,19 +101,19 @@ const Navbar = () => {
                   }`}
               >
                 <item.icon className="w-4 h-4" />
-                <span>{item.name}{item.name === 'Profile' && inboxCount > 0 ? ` (${inboxCount})` : ''}</span>
+                <span>{t(item.name)}{item.name === 'Profile' && inboxCount > 0 ? ` (${inboxCount})` : ''}</span>
               </Link>
             ))}
 
             {/* Schemas dropdown moved to Settings second-level tabs */}
 
-            {!['/profile', '/inbox', '/kanban'].some((path) => location.pathname.startsWith(path)) && <Link className="flex items-center gap-1 px-3 py-2 text-sm text-gray-600" to={`/inbox/new?from=${encodeURIComponent(safeReportLocation(window.location.href))}`}><Flag size={16} />Rapportera fel</Link>}
+            {!['/profile', '/inbox', '/kanban'].some((path) => location.pathname.startsWith(path)) && <Link className="flex items-center gap-1 px-3 py-2 text-sm text-gray-600" to={`/inbox/new?from=${encodeURIComponent(safeReportLocation(window.location.href))}`}><Flag size={16} />{t('Report a problem')}</Link>}
             {/* Logout button */}
             <button
               onClick={logout}
               className="text-gray-600 hover:text-red-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
             >
-              Logout
+              {t('Logout')}
             </button>
           </div>
 
@@ -120,7 +122,7 @@ const Navbar = () => {
             <button
               type="button"
               onClick={() => setIsOpen(!isOpen)}
-              aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-label={isOpen ? t('Close navigation menu') : t('Open navigation menu')}
               aria-expanded={isOpen}
               aria-controls="cms-mobile-navigation"
               className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
@@ -138,7 +140,7 @@ const Navbar = () => {
         {isOpen && isCollapsed && (
           <div id="cms-mobile-navigation" className="py-4 border-t border-gray-200">
             <div className="space-y-2">
-              {!['/profile', '/inbox', '/kanban'].some((path) => location.pathname.startsWith(path)) && <Link className="px-3 py-2 text-sm text-gray-600" to={`/inbox/new?from=${encodeURIComponent(safeReportLocation(window.location.href))}`} onClick={() => setIsOpen(false)}>Rapportera fel</Link>}
+              {!['/profile', '/inbox', '/kanban'].some((path) => location.pathname.startsWith(path)) && <Link className="px-3 py-2 text-sm text-gray-600" to={`/inbox/new?from=${encodeURIComponent(safeReportLocation(window.location.href))}`} onClick={() => setIsOpen(false)}>{t('Report a problem')}</Link>}
               {visibleNavigation.map((item) => (
                 <Link
                   key={item.name}
@@ -151,7 +153,7 @@ const Navbar = () => {
                     }`}
                 >
                   <item.icon className="w-5 h-5" />
-                  <span>{item.name}{item.name === 'Profile' && inboxCount > 0 ? ` (${inboxCount})` : ''}</span>
+                  <span>{t(item.name)}{item.name === 'Profile' && inboxCount > 0 ? ` (${inboxCount})` : ''}</span>
                 </Link>
               ))}
 
@@ -165,7 +167,7 @@ const Navbar = () => {
                 }}
                 className="flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-red-600 transition-colors w-full text-left"
               >
-                <span>Logout</span>
+                <span>{t('Logout')}</span>
               </button>
             </div>
           </div>

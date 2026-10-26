@@ -39,6 +39,7 @@ describe('HelpVideoPlayer', () => {
             <HelpVideoPlayer
                 videoUrl="/howto-videos/prod/sv/pages-pages-create.mp4"
                 captionsUrl="/howto-videos/prod/sv/pages-pages-create.vtt"
+                language="sv"
                 title="Pages video"
             />
         )

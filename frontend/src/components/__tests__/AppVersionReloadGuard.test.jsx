@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { UnifiedDataProvider, useUnifiedData } from '../../contexts/unified-data'
 import { hasUnsavedEditorChanges } from '../../utils/editorDirtyState'
 import AppVersionReloadGuard from '../AppVersionReloadGuard'
+import { setCmsCopyLanguage } from '../../utils/cmsCopy'
 
 const mocks = vi.hoisted(() => ({
     addNotification: vi.fn(),
@@ -52,6 +53,7 @@ const dispatchMismatch = () => {
 
 describe('AppVersionReloadGuard', () => {
     beforeEach(() => {
+        setCmsCopyLanguage('sv-se')
         mocks.addNotification.mockReset()
         mocks.resumePendingAppVersionReload.mockReset()
     })

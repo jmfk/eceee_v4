@@ -1,7 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MarkdownEditor, { MarkdownView } from './MarkdownEditor'
 import { htmlMarkdown, markdownHtml } from './markdown'
+import { setCmsCopyLanguage } from '../../utils/cmsCopy'
+
+beforeEach(() => setCmsCopyLanguage('sv-se'))
 
 vi.mock('../form-fields/RichTextInput', () => ({
     default: ({ value, onChange }) => (

@@ -3,6 +3,7 @@ import { Check, Copy, History, KeyRound, Link2, Pencil, Plus, RotateCw, Trash2, 
 
 import { designerThemesApi } from '../api/designerThemes'
 import { objectTransfersApi } from '../api/objectTransfers'
+import { cmsText, getCmsCopyLanguage } from '../utils/cmsCopy'
 
 const emptyConnection = { name: '', baseUrl: '', remoteWorkspace: '', accessKey: '', credentialScheme: 'theme_key', isDefault: false }
 const objectCapabilities = ['object.read', 'object.transfer']
@@ -21,9 +22,9 @@ const capabilityLabels = (capabilities) => {
     return labels.join(', ')
 }
 
-const formatDate = (value) => value
-    ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
-    : 'Never'
+const formatDate = (value, language) => value
+    ? new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+    : cmsText('Never', language)
 
 const cursorFromUrl = (value) => value
     ? new URL(value, window.location.origin).searchParams.get('cursor')
@@ -42,6 +43,7 @@ const loadCheckpointPages = async (pageCount) => {
 }
 
 export default function RemoteSitesSettings() {
+    const language = getCmsCopyLanguage()
     const [connections, setConnections] = useState([])
     const [accessKeys, setAccessKeys] = useState([])
     const [checkpoints, setCheckpoints] = useState([])
@@ -343,7 +345,7 @@ export default function RemoteSitesSettings() {
                     <div>
                         <div className="flex flex-wrap items-center gap-2"><p className="font-medium text-gray-900">{accessKey.name}</p><span className={`text-xs ${accessKey.isActive ? 'text-green-700' : 'text-gray-500'}`}>{accessKey.isActive ? 'Active' : 'Revoked'}</span></div>
                         <p className="mt-1 text-sm text-gray-600">{accessKey.keyPrefix}… · {capabilityLabels(accessKey.capabilities)}</p>
-                        <p className="mt-1 text-xs text-gray-500">Created {formatDate(accessKey.createdAt)} · Last used {formatDate(accessKey.lastUsedAt)}</p>
+                        <p className="mt-1 text-xs text-gray-500">Created {formatDate(accessKey.createdAt, language)} · Last used {formatDate(accessKey.lastUsedAt, language)}</p>
                     </div>
                     <div className="flex gap-2">
                         <button type="button" disabled={busy === `rotate-${accessKey.id}`} onClick={() => rotateKey(accessKey)} className="inline-flex min-h-9 items-center gap-1.5 rounded border border-gray-300 px-3 text-sm text-gray-700"><RotateCw className="h-4 w-4" />Rotate</button>
@@ -364,7 +366,7 @@ export default function RemoteSitesSettings() {
                     return <div key={checkpoint.id} className="flex flex-wrap items-center justify-between gap-4 py-4">
                         <div className="min-w-0">
                             <div className="flex items-center gap-2"><History className="h-4 w-4 text-gray-400" /><p className="font-medium text-gray-900">Object import checkpoint</p><span className="text-xs text-gray-500">{cleanupPending ? 'cleanup failed' : checkpoint.status.replace('_', ' ')}</span></div>
-                            <p className="mt-1 text-sm text-gray-600">Saved {formatDate(checkpoint.createdAt)} · {checkpoint.resourceScopes.join(' and ')}</p>
+                            <p className="mt-1 text-sm text-gray-600">Saved {formatDate(checkpoint.createdAt, language)} · {checkpoint.resourceScopes.join(' and ')}</p>
                             {checkpoint.errors?.length > 0 && <p role="alert" className="mt-1 text-sm text-red-700">{checkpoint.errors.join(' ')}</p>}
                         </div>
                         <button type="button" disabled={!canRestore || busy === `restore-${checkpoint.id}`} onClick={() => restoreCheckpoint(checkpoint)} className="inline-flex min-h-9 items-center gap-1.5 rounded border border-gray-300 px-3 text-sm text-gray-700 disabled:opacity-50"><Undo2 className="h-4 w-4" />{cleanupPending ? 'Retry cleanup' : restoring ? 'Restore queued' : checkpoint.status === 'restored' ? 'Restored' : 'Restore'}</button>

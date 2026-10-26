@@ -1,9 +1,11 @@
+import { cmsText } from './cmsCopy'
+
 export const HELP_LANGUAGES = [
     { code: 'sv', label: 'Svenska' },
     { code: 'en', label: 'English' }
 ]
 
-const DEFAULT_HELP_UI_LANGUAGE = 'sv'
+const DEFAULT_HELP_UI_LANGUAGE = 'en'
 
 const UI_TEXT = {
     en: {
@@ -299,8 +301,8 @@ export const localizeSection = (section, language = DEFAULT_HELP_UI_LANGUAGE) =>
 
     return {
         ...section,
-        title: translatedSection?.title || localized?.title || section.title,
-        summary: translatedSection?.summary || localized?.summary || section.summary
+        title: translatedSection?.title || localized?.title || cmsText(section.title, normalized === 'sv' ? 'sv-se' : 'en-us'),
+        summary: translatedSection?.summary || localized?.summary || cmsText(section.summary, normalized === 'sv' ? 'sv-se' : 'en-us')
     }
 }
 
@@ -314,9 +316,9 @@ export const localizeGuide = (guide, language = DEFAULT_HELP_UI_LANGUAGE) => {
     return {
         ...guide,
         ...(translatedGuide || {}),
-        title: translatedGuide?.title || localized?.title || widgetTitle || guide.title,
-        summary: translatedGuide?.summary || localized?.summary || widgetSummary || guide.summary,
-        steps: translatedGuide?.steps || localized?.steps || guide.steps,
-        narration: translatedGuide?.narration || localized?.narration || guide.narration
+        title: translatedGuide?.title || localized?.title || widgetTitle || cmsText(guide.title, normalized === 'sv' ? 'sv-se' : 'en-us'),
+        summary: translatedGuide?.summary || localized?.summary || widgetSummary || cmsText(guide.summary, normalized === 'sv' ? 'sv-se' : 'en-us'),
+        steps: translatedGuide?.steps || localized?.steps || guide.steps?.map(step => cmsText(step, normalized === 'sv' ? 'sv-se' : 'en-us')),
+        narration: translatedGuide?.narration || localized?.narration || cmsText(guide.narration, normalized === 'sv' ? 'sv-se' : 'en-us')
     }
 }

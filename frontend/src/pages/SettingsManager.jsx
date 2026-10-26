@@ -47,10 +47,12 @@ import ValueListEditor from '../components/ValueListEditor'
 import SettingsDashboard from '../components/SettingsDashboard'
 import { extractErrorMessage } from '../utils/errorHandling.js'
 import { getSettingsHelpTopic } from '../utils/howToHelp'
+import { cmsText, getCmsCopyLanguage } from '../utils/cmsCopy'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 // Schema managers are no longer embedded in Settings; use dedicated pages under /schemas
 
 const SettingsManager = () => {
+    const language = getCmsCopyLanguage()
     const navigate = useNavigate()
     const location = useLocation()
     const [searchParams, setSearchParams] = useSearchParams()
@@ -361,7 +363,7 @@ const SettingsManager = () => {
                                         }`}
                                 >
                                     <Icon className="w-4 h-4 mr-2" />
-                                    {tab.label}
+                                    {cmsText(tab.label, language)}
                                 </button>
                             )
                         })}

@@ -12,6 +12,10 @@ export const getCurrentUser = () => {
     return client.get('/api/v1/utils/current-user/');
 };
 
+export const updatePreferredLanguage = (preferredLanguage) => {
+    return client.patch('/api/v1/utils/current-user/', { preferredLanguage });
+};
+
 /**
  * Change password for current user
  * @param {Object} data - Password change data

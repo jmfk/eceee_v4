@@ -70,7 +70,7 @@ describe('Navbar', () => {
     for (const name of ['Inbox', 'Kanban']) {
       expect(screen.queryByRole('link', { name })).not.toBeInTheDocument()
     }
-    expect(screen.getByRole('link', { name: 'Rapportera fel' })).toHaveAttribute('href', expect.stringContaining('/inbox/new?from='))
+    expect(screen.getByRole('link', { name: 'Report a problem' })).toHaveAttribute('href', expect.stringContaining('/inbox/new?from='))
     expect(screen.queryByText('EASY v4')).not.toBeInTheDocument()
     expect(screen.queryByText('›')).not.toBeInTheDocument()
   })

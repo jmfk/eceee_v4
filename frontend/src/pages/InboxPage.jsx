@@ -28,6 +28,7 @@ import {
     useSupportIdentity,
 } from '../components/support/useSupportContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { cmsLegacyText, getCmsCopyLanguage } from '../utils/cmsCopy'
 import './InboxPage.css'
 
 const deliveryReason = {
@@ -44,7 +45,7 @@ const statusText = {
     resolved: 'Löst',
 }
 const dateText = (value) =>
-    new Date(value).toLocaleString('sv-SE', {
+    new Date(value).toLocaleString(getCmsCopyLanguage(), {
         dateStyle: 'short',
         timeStyle: 'short',
     })
@@ -130,7 +131,7 @@ function InboxList({ link }) {
                 <article className={`mail-row ${entry.readAt ? '' : 'mail-unread'}`} key={entry.id}>
                     <span className="mail-sender">{entry.senderName || (entry.kind === 'instruction' ? 'Instruktion' : 'Meddelande')}</span>
                     <Link className="mail-subject" to={link(entry.instructionId ? `instructions/${entry.instructionId}` : `threads/${entry.threadId}`)}>
-                        {!entry.readAt && <span className="sr-only">Oläst · </span>}<span>{entry.title}</span><span className="mail-preview"> — {entry.preview || (entry.status ? statusText[entry.status] : '')}</span>
+                        {!entry.readAt && <span className="sr-only">Oläst · </span>}<span>{entry.title}</span><span className="mail-preview"> — {entry.preview || (entry.status ? cmsLegacyText(statusText[entry.status], getCmsCopyLanguage()) : '')}</span>
                     </Link>
                     <time className="mail-time" dateTime={entry.activityAt}>{dateText(entry.activityAt)}</time>
                     <button title={entry.archived ? 'Återför till inbox' : 'Arkivera'} aria-label={`${entry.archived ? 'Återför till inbox' : 'Arkivera'}: ${entry.title}`} disabled={archive.isPending} onClick={() => archive.mutate({ id: entry.id, archived: !entry.archived })}><Archive size={16} /></button>
@@ -714,7 +715,7 @@ function ThreadDetail({ id, context }) {
                     <h2>{t.title}</h2>
                     <p>
                         {t.kind === 'bug' ? 'Felrapport' : 'Fråga'} ·{' '}
-                        {statusText[t.status]} · {t.supportTarget !== false ? 'Supporttråd' : 'Privat meddelande'}
+                        {cmsLegacyText(statusText[t.status], getCmsCopyLanguage())} · {t.supportTarget !== false ? 'Supporttråd' : 'Privat meddelande'}
                     </p>
                     {t.boardCardId && <Link to={`/kanban/cards/${t.boardCardId}`}>Öppna kortet i tavlans Inbox</Link>}
                     {t.location && (
@@ -910,7 +911,7 @@ function Manage({ context }) {
                                 ? 'Okänt leveransutfall; kontrollera leverantören före nytt försök'
                                 : 'Leverans misslyckades'}{' '}
                             ·{' '}
-                            {deliveryReason[f.errorCode] ||
+                            {cmsLegacyText(deliveryReason[f.errorCode], getCmsCopyLanguage()) ||
                                 'Leveransen behöver kontrolleras'}{' '}
                             · Referens {f.id}
                         </p>

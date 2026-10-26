@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 export default defineConfig({
-    plugins: [react()],
+    plugins: [react({ babel: { plugins: ['./scripts/cms-i18n-babel.cjs'] } })],
     test: {
         globals: true,
         environment: 'jsdom',
