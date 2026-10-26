@@ -228,7 +228,7 @@ const ProfilePage = () => {
                                         aria-label="Current workspace"
                                         value={selectedWorkspace}
                                         onChange={(event) => setSelectedWorkspace(event.target.value)}
-                                        className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="cms-native-select mt-1 w-full rounded-lg border border-gray-300 bg-white py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     >
                                         {user.designerTenants.map((workspace) => (
                                             <option key={workspace.id} value={workspace.identifier}>{workspace.name}</option>
