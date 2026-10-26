@@ -113,7 +113,7 @@ describe('Kanban application navigation', () => {
         fireEvent.change(screen.getByRole('textbox', { name: 'Listnamn' }), { target: { value: 'Pågår' } })
         fireEvent.click(screen.getByRole('button', { name: 'Lägg till lista' }))
         await waitFor(() => expect(kanbanApi.post).toHaveBeenCalledWith('boards/board-1/columns/', expect.objectContaining({ title: 'Pågår' })))
-        expect(screen.queryByRole('textbox', { name: 'Listnamn' })).not.toBeInTheDocument()
+        await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Listnamn' })).not.toBeInTheDocument())
     })
 
     it('places a board background behind the full screen instead of only the lists', async () => {
