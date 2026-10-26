@@ -166,11 +166,11 @@ const SettingsDashboard = () => {
                             <h4 className="font-semibold text-gray-900">Create New Page</h4>
                             <p className="text-xs text-gray-500 mt-1">Start building a new content page</p>
                         </Link>}
-                        {allowed('/settings/roles') && <Link to="/settings/roles" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100"><h4 className="font-semibold text-gray-900">Roller och behörigheter</h4><p className="text-xs text-gray-500 mt-1">Hantera arbetsytans roller</p></Link>}
+                        {allowed('/settings/roles') && <Link to="/settings/roles" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100"><h4 className="font-semibold text-gray-900">Användare och behörigheter</h4><p className="text-xs text-gray-500 mt-1">Hantera arbetsytans medlemmar och roller</p></Link>}
                         {allowed('/settings/support') && <Link to="/settings/support" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100"><h4 className="font-semibold text-gray-900">Support</h4><p className="text-xs text-gray-500 mt-1">Mottagare, publicerare och leveransstatus</p></Link>}
                         {allowed('/settings/users') && <Link to="/settings/users" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100">
-                            <h4 className="font-semibold text-gray-900">Manage Users</h4>
-                            <p className="text-xs text-gray-500 mt-1">Add or edit system administrators</p>
+                            <h4 className="font-semibold text-gray-900">System accounts</h4>
+                            <p className="text-xs text-gray-500 mt-1">Create accounts and manage system owners</p>
                         </Link>}
                         {allowed('/settings/publishing') && <Link to="/settings/publishing" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100">
                             <h4 className="font-semibold text-gray-900">Publishing Workflow</h4>

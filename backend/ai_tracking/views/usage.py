@@ -72,7 +72,7 @@ class AIUsageLogViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(content_type__model=content_type)
 
         # Non-admin users can only see their own logs
-        if not self.request.user.is_staff:
+        if not self.request.user.is_superuser:
             queryset = queryset.filter(user=self.request.user)
 
         return queryset

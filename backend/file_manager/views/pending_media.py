@@ -12,6 +12,8 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
+from core.roles import is_tenant_admin
+
 from ..models import MediaCollection, MediaFile, PendingMediaFile
 from ..security import pending_preview_token_is_valid
 from ..serializers import (
@@ -121,7 +123,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
         queryset = queryset.filter(~theme_media | allowed_theme_media).distinct()
 
         # Users can only see their own pending files unless they're staff
-        if self.request.user.is_authenticated and not self.request.user.is_staff:
+        if self.request.user.is_authenticated and not is_tenant_admin(self.request.user, tenant):
             queryset = queryset.filter(uploaded_by=self.request.user)
 
         return queryset.order_by("-created_at")
@@ -403,7 +405,10 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                         }
                     )
                     continue
-                if not request.user.is_staff and pending_file.uploaded_by != request.user:
+                if (
+                    not is_tenant_admin(request.user, pending_file.namespace.tenant)
+                    and pending_file.uploaded_by != request.user
+                ):
                     results.append(
                         {
                             "pending_file_id": approval_data["pending_file_id"],
@@ -499,7 +504,10 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                         }
                     )
                     continue
-                if not request.user.is_staff and pending_file.uploaded_by != request.user:
+                if (
+                    not is_tenant_admin(request.user, pending_file.namespace.tenant)
+                    and pending_file.uploaded_by != request.user
+                ):
                     results.append(
                         {
                             "file_id": file_id,

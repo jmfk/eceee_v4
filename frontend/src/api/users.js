@@ -6,7 +6,7 @@ import client from './client';
 
 /**
  * Get current authenticated user details
- * @returns {Promise} User details including is_staff and is_superuser
+ * @returns {Promise} User details including effective workspace permissions
  */
 export const getCurrentUser = () => {
     return client.get('/api/v1/utils/current-user/');
@@ -59,8 +59,7 @@ export const generatePasswordReset = (userId) => {
  * @param {string} userData.lastName - Last name
  * @param {string} userData.password - Password
  * @param {string} userData.confirmPassword - Password confirmation
- * @param {boolean} userData.isStaff - Staff status
- * @param {boolean} userData.isSuperuser - Superuser status
+ * @param {boolean} userData.isSuperuser - System owner status
  * @returns {Promise} Created user details
  */
 export const createUser = (userData) => {
@@ -74,8 +73,7 @@ export const createUser = (userData) => {
  * @param {string} userData.email - Email address
  * @param {string} userData.firstName - First name
  * @param {string} userData.lastName - Last name
- * @param {boolean} userData.isStaff - Staff status
- * @param {boolean} userData.isSuperuser - Superuser status
+ * @param {boolean} userData.isSuperuser - System owner status
  * @returns {Promise} Updated user details
  */
 export const updateUser = (userId, userData) => {

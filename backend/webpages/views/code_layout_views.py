@@ -13,6 +13,8 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from core.roles import is_tenant_admin
+
 from ..serializers import LayoutSerializer
 
 # Setup logging for API metrics
@@ -371,7 +373,7 @@ class CodeLayoutViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["post"])
     def reload(self, request):
         """Reload all layouts (admin/dev use)"""
-        if not request.user.is_staff:
+        if not is_tenant_admin(request.user, getattr(request, "tenant", None)):
             error_data = {"error": "Only staff can reload layouts"}
             return self._create_formatted_response(error_data, request, status.HTTP_403_FORBIDDEN)
 
@@ -396,7 +398,7 @@ class CodeLayoutViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["get"])
     def validate(self, request):
         """Validate all registered layouts (admin/dev use)"""
-        if not request.user.is_staff:
+        if not is_tenant_admin(request.user, getattr(request, "tenant", None)):
             error_data = {"error": "Only staff can validate layouts"}
             return self._create_formatted_response(error_data, request, status.HTTP_403_FORBIDDEN)
 

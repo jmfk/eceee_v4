@@ -44,11 +44,19 @@ def permissions_for(user, tenant):
     roles = TenantRole.objects.filter(tenant=tenant, users=user)
     if not roles.exists():
         return DEFAULT_PERMISSIONS.copy()
-    return {permission for role in roles for permission in role.permissions}
+    granted = {permission for role in roles for permission in role.permissions}
+    if "tenant.admin" in granted:
+        granted.update(set(ROLE_PERMISSIONS) - {"support.read", "support.publish"})
+    return granted
 
 
 def can_manage_roles(user, tenant):
     return "roles.manage" in permissions_for(user, tenant)
+
+
+def is_tenant_admin(user, tenant):
+    """Administrative CMS access is scoped to the selected workspace."""
+    return "tenant.admin" in permissions_for(user, tenant)
 
 
 def allows_request(request):
@@ -63,6 +71,8 @@ def allows_request(request):
         return True
     if user.is_superuser:
         return True
+    if path.startswith("/api/v1/utils/users/"):
+        return False  # Account administration is global, even for tenant admins.
     if path.startswith(
         (
             "/api/v1/auth/",
@@ -74,15 +84,13 @@ def allows_request(request):
     ):
         return True
     permissions = permissions_for(user, tenant)
-    if "tenant.admin" in permissions:
-        return True
     if path.startswith("/api/v1/utils/roles/"):
         return bool(permissions) if request.method in SAFE_METHODS else "roles.manage" in permissions
     if path.startswith("/api/v1/support/"):
         return bool(tenant and user.is_active and tenant.is_active and tenant.user_has_access(user))
         # Support views enforce participant access and combine direct and CMS support grants.
-    if path.startswith("/api/v1/utils/users/"):
-        return False  # Global account administration remains a system-owner operation.
+    if "tenant.admin" in permissions:
+        return True
     # Human-facing helper routes are broader than the machine API contract.
     for prefixes, read, write in [
         (("/api/v1/namespaces/",), "site.read", "settings.write"),

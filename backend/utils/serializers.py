@@ -189,10 +189,8 @@ class UserListSerializer(serializers.ModelSerializer):
             created_tenants = getattr(user, "created_tenants_for_access", None)
             member_tenants = getattr(user, "member_tenants_for_access", None)
             has_admin_access = (
-                user.is_staff
-                or (bool(created_tenants) if created_tenants is not None else user.created_tenants.exists())
-                or (bool(member_tenants) if member_tenants is not None else user.member_tenants.exists())
-            )
+                bool(created_tenants) if created_tenants is not None else user.created_tenants.exists()
+            ) or (bool(member_tenants) if member_tenants is not None else user.member_tenants.exists())
             cache[user.pk] = (assignments, has_admin_access)
             self._access_snapshot_cache = cache
         return cache[user.pk]
@@ -286,7 +284,6 @@ class CreateUserSerializer(serializers.ModelSerializer):
             "last_name",
             "password",
             "confirm_password",
-            "is_staff",
             "is_superuser",
         ]
 
@@ -308,6 +305,7 @@ class CreateUserSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data.pop("confirm_password")
         password = validated_data.pop("password")
+        validated_data["is_staff"] = validated_data.get("is_superuser", False)
         user = User.objects.create(**validated_data)
         user.set_password(password)
         user.save()
@@ -323,9 +321,13 @@ class UpdateUserSerializer(serializers.ModelSerializer):
             "email",
             "first_name",
             "last_name",
-            "is_staff",
             "is_superuser",
         ]
+
+    def update(self, instance, validated_data):
+        if "is_superuser" in validated_data:
+            validated_data["is_staff"] = validated_data["is_superuser"]
+        return super().update(instance, validated_data)
 
     def validate_email(self, value):
         # Check if email is being changed and if it already exists

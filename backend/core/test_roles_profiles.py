@@ -8,7 +8,7 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 
 from .models import ProfilePhoto, Tenant, TenantRole
 from .profile_views import ProfilePhotoView
-from .role_views import RolesView
+from .role_views import RolesView, WorkspaceMemberView
 from .roles import allows_request, permissions_for
 
 
@@ -53,6 +53,65 @@ class RolesAndProfilesTests(TestCase):
         self.assertEqual(response.status_code, 200, response.data)
         self.assertIn("page.write", permissions_for(self.user, self.tenant))
         self.assertEqual(self.call(RolesView).data["roles"], [])
+
+    def test_member_roles_are_editable_in_one_request_and_admin_grants_need_owner(self):
+        manager = TenantRole.objects.create(tenant=self.tenant, name="Manager", permissions=["roles.manage"])
+        manager.users.add(self.user)
+        reader = TenantRole.objects.create(tenant=self.tenant, name="Reader", permissions=["page.read"])
+        response = self.call(RolesView, user=self.owner)
+        member = next(item for item in response.data["members"] if item["id"] == self.user.pk)
+        self.assertEqual(member["role_ids"], [str(manager.pk)])
+        self.assertIn("roles.manage", member["permissions"])
+
+        response = self.call(
+            RolesView, "patch", {"user_id": self.user.pk, "role_ids": [str(reader.pk)]}, user=self.owner
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(permissions_for(self.user, self.tenant), {"page.read"})
+        self.assertEqual(
+            self.call(RolesView, "patch", {"user_id": self.user.pk, "role_ids": [str(manager.pk)]}).status_code,
+            403,
+        )
+
+        manager.users.add(self.user)
+        admin = TenantRole.objects.create(tenant=self.tenant, name="Admin", permissions=["tenant.admin"])
+        self.assertEqual(
+            self.call(RolesView, "patch", {"user_id": self.user.pk, "role_ids": [str(admin.pk)]}).status_code,
+            403,
+        )
+        self.assertEqual(
+            self.call(
+                RolesView, "post", {"name": "New admin", "permissions": ["tenant.admin"], "users": []}
+            ).status_code,
+            403,
+        )
+
+    def test_staff_flag_does_not_grant_workspace_or_global_account_access(self):
+        self.user.is_staff = True
+        self.user.save(update_fields=["is_staff"])
+        role = TenantRole.objects.create(tenant=self.tenant, name="Workspace admin", permissions=["tenant.admin"])
+        role.users.add(self.user)
+        self.assertIn("roles.manage", permissions_for(self.user, self.tenant))
+        self.assertNotIn("support.read", permissions_for(self.user, self.tenant))
+        request = self.factory.get("/api/v1/utils/users/")
+        request.tenant, request.user = self.tenant, self.user
+        self.assertFalse(allows_request(request))
+        from utils.views import UserListView
+
+        self.assertEqual(self.call(UserListView).status_code, 403)
+
+    def test_system_owner_can_add_existing_account_with_an_explicit_workspace_role(self):
+        system_owner = User.objects.create_superuser("system-owner", password="test")
+        role = TenantRole.objects.create(tenant=self.tenant, name="Reader", permissions=["page.read"])
+        payload = {"user_id": self.outsider.pk, "role_ids": [str(role.pk)]}
+        self.assertEqual(self.call(WorkspaceMemberView, "post", payload, user=self.owner).status_code, 403)
+        self.assertEqual(
+            self.call(WorkspaceMemberView, "post", {**payload, "role_ids": []}, user=system_owner).status_code, 400
+        )
+        response = self.call(WorkspaceMemberView, "post", payload, user=system_owner)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(self.tenant.members.filter(pk=self.outsider.pk).exists())
+        self.assertEqual(permissions_for(self.outsider, self.tenant), {"page.read"})
 
     def test_photo_upload_is_reencoded_private_and_owner_editable(self):
         stream = io.BytesIO()

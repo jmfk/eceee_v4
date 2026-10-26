@@ -12,6 +12,8 @@ from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
+from core.roles import is_tenant_admin
+
 from ..models import MediaFile
 from ..serializers import MediaFileDetailSerializer, MediaFileListSerializer
 from ..storage import S3MediaStorage, storage
@@ -84,12 +86,6 @@ class MediaFileViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def force_delete(self, request, pk=None):
         """Permanently delete a file, bypassing reference checks."""
-        if not request.user.is_staff:
-            return Response(
-                {"error": "Only staff users can force delete files"},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
         try:
             instance = MediaFile.objects.with_deleted().get(pk=pk)
         except MediaFile.DoesNotExist:
@@ -103,6 +99,12 @@ class MediaFileViewSet(viewsets.ModelViewSet):
 
         if instance.namespace.is_hidden and not user_can_access_namespace(request.user, instance.namespace):
             raise Http404
+
+        if not is_tenant_admin(request.user, tenant):
+            return Response(
+                {"error": "Workspace administration is required to force delete files"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         instance.delete(user=request.user, force=True)
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -136,7 +138,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
 
         # Handle soft deletes
         show_deleted = self.request.query_params.get("show_deleted", "").lower() == "true"
-        if show_deleted and user.is_staff:
+        if show_deleted and is_tenant_admin(user, getattr(self.request, "tenant", None)):
             queryset = MediaFile.objects.with_deleted()
         elif show_deleted:
             return MediaFile.objects.none()  # Non-staff users can't see deleted files

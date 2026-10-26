@@ -7,7 +7,7 @@ API endpoints for managing AI budget alerts.
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from core.api_views import IsSuperUser
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 
@@ -31,7 +31,7 @@ class AIBudgetAlertViewSet(viewsets.ModelViewSet):
 
     queryset = AIBudgetAlert.objects.all()
     serializer_class = AIBudgetAlertSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsSuperUser]
     filter_backends = [
         DjangoFilterBackend,
         filters.SearchFilter,
@@ -45,8 +45,8 @@ class AIBudgetAlertViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         """Only admins can create/update/delete alerts."""
         if self.action in ["create", "update", "partial_update", "destroy"]:
-            return [IsAdminUser()]
-        return [IsAuthenticated()]
+            return [IsSuperUser()]
+        return [IsSuperUser()]
 
     @action(detail=False, methods=["get"])
     def check(self, request):
@@ -86,20 +86,14 @@ class AIBudgetAlertViewSet(viewsets.ModelViewSet):
 
         Admin only. Useful for testing email configuration.
         """
-        if not request.user.is_staff:
-            return Response(
-                {"detail": "Admin access required"}, status=status.HTTP_403_FORBIDDEN
-            )
+        if not request.user.is_superuser:
+            return Response({"detail": "Admin access required"}, status=status.HTTP_403_FORBIDDEN)
 
         alert = self.get_object()
         updater = PriceUpdater()
 
         try:
             updater._send_budget_alert_email(alert)
-            return Response(
-                {"message": f'Test alert sent to {", ".join(alert.email_recipients)}'}
-            )
+            return Response({"message": f'Test alert sent to {", ".join(alert.email_recipients)}'})
         except Exception as e:
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

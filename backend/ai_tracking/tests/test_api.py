@@ -19,9 +19,7 @@ class AIModelPriceAPITestCase(TestCase):
     def setUp(self):
         """Set up test data."""
         self.client = APIClient()
-        self.user = User.objects.create_user(
-            username="testuser_api", password="testpass123"
-        )
+        self.user = User.objects.create_user(username="testuser_api", password="testpass123")
         self.admin = User.objects.create_user(
             username="admin_api", password="adminpass123", is_staff=True, is_superuser=True
         )
@@ -66,9 +64,7 @@ class AIModelPriceAPITestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(
-            AIModelPrice.objects.filter(
-                model_name=model_name
-            ).count(),
+            AIModelPrice.objects.filter(model_name=model_name).count(),
             1,
         )
 
@@ -93,14 +89,10 @@ class AIUsageLogAPITestCase(TestCase):
     def setUp(self):
         """Set up test data."""
         self.client = APIClient()
-        self.user = User.objects.create_user(
-            username="testuser_usage", password="testpass123"
-        )
-        self.other_user = User.objects.create_user(
-            username="otheruser_usage", password="otherpass123"
-        )
+        self.user = User.objects.create_user(username="testuser_usage", password="testpass123")
+        self.other_user = User.objects.create_user(username="otheruser_usage", password="otherpass123")
         self.admin = User.objects.create_user(
-            username="admin_usage", password="adminpass123", is_staff=True
+            username="admin_usage", password="adminpass123", is_staff=True, is_superuser=True
         )
 
         # Create usage logs
@@ -169,12 +161,8 @@ class AnalyticsAPITestCase(TestCase):
     def setUp(self):
         """Set up test data."""
         self.client = APIClient()
-        self.user = User.objects.create_user(
-            username="testuser_analytics", password="testpass123"
-        )
-        self.admin = User.objects.create_user(
-            username="admin_analytics", password="adminpass123", is_staff=True
-        )
+        self.user = User.objects.create_user(username="testuser_analytics", password="testpass123")
+        self.admin = User.objects.create_user(username="admin_analytics", password="adminpass123", is_staff=True)
 
         # Create usage logs
         for i in range(5):

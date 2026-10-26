@@ -11,10 +11,11 @@ from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.api_views import IsSuperUser
 from core.models import Tenant
 from core.permissions import user_can_switch_tenant
 from webpages.models import ThemeDesignerAssignment
@@ -664,7 +665,7 @@ class UserListView(APIView):
     POST /api/v1/utils/users/
     """
 
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsSuperUser]
 
     def get(self, request):
         users = (
@@ -709,7 +710,7 @@ class UserDetailView(APIView):
     DELETE /api/v1/utils/users/<user_id>/
     """
 
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsSuperUser]
 
     def patch(self, request, user_id):
         try:
@@ -770,7 +771,7 @@ class GeneratePasswordResetView(APIView):
     POST /api/v1/utils/users/<user_id>/reset-password/
     """
 
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsSuperUser]
 
     def post(self, request, user_id):
         try:

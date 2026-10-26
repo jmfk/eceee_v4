@@ -13,6 +13,8 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.roles import is_tenant_admin
+
 from ..models import MediaCollection, MediaFile, MediaTag
 from ..storage import storage
 
@@ -193,7 +195,7 @@ class BulkMediaOperationsView(APIView):
         files = files.filter(~models.Q(namespace__is_hidden=True) | models.Q(id__in=accessible_theme_file_ids))
 
         # Filter by permissions
-        if not request.user.is_staff:
+        if not is_tenant_admin(request.user, selected_tenant):
             # Regular users can only modify their own files or files in accessible namespaces
             accessible_namespaces = Namespace.objects.filter(
                 models.Q(created_by=request.user) | models.Q(is_active=True)

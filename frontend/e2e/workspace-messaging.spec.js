@@ -14,7 +14,8 @@ async function mockMessaging(page) {
         else if (path.endsWith('/support/attachments/')) data = { id: 'a1', filename: 'notes.txt', contentType: 'text/plain', byteSize: 8 }
         else if (path.endsWith('/support/threads/')) { const body = request.postDataJSON(); thread.title = body.title; thread.messages[0].body = body.body; data = thread }
         else if (path.endsWith('/support/threads/thread-1/')) data = thread
-        else if (path.endsWith('/utils/roles/')) data = request.method() === 'POST' ? { id: 'r1' } : { canManage: true, permissions: ['tenant.admin', 'roles.manage'], availablePermissions: ['page.read', 'page.write', 'support.read'], members: [{ id: 1, name: 'Johan' }], roles: [{ id: 'r1', name: 'Redaktör', permissions: ['page.read'], users: [1] }] }
+        else if (path.endsWith('/utils/roles/')) data = request.method() === 'POST' ? { id: 'r1' } : { canManage: true, canGrantAdmin: true, permissions: ['tenant.admin', 'roles.manage'], availablePermissions: ['page.read', 'page.write', 'support.read'], members: [{ id: 1, name: 'Johan', roleIds: ['r1'], permissions: ['page.read'], isSystemOwner: true }], roles: [{ id: 'r1', name: 'Redaktör', permissions: ['page.read'], users: [1] }] }
+        else if (path.endsWith('/utils/users/')) data = { users: [{ id: 1, username: 'johan', isSuperuser: true }] }
         else if (path.includes('/support/instructions/')) data = { count: 0, results: [] }
         else if (path.includes('/webpages/pages/')) data = { results: [], count: 0 }
         await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) })
@@ -65,17 +66,24 @@ test('contextual reports provide safe URL, diagnostics and the uploadable help v
 test('roles and profile photo upload are available in settings and Profile', async ({ page }, testInfo) => {
     await mockMessaging(page)
     await page.goto('/settings/roles')
-    await expect(page.getByRole('heading', { name: 'Roller och behörigheter' })).toBeVisible()
-    await page.getByRole('button', { name: 'Redigera Redaktör' }).click()
-    await page.getByRole('checkbox', { name: 'Sidor · redigera', exact: true }).check()
+    await expect(page.getByRole('heading', { name: /Användare och behörigheter|Users and permissions/ })).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath('workspace-permissions-desktop.png'), fullPage: true })
+    await page.setViewportSize({ width: 390, height: 844 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy()
+    await page.screenshot({ path: testInfo.outputPath('workspace-permissions-mobile.png'), fullPage: true })
+    await page.getByRole('button', { name: 'Settings menu' }).click()
+    await expect(page.getByRole('navigation', { name: 'Settings' })).toBeVisible()
+    await page.setViewportSize({ width: 1280, height: 720 })
+    await page.getByRole('button', { name: /Edit Redaktör|Redigera Redaktör/ }).click()
+    await page.getByRole('checkbox', { name: /Pages · edit|Sidor · redigera/ }).check()
     const update = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/utils/roles/'))
-    await page.getByRole('button', { name: 'Spara roll' }).click()
+    await page.getByRole('button', { name: /Save role|Spara roll/ }).click()
     expect((await update).postDataJSON().permissions).toContain('page.write')
     await page.goto('/profile')
-    await expect(page.getByRole('heading', { name: 'Profilbild', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Profilbild|Profile photo/ })).toBeVisible()
     const upload = page.waitForRequest((r) => r.method() === 'PUT' && r.url().includes('/profile-photos/1/'))
-    await page.getByLabel('Ladda upp profilbild').setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: Buffer.from('mock-image') })
+    await page.getByLabel(/Ladda upp profilbild|Upload profile photo/).setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: Buffer.from('mock-image') })
     await upload
-    await expect(page.getByText('Profilbilden har sparats.', { exact: true })).toBeVisible()
+    await expect(page.getByText(/Profilbilden har sparats|Profile photo saved/)).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath('profile-desktop.png') })
 })
