@@ -239,7 +239,7 @@ const HelpGuidePage = ({ language }) => {
                     <span>{localizedGuide.title}</span>
                 </div>
 
-                <HelpInstructionVideos guideId={guide.id}>
+                <HelpInstructionVideos guideId={guide.id} language={language}>
                     <HelpVideoPlayer
                         videoUrl={videoConfig.videoUrl}
                         captionsUrl={videoConfig.captionsUrl}

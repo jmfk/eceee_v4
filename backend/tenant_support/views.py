@@ -222,6 +222,14 @@ class InstructionsView(SupportView):
         help_guide_id = request.query_params.get("help_guide_id", "").strip()[:150]
         if help_guide_id:
             rows = rows.filter(help_guide_id=help_guide_id, withdrawn=False)
+        language = request.query_params.get("language", "")
+        if language:
+            if language not in dict(Instruction._meta.get_field("language").choices):
+                raise ValidationError({"language": "Välj ett språk som stöds."})
+            if language == "sv":
+                rows = rows.filter(Q(language="sv") | Q(language__isnull=True))
+            else:
+                rows = rows.filter(language=language)
         search = request.query_params.get("search", "").strip()[:150]
         if search:
             rows = rows.filter(Q(title__icontains=search) | Q(description__icontains=search))
@@ -242,6 +250,7 @@ class InstructionsView(SupportView):
         if previous:
             # Match old-release rows without changing the public empty-string contract.
             previous.help_guide_id = previous.help_guide_id or ""
+            previous.language = previous.language or "sv"
             if any(getattr(previous, field) != value for field, value in data.items()):
                 return submission_conflict(previous.pk)
             return Response(InstructionSerializer(previous).data)

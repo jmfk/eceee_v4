@@ -38,6 +38,7 @@ class PrivateVideo(TenantRecord):
 
 
 class Instruction(TenantRecord):
+    language = models.CharField(max_length=2, choices=[("sv", "Svenska"), ("en", "English")], default="sv", null=True)
     title = models.CharField(max_length=150)
     description = models.TextField(max_length=4000)
     transcript = models.TextField(blank=True, max_length=30000)

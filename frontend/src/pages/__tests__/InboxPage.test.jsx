@@ -106,9 +106,14 @@ describe('tenant inbox journey', () => {
     })
 
     it('preselects a help article when publishing from its documentation page', async () => {
-        renderInbox('/inbox/publish?tenant=a&guide=pages-create')
+        renderInbox('/inbox/publish?tenant=a&guide=pages-create&lang=en')
         await screen.findByRole('heading', { name: 'Publicera instruktion' })
         expect(screen.getByRole('combobox', { name: /Koppla till hjälpartikel/ })).toHaveValue('pages-create')
+        expect(screen.getByRole('combobox', { name: 'Instruktionens språk' })).toHaveValue('en')
+        fireEvent.change(screen.getByRole('combobox', { name: 'Instruktionens språk' }), {
+            target: { value: 'sv' },
+        })
+        expect(screen.getByRole('combobox', { name: 'Instruktionens språk' })).toHaveValue('sv')
     })
 
     it('requires an explicit new submission after an edited retry conflicts', async () => {

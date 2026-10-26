@@ -5,15 +5,20 @@ from .models import Instruction, Message, MessageAttachment, SupportThread
 
 class InstructionSerializer(serializers.ModelSerializer):
     help_guide_id = serializers.SerializerMethodField()
+    language = serializers.SerializerMethodField()
 
     def get_help_guide_id(self, obj):
         # A previous release can still insert NULL while the new schema is deployed.
         return obj.help_guide_id or ""
 
+    def get_language(self, obj):
+        return obj.language or "sv"
+
     class Meta:
         model = Instruction
         fields = [
             "id",
+            "language",
             "title",
             "description",
             "transcript",
@@ -74,6 +79,7 @@ def help_guide_field(**kwargs):
 
 
 class PublishInput(serializers.Serializer):
+    language = serializers.ChoiceField(choices=Instruction._meta.get_field("language").choices, default="sv")
     title = serializers.CharField(max_length=150)
     description = serializers.CharField(max_length=4000)
     help_guide_id = help_guide_field(default="")
@@ -122,6 +128,7 @@ class ArchiveInput(serializers.Serializer):
 
 
 class InstructionStateInput(serializers.Serializer):
+    language = serializers.ChoiceField(choices=Instruction._meta.get_field("language").choices, required=False)
     help_guide_id = help_guide_field(required=False)
     archived = serializers.BooleanField(required=False)
     withdrawn = serializers.BooleanField(required=False)
