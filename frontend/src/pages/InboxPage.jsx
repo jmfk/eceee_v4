@@ -10,7 +10,6 @@ import {
     useParams,
 } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import Navbar from '../components/Navbar'
 import PrivatePlayer from '../components/support/PrivateVideoPlayer'
 import HelpGuideSelect from '../components/help/HelpGuideSelect'
 import StatusBar from '../components/StatusBar'
@@ -1015,10 +1014,9 @@ export default function InboxPage() {
     }
     return (
         <div className="user-tools-shell">
-            <Navbar />
+            <UserToolsNav tenant={tenant} unreadCount={context.data?.unreadCount || 0} />
             <main className="user-tools-main user-tools-content" key={`${tenant}:${identity}`}>
                 <div className="support-container container mx-auto px-4 py-8">
-                    <UserToolsNav tenant={tenant} unreadCount={context.data?.unreadCount || 0} />
                     <header className="user-tools-header">
                         <div>
                             <div className="user-tools-title">

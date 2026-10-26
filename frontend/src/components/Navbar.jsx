@@ -24,7 +24,7 @@ const Navbar = () => {
   const location = useLocation()
   const support = useSupportContext()
   const inboxCount = support.data?.unreadCount || 0
-  const { logout, user, language } = useAuth()
+  const { user, language } = useAuth()
   const t = (key) => cmsText(key, language)
   const visibleNavigation = navigation.filter((item) => canAccessCmsPath(user, item.href))
   const navRef = useRef(null)
@@ -108,13 +108,6 @@ const Navbar = () => {
             {/* Schemas dropdown moved to Settings second-level tabs */}
 
             {!['/profile', '/inbox', '/kanban'].some((path) => location.pathname.startsWith(path)) && <Link className="flex items-center gap-1 px-3 py-2 text-sm text-gray-600" to={`/inbox/new?from=${encodeURIComponent(safeReportLocation(window.location.href))}`}><Flag size={16} />{t('Report a problem')}</Link>}
-            {/* Logout button */}
-            <button
-              onClick={logout}
-              className="text-gray-600 hover:text-red-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-            >
-              {t('Logout')}
-            </button>
           </div>
 
           {/* Mobile/Collapsed menu button */}
@@ -159,16 +152,6 @@ const Navbar = () => {
 
               {/* Schemas moved to Settings second-level menu */}
 
-              {/* Mobile logout button */}
-              <button
-                onClick={() => {
-                  logout();
-                  setIsOpen(false);
-                }}
-                className="flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-red-600 transition-colors w-full text-left"
-              >
-                <span>{t('Logout')}</span>
-              </button>
             </div>
           </div>
         )}
