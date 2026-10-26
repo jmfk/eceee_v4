@@ -205,18 +205,17 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
     const dropCommentFiles = async (event) => {
         const files = Array.from(event.dataTransfer?.files || [])
         let inlineImage = null
-        if (!files.length) {
-            try {
-                inlineImage = JSON.parse(event.dataTransfer?.getData('application/x-kanban-inline-image') || 'null')
-            } catch {
-                return
-            }
-            if (!/^[a-f0-9-]{36}$/.test(inlineImage?.id || '')) return
+        try {
+            inlineImage = JSON.parse(event.dataTransfer?.getData('application/x-kanban-inline-image') || 'null')
+        } catch {
+            inlineImage = null
         }
+        if (!/^[a-f0-9-]{36}$/.test(inlineImage?.id || '')) inlineImage = null
+        if (!inlineImage && !files.length) return
         event.preventDefault()
         event.stopPropagation()
-        const uploaded = files.length ? await upload(files) : []
-        if (files.length && !uploaded.length) return
+        const uploaded = inlineImage ? [] : await upload(files)
+        if (!inlineImage && !uploaded.length) return
         await run(async () => {
             const current = await kanbanApi.get(`cards/${card.id}/`)
             await kanbanApi.post(`cards/${card.id}/comments/`, {
@@ -738,7 +737,11 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                         </div>
                         <aside aria-label="Kommentarer och aktivitet" className="kb-detail-activity"
                             onDragOverCapture={(event) => {
-                                if (Array.from(event.dataTransfer?.types || []).includes('Files')) event.preventDefault()
+                                const types = Array.from(event.dataTransfer?.types || [])
+                                if (types.includes('Files') || types.includes('application/x-kanban-inline-image')) {
+                                    event.preventDefault()
+                                    event.dataTransfer.dropEffect = 'copy'
+                                }
                             }}
                             onDropCapture={dropCommentFiles}>
                             <h2 className="kb-detail-section-heading">
