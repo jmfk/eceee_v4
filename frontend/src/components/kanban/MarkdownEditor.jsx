@@ -90,7 +90,8 @@ export default function MarkdownEditor({
         event.dataTransfer.effectAllowed = 'copyMove'
     }
     const onDragOver = (event) => {
-        if (draggedImage.current || (onFileDrop && Array.from(event.dataTransfer?.types || []).includes('Files'))) {
+        const types = Array.from(event.dataTransfer?.types || [])
+        if (draggedImage.current || types.includes('application/x-kanban-inline-image') || (onFileDrop && types.includes('Files'))) {
             event.preventDefault()
             event.dataTransfer.dropEffect = draggedImage.current ? 'move' : 'copy'
         }
@@ -154,6 +155,29 @@ export default function MarkdownEditor({
             if (image.contains(range.startContainer) || range.startContainer === image) return
             range.insertNode(image)
             editor.dispatchEvent(new Event('input', { bubbles: true }))
+            return
+        }
+        let existingImage
+        try {
+            existingImage = JSON.parse(event.dataTransfer?.getData('application/x-kanban-inline-image') || 'null')
+        } catch {
+            existingImage = null
+        }
+        if (/^[a-f0-9-]{36}$/.test(existingImage?.id || '')) {
+            event.preventDefault()
+            event.stopPropagation()
+            const file = { id: existingImage.id, filename: existingImage.name || 'Bild', contentType: 'image/png' }
+            const source = event.target.closest?.('textarea')
+            if (source) {
+                const start = source.selectionStart
+                const current = latestValue.current
+                const next = `${current.slice(0, start)}${fileMarkdown(file)}${current.slice(start)}`
+                latestValue.current = next
+                onChange(next)
+            } else if (editor) {
+                dropRange(event, editor).insertNode(fileNode(file, ticket))
+                editor.dispatchEvent(new Event('input', { bubbles: true }))
+            }
             return
         }
         const files = Array.from(event.dataTransfer?.files || [])

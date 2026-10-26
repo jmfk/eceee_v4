@@ -292,6 +292,33 @@ describe('Kanban card attachments', () => {
         delete document.caretRangeFromPoint
     })
 
+    it('inserts an existing attachment image into rich text without uploading it again', async () => {
+        const imageId = '11111111-1111-1111-1111-111111111111'
+        const existing = { ...attachmentCard, attachments: [{ id: imageId, filename: 'portrait.jpg', contentType: 'image/jpeg', size: 1024 }] }
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? workspace : path === 'cards/card-1/' ? existing : {})
+        kanbanApi.patch.mockResolvedValue(existing)
+        renderKanban('/kanban/cards/card-1')
+        fireEvent.click(await screen.findByRole('button', { name: 'Redigera beskrivning' }))
+        const image = screen.getByAltText('portrait.jpg')
+        const payload = {}
+        const dataTransfer = {
+            files: [], types: [],
+            setData: (type, value) => { payload[type] = value; dataTransfer.types.push(type) },
+            getData: (type) => payload[type] || '',
+        }
+        fireEvent.dragStart(image, { dataTransfer })
+        expect(dataTransfer.types).toContain('application/x-kanban-inline-image')
+        const visual = document.querySelector('.kb-detail-description .kb-editor-visual')
+        expect(fireEvent.dragOver(visual, { dataTransfer })).toBe(false)
+        fireEvent.drop(visual, { dataTransfer })
+        expect(visual.querySelector('img')).toHaveAttribute('alt', 'portrait.jpg')
+        fireEvent.click(screen.getByRole('button', { name: 'Spara', exact: true }))
+        await waitFor(() => expect(kanbanApi.patch).toHaveBeenCalledWith('cards/card-1/', expect.objectContaining({
+            description: `![portrait.jpg](/api/v1/kanban/attachments/${imageId}/download/)`,
+        })))
+        expect(kanbanApi.upload).not.toHaveBeenCalled()
+    })
+
     it('adds an existing editor image to a comment when dropped in the activity area', async () => {
         const description = '![first](/api/v1/kanban/attachments/11111111-1111-1111-1111-111111111111/download/)'
         kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? workspace : path === 'cards/card-1/' ? { ...attachmentCard, description } : {})
