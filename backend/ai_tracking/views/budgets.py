@@ -4,16 +4,15 @@ Budget Alerts Views
 API endpoints for managing AI budget alerts.
 """
 
-from rest_framework import viewsets, status
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from core.api_views import IsSuperUser
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters
 
 from ai_tracking.models import AIBudgetAlert
 from ai_tracking.serializers import AIBudgetAlertSerializer
 from ai_tracking.services import PriceUpdater
+from core.api_views import IsSuperUser
 
 
 class AIBudgetAlertViewSet(viewsets.ModelViewSet):

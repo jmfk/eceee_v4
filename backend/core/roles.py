@@ -35,16 +35,18 @@ def permissions_for(user, tenant):
         if assignments is not None and assignments.filter(user=user).exists():
             allowed.update({"theme.read", "theme.write", "theme.version", "layout.read", "site.read"})
         return allowed
-    if user.is_superuser or tenant.created_by_id == user.pk:
-        return (
-            (set(ROLE_PERMISSIONS) - {"support.read", "support.publish"})
-            | {"tenant.admin"}
-            | {p for role in TenantRole.objects.filter(tenant=tenant, users=user) for p in role.permissions}
-        )
-    roles = TenantRole.objects.filter(tenant=tenant, users=user)
-    if not roles.exists():
-        return DEFAULT_PERMISSIONS.copy()
+    return permissions_for_member(user, tenant, list(TenantRole.objects.filter(tenant=tenant, users=user)))
+
+
+def permissions_for_member(user, tenant, roles):
+    """Calculate access for a known member from roles already loaded by the caller."""
+    if not user or not user.is_authenticated or not user.is_active or not tenant or not tenant.is_active:
+        return set()
     granted = {permission for role in roles for permission in role.permissions}
+    if user.is_superuser or tenant.created_by_id == user.pk:
+        return (set(ROLE_PERMISSIONS) - {"support.read", "support.publish"}) | {"tenant.admin"} | granted
+    if not roles:
+        return DEFAULT_PERMISSIONS.copy()
     if "tenant.admin" in granted:
         granted.update(set(ROLE_PERMISSIONS) - {"support.read", "support.publish"})
     return granted

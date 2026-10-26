@@ -4,17 +4,16 @@ Price Management Views
 API endpoints for managing AI model prices.
 """
 
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from core.api_views import IsSuperUser
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters
+from rest_framework import filters, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from ai_tracking.models import AIModelPrice
 from ai_tracking.serializers import AIModelPriceSerializer
 from ai_tracking.services import PriceUpdater
+from core.api_views import IsSuperUser
 
 
 class AIModelPriceViewSet(viewsets.ModelViewSet):

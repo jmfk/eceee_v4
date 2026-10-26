@@ -4,22 +4,19 @@ Analytics Views
 API endpoints for AI usage analytics and reporting.
 """
 
-from decimal import Decimal
 from datetime import timedelta
-from django.db.models import Sum, Count, Avg, Q
-from django.db.models.functions import TruncDate, TruncWeek, TruncMonth
+from decimal import Decimal
+
+from django.db.models import Avg, Count, Sum
+from django.db.models.functions import TruncDate, TruncMonth, TruncWeek
 from django.utils import timezone
-from rest_framework import viewsets, status
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from ai_tracking.models import AIUsageLog
-from ai_tracking.serializers import (
-    AnalyticsSummarySerializer,
-    AnalyticsGroupSerializer,
-    AnalyticsTrendSerializer,
-)
+from ai_tracking.serializers import AnalyticsGroupSerializer, AnalyticsSummarySerializer, AnalyticsTrendSerializer
 
 
 class AnalyticsViewSet(viewsets.ViewSet):

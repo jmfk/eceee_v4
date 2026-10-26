@@ -3,12 +3,14 @@ Tests for AI Tracking API Endpoints
 """
 
 from decimal import Decimal
-from django.test import TestCase
+
 from django.contrib.auth import get_user_model
+from django.test import TestCase
 from django.urls import reverse
-from rest_framework.test import APIClient
 from rest_framework import status
-from ai_tracking.models import AIModelPrice, AIUsageLog, AIBudgetAlert
+from rest_framework.test import APIClient
+
+from ai_tracking.models import AIBudgetAlert, AIModelPrice, AIUsageLog
 
 User = get_user_model()
 

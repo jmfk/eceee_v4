@@ -5,12 +5,24 @@ from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 from core.models import Tenant
 from core.permissions import user_can_switch_tenant
 from kanban.models import Board
-from utils.views import CurrentUserView, UserListView
 from utils.serializers import CreateUserSerializer, UpdateUserSerializer
+from utils.views import CurrentUserView, UserListView
 from webpages.models import PageTheme, ThemeDesignerAssignment
 
 
 class UserListQueryTests(TestCase):
+    def test_user_list_exposes_active_status_for_workspace_member_picker(self):
+        admin = User.objects.create_superuser("account-picker-admin", password="test")
+        inactive = User.objects.create_user("inactive-account", is_active=False)
+        request = APIRequestFactory().get("/api/v1/utils/users/")
+        force_authenticate(request, user=admin)
+
+        response = UserListView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        listed = next(user for user in response.data["users"] if user["id"] == inactive.pk)
+        self.assertFalse(listed["is_active"])
+
     def test_account_serializers_do_not_accept_staff_as_a_cms_permission(self):
         create = CreateUserSerializer(
             data={
