@@ -1,4 +1,4 @@
-import { markdownHtml, htmlMarkdown, withAttachmentTickets } from './markdown'
+import { markdownHtml, htmlMarkdown, withAttachmentTickets, fileMarkdown } from './markdown'
 import { useId, useMemo, useRef, useState } from 'react'
 import { useKanbanAccess } from './AccessContext'
 import RichTextInput from '../form-fields/RichTextInput'
@@ -20,14 +20,6 @@ const dropRange = (event, editor) => {
     return fallback
 }
 
-const fileMarkdown = (file) => {
-    const name = file.filename.replaceAll('\\', '\\\\').replaceAll('[', '\\[').replaceAll(']', '\\]')
-    const url = attachmentUrl(file.id)
-    return file.contentType.startsWith('image/') && file.contentType !== 'image/svg+xml'
-        ? `![${name}](${url})`
-        : `[${name}](${url})`
-}
-
 const fileNode = (file, ticket) => {
     if (file.contentType.startsWith('image/') && file.contentType !== 'image/svg+xml') {
         const image = document.createElement('img')
@@ -36,7 +28,7 @@ const fileNode = (file, ticket) => {
         return image
     }
     const link = document.createElement('a')
-    link.href = attachmentUrl(file.id)
+    link.href = attachmentUrl(file.id, ticket)
     link.textContent = file.filename
     return link
 }
@@ -65,6 +57,8 @@ export default function MarkdownEditor({
     const [mode, setMode] = useState('visual')
     const [localEdit, setLocalEdit] = useState(null)
     const visualRef = useRef(null)
+    const latestValue = useRef(value || '')
+    latestValue.current = value || ''
     const draggedImage = useRef(null)
     const imagePickerRef = useRef(null)
     const pickerRange = useRef(null)
@@ -124,8 +118,11 @@ export default function MarkdownEditor({
                 })
                 marker.replaceWith(fragment)
                 editor.dispatchEvent(new Event('input', { bubbles: true }))
-            } else if (source && start != null) {
-                onChange(`${(value || '').slice(0, start)}${insert}${(value || '').slice(start)}`)
+            } else if (source && start != null && uploaded.length) {
+                const current = latestValue.current
+                const next = `${current.slice(0, start)}${insert}${current.slice(start)}`
+                latestValue.current = next
+                onChange(next)
             }
         } finally {
             marker?.remove()
@@ -183,7 +180,7 @@ export default function MarkdownEditor({
                         aria-label={label}
                         rows={12}
                         value={value || ''}
-                        onChange={(e) => onChange(e.target.value)}
+                        onChange={(e) => { latestValue.current = e.target.value; onChange(e.target.value) }}
                         onDropCapture={onDrop}
                     />
                 ) : (

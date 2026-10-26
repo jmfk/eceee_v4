@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
 import MarkdownEditor, { MarkdownView } from './MarkdownEditor'
 import { htmlMarkdown, markdownHtml, withAttachmentTickets } from './markdown'
 import { setCmsCopyLanguage } from '../../utils/cmsCopy'
@@ -57,6 +58,15 @@ it('does not persist temporary attachment tickets from the visual editor', () =>
     expect(text).toContain(`/attachments/${id}/download/`)
 })
 
+it('adds download tickets to attachment links without storing them in Markdown', () => {
+    const id = '11111111-1111-1111-1111-111111111111'
+    const url = `/api/v1/kanban/attachments/${id}/download/`
+    const html = withAttachmentTickets(markdownHtml(`[note](${url})`), 'temporary', true)
+    expect(html).toContain(`${url}?ticket=temporary`)
+    expect(htmlMarkdown(html)).toContain(`[note](${url})`)
+    expect(htmlMarkdown(html)).not.toContain('ticket=')
+})
+
 it('keeps uploaded images in the visual editor instead of switching to HTML source', () => {
     const id = '11111111-1111-1111-1111-111111111111'
     const html = withAttachmentTickets(markdownHtml(`![photo](/api/v1/kanban/attachments/${id}/download/)`), 'temporary', true)
@@ -105,4 +115,21 @@ it('inserts a dropped file at the cursor in Markdown mode', async () => {
     const file = new File(['note'], 'note.txt', { type: 'text/plain' })
     fireEvent.drop(source, { dataTransfer: { files: [file], types: ['Files'] } })
     await waitFor(() => expect(onChange).toHaveBeenCalledWith('Before [note.txt](/api/v1/kanban/attachments/11111111-1111-1111-1111-111111111111/download/)After'))
+})
+
+it('preserves text typed while a Markdown upload is pending', async () => {
+    let finishUpload
+    const onFileDrop = vi.fn(() => new Promise((resolve) => { finishUpload = resolve }))
+    function TestEditor() {
+        const [value, setValue] = useState('Before After')
+        return <MarkdownEditor label="Beskrivning" value={value} onChange={setValue} onFileDrop={onFileDrop} />
+    }
+    render(<TestEditor />)
+    fireEvent.click(screen.getByRole('button', { name: 'Markdown' }))
+    const source = screen.getByRole('textbox', { name: 'Beskrivning' })
+    source.setSelectionRange(7, 7)
+    fireEvent.drop(source, { dataTransfer: { files: [new File(['note'], 'note.txt', { type: 'text/plain' })], types: ['Files'] } })
+    fireEvent.change(source, { target: { value: 'Before After and more' } })
+    finishUpload([{ id: '11111111-1111-1111-1111-111111111111', filename: 'note.txt', contentType: 'text/plain' }])
+    await waitFor(() => expect(source).toHaveValue('Before [note.txt](/api/v1/kanban/attachments/11111111-1111-1111-1111-111111111111/download/)After and more'))
 })

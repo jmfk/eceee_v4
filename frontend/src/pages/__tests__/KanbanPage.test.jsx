@@ -193,13 +193,27 @@ describe('Kanban card attachments', () => {
         let revision = 1
         const image = new File(['image'], 'photo.png', { type: 'image/png' })
         kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? workspace : path === 'cards/card-1/' ? { ...attachmentCard, revision } : {})
-        kanbanApi.post.mockImplementation(async () => { revision += 1; return { id: 'comment-1' } })
-        kanbanApi.upload.mockResolvedValue({ id: 'attachment-1' })
+        kanbanApi.post.mockResolvedValue({ id: 'comment-1' })
+        kanbanApi.upload.mockImplementation(async () => { revision += 1; return { id: '11111111-1111-1111-1111-111111111111', filename: 'photo.png', contentType: 'image/png' } })
         renderKanban('/kanban/cards/card-1')
         const comments = await screen.findByLabelText('Kommentarer och aktivitet')
         fireEvent.drop(comments, { dataTransfer: { files: [image], types: ['Files'] } })
-        await waitFor(() => expect(kanbanApi.upload).toHaveBeenCalledWith('card-1', image, 2, 'comment-1'))
-        expect(kanbanApi.post).toHaveBeenCalledWith('cards/card-1/comments/', { body: 'photo.png', revision: 1 })
+        await waitFor(() => expect(kanbanApi.post).toHaveBeenCalledWith('cards/card-1/comments/', {
+            body: '![photo.png](/api/v1/kanban/attachments/11111111-1111-1111-1111-111111111111/download/)', revision: 2,
+        }))
+        expect(kanbanApi.upload).toHaveBeenCalledWith('card-1', image, 1)
+    })
+
+    it('does not create an empty attachment comment when upload fails', async () => {
+        const image = new File(['invalid'], 'photo.png', { type: 'image/png' })
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? workspace : path === 'cards/card-1/' ? attachmentCard : {})
+        kanbanApi.upload.mockRejectedValue(new Error('Invalid image'))
+        renderKanban('/kanban/cards/card-1')
+        fireEvent.drop(await screen.findByLabelText('Kommentarer och aktivitet'), {
+            dataTransfer: { files: [image], types: ['Files'] },
+        })
+        await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Invalid image'))
+        expect(kanbanApi.post).not.toHaveBeenCalled()
     })
 
     it('uploads an image dropped into the description editor and saves it inline', async () => {

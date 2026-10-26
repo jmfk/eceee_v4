@@ -1,6 +1,15 @@
 import { marked } from 'marked'
 import TurndownService from 'turndown'
 import DOMPurify from 'isomorphic-dompurify'
+import { attachmentUrl } from '../../api/kanban'
+
+export const fileMarkdown = (file) => {
+    const name = file.filename.replaceAll('\\', '\\\\').replaceAll('[', '\\[').replaceAll(']', '\\]')
+    const url = attachmentUrl(file.id)
+    return file.contentType.startsWith('image/') && file.contentType !== 'image/svg+xml'
+        ? `![${name}](${url})`
+        : `[${name}](${url})`
+}
 
 const converter = new TurndownService({
     headingStyle: 'atx',
@@ -27,11 +36,12 @@ export const htmlMarkdown = (html) => {
 export const withAttachmentTickets = (html, ticket, forEditor = false) => {
     const root = document.createElement('div')
     root.innerHTML = html
-    root.querySelectorAll('img').forEach((image) => {
-        const src = image.getAttribute('src') || ''
-        if (ticket && /^\/api\/v1\/kanban\/attachments\/[a-f0-9-]+\/download\/$/.test(src))
-            image.setAttribute('src', `${src}?ticket=${encodeURIComponent(ticket)}`)
-        if (!forEditor) image.referrerPolicy = 'no-referrer'
+    root.querySelectorAll('img, a').forEach((node) => {
+        const attribute = node.tagName === 'IMG' ? 'src' : 'href'
+        const url = node.getAttribute(attribute) || ''
+        if (ticket && /^\/api\/v1\/kanban\/attachments\/[a-f0-9-]+\/download\/$/.test(url))
+            node.setAttribute(attribute, `${url}?ticket=${encodeURIComponent(ticket)}`)
+        if (node.tagName === 'IMG' && !forEditor) node.referrerPolicy = 'no-referrer'
     })
     return root.innerHTML
 }
