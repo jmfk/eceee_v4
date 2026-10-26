@@ -29,7 +29,7 @@ vi.mock('../../utils/tenant', () => ({
 }))
 vi.mock('../../api/kanban', async (importOriginal) => ({
     ...(await importOriginal()),
-    kanbanApi: { get: vi.fn(), cards: vi.fn(), post: vi.fn(), patch: vi.fn(), upload: vi.fn(), blob: vi.fn(), background: vi.fn() },
+    kanbanApi: { get: vi.fn(), cards: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn(), upload: vi.fn(), blob: vi.fn(), background: vi.fn() },
 }))
 
 const workspace = {
@@ -84,6 +84,37 @@ describe('Kanban application navigation', () => {
         expect(screen.getByRole('button', { name: 'Flytta ECE-1 upp' })).toBeDisabled()
         expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/profile')
     })
+
+    it('shows board member profile images in the board header', async () => {
+        const member = { id: 42, name: 'Johan Berg', username: 'johan' }
+        kanbanApi.get.mockImplementation(async (path) => {
+            if (path === 'workspace/') return { ...workspace, boards: [{ ...workspace.boards[0], members: [42] }], members: [member], canManageMembers: true }
+            return []
+        })
+        renderKanban('/kanban/boards/board-1')
+        const avatar = await screen.findByRole('button', { name: 'Visa medlem Johan Berg' })
+        expect(avatar).toBeVisible()
+        expect(avatar.querySelector('[role="img"]')).toHaveAttribute('aria-label', 'Johan Berg')
+    })
+
+    it('creates a card from the inline composer and clears cancelled text', async () => {
+        kanbanApi.post.mockResolvedValue({})
+        renderKanban('/kanban/boards/board-1')
+        await screen.findByRole('heading', { name: 'Redaktionen' })
+        fireEvent.click(screen.getByRole('button', { name: 'Lägg till kort' }))
+        const title = screen.getByRole('textbox', { name: 'Kortrubrik' })
+        expect(title).toHaveFocus()
+        expect(screen.getByRole('button', { name: 'Lägg till kort' })).toBeDisabled()
+        fireEvent.change(title, { target: { value: 'Utkast' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Avbryt nytt kort' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Lägg till kort' }))
+        expect(screen.getByRole('textbox', { name: 'Kortrubrik' })).toHaveValue('')
+        fireEvent.change(screen.getByRole('textbox', { name: 'Kortrubrik' }), { target: { value: '  Nytt kort  ' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Lägg till kort' }))
+        await waitFor(() => expect(kanbanApi.post).toHaveBeenCalledWith('cards/', { title: 'Nytt kort', column: 'column-1' }))
+        await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Kortrubrik' })).not.toBeInTheDocument())
+    })
+
     it('keeps board creation in the overview and opens the created board', async () => {
         kanbanApi.post.mockResolvedValue(workspace.boards[0])
         renderKanban()
@@ -114,6 +145,61 @@ describe('Kanban application navigation', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Lägg till lista' }))
         await waitFor(() => expect(kanbanApi.post).toHaveBeenCalledWith('boards/board-1/columns/', expect.objectContaining({ title: 'Pågår' })))
         await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Listnamn' })).not.toBeInTheDocument())
+    })
+
+    it('keeps selected filters when the filter popup closes and can clear them', async () => {
+        renderKanban('/kanban/boards/board-1')
+        await screen.findByRole('heading', { name: 'Redaktionen' })
+        fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
+        expect(screen.getByRole('dialog', { name: 'Filtrera kort' })).toBeVisible()
+        expect(screen.getByRole('textbox', { name: 'Sök kort' })).toHaveFocus()
+        const option = (text) => screen.getByText(text).closest('label').querySelector('input')
+        fireEvent.click(option('Mina uppgifter'))
+        fireEvent.click(option('Försenade'))
+        await waitFor(() => expect(kanbanApi.cards).toHaveBeenCalledWith(expect.objectContaining({ mine: true, deadline: 'overdue' })))
+        fireEvent.click(screen.getByRole('button', { name: 'Stäng filter' }))
+        expect(screen.queryByRole('dialog', { name: 'Filtrera kort' })).not.toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
+        expect(option('Mina uppgifter')).toBeChecked()
+        expect(option('Försenade')).toBeChecked()
+        fireEvent.click(screen.getByRole('button', { name: 'Rensa filter' }))
+        expect(option('Mina uppgifter')).not.toBeChecked()
+        expect(option('Alla datum')).toBeChecked()
+    })
+
+    it('shows image generation progress and warns before cancelling it', async () => {
+        const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? {
+            ...workspace,
+            boards: [{ ...workspace.boards[0], revision: 1 }],
+            canGenerateImages: true,
+        } : {})
+        kanbanApi.post.mockImplementation((_path, _data, options) => new Promise((resolve, reject) => {
+            options.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+        }))
+        try {
+            renderKanban('/kanban/boards/board-1')
+            await screen.findByRole('heading', { name: 'Redaktionen' })
+            fireEvent.click(screen.getByRole('button', { name: 'Tavelåtgärder' }))
+            fireEvent.click(await screen.findByRole('button', { name: 'Redigera tavlan' }))
+            fireEvent.change(screen.getByLabelText('Beskriv bakgrundsbilden'), { target: { value: 'Hav vid gryningen' } })
+            fireEvent.click(screen.getByRole('button', { name: 'Generera från beskrivning' }))
+            expect(await screen.findByRole('status')).toHaveTextContent('Genererar bakgrundsbild')
+            const signal = kanbanApi.post.mock.calls[0][2].signal
+            const unload = new Event('beforeunload', { cancelable: true })
+            window.dispatchEvent(unload)
+            expect(unload.defaultPrevented).toBe(true)
+            fireEvent.click(screen.getByRole('button', { name: 'Stäng dialog' }))
+            expect(confirm).toHaveBeenCalledOnce()
+            expect(screen.getByRole('dialog')).toBeVisible()
+            expect(signal.aborted).toBe(false)
+            confirm.mockReturnValue(true)
+            fireEvent.click(screen.getByRole('button', { name: 'Stäng dialog' }))
+            expect(signal.aborted).toBe(true)
+            await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+        } finally {
+            confirm.mockRestore()
+        }
     })
 
     it('places a board background behind the full screen instead of only the lists', async () => {
@@ -149,6 +235,30 @@ describe('Kanban card attachments', () => {
     }
     const attachmentWorkspace = { fileTypes: { 'text/plain': ['.txt'] } }
 
+    it('opens a clicked description image selected in the visual editor', async () => {
+        const id = '11111111-1111-1111-1111-111111111111'
+        const image = { id, filename: 'portrait.png', size: 4, contentType: 'image/png', imports: [] }
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? workspace : {
+            ...attachmentCard, description: `![portrait](/api/v1/kanban/attachments/${id}/download/)`, attachments: [image],
+        })
+        renderKanban('/kanban/cards/card-1')
+        fireEvent.click(await screen.findByRole('button', { name: 'Redigera bild portrait' }))
+        expect(await screen.findByRole('toolbar', { name: 'Bildinställningar för portrait' })).toBeVisible()
+    })
+
+    it('opens a clicked comment image selected for comment editing', async () => {
+        const id = '11111111-1111-1111-1111-111111111111'
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? workspace : {
+            ...attachmentCard,
+            comments: [{ id: 'comment-1', body: `![portrait](/api/v1/kanban/attachments/${id}/download/)`,
+                author: { id: 42, name: 'Johan' }, createdAt: '2026-01-01T12:00:00Z' }],
+        })
+        renderKanban('/kanban/cards/card-1')
+        fireEvent.click(await screen.findByRole('button', { name: 'Redigera bild portrait' }))
+        expect(await screen.findByRole('toolbar', { name: 'Bildinställningar för portrait' })).toBeVisible()
+        expect(screen.getByRole('button', { name: 'Spara kommentar' })).toBeInTheDocument()
+    })
+
     it('uploads files dropped on a card in the board without moving it', async () => {
         let revision = 1
         const first = new File(['first'], 'first.txt', { type: 'text/plain' })
@@ -176,6 +286,49 @@ describe('Kanban card attachments', () => {
         expect(screen.queryByRole('combobox', { name: 'Fäst på' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Godkänn bilaga' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Importera till media' })).not.toBeInTheDocument()
+    })
+
+    it('groups image actions into a compact attachment toolbar', () => {
+        const remove = vi.fn()
+        render(<Attachments card={{ ...attachmentCard, attachments: [{
+            id: 'file-1', filename: 'portrait.png', size: 4, contentType: 'image/png',
+        }] }} onDelete={remove} />)
+        const toolbar = screen.getByRole('toolbar', { name: 'Åtgärder för portrait.png' })
+        expect(toolbar).toHaveClass('kb-attachment-toolbar')
+        expect(toolbar.querySelectorAll('button')).toHaveLength(2)
+        fireEvent.click(screen.getByRole('button', { name: 'Ta bort bilaga' }))
+        expect(remove).toHaveBeenCalledWith(expect.objectContaining({ id: 'file-1' }))
+    })
+
+    it('asks before deleting a card image and refreshes the card after deletion', async () => {
+        const image = { id: 'file-1', filename: 'portrait.png', size: 4, contentType: 'image/png', imports: [] }
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? workspace : { ...attachmentCard, attachments: [image] })
+        kanbanApi.delete.mockResolvedValue({})
+        const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+        try {
+            renderKanban('/kanban/cards/card-1')
+            const remove = await screen.findByRole('button', { name: 'Ta bort bilaga' })
+            fireEvent.click(remove)
+            expect(confirm).toHaveBeenCalledWith(expect.stringContaining('portrait.png'))
+            expect(kanbanApi.delete).not.toHaveBeenCalled()
+            confirm.mockReturnValue(true)
+            fireEvent.click(remove)
+            await waitFor(() => expect(kanbanApi.delete).toHaveBeenCalledWith('attachments/file-1/', { revision: 1 }))
+        } finally {
+            confirm.mockRestore()
+        }
+    })
+
+    it('explains when the server reuses an identical attachment', async () => {
+        const image = new File(['portrait'], 'portrait.png', { type: 'image/png' })
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? workspace : attachmentCard)
+        kanbanApi.upload.mockResolvedValue({ id: 'file-1', duplicate: true })
+        renderKanban('/kanban/cards/card-1')
+        await screen.findByRole('button', { name: 'Bilaga', exact: true })
+        fireEvent.drop(document.querySelector('.kb-detail'), {
+            dataTransfer: { files: [image], items: [{ kind: 'file', type: image.type, getAsFile: () => image }], types: ['Files'] },
+        })
+        expect(await screen.findByRole('status')).toHaveTextContent('En identisk bilaga finns redan')
     })
 
     it('opens the picker from Bilaga and uploads files dropped anywhere on the card', async () => {

@@ -1,5 +1,5 @@
 import { markdownHtml, htmlMarkdown, withAttachmentTickets, fileMarkdown } from './markdown'
-import { useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useKanbanAccess } from './AccessContext'
 import RichTextInput from '../form-fields/RichTextInput'
 import { attachmentUrl } from '../../api/kanban'
@@ -33,11 +33,34 @@ const fileNode = (file, ticket) => {
     return link
 }
 
-export function MarkdownView({ value }) {
+export function MarkdownView({ value, onImageClick }) {
     const ticket = useKanbanAccess()
-    const html = useMemo(() => withAttachmentTickets(markdownHtml(value), ticket), [value, ticket])
+    const html = useMemo(() => {
+        const content = withAttachmentTickets(markdownHtml(value), ticket)
+        if (!onImageClick) return content
+        const root = document.createElement('div')
+        root.innerHTML = content
+        root.querySelectorAll('img').forEach((image) => {
+            if (!/^\/api\/v1\/kanban\/attachments\/[a-f0-9-]+\/download\//.test(image.getAttribute('src') || '')) return
+            image.tabIndex = 0
+            image.setAttribute('role', 'button')
+            image.setAttribute('aria-label', `Redigera bild ${image.alt || ''}`.trim())
+        })
+        return root.innerHTML
+    }, [value, ticket, onImageClick])
+    const openImage = (event) => {
+        const image = event.target.closest?.('img')
+        const id = image?.getAttribute('src')?.match(/^\/api\/v1\/kanban\/attachments\/([a-f0-9-]+)\/download\//)?.[1]
+        if (id) onImageClick?.(id)
+    }
     return (
-        <div className="prose prose-sm max-w-none break-words" dangerouslySetInnerHTML={{ __html: html }} />
+        <div className="prose prose-sm max-w-none break-words" onClick={onImageClick ? openImage : undefined}
+            onKeyDown={onImageClick ? (event) => {
+                if (event.target.tagName === 'IMG' && (event.key === 'Enter' || event.key === ' ')) {
+                    event.preventDefault()
+                    openImage(event)
+                }
+            } : undefined} dangerouslySetInnerHTML={{ __html: html }} />
     )
 }
 
@@ -51,11 +74,16 @@ export default function MarkdownEditor({
     busy = false,
     onFileDrop,
     onDropComplete,
+    onDeleteAttachment,
+    canDeleteAttachment,
+    initialImageId,
 }) {
     const [helpOpen, setHelpOpen] = useState(false)
     const helpId = useId()
     const [mode, setMode] = useState('visual')
     const [localEdit, setLocalEdit] = useState(null)
+    const [selectedImage, setSelectedImage] = useState(null)
+    const [imageMenuPosition, setImageMenuPosition] = useState({ top: 0, left: 0 })
     const visualRef = useRef(null)
     const latestValue = useRef(value || '')
     latestValue.current = value || ''
@@ -63,6 +91,42 @@ export default function MarkdownEditor({
     const imagePickerRef = useRef(null)
     const pickerRange = useRef(null)
     const ticket = useKanbanAccess()
+    const imageId = selectedImage?.getAttribute('src')?.match(/^\/api\/v1\/kanban\/attachments\/([a-f0-9-]+)\/download\//)?.[1]
+    const imageWidth = Number(selectedImage?.getAttribute('data-width')) || 100
+    const imageFloat = selectedImage?.getAttribute('data-image-style') || ''
+    const imageAlign = selectedImage?.getAttribute('data-align') || ''
+    const selectImage = (image) => {
+        selectedImage?.classList.remove('kb-image-selected')
+        if (!image) {
+            setSelectedImage(null)
+            return
+        }
+        image.classList.add('kb-image-selected')
+        const bounds = image.getBoundingClientRect()
+        const container = visualRef.current.getBoundingClientRect()
+        setImageMenuPosition({
+            top: bounds.bottom - container.top + 6,
+            left: Math.max(8, Math.min(bounds.left - container.left, visualRef.current.clientWidth - 328)),
+        })
+        setSelectedImage(image)
+    }
+    useEffect(() => {
+        if (!initialImageId || mode !== 'visual') return
+        const image = visualRef.current?.querySelector(`img[src^="/api/v1/kanban/attachments/${initialImageId}/download/"]`)
+        if (image) selectImage(image)
+    // Select only when a read-only image first opens this editor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [initialImageId, mode])
+    useEffect(() => {
+        if (!selectedImage) return
+        const dismiss = (event) => {
+            if (event.key === 'Escape') selectImage(null)
+        }
+        document.addEventListener('keydown', dismiss)
+        return () => document.removeEventListener('keydown', dismiss)
+    // Selection is tied to the current DOM image.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedImage])
     // Echo the editor's own HTML unchanged to preserve its DOM, caret and undo
     // history. Canonicalize only external Markdown updates or a mode switch.
     const html = useMemo(
@@ -76,6 +140,23 @@ export default function MarkdownEditor({
         const markdown = htmlMarkdown(content)
         setLocalEdit({ markdown, html: content, ticket })
         onChange(markdown)
+    }
+    const updateImage = (attribute, value) => {
+        if (!selectedImage?.isConnected) return
+        if (value && attribute === 'data-image-style') selectedImage.removeAttribute('data-align')
+        if (value && attribute === 'data-align') selectedImage.removeAttribute('data-image-style')
+        if (value) selectedImage.setAttribute(attribute, value)
+        else selectedImage.removeAttribute(attribute)
+        visualRef.current?.querySelector('[contenteditable="true"]')?.dispatchEvent(new Event('input', { bubbles: true }))
+        selectImage(selectedImage)
+    }
+    const removeImage = async (keepAttachment) => {
+        if (!selectedImage?.isConnected) return
+        if (!keepAttachment && (!imageId || !await onDeleteAttachment?.(imageId))) return
+        const editor = visualRef.current?.querySelector('[contenteditable="true"]')
+        selectedImage.remove()
+        selectImage(null)
+        editor?.dispatchEvent(new Event('input', { bubbles: true }))
     }
     const mention = (id) => {
         const member = members.find((item) => String(item.id) === id)
@@ -209,10 +290,58 @@ export default function MarkdownEditor({
                     />
                 ) : (
                     <div className="kb-editor-visual" aria-label={label} ref={visualRef}
+                        onClickCapture={(event) => {
+                            if (event.target.closest?.('.kb-image-menu')) return
+                            const image = event.target.closest?.('img')
+                            selectImage(image && visualRef.current.contains(image) ? image : null)
+                        }}
+                        onContextMenuCapture={(event) => {
+                            const image = event.target.closest?.('img')
+                            if (!image || !visualRef.current.contains(image)) return
+                            event.preventDefault()
+                            event.stopPropagation()
+                            selectImage(image)
+                        }}
                         onDragStartCapture={onDragStart} onDragEndCapture={() => { draggedImage.current = null }}
                         onDragOverCapture={onDragOver} onDropCapture={onDrop}>
                         <RichTextInput value={html} onChange={editVisual} rows={10} fieldName={label}
                             allowMediaInsert={false} onImageUpload={onFileDrop ? openImagePicker : undefined} />
+                        {selectedImage?.isConnected && <div className="kb-image-menu" role="toolbar" aria-label={`Bildinställningar för ${selectedImage.alt || 'bild'}`}
+                            style={imageMenuPosition}>
+                            <div className="kb-image-menu-row">
+                                <span id={`${helpId}-image-size`}>Storlek</span>
+                                <div className="kb-image-menu-segments" role="group" aria-labelledby={`${helpId}-image-size`}>
+                                    <button type="button" aria-label="Minska" disabled={imageWidth <= 25}
+                                        onClick={() => updateImage('data-width', String(Math.max(25, imageWidth - 25)))}>−</button>
+                                    <output aria-live="polite">{imageWidth} %</output>
+                                    <button type="button" aria-label="Öka" disabled={imageWidth >= 100}
+                                        onClick={() => updateImage('data-width', String(Math.min(100, imageWidth + 25)))}>+</button>
+                                </div>
+                            </div>
+                            <div className="kb-image-menu-row">
+                                <span id={`${helpId}-image-float`}>Textflöde</span>
+                                <div className="kb-image-menu-segments" role="group" aria-labelledby={`${helpId}-image-float`}>
+                                    {[[ '', 'Inget' ], [ 'float-left', 'Vänster' ], [ 'float-right', 'Höger' ]].map(([value, title]) => (
+                                        <button key={title} type="button" aria-pressed={imageFloat === value}
+                                            onClick={() => updateImage('data-image-style', value)}>{title}</button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="kb-image-menu-row">
+                                <span id={`${helpId}-image-align`}>Justering</span>
+                                <div className="kb-image-menu-segments" role="group" aria-labelledby={`${helpId}-image-align`}>
+                                    {[[ '', 'Auto' ], [ 'left', 'Vänster' ], [ 'center', 'Mitten' ], [ 'right', 'Höger' ]].map(([value, title]) => (
+                                        <button key={title} type="button" aria-pressed={imageAlign === value}
+                                            onClick={() => updateImage('data-align', value)}>{title}</button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="kb-image-menu-footer">
+                                <button type="button" onClick={() => removeImage(true)}>Ta bort ur texten</button>
+                                <button type="button" className="kb-image-delete" disabled={!imageId || !onDeleteAttachment || canDeleteAttachment?.(imageId) === false || busy}
+                                    onClick={() => removeImage(false)}>Ta bort bilaga</button>
+                            </div>
+                        </div>}
                     </div>
                 )}
                 <div className="kb-editor-modebar" aria-label={`${label}: redigeringsläge`}>
@@ -223,6 +352,7 @@ export default function MarkdownEditor({
                         type="button"
                         aria-pressed={mode === 'source'}
                         onClick={() => {
+                            selectImage(null)
                             setLocalEdit(null)
                             setMode('source')
                         }}

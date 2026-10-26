@@ -64,6 +64,23 @@ def save_upload(tenant, upload):
     return path
 
 
+def matches_upload(upload, attachment):
+    """Compare a same-sized stored attachment without buffering it in memory."""
+    result = attachment_storage.client.get_object(
+        Bucket=attachment_storage.bucket_name, Key=attachment_storage._get_key(attachment.path)
+    )
+    body = result["Body"]
+    upload.seek(0)
+    try:
+        for chunk in upload.chunks(chunk_size=CHUNK_SIZE):
+            if chunk != body.read(len(chunk)):
+                return False
+        return not body.read(1)
+    finally:
+        upload.seek(0)
+        body.close()
+
+
 @contextmanager
 def prepared_attachment(attachment):
     if not attachment.approved_at:

@@ -1,9 +1,11 @@
 import re
+import logging
 from pathlib import PurePath
 
 from asgiref.sync import sync_to_async
 from django.contrib.auth.models import User
 from django.core.handlers.asgi import ASGIRequest
+from django.db import transaction
 from django.db.models import Max, Q
 from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
@@ -56,6 +58,8 @@ from .services import (
     update_card,
     update_named,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def validated(schema, data):
@@ -464,33 +468,42 @@ class CardViewSet(BaseViewSet):
             comment = get_object_or_404(Comment, tenant=request.tenant, card=card, pk=comment_id)
         # Validate/upload before taking the tenant write lock.
         path = files.save_upload(request.tenant, upload)
+        duplicate = None
         try:
             with locked_tenant(request) as tenant:
                 card = self.record(Card, pk)
                 check_revision(card, revision)
-                attachment = Attachment.objects.create(
-                    tenant=tenant,
-                    card=card,
-                    comment=comment,
-                    filename=PurePath(upload.name).name,
-                    path=path,
-                    content_type=upload.content_type,
-                    size=upload.size,
-                    uploaded_by=request.user,
-                )
-                bump(card)
-                event(
-                    tenant,
-                    request.user,
-                    card,
-                    "attachment.uploaded",
-                    f"Uploaded {attachment.filename}",
-                    {"attachment_id": str(attachment.pk)},
-                )
-                enqueue_index(card)
+                for existing in card.attachments.filter(size=upload.size):
+                    if files.matches_upload(upload, existing):
+                        duplicate = existing
+                        break
+                if not duplicate:
+                    attachment = Attachment.objects.create(
+                        tenant=tenant,
+                        card=card,
+                        comment=comment,
+                        filename=PurePath(upload.name).name,
+                        path=path,
+                        content_type=upload.content_type,
+                        size=upload.size,
+                        uploaded_by=request.user,
+                    )
+                    bump(card)
+                    event(
+                        tenant,
+                        request.user,
+                        card,
+                        "attachment.uploaded",
+                        f"Uploaded {attachment.filename}",
+                        {"attachment_id": str(attachment.pk)},
+                    )
+                    enqueue_index(card)
         except Exception:
             files.attachment_storage.delete(path)
             raise
+        if duplicate:
+            files.attachment_storage.delete(path)
+            return Response({**AttachmentSerializer(duplicate).data, "duplicate": True})
         return Response(AttachmentSerializer(attachment).data, status=201)
 
     @action(detail=True, methods=["post"], url_path="generate-cover", throttle_classes=[ImageGenerationThrottle])
@@ -562,6 +575,30 @@ class CommentViewSet(BaseViewSet):
 class AttachmentViewSet(BaseViewSet):
     authentication_classes = [AttachmentTicketAuthentication, *api_settings.DEFAULT_AUTHENTICATION_CLASSES]
     serializer_class = AttachmentSerializer
+
+    def destroy(self, request, pk=None):
+        revision = validated(RevisionInput, request.data)["revision"]
+        with locked_tenant(request) as tenant:
+            attachment = self.record(Attachment, pk)
+            card = attachment.card
+            check_revision(card, revision)
+            if attachment.imports.exists():
+                raise ValidationError("This attachment has been imported and cannot be deleted.")
+            path = attachment.path
+            filename = attachment.filename
+            attachment.delete()
+            bump(card)
+            event(tenant, request.user, card, "attachment.deleted", f"Deleted {filename}")
+            enqueue_index(card)
+
+            def delete_file():
+                try:
+                    files.attachment_storage.delete(path)
+                except Exception:
+                    logger.exception("Could not remove Kanban attachment file after record deletion")
+
+            transaction.on_commit(delete_file)
+        return Response(status=204)
 
     def list(self, request):
         attachments = self.scoped(Attachment).select_related("card__column__board").prefetch_related("imports")
