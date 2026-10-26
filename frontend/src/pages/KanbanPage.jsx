@@ -953,6 +953,11 @@ export default function KanbanPage() {
         enabled: canLoad && !!boardId && boardDialog === 'members',
     })
     const boardDrag = useBoardDrag(`${tenant}:${boardId}`)
+    useEffect(() => {
+        if (addingList && boardDrag.boardRef.current) {
+            boardDrag.boardRef.current.scrollLeft = boardDrag.boardRef.current.scrollWidth
+        }
+    }, [addingList, boardDrag.boardRef])
     const params = {
         board: boardId || '',
         q: search,
@@ -1319,6 +1324,7 @@ export default function KanbanPage() {
                                 <span className="kb-muted kb-board-summary">{visibleColumns.length} listor · {cards.length} kort{board.archived ? ' · Arkiverad tavla' : ''}</span>
                                 <ActionsMenu label="Tavelåtgärder">
                                     {(close) => <>
+                                        {!board.archived && <button onClick={() => { close(); setAddingList(true) }}><Plus size={15} />Lägg till lista</button>}
                                         <button onClick={() => { close(); setBoardDialog('members') }}><Users size={15} />Medlemmar</button>
                                         <button onClick={() => { close(); setBoardTitle(board.title); setBoardDialog('edit') }}><Pencil size={15} />Redigera tavlan</button>
                                         <button disabled={busy} onClick={() => { close(); run(async () => await kanbanApi.patch(`boards/${board.id}/`, { revision: board.revision, archived: !board.archived })) }}><Archive size={15} />{board.archived ? 'Återställ tavla' : 'Arkivera tavla'}</button>
@@ -1504,8 +1510,8 @@ export default function KanbanPage() {
                                         </Fragment>
                                     ))}
                                     {boardDrag.drag?.type === 'column' && boardDrag.target?.index === visibleColumns.length && <div className="kb-column-landing" aria-label="Placera lista här" />}
-                                    {!board.archived && <div className="kb-add-list">
-                                        {addingList ? <form onSubmit={(e) => {
+                                    {!board.archived && addingList && <div className="kb-add-list">
+                                        <form onSubmit={(e) => {
                                             e.preventDefault()
                                             run(async () => {
                                                 await kanbanApi.post(`boards/${board.id}/columns/`, { revision: board.revision, title: newColumn })
@@ -1515,7 +1521,7 @@ export default function KanbanPage() {
                                         }}>
                                             <input aria-label="Listnamn" placeholder="Ange listnamn" required autoFocus value={newColumn} onChange={(e) => setNewColumn(e.target.value)} />
                                             <div className="flex gap-2 mt-2"><button className="user-tools-primary" disabled={busy || !newColumn.trim()}>Lägg till lista</button><button type="button" aria-label="Avbryt ny lista" onClick={() => setAddingList(false)}><X size={16} /></button></div>
-                                        </form> : <button onClick={() => setAddingList(true)}><Plus size={16} />Lägg till lista</button>}
+                                        </form>
                                     </div>}
                                 </div>
                             ) : boardId && cards.length > 0 ? (

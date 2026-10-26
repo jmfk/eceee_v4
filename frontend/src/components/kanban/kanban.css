@@ -145,7 +145,6 @@
 .kb-card:hover .kb-card-menu > summary, .kb-card:focus-within .kb-card-menu > summary { opacity: 1; }
 .kb-column .kb-add-card { width: 100%; justify-content: flex-start; border: 0; background: transparent; padding: 0.5rem; min-height: 36px; color: var(--color-gray-600, #4b5563); }
 .kb-add-list { width: 280px; min-width: min(280px, 80vw); align-self: flex-start; }
-.kb-add-list > button { width: 100%; justify-content: flex-start; background: white; }
 .kb-add-list form { padding: 0.5rem; background: var(--color-gray-100, #f3f4f6); border-radius: 0.5rem; }
 .kb-add-list input, .kb-column form input { width: 100%; }
 .kb-toolbar[hidden] { display: none; }
