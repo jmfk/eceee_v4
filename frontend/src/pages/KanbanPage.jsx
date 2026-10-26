@@ -11,7 +11,7 @@ import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import UserToolsNav from '../components/UserToolsNav'
 import StatusBar from '../components/StatusBar'
-import { Columns3, Plus, MoreHorizontal, SlidersHorizontal, ArrowLeft, X, Tag, Clock, ListChecks, AlignLeft, MessageSquare, Users, Pencil, Archive, Upload } from 'lucide-react'
+import { Columns3, Plus, MoreHorizontal, SlidersHorizontal, ArrowLeft, X, Tag, Clock, ListChecks, Paperclip, AlignLeft, MessageSquare, Users, Pencil, Archive } from 'lucide-react'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import '../components/user-tools.css'
 import { useAuth } from '../contexts/AuthContext'
@@ -28,71 +28,11 @@ const useTenant = () => {
     return tenant
 }
 
-export function Attachments({ card, workspace, run }) {
+export function Attachments({ card }) {
     const ticket = useKanbanAccess()
-    const [comment, setComment] = useState('')
-    const [uploadError, setUploadError] = useState('')
-    const [uploading, setUploading] = useState(false)
-    const upload = async (files, rejected) => {
-        if (rejected.length) {
-            setUploadError('Filformatet stöds inte. Välj en filtyp som är tillåten för bilagor.')
-        }
-        if (!files.length) return
-        setUploading(true)
-        if (!rejected.length) setUploadError('')
-        let revision = card.revision
-        let uploaded = 0
-        try {
-            for (const [index, file] of files.entries()) {
-                await kanbanApi.upload(card.id, file, revision, comment)
-                uploaded += 1
-                if (index < files.length - 1) {
-                    revision = (await kanbanApi.get(`cards/${card.id}/`)).revision
-                }
-            }
-        } catch (error) {
-            setUploadError(kanbanError(error))
-        } finally {
-            if (uploaded) await run(async () => {})
-            setUploading(false)
-        }
-    }
-    const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
-        onDrop: upload,
-        accept: workspace.fileTypes || undefined,
-        disabled: uploading,
-    })
     return (
         <section className="mt-8" aria-label="Bilagor">
             <h2 className="text-xl font-semibold mb-3">Bilagor</h2>
-            <p className="kb-muted mb-3">Bilder högst 50 MB, dokument/ljud 100 MB, MP4/WebM 500 MB.</p>
-            <label>
-                Fäst på{' '}
-                <select value={comment} onChange={(e) => setComment(e.target.value)}>
-                    <option value="">Kortet</option>
-                    {card.comments.map((item) => (
-                        <option key={item.id} value={item.id}>
-                            Kommentar av {item.author.name}: {item.body.slice(0, 45)}
-                        </option>
-                    ))}
-                </select>
-            </label>
-            <div
-                {...getRootProps({
-                    className: `kb-attachment-dropzone${isDragActive ? ' kb-attachment-dropzone-active' : ''}${isDragReject ? ' kb-attachment-dropzone-reject' : ''}`,
-                    role: 'button',
-                    'aria-label': 'Ladda upp bilagor',
-                })}
-            >
-                <input {...getInputProps()} />
-                <Upload size={18} aria-hidden="true" />
-                <span>{uploading ? 'Laddar upp…' : 'Dra filer hit eller klicka för att välja'}</span>
-            </div>
-            {uploadError && (
-                <p role="alert" className="text-red-600">
-                    {uploadError}
-                </p>
-            )}
             <ul className="space-y-6">
                 {card.attachments.map((file) => (
                     <li key={file.id}>
@@ -158,6 +98,35 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
     const [editingDescription, setEditingDescription] = useState(false)
     const [commentOpen, setCommentOpen] = useState(false)
     const [pendingClose, setPendingClose] = useState(false)
+    const [uploadError, setUploadError] = useState('')
+    const [uploading, setUploading] = useState(false)
+    const upload = async (files, rejected) => {
+        if (rejected.length) setUploadError('Filformatet stöds inte. Välj en filtyp som är tillåten för bilagor.')
+        if (!files.length) return
+        setUploading(true)
+        if (!rejected.length) setUploadError('')
+        let revision = card.revision
+        let uploaded = 0
+        try {
+            for (const [index, file] of files.entries()) {
+                await kanbanApi.upload(card.id, file, revision)
+                uploaded += 1
+                if (index < files.length - 1) revision = (await kanbanApi.get(`cards/${card.id}/`)).revision
+            }
+        } catch (uploadFailure) {
+            setUploadError(kanbanError(uploadFailure))
+        } finally {
+            if (uploaded) await run(async () => {})
+            setUploading(false)
+        }
+    }
+    const { getRootProps, getInputProps, open, isDragActive, isDragReject } = useDropzone({
+        onDrop: upload,
+        accept: workspace.fileTypes || undefined,
+        disabled: uploading,
+        noClick: true,
+        noKeyboard: true,
+    })
     const dirty = editableSignature(draft) !== baselineRef.current
     const leave = () => navigate(`/kanban/boards/${card.board}`, { state: { focusCard: card.id } })
     const close = () => {
@@ -238,8 +207,14 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
         <Dialog open onClose={close} className="kb-detail-dialog">
             <DialogBackdrop className="kb-detail-backdrop" />
             <div className="kb-detail-position">
-                <DialogPanel className="kb kb-detail user-tools-content">
+                <DialogPanel {...getRootProps({ className: 'kb kb-detail user-tools-content' })}>
                     <DialogTitle className="sr-only">{card.title}</DialogTitle>
+                    <input {...getInputProps({ 'aria-label': 'Välj bilagor' })} />
+                    {isDragActive && (
+                        <div className={`kb-detail-drop-overlay${isDragReject ? ' kb-detail-drop-overlay-reject' : ''}`} aria-hidden="true">
+                            {isDragReject ? 'Filtypen stöds inte' : 'Släpp filer för att bifoga dem till kortet'}
+                        </div>
+                    )}
                     {card.coverAttachment ? <img className="kb-detail-cover kb-detail-cover-image" src={attachmentUrl(card.coverAttachment, ticket)} alt="" /> : card.coverColor && (
                         <div
                             className="kb-detail-cover"
@@ -316,6 +291,7 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                             {error}
                         </p>
                     )}
+                    {uploadError && <p role="alert" className="kb-error">{uploadError}</p>}
                     {pendingClose && (
                         <div className="kb-unsaved" role="status">
                             <span>
@@ -408,6 +384,10 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                     >
                                         <ListChecks size={15} />
                                         Checklista
+                                    </button>
+                                    <button type="button" disabled={uploading} onClick={open}>
+                                        <Paperclip size={15} />
+                                        {uploading ? 'Laddar upp…' : 'Bilaga'}
                                     </button>
                                 </div>
                                 <div className="kb-detail-metadata">
@@ -721,7 +701,7 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                     </div>
                                 )}
                             </form>
-                            <Attachments card={card} workspace={workspace} run={run} />
+                            {card.attachments.length > 0 && <Attachments card={card} />}
                         </div>
                         <aside aria-label="Kommentarer och aktivitet" className="kb-detail-activity">
                             <h2 className="kb-detail-section-heading">

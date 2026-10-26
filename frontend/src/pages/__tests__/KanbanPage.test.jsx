@@ -33,6 +33,7 @@ const renderKanban = (route = '/kanban') => render(
             <Routes>
                 <Route path="/kanban" element={<KanbanPage />} />
                 <Route path="/kanban/boards/:boardId" element={<KanbanPage />} />
+                <Route path="/kanban/cards/:cardId" element={<KanbanPage />} />
             </Routes>
         </MemoryRouter>
     </QueryClientProvider>,
@@ -97,43 +98,47 @@ describe('Kanban application navigation', () => {
 })
 
 describe('Kanban card attachments', () => {
-    const attachmentCard = { id: 'card-1', revision: 1, comments: [], attachments: [] }
+    const attachmentCard = {
+        ...card, board: 'board-1', revision: 1, description: '', deadline: null, labels: [],
+        externalReferences: [], comments: [], attachments: [], activity: [],
+    }
     const attachmentWorkspace = { fileTypes: { 'text/plain': ['.txt'] } }
 
-    it('opens the file picker when the drop zone is clicked', () => {
+    it('shows existing attachments without an upload form below the card', () => {
         render(<Attachments
             card={{ ...attachmentCard, attachments: [{ id: 'file-1', filename: 'note.txt', size: 4, contentType: 'text/plain' }] }}
-            workspace={attachmentWorkspace}
-            run={vi.fn()}
         />)
-        const input = screen.getByLabelText('Ladda upp bilagor').querySelector('input[type="file"]')
-        const click = vi.spyOn(input, 'click')
-        fireEvent.click(screen.getByRole('button', { name: 'Ladda upp bilagor' }))
-        expect(click).toHaveBeenCalledOnce()
-        fireEvent.keyDown(screen.getByRole('button', { name: 'Ladda upp bilagor' }), { key: 'Enter' })
-        expect(click).toHaveBeenCalledTimes(2)
+        expect(screen.getByRole('link', { name: 'note.txt' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Ladda upp bilagor' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('combobox', { name: 'Fäst på' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Godkänn bilaga' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Importera till media' })).not.toBeInTheDocument()
     })
 
-    it('uploads dropped files in order using each new card revision', async () => {
-        const run = vi.fn(async (action) => action())
+    it('opens the picker from Bilaga and uploads files dropped anywhere on the card', async () => {
+        let revision = 1
         const first = new File(['first'], 'first.txt', { type: 'text/plain' })
         const second = new File(['second'], 'second.txt', { type: 'text/plain' })
-        kanbanApi.upload.mockResolvedValue({})
-        kanbanApi.get.mockResolvedValue({ revision: 2 })
-        render(<Attachments card={attachmentCard} workspace={attachmentWorkspace} run={run} />)
-        fireEvent.drop(screen.getByRole('button', { name: 'Ladda upp bilagor' }), {
-            dataTransfer: {
-                files: [first, second],
-                items: [first, second].map((file) => ({ kind: 'file', type: file.type, getAsFile: () => file })),
-                types: ['Files'],
-            },
-        })
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? { ...workspace, ...attachmentWorkspace } : path === 'cards/card-1/' ? { ...attachmentCard, revision } : {})
+        kanbanApi.upload.mockImplementation(async () => { revision += 1; return {} })
+        renderKanban('/kanban/cards/card-1')
+        const button = await screen.findByRole('button', { name: 'Bilaga', exact: true })
+        const input = document.querySelector('.kb-detail input[type="file"]')
+        const click = vi.spyOn(input, 'click')
+        fireEvent.click(button)
+        expect(click).toHaveBeenCalledOnce()
+        expect(screen.queryByRole('region', { name: 'Bilagor' })).not.toBeInTheDocument()
+        const dataTransfer = {
+            files: [first, second],
+            items: [first, second].map((file) => ({ kind: 'file', type: file.type, getAsFile: () => file })),
+            types: ['Files'],
+        }
+        fireEvent.dragEnter(document.querySelector('.kb-detail'), { dataTransfer })
+        expect(await screen.findByText('Släpp filer för att bifoga dem till kortet')).toBeInTheDocument()
+        fireEvent.drop(document.querySelector('.kb-detail'), { dataTransfer })
         await waitFor(() => expect(kanbanApi.upload).toHaveBeenCalledTimes(2))
-        expect(kanbanApi.upload).toHaveBeenNthCalledWith(1, 'card-1', first, 1, '')
-        expect(kanbanApi.upload).toHaveBeenNthCalledWith(2, 'card-1', second, 2, '')
-        await waitFor(() => expect(run).toHaveBeenCalledOnce())
+        expect(kanbanApi.upload).toHaveBeenNthCalledWith(1, 'card-1', first, 1)
+        expect(kanbanApi.upload).toHaveBeenNthCalledWith(2, 'card-1', second, 2)
     })
 
     it('does not print a server HTML error page inside the card', () => {
