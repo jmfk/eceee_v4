@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import MachineAPIKey, Tenant, TenantRole
-from .roles import ROLE_PERMISSIONS, can_manage_roles, permissions_for
+from .roles import ROLE_PERMISSIONS, can_manage_roles, permissions_for, permissions_for_member
 
 
 class RoleInput(serializers.Serializer):
@@ -47,7 +47,7 @@ class RolesView(APIView):
         for role in roles:
             for user in role.users.all():
                 if user.pk in member_roles:
-                    member_roles[user.pk].append(str(role.pk))
+                    member_roles[user.pk].append(role)
         return Response(
             {
                 "permissions": sorted(permissions_for(request.user, tenant)),
@@ -59,8 +59,8 @@ class RolesView(APIView):
                         {
                             "id": u.pk,
                             "name": u.get_full_name() or u.username,
-                            "role_ids": member_roles[u.pk],
-                            "permissions": sorted(permissions_for(u, tenant)),
+                            "role_ids": [str(role.pk) for role in member_roles[u.pk]],
+                            "permissions": sorted(permissions_for_member(u, tenant, member_roles[u.pk])),
                             "is_owner": tenant.created_by_id == u.pk,
                             "is_system_owner": u.is_superuser,
                         }
@@ -85,7 +85,7 @@ class RolesView(APIView):
         schema.is_valid(raise_exception=True)
         data = schema.validated_data
         if "tenant.admin" in data["permissions"] and not _may_assign_admin(request.user, request.tenant):
-            raise PermissionDenied("Only a workspace owner may grant workspace administration.")
+            raise PermissionDenied("Only a workspace owner may change workspace administration.")
         from tenant_support.access import members
 
         ids = set(data.pop("users"))
@@ -124,13 +124,16 @@ class RolesView(APIView):
         roles = list(TenantRole.objects.filter(tenant=tenant, pk__in=ids))
         if len(roles) != len(ids):
             raise ValidationError({"role_ids": "All roles must belong to the current workspace."})
-        if any("tenant.admin" in role.permissions for role in roles) and not _may_assign_admin(request.user, tenant):
-            raise PermissionDenied("Only a workspace owner may grant workspace administration.")
+        current_roles = list(TenantRole.objects.filter(tenant=tenant, users=user))
+        if not _may_assign_admin(request.user, tenant) and any(
+            "tenant.admin" in role.permissions for role in current_roles + roles
+        ):
+            raise PermissionDenied("Only a workspace owner may change workspace administration.")
         from tenant_support.access import has_role
         from tenant_support.services import sync_support_inbox
 
         previous_support = has_role(user, tenant, "can_support")
-        for role in TenantRole.objects.filter(tenant=tenant, users=user):
+        for role in current_roles:
             if role.pk not in ids:
                 role.users.remove(user)
         for role in roles:

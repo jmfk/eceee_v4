@@ -2,7 +2,9 @@ import io
 
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from PIL import Image
 from rest_framework.test import APIRequestFactory, force_authenticate
 
@@ -79,12 +81,35 @@ class RolesAndProfilesTests(TestCase):
             self.call(RolesView, "patch", {"user_id": self.user.pk, "role_ids": [str(admin.pk)]}).status_code,
             403,
         )
+        self.tenant.members.add(self.outsider)
+        admin.users.add(self.outsider)
+        self.assertEqual(
+            self.call(RolesView, "patch", {"user_id": self.outsider.pk, "role_ids": []}).status_code,
+            403,
+        )
+        self.assertTrue(admin.users.filter(pk=self.outsider.pk).exists())
         self.assertEqual(
             self.call(
                 RolesView, "post", {"name": "New admin", "permissions": ["tenant.admin"], "users": []}
             ).status_code,
             403,
         )
+
+    def test_member_list_queries_do_not_grow_with_member_count(self):
+        reader = TenantRole.objects.create(tenant=self.tenant, name="Reader", permissions=["page.read"])
+        reader.users.add(self.user)
+        with CaptureQueriesContext(connection) as baseline_queries:
+            baseline = self.call(RolesView, user=self.owner)
+        self.assertEqual(baseline.status_code, 200)
+        for index in range(5):
+            member = User.objects.create_user(f"role-list-member-{index}")
+            self.tenant.members.add(member)
+            reader.users.add(member)
+        with CaptureQueriesContext(connection) as expanded_queries:
+            expanded = self.call(RolesView, user=self.owner)
+        self.assertEqual(expanded.status_code, 200)
+        self.assertEqual(len(expanded.data["members"]), len(baseline.data["members"]) + 5)
+        self.assertLessEqual(len(expanded_queries), len(baseline_queries) + 2)
 
     def test_staff_flag_does_not_grant_workspace_or_global_account_access(self):
         self.user.is_staff = True

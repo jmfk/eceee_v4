@@ -4,13 +4,12 @@ Usage Logs Views
 API endpoints for viewing AI usage logs.
 """
 
-from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters
+from rest_framework import filters, viewsets
+from rest_framework.permissions import IsAuthenticated
 
 from ai_tracking.models import AIUsageLog
-from ai_tracking.serializers import AIUsageLogSerializer, AIUsageLogListSerializer
+from ai_tracking.serializers import AIUsageLogListSerializer, AIUsageLogSerializer
 
 
 class AIUsageLogViewSet(viewsets.ReadOnlyModelViewSet):
