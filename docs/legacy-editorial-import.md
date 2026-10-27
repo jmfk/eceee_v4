@@ -2,6 +2,8 @@
 
 Importen omfattar `news`, `columns`, `columnists`, `events` och `organizations`. De ger Artikel, Krönikör, Evenemang och Organisation. `publications` och `ReportPage` ingår inte; måltypen `library_item` finns kvar. Alla importerade objekt är utkast.
 
+Den fristående [objektmodellen](legacy-editorial-object-model.md) beskriver exakt vilka typer, fält, relationer och klassificeringar ett annat projekt behöver bygga för denna import.
+
 ## Granskad termkarta
 
 `backend/content_migration/legacy_content/site2_terms.json` innehåller de 698 använda källidentiteterna med originalnamn och användningsantal. `site2_decisions.json` innehåller de beslutade grenarna, barnrelationerna, namnen och sammanslagningarna. `term_plan.py` validerar täckning, identiteter, sammanslagningar och föräldragraf och kompilerar ett portabelt paket med 703 måltermer inklusive de tre innehållsslagen. Källidentitet är site, dimension, modell och ID; evenemangens textval använder site, fältnamn och exakt värde. En ny eller omdöpt källterm stoppar den berörda stage-körningen. Källorna med tomt namn respektive `external-resource` är uttryckligen mappade till Okänd källa.
