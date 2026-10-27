@@ -28,6 +28,71 @@ const useTenant = () => {
     return tenant
 }
 
+function useBoardBackground(board) {
+    const [imageUrl, setImageUrl] = useState('')
+    useEffect(() => {
+        if (!board?.hasBackground) {
+            setImageUrl('')
+            return undefined
+        }
+        let active = true
+        let objectUrl = ''
+        kanbanApi.background(board.id).then((blob) => {
+            if (!active) return
+            objectUrl = URL.createObjectURL(blob)
+            setImageUrl(objectUrl)
+        }).catch(() => { if (active) setImageUrl('') })
+        return () => {
+            active = false
+            if (objectUrl) URL.revokeObjectURL(objectUrl)
+            setImageUrl('')
+        }
+    }, [board?.id, board?.hasBackground, board?.revision])
+    return imageUrl
+}
+
+function BoardOverviewTile({ board, listCount, busy, onRename, onArchive, onDropCard }) {
+    const navigate = useNavigate()
+    const imageUrl = useBoardBackground(board)
+    const [editing, setEditing] = useState(false)
+    const [title, setTitle] = useState(board.title)
+    useEffect(() => { if (!editing) setTitle(board.title) }, [board.title, editing])
+    const edit = () => { setTitle(board.title); setEditing(true) }
+    const openSettings = (dialog) => navigate(`/kanban/boards/${board.id}`, { state: { boardDialog: dialog } })
+    return (
+        <article className={`kb-board-tile ${imageUrl ? 'has-image' : ''}`}
+            onDragOver={(event) => event.preventDefault()} onDrop={(event) => onDropCard(event, board)}>
+            <Link className="kb-board-tile-open" to={`/kanban/boards/${board.id}`} aria-label={board.title}>
+                {imageUrl ? <img src={imageUrl} alt="" loading="lazy" /> : <span className="kb-board-tile-preview" aria-hidden="true"><span><i /><i /></span><span><i /></span><span><i /><i /></span></span>}
+            </Link>
+            <ActionsMenu label={`Tavelåtgärder för ${board.title}`}>
+                {(close) => <>
+                    <button type="button" onClick={() => { edit(); close() }}><Pencil size={15} />Byt namn</button>
+                    <button type="button" onClick={() => { close(); openSettings('edit') }}><SlidersHorizontal size={15} />Redigera tavlan</button>
+                    <button type="button" onClick={() => { close(); openSettings('members') }}><Users size={15} />Medlemmar</button>
+                    <button type="button" disabled={busy} onClick={() => { close(); onArchive(board) }}><Archive size={15} />{board.archived ? 'Återställ tavla' : 'Arkivera tavla'}</button>
+                </>}
+            </ActionsMenu>
+            <div className="kb-board-tile-footer">
+                {editing ? <form className="kb-board-tile-rename" onSubmit={async (event) => {
+                    event.preventDefault()
+                    const updated = await onRename(board, title.trim())
+                    if (updated) setEditing(false)
+                }}>
+                    <input aria-label={`Tavelnamn för ${board.title}`} autoFocus required maxLength={200} value={title}
+                        onFocus={(event) => event.target.select()} onChange={(event) => setTitle(event.target.value)}
+                        onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setEditing(false) } }} />
+                    <button type="submit" aria-label="Spara tavelnamn" title="Spara" disabled={busy || !title.trim()}><Check size={16} /></button>
+                    <button type="button" aria-label="Avbryt namnändring" title="Avbryt" onClick={() => setEditing(false)}><X size={16} /></button>
+                </form> : <button type="button" className="kb-board-tile-title" aria-label={`Byt namn på ${board.title}`} title="Byt namn" onClick={edit}>
+                    <span>{board.title}</span><Pencil size={14} aria-hidden="true" />
+                </button>}
+                <span className="kb-board-tile-meta">{listCount} {listCount === 1 ? 'lista' : 'listor'}{board.archived ? ' · Arkiverad' : ''}</span>
+            </div>
+        </article>
+    )
+}
+
 export function Attachments({ card, onDelete, busy = false }) {
     const ticket = useKanbanAccess()
     return (
@@ -1001,7 +1066,6 @@ export default function KanbanPage() {
     const handledNavigationRef = useRef(false)
     const navigationBlocker = useBlocker(generatingBackground)
     const [memberSearch, setMemberSearch] = useState('')
-    const [boardBackground, setBoardBackground] = useState('')
     const searchRef = useRef(null)
     const filterRef = useRef(null)
     const filterButtonRef = useRef(null)
@@ -1202,21 +1266,16 @@ export default function KanbanPage() {
         setMemberSearch('')
     }, [boardId, tenant, principal])
     const board = workspace?.boards.find((item) => item.id === boardId)
+    const boardBackground = useBoardBackground(board)
     useEffect(() => {
-        if (!board?.hasBackground) return undefined
-        let active = true
-        let objectUrl = ''
-        kanbanApi.background(board.id).then((blob) => {
-            if (!active) return
-            objectUrl = URL.createObjectURL(blob)
-            setBoardBackground(objectUrl)
-        }).catch(() => { if (active) setBoardBackground('') })
-        return () => {
-            active = false
-            if (objectUrl) URL.revokeObjectURL(objectUrl)
-            setBoardBackground('')
-        }
-    }, [board?.id, board?.hasBackground, board?.revision])
+        const requestedDialog = location.state?.boardDialog
+        if (!board || !['edit', 'members'].includes(requestedDialog)) return
+        setBoardTitle(board.title)
+        setBoardDialog(requestedDialog)
+        const nextState = { ...location.state }
+        delete nextState.boardDialog
+        navigate(`${location.pathname}${location.search}`, { replace: true, state: nextState })
+    }, [board, location.pathname, location.search, location.state, navigate])
     const columns = (workspace?.columns || []).filter((item) => item.board === boardId)
     const cards = cardsQuery.data?.results || []
     const activeFilterCount = [search, mine, assignee, label, deadline, archived !== 'false'].filter(Boolean).length
@@ -1453,21 +1512,20 @@ export default function KanbanPage() {
                                 {workspace.boards
                                     .filter((item) => archived !== 'false' || !item.archived)
                                     .map((item) => (
-                                        <Link
+                                        <BoardOverviewTile
                                             key={item.id}
-                                            aria-current={item.id === boardId ? 'page' : undefined}
-                                            to={`/kanban/boards/${item.id}`}
-                                            onDragOver={(e) => e.preventDefault()}
-                                            onDrop={(e) => {
+                                            board={item}
+                                            listCount={workspace.columns.filter((column) => column.board === item.id).length}
+                                            busy={busy}
+                                            onRename={(selected, title) => run(async () => await kanbanApi.patch(`boards/${selected.id}/`, { revision: selected.revision, title }))}
+                                            onArchive={(selected) => run(async () => await kanbanApi.patch(`boards/${selected.id}/`, { revision: selected.revision, archived: !selected.archived }))}
+                                            onDropCard={(event, selected) => {
                                                 const column = workspace.columns.find(
-                                                    (column) => column.board === item.id && !column.archived,
+                                                    (column) => column.board === selected.id && !column.archived,
                                                 )
-                                                if (column && !item.archived) drop(e, column.id, 0)
+                                                if (column && !selected.archived) drop(event, column.id, 0)
                                             }}
-                                        >
-                                            {item.title}
-                                            {item.archived ? ' (arkiverat)' : ''}
-                                        </Link>
+                                        />
                                     ))}
                             </nav>
                             {!workspace.boards.some((item) => !item.archived) && <p className="kb-muted mb-4">Här finns inga aktiva tavlor ännu. Skapa din första tavla.</p>}
