@@ -9,7 +9,7 @@ import { cmsText } from '../utils/cmsCopy'
 
 const navigation = [
   { name: 'Pages', href: '/pages', icon: Grid3X3 },
-  { name: 'Objects', href: '/objects', icon: Database },
+  { name: 'Publisher', href: '/objects', icon: Database },
   { name: 'Media', href: '/media', icon: FolderOpen },
   { name: 'Statistics', href: '/statistics', icon: BarChart2 },
   { name: 'Tags', href: '/tags', icon: Hash },

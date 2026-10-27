@@ -210,6 +210,7 @@ describe('ObjectBrowser grouped type list', () => {
     it('separates main objects and supporting types grouped by category', async () => {
         renderBrowser()
 
+        expect(screen.getByRole('heading', { name: 'Publisher' })).toBeInTheDocument()
         const groupList = await screen.findByRole('list', { name: 'Object type groups' })
         const eventButton = within(groupList).getByTestId('object-type-card-event')
         const newsButton = within(groupList).getByTestId('object-type-card-news')

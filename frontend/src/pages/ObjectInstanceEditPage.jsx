@@ -256,7 +256,7 @@ const ObjectInstanceEditPage = () => {
     }, [setIsDirty, refreshObject])
 
     const breadcrumbItems = useMemo(() => {
-        const items = [{ label: 'Objects', path: '/objects', icon: Layout }]
+        const items = [{ label: 'Publisher', path: '/objects', icon: Layout }]
         
         // Helper to pluralize type labels
         const pluralize = (label) => {
@@ -412,7 +412,7 @@ const ObjectInstanceEditPage = () => {
             <div className="text-center">
                 <div className="text-xl font-semibold text-gray-900 mb-2" role="heading" aria-level="2">Object Type Not Found</div>
                 <div className="text-gray-600 mb-4">The specified object type could not be found.</div>
-                <button onClick={handleBack} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Back to Objects</button>
+                <button onClick={handleBack} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Back to Publisher</button>
             </div>
         </div>
     )
@@ -449,7 +449,7 @@ const ObjectInstanceEditPage = () => {
 
     const backButtonLabel = parentObject 
         ? `Back to ${parentObject.title}` 
-        : `Back to ${pluralize(objectType?.label) || 'Objects'}`
+        : `Back to ${pluralize(objectType?.label) || 'Publisher'}`
 
     function pluralize(label) {
         if (!label) return ''

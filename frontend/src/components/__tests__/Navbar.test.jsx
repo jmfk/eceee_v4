@@ -67,6 +67,7 @@ describe('Navbar', () => {
     expect(screen.getAllByText('Pages')).toHaveLength(1)
     expect(screen.queryByRole('link', { name: 'A/B Tests' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Tags' })).toHaveAttribute('href', '/tags')
+    expect(screen.getByRole('link', { name: 'Publisher' })).toHaveAttribute('href', '/objects')
     expect(screen.getByRole('link', { name: 'Designer' })).toHaveAttribute('href', '/designer/themes')
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
     expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/inbox')
@@ -225,7 +226,7 @@ describe('Navbar', () => {
     renderNavbar()
 
     fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
-    fireEvent.click(screen.getByRole('link', { name: 'Objects' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Publisher' }))
     expect(screen.getByRole('button', { name: 'Open navigation menu' })).toHaveAttribute('aria-expanded', 'false')
 
     fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
