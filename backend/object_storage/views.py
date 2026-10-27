@@ -631,7 +631,9 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         page_obj = paginator.get_page(page)
         return Response(
             {
-                "results": self.get_serializer(page_obj.object_list, many=True).data,
+                "results": ObjectInstanceListSerializer(
+                    page_obj.object_list, many=True, context=self.get_serializer_context()
+                ).data,
                 "count": paginator.count,
                 "page": page_obj.number,
                 "page_size": page_size,
