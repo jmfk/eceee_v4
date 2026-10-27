@@ -1,6 +1,7 @@
 import React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { objectInstancesApi, objectRelationshipsApi } from '../../api/objectStorage'
+import EditorAccordion from './EditorAccordion'
 
 const parentId = object => object.parent?.id ?? object.parent
 
@@ -45,6 +46,12 @@ export default function ObjectNavigation({ instanceId, anchorId, onSelect, disab
     const objects = tree?.data || []
     const treeIds = new Set(objects.map(object => String(object.id)))
     const relatedObjects = (related || []).filter(object => !treeIds.has(String(object.id)))
+    const relatedByType = new Map()
+    relatedObjects.forEach(object => {
+        const label = object.objectTypeLabel || object.objectType?.pluralLabel || object.objectType?.label || 'Related objects'
+        if (!relatedByType.has(label)) relatedByType.set(label, [])
+        relatedByType.get(label).push(object)
+    })
     const childrenByParent = new Map()
     objects.forEach(object => {
         const key = String(parentId(object))
@@ -67,10 +74,10 @@ export default function ObjectNavigation({ instanceId, anchorId, onSelect, disab
         {pathError || treeError ? <p role="alert" className="p-2 text-sm text-red-700">Could not load the object tree. Reopen this object to retry.</p>
             : pathLoading || treeLoading ? <p className="p-2 text-sm text-gray-500">Loading object tree…</p>
                 : root && <ul aria-label="Object tree">{renderBranch(objects.find(object => String(object.id) === String(root.id)) || root)}</ul>}
-        <h2 className="mb-1 mt-5 px-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Related objects</h2>
         {relatedError ? <p role="alert" className="p-2 text-sm text-red-700">Could not load related objects.</p>
             : relatedLoading ? <p className="p-2 text-sm text-gray-500">Loading relations…</p>
-                : relatedObjects.length ? <ul aria-label="Related objects">{relatedObjects.map(object => <li key={object.id}>{root && renderButton(object)}</li>)}</ul>
-                    : <p className="p-2 text-sm text-gray-500">No related objects.</p>}
+                : [...relatedByType].map(([label, items]) => <EditorAccordion key={label} title={label} defaultOpen>
+                    <ul aria-label={label}>{items.map(object => <li key={object.id}>{root && renderButton(object)}</li>)}</ul>
+                </EditorAccordion>)}
     </nav>
 }

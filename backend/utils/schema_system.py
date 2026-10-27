@@ -704,6 +704,26 @@ class SchemaValidator:
         if "propertyOrder" in schema and not isinstance(schema["propertyOrder"], list):
             raise ValidationError("Schema 'propertyOrder' must be an array")
 
+        groups = schema.get("editorGroups", [])
+        if not isinstance(groups, list):
+            raise ValidationError("Schema 'editorGroups' must be an array")
+        group_ids = set()
+        assigned_fields = set()
+        for group in groups:
+            if not isinstance(group, dict) or not isinstance(group.get("id"), str) or not group["id"]:
+                raise ValidationError("Each editor group needs an id")
+            if not isinstance(group.get("label"), str) or not group["label"].strip():
+                raise ValidationError("Each editor group needs a label")
+            if not isinstance(group.get("fields"), list):
+                raise ValidationError("Each editor group needs a fields array")
+            if group["id"] in group_ids:
+                raise ValidationError("Editor group ids must be unique")
+            group_ids.add(group["id"])
+            for field in group["fields"]:
+                if not isinstance(field, str) or field not in schema["properties"] or field in assigned_fields:
+                    raise ValidationError("Editor group fields must exist and belong to only one group")
+                assigned_fields.add(field)
+
         # Validate each property
         for prop_name, prop_def in schema["properties"].items():
             if schema_type == "object_type" and _canonical_field_name(prop_name) in OBJECT_TYPE_RESERVED_FIELD_NAMES:

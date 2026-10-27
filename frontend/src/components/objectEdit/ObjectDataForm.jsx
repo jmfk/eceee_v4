@@ -4,6 +4,7 @@ import { AlertCircle } from 'lucide-react'
 import { namespacesApi } from '../../api'
 import { objectTypesApi } from '../../api/objectStorage'
 import ObjectSchemaForm from '../ObjectSchemaForm'
+import EditorAccordion from './EditorAccordion'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
@@ -347,8 +348,15 @@ const ObjectDataForm = forwardRef(({
         getErrors: () => errors
     }), [validateForm, formData, errors])
 
+    const schemaFields = getSchemaFromObjectType(objectType).fields
+    const editorGroups = objectType?.schema?.editorGroups || []
+    const assignedFields = new Set(editorGroups.flatMap(group => group.fields))
+    const propertiesFields = schemaFields.filter(field => !assignedFields.has(field.name))
+
     return (
         <>
+            <EditorAccordion title="Properties" defaultOpen>
+            <div className="space-y-6">
             {/* Object Type Selection (only for new instances) */}
             {isNewInstance && (
                 <div>
@@ -402,19 +410,25 @@ const ObjectDataForm = forwardRef(({
             </div>
 
             {/* Dynamic Schema Fields */}
-            {objectType && (
+            {objectType && propertiesFields.length > 0 && (
                 <div className="border-t pt-4">
-                    <div className="font-medium text-gray-900 mb-4" role="heading" aria-level="4">
-                        {objectType.label} Fields
-                    </div>
                     <ObjectSchemaForm
-                        schema={getSchemaFromObjectType(objectType)}
+                        schema={{ fields: propertiesFields }}
                         data={formData.data || {}}
                         onChange={handleDataFieldChange}
                         namespace={namespace}
                     />
                 </div>
             )}
+            </div>
+            </EditorAccordion>
+            {editorGroups.map(group => {
+                const fields = schemaFields.filter(field => group.fields.includes(field.name))
+                return fields.length > 0 && <EditorAccordion key={group.id} title={group.label}>
+                    <ObjectSchemaForm schema={{ fields }} data={formData.data || {}}
+                        onChange={handleDataFieldChange} namespace={namespace} />
+                </EditorAccordion>
+            })}
         </>
     )
 })

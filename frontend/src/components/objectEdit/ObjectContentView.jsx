@@ -11,6 +11,8 @@ import ObjectContentEditor from '../ObjectContentEditor'
 import WidgetEditorPanel from '../WidgetEditorPanel'
 import ObjectEditorPanel from './ObjectEditorPanel'
 import ObjectDataForm from './ObjectDataForm'
+import ObjectTags from './ObjectTags'
+import EditorAccordion from './EditorAccordion'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
 
@@ -162,8 +164,7 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                                 />
                             )}
                         </div>
-                        <ObjectEditorPanel side="right" title="Object data" initialWidth={420}>
-                            <div className="space-y-6 p-6">
+                        <ObjectEditorPanel side="right" initialWidth={420}>
                                 <ObjectDataForm
                                     ref={formRef}
                                     objectType={objectType}
@@ -174,7 +175,9 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                                     onValidationChange={handleValidationChange}
                                     context={{ ...context, instanceId }}
                                 />
-                            </div>
+                            <EditorAccordion title="Tags" defaultOpen>
+                                <ObjectTags objectType={objectType} instance={instance} />
+                            </EditorAccordion>
                         </ObjectEditorPanel>
                     </div>
                 </div>

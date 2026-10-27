@@ -370,7 +370,8 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
             type: schema.type || 'object',
             properties: {},
             required: schema.required || [],
-            propertyOrder: schema.propertyOrder || []
+            propertyOrder: schema.propertyOrder || [],
+            editorGroups: schema.editorGroups || []
         }
 
         // Normalize each property (ensure they have required fields)
@@ -423,10 +424,12 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
     }
 
     const handleSchemaChange = (newSchema) => {
-        setFormData(prev => ({ ...prev, schema: newSchema }))
+        const mergedSchema = { ...newSchema, editorGroups: (newSchema.editorGroups || formData.schema.editorGroups || [])
+            .map(group => ({ ...group, fields: group.fields.filter(field => field in newSchema.properties) })) }
+        setFormData(prev => ({ ...prev, schema: mergedSchema }))
 
         // Normalize schemas before comparison to handle edge cases
-        const normalizedNew = normalizeSchema(newSchema)
+        const normalizedNew = normalizeSchema(mergedSchema)
         const normalizedOriginal = normalizeSchema(originalSchema)
 
         // Check if schema has changed from original
@@ -511,6 +514,21 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                 if (!(orderedProp in schema.properties)) {
                     return `PropertyOrder property "${orderedProp}" not found in properties`
                 }
+            }
+        }
+
+        const seenGroups = new Set()
+        const assignedFields = new Set()
+        for (const group of schema.editorGroups || []) {
+            if (!group.id || !group.label?.trim() || seenGroups.has(group.id)) {
+                return 'Each editor accordion needs a unique ID and a name'
+            }
+            seenGroups.add(group.id)
+            for (const field of group.fields || []) {
+                if (!(field in schema.properties) || assignedFields.has(field)) {
+                    return `Field "${field}" must exist and belong to only one accordion`
+                }
+                assignedFields.add(field)
             }
         }
 
@@ -1172,6 +1190,36 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                         showPreview={true}
                         showJsonView={true}
                     />
+                    <div className="mt-6 border-t border-gray-200 pt-4">
+                        <div className="mb-2 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-sm font-semibold text-gray-900">Editor accordions</h3>
+                                <p className="text-xs text-gray-500">Properties is always first. Unassigned fields stay there; Tags follows the custom groups.</p>
+                            </div>
+                            <button type="button" className="rounded border border-gray-300 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                                onClick={() => handleSchemaChange({ ...formData.schema, editorGroups: [
+                                    ...(formData.schema.editorGroups || []), { id: crypto.randomUUID(), label: 'New group', fields: [] },
+                                ] })}>Add accordion</button>
+                        </div>
+                        {(formData.schema.editorGroups || []).map((group, index) => <div key={group.id} className="mb-3 rounded border border-gray-200 p-3">
+                            <div className="mb-3 flex gap-2">
+                                <input aria-label={`Accordion ${index + 1} name`} value={group.label}
+                                    onChange={event => handleSchemaChange({ ...formData.schema, editorGroups: formData.schema.editorGroups.map(item => item.id === group.id ? { ...item, label: event.target.value } : item) })}
+                                    className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1 text-xs" />
+                                <button type="button" aria-label={`Remove ${group.label}`} onClick={() => handleSchemaChange({ ...formData.schema, editorGroups: formData.schema.editorGroups.filter(item => item.id !== group.id) })}
+                                    className="rounded p-1 text-gray-500 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                            </div>
+                            <div className="flex flex-wrap gap-3">
+                                {Object.entries(formData.schema.properties || {}).map(([field, definition]) => <label key={field} className="flex items-center gap-1.5 text-xs text-gray-700">
+                                    <input type="checkbox" checked={group.fields.includes(field)}
+                                        disabled={!group.fields.includes(field) && (formData.schema.editorGroups || []).some(item => item.id !== group.id && item.fields.includes(field))}
+                                        onChange={event => handleSchemaChange({ ...formData.schema, editorGroups: formData.schema.editorGroups.map(item => item.id === group.id ? {
+                                            ...item, fields: event.target.checked ? [...item.fields, field] : item.fields.filter(name => name !== field),
+                                        } : item) })} />{definition.title || field}
+                                </label>)}
+                            </div>
+                        </div>)}
+                    </div>
                 </div>
             )}
 

@@ -8,20 +8,21 @@ export default function ObjectEditorPanel({ side, title, initialWidth = 260, chi
     const drag = useRef(null)
     const clamp = value => Math.max(200, Math.min(640, value))
     const CollapseIcon = (side === 'left') !== collapsed ? ChevronLeft : ChevronRight
+    const accessibleTitle = title || (side === 'left' ? 'Object navigation' : 'Object details')
 
     return (
-        <aside aria-label={title} className="relative flex shrink-0 flex-col border-gray-200 bg-white"
+        <aside aria-label={accessibleTitle} className="relative flex shrink-0 flex-col border-gray-200 bg-white"
             style={{ width: collapsed ? 40 : width, borderRightWidth: side === 'left' ? 1 : 0, borderLeftWidth: side === 'right' ? 1 : 0 }}>
             <div className={`flex min-h-10 items-center ${collapsed ? 'justify-center' : 'justify-between px-3'}`}>
-                {!collapsed && <span className="text-sm font-medium text-gray-700">{title}</span>}
-                <button type="button" aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${title}`} aria-expanded={!collapsed}
-                    title={`${collapsed ? 'Expand' : 'Collapse'} ${title}`} onClick={() => setCollapsed(value => !value)}
+                {!collapsed && title && <span className="text-sm font-medium text-gray-700">{title}</span>}
+                <button type="button" aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${accessibleTitle}`} aria-expanded={!collapsed}
+                    title={`${collapsed ? 'Expand' : 'Collapse'} ${accessibleTitle}`} onClick={() => setCollapsed(value => !value)}
                     className="rounded p-1.5 text-gray-500 hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-blue-500">
                     <CollapseIcon className="h-4 w-4" />
                 </button>
             </div>
             <div hidden={collapsed} className="min-h-0 flex-1 overflow-auto">{children}</div>
-            {!collapsed && <div role="separator" aria-label={`Resize ${title}`} aria-orientation="vertical"
+            {!collapsed && <div role="separator" aria-label={`Resize ${accessibleTitle}`} aria-orientation="vertical"
                 aria-valuemin={200} aria-valuemax={640} aria-valuenow={width} tabIndex={0}
                 className={`absolute inset-y-0 z-10 w-2 cursor-col-resize touch-none hover:bg-blue-200 focus-visible:bg-blue-200 focus-visible:outline-none ${side === 'left' ? '-right-1' : '-left-1'}`}
                 onKeyDown={event => {

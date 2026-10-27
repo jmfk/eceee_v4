@@ -45,6 +45,22 @@ describe('Object navigation', () => {
         expect(api.getRelatedObjects).toHaveBeenCalledWith(1)
     })
 
+    it('groups related objects by type in independent accordions', async () => {
+        api.getRelatedObjects.mockResolvedValue({ data: { relatedObjects: [
+            { object: { id: 4, title: 'Writer A', objectTypeLabel: 'Writers' } },
+            { object: { id: 5, title: 'Writer B', objectTypeLabel: 'Writers' } },
+            { object: { id: 6, title: 'Event A', objectTypeLabel: 'Events' } },
+        ] } })
+        api.getRelatedFromObjects.mockResolvedValue({ data: { relatedFromObjects: [] } })
+        renderNavigation()
+        expect(await screen.findByRole('button', { name: /Writer A/ })).toBeInTheDocument()
+        const writers = screen.getByRole('button', { name: 'Writers' })
+        expect(writers).toHaveAttribute('aria-expanded', 'true')
+        fireEvent.click(writers)
+        expect(screen.queryByRole('button', { name: /Writer A/ })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /Event A/ })).toBeInTheDocument()
+    })
+
     it('refreshes a mounted tree and relations after object mutation invalidation', async () => {
         const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
         renderNavigation({}, client)
