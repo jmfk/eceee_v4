@@ -178,10 +178,10 @@ class MessageLabelsView(SupportView):
     def post(self, request):
         from core.roles import can_manage_roles
 
+        Tenant.objects.select_for_update().get(pk=request.tenant.pk)
         if not can_manage_roles(request.user, request.tenant):
             raise PermissionDenied("Du saknar behörighet att ändra meddelandeetiketter.")
         name = validated(MessageLabelInput, request)["name"]
-        Tenant.objects.select_for_update().get(pk=request.tenant.pk)
         ensure_message_labels(request.tenant)
         existing = MessageLabel.objects.filter(tenant=request.tenant, name__iexact=name).first()
         if existing:
@@ -203,10 +203,10 @@ class MessageLabelView(SupportView):
     def patch(self, request, pk):
         from core.roles import can_manage_roles
 
+        Tenant.objects.select_for_update().get(pk=request.tenant.pk)
         if not can_manage_roles(request.user, request.tenant):
             raise PermissionDenied("Du saknar behörighet att ändra meddelandeetiketter.")
         name = validated(MessageLabelInput, request)["name"]
-        Tenant.objects.select_for_update().get(pk=request.tenant.pk)
         label = get_object_or_404(MessageLabel, tenant=request.tenant, pk=pk, active=True)
         if MessageLabel.objects.filter(tenant=request.tenant, name__iexact=name).exclude(pk=pk).exists():
             raise ValidationError({"name": "Etiketten finns redan."})
@@ -218,9 +218,9 @@ class MessageLabelView(SupportView):
     def delete(self, request, pk):
         from core.roles import can_manage_roles
 
+        Tenant.objects.select_for_update().get(pk=request.tenant.pk)
         if not can_manage_roles(request.user, request.tenant):
             raise PermissionDenied("Du saknar behörighet att ändra meddelandeetiketter.")
-        Tenant.objects.select_for_update().get(pk=request.tenant.pk)
         label = get_object_or_404(MessageLabel, tenant=request.tenant, pk=pk, active=True)
         label.active = False
         label.save(update_fields=["active"])

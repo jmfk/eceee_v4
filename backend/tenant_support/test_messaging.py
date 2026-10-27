@@ -3,18 +3,19 @@ import uuid
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from django.apps import apps
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.apps import apps
 from django.db import connection
 from django.test import TestCase, override_settings
 from rest_framework.test import force_authenticate
 
-from core.models import TenantRole
+from core.models import Tenant, TenantRole
 from kanban.models import Board, Card
 from kanban.services import ensure_required_columns
 
 from . import views
+from .message_labels import ensure_message_labels
 from .models import EmailDelivery, InboxEntry, MessageAttachment, MessageLabel, PrivateVideo, SupportThread
 from .recipients import directory
 from .tests import SupportAPITests
@@ -76,6 +77,51 @@ class MessagingTests(TestCase):
         )
         self.assertEqual(self.call(views.MessageLabelView, "delete", user=self.owner, pk=label_id).status_code, 204)
         self.assertNotIn(label_id, [label["id"] for label in self.call(views.ContextView).data["message_labels"]])
+
+    def test_default_labels_roll_back_together_when_initialization_fails(self):
+        original_create = MessageLabel.objects.create
+
+        def fail_after_first(*args, **kwargs):
+            original_create(*args, **kwargs)
+            raise RuntimeError("Interrupted while creating defaults")
+
+        with patch.object(MessageLabel.objects, "create", side_effect=fail_after_first):
+            with self.assertRaises(RuntimeError):
+                ensure_message_labels(self.tenant)
+        self.assertFalse(MessageLabel.objects.filter(tenant=self.tenant).exists())
+        ensure_message_labels(self.tenant)
+        self.assertEqual(MessageLabel.objects.filter(tenant=self.tenant).count(), 4)
+
+    def test_label_mutations_check_manager_access_after_tenant_lock(self):
+        label = MessageLabel.objects.create(tenant=self.tenant, name="Existing")
+        original_lock = Tenant.objects.select_for_update
+        actions = (
+            (views.MessageLabelsView, "post", {"name": "New"}, None),
+            (views.MessageLabelView, "patch", {"name": "Renamed"}, label.pk),
+            (views.MessageLabelView, "delete", None, label.pk),
+        )
+        for view, method, data, pk in actions:
+            with self.subTest(method=method):
+                order = []
+
+                def lock(*args, **kwargs):
+                    order.append("lock")
+                    return original_lock(*args, **kwargs)
+
+                def denied(*args):
+                    order.append("permission")
+                    return False
+
+                with (
+                    patch.object(Tenant.objects, "select_for_update", side_effect=lock),
+                    patch("core.roles.can_manage_roles", side_effect=denied),
+                ):
+                    response = self.call(view, method, data, user=self.owner, pk=pk)
+                self.assertEqual(response.status_code, 403)
+                self.assertEqual(order, ["lock", "permission"])
+        self.assertEqual(
+            list(MessageLabel.objects.filter(tenant=self.tenant).values_list("name", flat=True)), ["Existing"]
+        )
 
     def test_message_can_have_multiple_labels_and_rejects_foreign_or_archived_labels(self):
         labels = self.call(views.ContextView).data["message_labels"]
