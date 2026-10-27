@@ -14,14 +14,13 @@ const stateLabels = {
 
 const actionClass = 'rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50'
 
-const ObjectPublishingView = ({ instance, isNewInstance, isDirty = false, onSave, onWorkflowChange, onRestored, isFeatured = false, onFeaturedChange, showHistory = false }) => {
+const ObjectPublishingView = ({ instance, isNewInstance, isDirty = false, onSave, onWorkflowChange, onRestored, onViewVersion, isFeatured = false, onFeaturedChange, showHistory = false }) => {
     const queryClient = useQueryClient()
     const { showConfirm } = useNotificationContext()
     const [scheduleDate, setScheduleDate] = useState('')
     const [busy, setBusy] = useState(false)
     const [error, setError] = useState('')
     const [notice, setNotice] = useState('')
-    const [snapshot, setSnapshot] = useState(null)
     const workflowQuery = useQuery({
         queryKey: ['objectWorkflow', String(instance?.id)],
         queryFn: async () => await objectInstancesApi.getWorkflow(instance.id),
@@ -95,7 +94,6 @@ const ObjectPublishingView = ({ instance, isNewInstance, isDirty = false, onSave
         return run(async () => {
             const reviewed = workflow.editableVersion || workflow.liveVersion || versions[0]
             await objectVersionsApi.restore(source.id, reviewed)
-            setSnapshot(null)
             await onRestored?.()
         }, 'Historical content restored into the working copy.')
     }
@@ -153,7 +151,7 @@ const ObjectPublishingView = ({ instance, isNewInstance, isDirty = false, onSave
                         return <div key={version.id} className="flex flex-col justify-between gap-3 py-3 md:flex-row md:items-center">
                             <div><p className="text-sm font-medium text-gray-900">v{version.versionNumber} · {isWorking ? 'Working copy' : isLive ? 'Live' : version.publicationStatus === 'scheduled' ? 'Scheduled' : 'Historical'}</p><p className="text-sm text-gray-600">{version.title || version.changeDescription || 'Saved version'}</p><p className="text-xs text-gray-500">{new Date(version.createdAt).toLocaleString()}{version.effectiveDate && ` · Publication: ${new Date(version.effectiveDate).toLocaleString()}`}</p></div>
                             <div className="flex flex-wrap gap-2">
-                                <button type="button" disabled={busy} onClick={() => run(async () => { const response = await objectVersionsApi.get(version.id); setSnapshot(response.data) }, '', false)} className={actionClass}>View</button>
+                                <button type="button" disabled={busy} onClick={() => onViewVersion?.(version.id)} className={actionClass}>View</button>
                                 {!isWorking && <button type="button" disabled={busy} onClick={() => restore(version)} className={actionClass}>Restore as working</button>}
                                 {version.publicationStatus === 'scheduled' && String(version.id) !== String(workflow?.scheduledVersion?.id) && <button type="button" disabled={busy || isDirty} onClick={() => run(async () => await objectVersionsApi.cancelSchedule(version), 'Additional schedule cancelled.')} className={actionClass}>Cancel schedule v{version.versionNumber}</button>}
                             </div>
@@ -161,7 +159,6 @@ const ObjectPublishingView = ({ instance, isNewInstance, isDirty = false, onSave
                     })}
                     {!historyQuery.isLoading && !historyQuery.isError && versions.length === 0 && <p className="py-4 text-sm text-gray-500">No history yet.</p>}
                 </div>
-                {snapshot && <div className="mt-5"><div className="flex items-center justify-between"><h3 className="font-medium">Version {snapshot.versionNumber} snapshot</h3><button type="button" onClick={() => setSnapshot(null)} className={actionClass}>Close snapshot</button></div><pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify({ title: snapshot.title, data: snapshot.data, widgets: snapshot.widgets }, null, 2)}</pre></div>}
             </section>
         </div>
     )

@@ -53,6 +53,7 @@ import ContextualHelpLink from './help/ContextualHelpLink'
 import { useUnifiedData, defaultEqualityFn } from '../contexts/unified-data'
 import { OperationTypes } from '../contexts/unified-data/types/operations'
 import PageContentEditor from '../editors/page-editor/PageContentEditor'
+import { HistoricalPageView } from './HistoricalVersionView'
 import { useClipboard } from '../contexts/ClipboardContext'
 import { getDefaultLayout } from '../utils/defaultLayout'
 import ErrorTodoSidebar from './ErrorTodoSidebar'
@@ -147,6 +148,7 @@ const PageEditor = () => {
     // Extract version from URL search parameters
     const urlParams = new URLSearchParams(location.search)
     const versionFromUrl = urlParams.get('version')
+    const historyVersionId = urlParams.get('historyVersion')
 
     // Determine previous view from location state or default to /pages
     const previousView = location.state?.previousView || '/pages'
@@ -1971,6 +1973,13 @@ const PageEditor = () => {
         )
     }
 
+    if (historyVersionId && !isNewPage) {
+        return <div className="fixed inset-0 z-[10000] bg-gray-50">
+            <HistoricalPageView pageId={pageId} versionId={historyVersionId} webpageData={webpageData}
+                namespace={namespace} onClose={() => navigate(`/pages/${pageId}/edit/publishing?panel=history`, { state: { previousView } })} />
+        </div>
+    }
+
     return (
         <div className="fixed inset-0 bg-gray-50 flex flex-col" style={{ zIndex: 10000 }}>
             {/* Top Menu Bar */}
@@ -2294,6 +2303,7 @@ const PageEditor = () => {
                                 onSave={handleSave}
                                 onWorkflowChange={refetchWorkflow}
                                 onVersionRestored={handleVersionRestored}
+                                onViewVersion={versionId => navigate(`/pages/${pageId}/edit/content?historyVersion=${encodeURIComponent(versionId)}`, { state: { previousView } })}
                             />
                         )}
                         {activeTab === 'preview' && (

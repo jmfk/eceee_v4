@@ -61,6 +61,14 @@ describe('PageVersionHistoryPanel', () => {
         expect(onRestoreError).not.toHaveBeenCalled()
     })
 
+    it('opens a historical version in the read-only editor without restoring it', async () => {
+        const onViewVersion = vi.fn()
+        render(<PageVersionHistoryPanel pageId={4} workflow={{ editableVersion: { id: 11 } }} onViewVersion={onViewVersion} />)
+        fireEvent.click((await screen.findAllByRole('button', { name: 'View' }))[1])
+        expect(onViewVersion).toHaveBeenCalledWith(10)
+        expect(versionsApi.restore).not.toHaveBeenCalled()
+    })
+
     it('keeps technical version details in history and reports legacy conflicts', async () => {
         render(
             <PageVersionHistoryPanel
