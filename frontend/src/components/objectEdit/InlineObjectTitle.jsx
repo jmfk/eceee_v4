@@ -11,7 +11,8 @@ export default function InlineObjectTitle({ instanceId, title, disabled = false 
     const previousProp = useRef(title)
     const lastValidTitle = useRef(initialTitle)
 
-    useExternalChanges(`inline-object-title-${instanceId}`, state => {
+    useExternalChanges(`inline-object-title-${instanceId}`, (state, metadata) => {
+        if (metadata?.type === OperationTypes.SET_DIRTY) return
         const updated = state.objects?.[String(instanceId)]?.title
         if (updated !== undefined) {
             setValue(updated)
@@ -22,10 +23,12 @@ export default function InlineObjectTitle({ instanceId, title, disabled = false 
     useEffect(() => {
         if (title !== previousProp.current) {
             previousProp.current = title
+            const state = getState()
+            if (state.metadata.isDirty && state.objects?.[String(instanceId)]?.title !== title) return
             setValue(title || '')
             if (title?.trim()) lastValidTitle.current = title
         }
-    }, [title])
+    }, [getState, instanceId, title])
 
     const updateWorkingCopy = nextTitle => {
         setIsDirty(true)
@@ -39,12 +42,12 @@ export default function InlineObjectTitle({ instanceId, title, disabled = false 
             required disabled={disabled} value={value}
             onChange={event => {
                 const nextTitle = event.target.value
-                setValue(nextTitle)
                 setError('')
                 if (nextTitle.trim()) {
                     lastValidTitle.current = nextTitle
                     updateWorkingCopy(nextTitle)
                 }
+                setValue(nextTitle)
             }}
             onBlur={() => {
                 const trimmed = value.trim()
@@ -52,9 +55,9 @@ export default function InlineObjectTitle({ instanceId, title, disabled = false 
                     setValue(lastValidTitle.current)
                     setError('Title is required')
                 } else if (trimmed !== value) {
-                    setValue(trimmed)
                     lastValidTitle.current = trimmed
                     updateWorkingCopy(trimmed)
+                    setValue(trimmed)
                 }
             }}
             className="min-w-[12rem] w-[min(60vw,40rem)] max-w-full rounded border border-transparent bg-transparent px-1 text-lg font-semibold text-gray-900 hover:border-gray-300 focus:border-blue-500 focus:bg-white focus:outline-none disabled:opacity-70" />

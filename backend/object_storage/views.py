@@ -15,6 +15,8 @@ from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Exists, OuterRef, Q
+from django.db.models.fields.json import KeyTextTransform
+from django.db.models.functions import Length
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions, serializers, status, viewsets
@@ -71,10 +73,13 @@ def filter_browser_statuses(queryset, request):
     if not raw:
         return queryset
     selected = set(raw.split(","))
-    if not selected or not selected <= {"draft", "scheduled", "published"}:
-        raise serializers.ValidationError({"statuses": "Choose draft, scheduled or published."})
-    if len(selected) == 3:
+    allowed = {"draft", "scheduled", "published", "archived"}
+    if not selected or not selected <= allowed:
+        raise serializers.ValidationError({"statuses": "Choose draft, scheduled, published or archived."})
+    if selected == allowed:
         return queryset
+    if selected == {"archived"}:
+        return queryset.filter(status="archived")
     now = timezone.now()
     live = ObjectVersion.objects.filter(object_instance_id=OuterRef("pk"), effective_date__lte=now).filter(
         Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
@@ -88,6 +93,10 @@ def filter_browser_statuses(queryset, request):
         choices |= Q(_has_live_version=False, _has_scheduled_version=True)
     if "draft" in selected:
         choices |= Q(_has_live_version=False, _has_scheduled_version=False)
+    if "archived" in selected:
+        choices = Q(status="archived") | (~Q(status="archived") & choices)
+    else:
+        choices = ~Q(status="archived") & choices
     return queryset.filter(choices)
 
 
@@ -146,7 +155,24 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         self._validate_machine_definition_scope(serializer)
+        self._validate_global_browser_write(serializer)
         serializer.save()
+
+    def _validate_global_browser_write(self, serializer):
+        if not {"metadata", "namespace"} & serializer.validated_data.keys():
+            return
+        definition = serializer.instance
+        if self.request.user.is_superuser:
+            return
+        metadata = serializer.validated_data.get("metadata", definition.metadata if definition else {})
+        current_metadata = definition.metadata if definition and isinstance(definition.metadata, dict) else {}
+        current_browser = current_metadata.get("browser")
+        next_browser = metadata.get("browser") if isinstance(metadata, dict) else None
+        namespace = serializer.validated_data.get("namespace", definition.namespace if definition else None)
+        if (definition and definition.namespace_id is None and next_browser != current_browser) or (
+            namespace is None and next_browser is not None and (not definition or definition.namespace_id is not None)
+        ):
+            raise PermissionDenied("Only a superuser can change a global Object type's browser configuration.")
 
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""
@@ -157,6 +183,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Set the created_by field when creating"""
         self._validate_machine_definition_scope(serializer)
+        self._validate_global_browser_write(serializer)
         serializer.save(created_by=self.request.user)
 
     def destroy(self, request, *args, **kwargs):
@@ -1387,7 +1414,10 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         )
         if query:
             values = values.filter(**{f"{path}__icontains": query})
-        choices = list(values.order_by(path).values_list(path, flat=True).distinct()[:51])
+        values = values.annotate(_choice_length=Length(KeyTextTransform(filter_key[6:], "current_version__data")))
+        choices = list(
+            values.filter(_choice_length__lte=255).order_by(path).values_list(path, flat=True).distinct()[:51]
+        )
         return Response(
             {
                 "results": [{"value": item, "label": item} for item in choices[:50] if isinstance(item, str)],

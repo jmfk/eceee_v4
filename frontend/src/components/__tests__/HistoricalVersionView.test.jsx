@@ -44,4 +44,14 @@ describe('historical editor views', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Tags' }))
         expect(await screen.findByText('Ämne / Energy')).toBeInTheDocument()
     })
+
+    it('shows saved widgets when their slot is no longer on the current object type', async () => {
+        mocks.object.mockResolvedValue({ data: {
+            id: 9, versionNumber: 1, title: 'Old object', data: {},
+            widgets: { retired: [{ id: 'w1', name: 'Saved widget' }] }, classificationIds: [],
+        } })
+        mount(<HistoricalObjectView versionId="9" objectType={{ slotConfiguration: { slots: [{ name: 'current' }] } }} onClose={vi.fn()} />)
+        expect(await screen.findByText('Saved widget')).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'retired' })).toBeInTheDocument()
+    })
 })

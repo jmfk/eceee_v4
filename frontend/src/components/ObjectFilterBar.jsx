@@ -8,6 +8,7 @@ const STATUS_OPTIONS = [
     { value: 'draft', label: 'Draft' },
     { value: 'scheduled', label: 'Scheduled' },
     { value: 'published', label: 'Published' },
+    { value: 'archived', label: 'Archived' },
 ]
 
 const ObjectFilterBar = ({ search, onSearchChange, statuses, onStatusesChange, filters, onFiltersChange, objectType, availableFilters = [], overview = false, typeOptions = [], overviewType = '', onOverviewTypeChange }) => {
