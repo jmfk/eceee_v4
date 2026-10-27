@@ -10,10 +10,11 @@ import {
     useParams,
 } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react'
 import PrivatePlayer from '../components/support/PrivateVideoPlayer'
 import HelpGuideSelect from '../components/help/HelpGuideSelect'
 import StatusBar from '../components/StatusBar'
-import { Inbox, Search, PenLine, Archive, RotateCw } from 'lucide-react'
+import { Inbox, Search, PenLine, Archive, RotateCw, Plus, X } from 'lucide-react'
 import '../components/user-tools.css'
 import {
     supportError,
@@ -420,6 +421,49 @@ function VideoField({ purpose, maxBytes, file, setFile, valid, setValid }) {
     )
 }
 
+function RecipientField({ options, value, onChange, disabled }) {
+    const [search, setSearch] = useState('')
+    const selected = options.filter((option) => value.includes(option.id))
+    const matches = options.filter((option) => option.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
+    const groups = [
+        ['Användare', matches.filter((option) => option.kind === 'user')],
+        ['Roller och grupper', matches.filter((option) => option.kind === 'group')],
+        ['Övriga', matches.filter((option) => !['user', 'group'].includes(option.kind))],
+    ]
+    const selectedBoard = value.find((id) => id.startsWith('board:'))
+
+    return <fieldset className="message-recipients">
+        <legend>Till</legend>
+        <div className="message-recipient-line">
+            {selected.map((option) => <span className="message-recipient-chip" key={option.id}>
+                <span>{option.name}</span>
+                <button type="button" aria-label={`Ta bort ${option.name}`} disabled={disabled}
+                    onClick={() => onChange(value.filter((id) => id !== option.id))}><X size={14} /></button>
+            </span>)}
+            {options.length > 0 && <Popover className="message-recipient-popover">
+                <PopoverButton type="button" className="message-recipient-add" disabled={disabled} onClick={() => setSearch('')}><Plus size={15} /> Lägg till</PopoverButton>
+                <PopoverPanel anchor="bottom start" className="message-recipient-picker">
+                    <strong>Välj mottagare</strong>
+                    <input aria-label="Sök mottagare" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Sök användare eller roll" />
+                    <div className="message-recipient-options">
+                        {groups.map(([title, items]) => items.length > 0 && <section key={title} aria-label={title}>
+                            <h3>{title}</h3>
+                            {items.map((option) => <label key={option.id}>
+                                <input type="checkbox" checked={value.includes(option.id)}
+                                    disabled={disabled || (option.kind === 'board' && !!selectedBoard && selectedBoard !== option.id)}
+                                    onChange={(event) => onChange(event.target.checked ? [...value, option.id] : value.filter((id) => id !== option.id))} />
+                                <span>{option.name}</span>
+                            </label>)}
+                        </section>)}
+                        {!matches.length && <p>Inga mottagare matchar sökningen.</p>}
+                    </div>
+                </PopoverPanel>
+            </Popover>}
+            {!options.length && <span className="support-muted">Inga mottagare är tillgängliga i arbetsytan.</span>}
+        </div>
+    </fieldset>
+}
+
 function Compose({ context, link, publish = false }) {
     const tenant = useSupportTenant()
     const navigate = useNavigate()
@@ -556,12 +600,10 @@ function Compose({ context, link, publish = false }) {
                 aria-busy={send.isPending}
             >
                 <fieldset disabled={send.isPending}>
-                    {!publish && <fieldset className="message-recipients"><legend>Mottagare</legend>
-                        {(context.recipients || (context.supportAvailable ? [{ id: 'support', name: 'Support', kind: 'support' }] : [])).map((recipient) => <label key={recipient.id}>
-                            <input type="checkbox" checked={recipients.includes(recipient.id)} onChange={(e) => setRecipients(e.target.checked ? [...recipients, recipient.id] : recipients.filter((id) => id !== recipient.id))} /> {recipient.name}
-                        </label>)}
-                        {!context.recipients?.length && !context.supportAvailable && <p>Inga mottagare är tillgängliga i arbetsytan.</p>}
-                    </fieldset>}
+                    {!publish && <RecipientField
+                        options={context.recipients || (context.supportAvailable ? [{ id: 'support', name: 'Support', kind: 'support' }] : [])}
+                        value={recipients} onChange={setRecipients} disabled={send.isPending}
+                    />}
                     {!publish && (
                         <label>
                             Typ (valfri)
