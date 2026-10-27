@@ -10,6 +10,7 @@ import RoleSettings from './pages/RoleSettings'
  */
 
 import InboxPage from './pages/InboxPage'
+import SupportSettingsPage from './pages/SupportSettingsPage'
 import { createBrowserRouter, RouterProvider, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster, toast } from 'react-hot-toast'
@@ -291,7 +292,7 @@ export const AppRoutes = () => {
           </PrivateRoute>
         } />
         <Route path="/settings/roles" element={<PrivateRoute><SettingsLayout><RoleSettings /></SettingsLayout></PrivateRoute>} />
-        <Route path="/settings/support" element={<Navigate to="/inbox/manage" replace />} />
+        <Route path="/settings/support" element={<PrivateRoute><SettingsLayout><SupportSettingsPage /></SettingsLayout></PrivateRoute>} />
         {/* Settings dashboard */}
         <Route path="/settings" element={
           <PrivateRoute>
