@@ -303,8 +303,12 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
 
         if isinstance(converted.get("editorGroups"), list):
             converted["editorGroups"] = [
-                {**group, "fields": [self._camel_to_snake(key) for key in group.get("fields", [])]}
-                if isinstance(group, dict) else group for group in converted["editorGroups"]
+                (
+                    {**group, "fields": [self._camel_to_snake(key) for key in group.get("fields", [])]}
+                    if isinstance(group, dict)
+                    else group
+                )
+                for group in converted["editorGroups"]
             ]
 
         return converted
@@ -331,8 +335,12 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
 
         if isinstance(converted.get("editorGroups"), list):
             converted["editorGroups"] = [
-                {**group, "fields": [self._snake_to_camel(key) for key in group.get("fields", [])]}
-                if isinstance(group, dict) else group for group in converted["editorGroups"]
+                (
+                    {**group, "fields": [self._snake_to_camel(key) for key in group.get("fields", [])]}
+                    if isinstance(group, dict)
+                    else group
+                )
+                for group in converted["editorGroups"]
             ]
 
         return converted

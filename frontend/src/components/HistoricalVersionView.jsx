@@ -82,7 +82,9 @@ export function HistoricalObjectView({ versionId, objectType, onClose }) {
     const schema = objectType?.schema || {}
     const keys = [...new Set([...(schema.propertyOrder || []), ...Object.keys(schema.properties || {}), ...Object.keys(version.data || {})])]
         .filter(key => key !== 'title')
-    const slots = objectType?.slotConfiguration?.slots || []
+    const currentSlots = objectType?.slotConfiguration?.slots || []
+    const savedSlotNames = Object.keys(version.widgets || {})
+    const slots = [...currentSlots, ...savedSlotNames.filter(name => !currentSlots.some(slot => slot.name === name)).map(name => ({ name }))]
     return <ReadOnlyShell versionNumber={version.versionNumber} onClose={onClose}>
         <div className="border-b border-gray-200 bg-white px-6 py-4"><h1 className="text-lg font-semibold text-gray-900">{version.title || 'Untitled object'}</h1></div>
         <div className="flex min-h-full flex-col bg-white lg:flex-row">

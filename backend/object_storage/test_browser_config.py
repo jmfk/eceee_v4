@@ -4,8 +4,9 @@ import json
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from django.db.models import Q
 from django.test import SimpleTestCase
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from content_migration.legacy_content.profile import initial_bundle
 from object_storage.browser_config import (
@@ -17,6 +18,7 @@ from object_storage.browser_config import (
     validate_browser_config,
 )
 from object_storage.serializers import ObjectInstanceListSerializer, ObjectTypeDefinitionListSerializer
+from object_storage.views import ObjectTypeDefinitionViewSet, filter_browser_statuses
 
 
 class BrowserConfigurationTests(SimpleTestCase):
@@ -194,3 +196,47 @@ class BrowserConfigurationTests(SimpleTestCase):
         )
         with self.assertRaises(ValidationError):
             parse_browser_filters(request, self.definition)
+
+    def test_regular_definition_write_cannot_change_global_browser_settings(self):
+        view = ObjectTypeDefinitionViewSet()
+        view.request = SimpleNamespace(user=SimpleNamespace(is_superuser=False))
+        global_type = SimpleNamespace(namespace=None, namespace_id=None, metadata={"browser": {"filters": []}})
+        serializer = SimpleNamespace(
+            instance=global_type,
+            validated_data={"metadata": {"browser": {"filters": [{"key": "created_at"}]}}},
+        )
+        with self.assertRaises(PermissionDenied):
+            view._validate_global_browser_write(serializer)
+
+        serializer.validated_data = {"metadata": None}
+        with self.assertRaises(PermissionDenied):
+            view._validate_global_browser_write(serializer)
+
+        tenant_type = SimpleNamespace(namespace_id=1, namespace=object(), metadata={"browser": {"filters": []}})
+        serializer.instance = tenant_type
+        serializer.validated_data = {"namespace": None}
+        with self.assertRaises(PermissionDenied):
+            view._validate_global_browser_write(serializer)
+
+        serializer.validated_data = {"metadata": {"browser": {"filters": [{"key": "created_at"}]}}}
+        view._validate_global_browser_write(serializer)
+        serializer.instance = global_type
+        view.request.user.is_superuser = True
+        view._validate_global_browser_write(serializer)
+
+    def test_archived_objects_can_be_filtered_by_status(self):
+        queryset = MagicMock()
+        request = SimpleNamespace(query_params={"statuses": "archived"})
+        self.assertIs(filter_browser_statuses(queryset, request), queryset.filter.return_value)
+        queryset.filter.assert_called_once_with(status="archived")
+
+    @patch("object_storage.views.ObjectVersion.objects.filter")
+    def test_mixed_statuses_keep_archived_separate_from_drafts(self, versions):
+        queryset = MagicMock()
+        queryset.annotate.return_value = queryset
+        request = SimpleNamespace(query_params={"statuses": "draft,archived"})
+        filter_browser_statuses(queryset, request)
+        self.assertEqual(
+            queryset.filter.call_args.args[0],
+            Q(status="archived") | (~Q(status="archived") & Q(_has_live_version=False, _has_scheduled_version=False)),
+        )
