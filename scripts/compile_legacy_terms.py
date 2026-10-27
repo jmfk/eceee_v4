@@ -9,7 +9,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
-from content_migration.legacy_content.term_plan import compile_plan, digest  # noqa: E402
+from content_migration.legacy_content import term_plan  # noqa: E402
+
+compile_plan = term_plan.compile_plan
+digest = term_plan.digest
 
 
 def main():
