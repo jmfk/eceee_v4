@@ -29,6 +29,7 @@ describe('role editor language', () => {
     it('uses English for the new role heading', async () => {
         renderRoles()
         fireEvent.click(await screen.findByRole('button', { name: 'Create role' }))
+        expect(mocks.get).toHaveBeenCalledWith('/api/v1/utils/roles/', { headers: { 'X-Tenant-ID': 'test' } })
         expect(screen.getByRole('heading', { name: 'New role' })).toBeInTheDocument()
     })
 
@@ -53,7 +54,7 @@ describe('role editor language', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Edit roles' }))
         fireEvent.click(screen.getByRole('checkbox', { name: 'Reader' }))
         fireEvent.click(screen.getByRole('button', { name: 'Save roles' }))
-        await waitFor(() => expect(mocks.patch).toHaveBeenCalledWith('/api/v1/utils/roles/', { userId: 7, roleIds: ['role-1'] }))
+        await waitFor(() => expect(mocks.patch).toHaveBeenCalledWith('/api/v1/utils/roles/', { userId: 7, roleIds: ['role-1'] }, { headers: { 'X-Tenant-ID': 'test' } }))
     })
 
     it('offers only active accounts when adding a workspace member', async () => {

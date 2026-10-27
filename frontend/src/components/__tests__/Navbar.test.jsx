@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Navbar from '../Navbar'
 import UserToolsNav from '../UserToolsNav'
 import { useAuth } from '../../contexts/AuthContext'
+import { useSupportContext } from '../support/useSupportContext'
 
-vi.mock('../support/useSupportContext', () => ({ useSupportContext: () => ({ data: { unreadCount: 0 } }), useSupportTenant: () => 'a' }))
+vi.mock('../support/useSupportContext', () => ({ useSupportContext: vi.fn(), useSupportTenant: () => 'a' }))
+vi.mock('react-router-dom', async () => vi.importActual('react-router-dom'))
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: vi.fn(() => ({ logout: vi.fn(), user: { username: 'editor' } })),
@@ -30,6 +32,7 @@ describe('Navbar', () => {
   }
 
   beforeEach(() => {
+    useSupportContext.mockReturnValue({ data: { unreadCount: 0 } })
     useAuth.mockReturnValue({ logout: vi.fn(), user: { username: 'editor' } })
     availableWidth = 1200
     menuWidth = 1060
@@ -89,9 +92,25 @@ describe('Navbar', () => {
   it('exposes settings to role managers and Statistics only to its readers', () => {
     useAuth.mockReturnValue({ logout: vi.fn(), user: { permissions: ['roles.manage', 'statistics.read'] } })
     renderNavbar()
-    expect(screen.getByRole('link', { name: 'Settings' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
     expect(screen.getByRole('link', { name: 'Statistics' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Pages' })).not.toBeInTheDocument()
+  })
+
+  it('exposes Settings to a directly assigned support agent without other CMS sections', () => {
+    useAuth.mockReturnValue({ logout: vi.fn(), user: { permissions: [] } })
+    useSupportContext.mockReturnValue({ data: { unreadCount: 0, canSupport: true } })
+    render(<MemoryRouter><Navbar /><UserToolsNav tenant="a" /></MemoryRouter>)
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings/support')
+    expect(screen.getByRole('link', { name: 'Till CMS' })).toHaveAttribute('href', '/settings/support?tenant=a')
+    expect(screen.queryByRole('link', { name: 'Pages' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the scoped workspace when a support agent opens Settings', () => {
+    useAuth.mockReturnValue({ logout: vi.fn(), user: { permissions: [] } })
+    useSupportContext.mockReturnValue({ data: { unreadCount: 0, canSupport: true } })
+    render(<MemoryRouter initialEntries={['/inbox?tenant=a']}><Navbar /></MemoryRouter>)
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings/support?tenant=a')
   })
 
   it('stays collapsed across measurements and menu interaction, then expands when space is available', () => {

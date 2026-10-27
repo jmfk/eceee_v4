@@ -21,10 +21,15 @@ import {
 import { themesApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
 import { cmsText } from '../utils/cmsCopy'
+import { useSupportContext } from './support/useSupportContext'
 
 export default function SettingsSidebar({ onNavigate }) {
     const location = useLocation()
     const { user, language } = useAuth()
+    const support = useSupportContext()
+    const scopedTenant = new URLSearchParams(location.search).get('tenant')
+    const scopedHref = (href) => scopedTenant && ['/settings/support', '/settings/roles'].includes(href)
+        ? `${href}?tenant=${encodeURIComponent(scopedTenant)}` : href
     const [isCollapsed, setIsCollapsed] = useState(false)
     const [expandedSections, setExpandedSections] = useState({
         themes: true,
@@ -71,7 +76,7 @@ export default function SettingsSidebar({ onNavigate }) {
             <div className="flex flex-col">
                 {item.href ? (
                     <Link
-                        to={item.href}
+                        to={scopedHref(item.href)}
                         onClick={onNavigate}
                         className={`flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors ${active
                             ? 'bg-blue-50 text-blue-700'
@@ -178,7 +183,7 @@ export default function SettingsSidebar({ onNavigate }) {
 
     const visibleNavigation = navigation.flatMap((item) => {
         if (item.href) return canAccessCmsPath(user, item.href) ? [item] : []
-        const items = item.items.filter((child) => canAccessCmsPath(user, child.href))
+        const items = item.items.filter((child) => canAccessCmsPath(user, child.href) || (child.href === '/settings/support' && support.data?.canSupport))
         return items.length ? [{ ...item, items }] : []
     })
 

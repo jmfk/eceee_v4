@@ -16,7 +16,7 @@ export const useSupportTenant = () => {
     )
     // Inbox, help, and support settings retain workspace scope; the server verifies membership.
     return (
-        ((location.pathname.startsWith('/inbox') || location.pathname.startsWith('/help/how-to/') || location.pathname === '/settings/support') &&
+        ((location.pathname.startsWith('/inbox') || location.pathname.startsWith('/help/how-to/') || ['/settings/support', '/settings/roles'].includes(location.pathname)) &&
             new URLSearchParams(location.search).get('tenant')) ||
         current
     )

@@ -111,7 +111,7 @@ class ThreadInput(serializers.Serializer):
     title = serializers.CharField(max_length=150)
     body = serializers.CharField(max_length=4000)
     kind = serializers.ChoiceField(choices=["question", "bug"], default="question", required=False)
-    label_ids = serializers.ListField(child=serializers.UUIDField(), max_length=20, required=False)
+    label_ids = serializers.ListField(child=serializers.UUIDField(), max_length=30, required=False)
     location = serializers.URLField(max_length=2000, allow_blank=True, default="")
     instruction_id = serializers.UUIDField(required=False, allow_null=True)
     video_id = serializers.UUIDField(required=False, allow_null=True)

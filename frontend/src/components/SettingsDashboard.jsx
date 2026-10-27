@@ -17,11 +17,12 @@ import {
     AlertCircle,
     Settings as Cog
 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { themesApi } from '../api'
 import { objectTypesApi } from '../api/objectStorage'
 import { api } from '../api/client'
 import { cmsText } from '../utils/cmsCopy'
+import { useSupportContext } from './support/useSupportContext'
 
 const StatCard = ({ title, count, icon: Icon, color, link, description }) => {
     const { language } = useAuth()
@@ -49,7 +50,11 @@ const StatCard = ({ title, count, icon: Icon, color, link, description }) => {
 
 const SettingsDashboard = () => {
     const { user } = useAuth()
-    const allowed = (path) => canAccessCmsPath(user, path)
+    const location = useLocation()
+    const support = useSupportContext()
+    const allowed = (path) => canAccessCmsPath(user, path) || (path === '/settings/support' && support.data?.canSupport)
+    const scopedTenant = new URLSearchParams(location.search).get('tenant')
+    const scopedHref = (path) => scopedTenant ? `${path}?tenant=${encodeURIComponent(scopedTenant)}` : path
     // Fetch only counts available to this role
     const { data: themes = [] } = useQuery({
         queryKey: ['themes'],
@@ -166,8 +171,8 @@ const SettingsDashboard = () => {
                             <h4 className="font-semibold text-gray-900">Create New Page</h4>
                             <p className="text-xs text-gray-500 mt-1">Start building a new content page</p>
                         </Link>}
-                        {allowed('/settings/roles') && <Link to="/settings/roles" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100"><h4 className="font-semibold text-gray-900">Användare och behörigheter</h4><p className="text-xs text-gray-500 mt-1">Hantera arbetsytans medlemmar och roller</p></Link>}
-                        {allowed('/settings/support') && <Link to="/settings/support" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100"><h4 className="font-semibold text-gray-900">Support</h4><p className="text-xs text-gray-500 mt-1">Etiketter, behörigheter och leveransstatus</p></Link>}
+                        {allowed('/settings/roles') && <Link to={scopedHref('/settings/roles')} className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100"><h4 className="font-semibold text-gray-900">Användare och behörigheter</h4><p className="text-xs text-gray-500 mt-1">Hantera arbetsytans medlemmar och roller</p></Link>}
+                        {allowed('/settings/support') && <Link to={scopedHref('/settings/support')} className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100"><h4 className="font-semibold text-gray-900">Support</h4><p className="text-xs text-gray-500 mt-1">Etiketter, behörigheter och leveransstatus</p></Link>}
                         {allowed('/settings/users') && <Link to="/settings/users" className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100">
                             <h4 className="font-semibold text-gray-900">System accounts</h4>
                             <p className="text-xs text-gray-500 mt-1">Create accounts and manage system owners</p>

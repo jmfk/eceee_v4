@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supportError, supportRequest } from '../api/support'
 import { useSupportContext, useSupportIdentity, useSupportTenant } from '../components/support/useSupportContext'
@@ -21,6 +21,8 @@ const ErrorText = ({ error }) => error ? <p className="support-error" role="aler
 
 function Manage({ context }) {
     const tenant = useSupportTenant()
+    const location = useLocation()
+    const rolesHref = `/settings/roles${location.search}`
     const identity = useSupportIdentity()
     const queryClient = useQueryClient()
     const [userId, setUserId] = useState('')
@@ -74,7 +76,7 @@ function Manage({ context }) {
                     : 'inte aktiverad; aviseringar väntar i kön'}
                 .
             </p>
-            {context.canManage && <p><Link to="/settings/roles">Hantera arbetsytans roller och behörigheter</Link>. Formuläret nedan hanterar direkta supporttilldelningar. Behörigheter från andra roller gäller också.</p>}
+            {context.canManage && <p><Link to={rolesHref}>Hantera arbetsytans roller och behörigheter</Link>. Formuläret nedan hanterar direkta supporttilldelningar. Behörigheter från andra roller gäller också.</p>}
             {context.canManage && <section className="message-label-settings" aria-label="Meddelandeetiketter">
                 <h3>Meddelandeetiketter</h3>
                 <p>Etiketterna kan användas på nya meddelanden i den här arbetsytan.</p>

@@ -150,6 +150,7 @@ describe('tenant inbox journey', () => {
         try {
             renderInbox('/settings/support?tenant=a')
             await screen.findByRole('heading', { name: 'Supportinställningar' })
+            expect(screen.getByRole('link', { name: 'Hantera arbetsytans roller och behörigheter' })).toHaveAttribute('href', '/settings/roles?tenant=a')
             fireEvent.click(screen.getAllByRole('button', { name: 'Byt namn' })[0])
             fireEvent.change(screen.getByRole('textbox', { name: 'Nytt namn för Question' }), { target: { value: 'General question' } })
             fireEvent.click(screen.getByRole('button', { name: 'Spara' }))
