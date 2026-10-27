@@ -123,16 +123,16 @@ const ObjectBrowser = () => {
     const overviewObjectType = overviewTypes.find(type => String(type.id) === overviewTypeId) || null
     const { data: listConfiguration } = useQuery({
         queryKey: ['objectTypeBrowserConfiguration', selectedObjectType?.id],
-        queryFn: async () => await objectTypesApi.getBrowserConfiguration(selectedObjectType.id),
+        queryFn: async () => (await objectTypesApi.getBrowserConfiguration(selectedObjectType.id)).data,
         enabled: currentView === 'list' && !!selectedObjectType,
     })
     const { data: overviewConfiguration } = useQuery({
         queryKey: ['objectTypeBrowserConfiguration', overviewObjectType?.id],
-        queryFn: async () => await objectTypesApi.getBrowserConfiguration(overviewObjectType.id),
+        queryFn: async () => (await objectTypesApi.getBrowserConfiguration(overviewObjectType.id)).data,
         enabled: currentView === 'grid' && !!overviewObjectType,
     })
-    const listObjectType = selectedObjectType ? { ...selectedObjectType, browserConfig: listConfiguration?.data?.config || selectedObjectType.browserConfig } : null
-    const overviewTypeWithConfig = overviewObjectType ? { ...overviewObjectType, browserConfig: overviewConfiguration?.data?.config || overviewObjectType.browserConfig } : null
+    const listObjectType = selectedObjectType ? { ...selectedObjectType, browserConfig: listConfiguration?.config || selectedObjectType.browserConfig } : null
+    const overviewTypeWithConfig = overviewObjectType ? { ...overviewObjectType, browserConfig: overviewConfiguration?.config || overviewObjectType.browserConfig } : null
     const overviewActive = Boolean(overviewSearch.trim() || overviewStatuses.length || overviewFilters.length || overviewTypeId)
     const { data: overviewResults, isLoading: overviewResultsLoading, error: overviewResultsError } = useQuery({
         queryKey: ['objectInstances', 'overview', overviewSearch, overviewStatuses, overviewFilters, overviewTypeId, overviewPage, pageSize],
@@ -341,7 +341,7 @@ const ObjectBrowser = () => {
                                 overview search={overviewSearch} onSearchChange={value => { setOverviewSearch(value); setOverviewPage(1) }}
                                 statuses={overviewStatuses} onStatusesChange={value => { setOverviewStatuses(value); setOverviewPage(1) }}
                                 filters={overviewFilters} onFiltersChange={value => { setOverviewFilters(value); setOverviewPage(1) }}
-                                objectType={overviewTypeWithConfig} availableFilters={overviewConfiguration?.data?.availableFilters || []}
+                                objectType={overviewTypeWithConfig} availableFilters={overviewConfiguration?.availableFilters || []}
                                 typeOptions={objectTypes} overviewType={overviewTypeId}
                                 onOverviewTypeChange={value => {
                                     setOverviewTypeId(value); setOverviewFilters([]); setOverviewPage(1)
@@ -544,7 +544,7 @@ const ObjectBrowser = () => {
                                 search={searchTerm} onSearchChange={value => { setSearchTerm(value); setPage(1) }}
                                 statuses={statuses} onStatusesChange={value => { setStatuses(value); setPage(1) }}
                                 filters={fieldFilters} onFiltersChange={value => { setFieldFilters(value); setPage(1) }}
-                                objectType={listObjectType} availableFilters={listConfiguration?.data?.availableFilters || []}
+                                objectType={listObjectType} availableFilters={listConfiguration?.availableFilters || []}
                             />
                         </div>
 
