@@ -10,7 +10,7 @@ import { useDropzone } from 'react-dropzone'
 import { Link, useBlocker, useNavigate, useParams, useLocation } from 'react-router-dom'
 import UserToolsNav from '../components/UserToolsNav'
 import StatusBar from '../components/StatusBar'
-import { Columns3, Plus, MoreHorizontal, SlidersHorizontal, ArrowLeft, X, Tag, Clock, ListChecks, Paperclip, AlignLeft, MessageSquare, Users, Pencil, Archive } from 'lucide-react'
+import { Columns3, Plus, MoreHorizontal, SlidersHorizontal, ArrowLeft, Check, X, Tag, Clock, ListChecks, Paperclip, AlignLeft, MessageSquare, Users, Pencil, Archive } from 'lucide-react'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import '../components/user-tools.css'
 import { useAuth } from '../contexts/AuthContext'
@@ -1544,32 +1544,6 @@ export default function KanbanPage() {
                                     </form>}
                                 </DialogPanel>
                             </Dialog>}
-                            {rename && (
-                                <form
-                                    className="flex gap-2 mb-4"
-                                    onSubmit={(e) => {
-                                        e.preventDefault()
-                                        run(async () => {
-                                            await kanbanApi.patch(`${rename.type}/${rename.id}/`, {
-                                                revision: rename.revision,
-                                                title: rename.title,
-                                            })
-                                            setRename(null)
-                                        })
-                                    }}
-                                >
-                                    <input
-                                        aria-label="Nytt namn"
-                                        required
-                                        value={rename.title}
-                                        onChange={(e) => setRename({ ...rename, title: e.target.value })}
-                                    />
-                                    <button>Spara namn</button>
-                                    <button type="button" onClick={() => setRename(null)}>
-                                        Avbryt
-                                    </button>
-                                </form>
-                            )}
                             {board ? (
                                 <div className="kb-lists" aria-label="Kanban-kolumner" ref={boardDrag.boardRef}
                                     onDrop={(e) => {
@@ -1591,15 +1565,46 @@ export default function KanbanPage() {
                                             className={`kb-column ${boardDrag.drag?.id === column.id ? 'kb-drag-source' : ''}`}
                                         >
                                             <header
-                                                draggable
+                                                draggable={rename?.id !== column.id}
                                                 onDragStart={(e) => boardDrag.start(e, { type: 'column', id: column.id })}
                                             >
-                                                <h3 className="text-sm font-semibold">
-                                                    {column.title}
-                                                    {column.archived ? ' (arkiverad)' : ''}
-                                                </h3>
-                                                <span className="kb-column-count">{cards.filter((card) => card.column === column.id).length}</span>
-                                                <ColumnActions column={column} index={index} columns={visibleColumns} board={board} busy={busy} run={run} reorder={reorder} rename={setRename} addCard={setCreateColumn} />
+                                                {rename?.id === column.id ? (
+                                                    <form className="kb-column-rename" onSubmit={(e) => {
+                                                        e.preventDefault()
+                                                        run(async () => {
+                                                            await kanbanApi.patch(`columns/${column.id}/`, {
+                                                                revision: rename.revision,
+                                                                title: rename.title.trim(),
+                                                            })
+                                                            setRename(null)
+                                                        })
+                                                    }}>
+                                                        <input
+                                                            aria-label={`Listnamn för ${column.title}`}
+                                                            autoFocus
+                                                            required
+                                                            maxLength={200}
+                                                            value={rename.title}
+                                                            onFocus={(e) => e.target.select()}
+                                                            onChange={(e) => setRename({ ...rename, title: e.target.value })}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Escape') {
+                                                                    e.stopPropagation()
+                                                                    setRename(null)
+                                                                }
+                                                            }}
+                                                        />
+                                                        <button type="submit" aria-label="Spara listnamn" title="Spara" disabled={busy || !rename.title.trim()}><Check size={16} /></button>
+                                                        <button type="button" aria-label="Avbryt namnändring" title="Avbryt" onClick={() => setRename(null)}><X size={16} /></button>
+                                                    </form>
+                                                ) : <>
+                                                    <h3 className="text-sm font-semibold">
+                                                        {column.title}
+                                                        {column.archived ? ' (arkiverad)' : ''}
+                                                    </h3>
+                                                    <span className="kb-column-count">{cards.filter((card) => card.column === column.id).length}</span>
+                                                    <ColumnActions column={column} index={index} columns={visibleColumns} board={board} busy={busy} run={run} reorder={reorder} rename={setRename} addCard={setCreateColumn} />
+                                                </>}
                                             </header>
                                             {cards
                                                 .filter((item) => item.column === column.id)
