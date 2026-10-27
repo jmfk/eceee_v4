@@ -39,6 +39,7 @@ class BrowserConfigurationTests(SimpleTestCase):
                 self.assertIn(key, properties)
                 self.assertEqual(field_kind(properties[key]), "choice")
             for item in config["filters"]:
+                self.assertEqual(item["quick"], item["control"] == "date_range")
                 if item["key"].startswith("field:"):
                     self.assertIn(item["key"][6:], properties)
 
@@ -82,3 +83,14 @@ class BrowserConfigurationTests(SimpleTestCase):
         )
         with self.assertRaises(ValidationError):
             parse_browser_filters(request, self.definition)
+
+    @patch("object_storage.browser_config.available_filters")
+    def test_quick_button_must_be_boolean_and_date_defaults_to_quick(self, options):
+        options.return_value = {
+            "effective_date": {"key": "effective_date", "kind": "date"},
+        }
+        item = {"key": "effective_date", "label": "Publication date", "overview": True}
+        saved = validate_browser_config(self.definition, None, {"search_fields": [], "filters": [item]})
+        self.assertTrue(saved["filters"][0]["quick"])
+        with self.assertRaises(ValidationError):
+            validate_browser_config(self.definition, None, {"search_fields": [], "filters": [{**item, "quick": "yes"}]})

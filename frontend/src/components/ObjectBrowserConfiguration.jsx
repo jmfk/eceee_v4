@@ -56,7 +56,7 @@ const ObjectBrowserConfiguration = ({ objectType, onDirtyChange }) => {
         ...current,
         filters: current.filters.some(item => item.key === option.key)
             ? current.filters.filter(item => item.key !== option.key)
-            : [...current.filters, { key: option.key, label: option.label, overview: false, control: controlsFor(option.kind)[0][0] }],
+            : [...current.filters, { key: option.key, label: option.label, overview: false, control: controlsFor(option.kind)[0][0], quick: option.kind === 'date' }],
     }))
     const changeEntry = (key, patch) => setDraft(current => ({
         ...current,
@@ -99,7 +99,7 @@ const ObjectBrowserConfiguration = ({ objectType, onDirtyChange }) => {
         </fieldset>
         <fieldset className="space-y-2">
             <legend className="font-semibold">Available filters</legend>
-            <p className="text-gray-600">Status is available in every Object list. Overview filters appear after choosing this Object type.</p>
+            <p className="text-gray-600">Status is always a quick button. The first three chosen quick filters appear in the search field, in the order below; others remain under Add filter. Overview filters appear after choosing this Object type.</p>
             {options.map(option => {
                 const index = selected.get(option.key)
                 const entry = index === undefined ? null : draft.filters[index]
@@ -119,6 +119,7 @@ const ObjectBrowserConfiguration = ({ objectType, onDirtyChange }) => {
                             <input aria-label={`${option.label} filter label`} className="h-8 rounded-sm border border-gray-300 px-2 text-xs focus:border-blue-600 focus:outline-none" value={entry.label} maxLength={80} onChange={event => changeEntry(option.key, { label: event.target.value })} />
                         </label>
                         <label className="flex items-center gap-2"><input type="checkbox" checked={entry.overview} onChange={event => changeEntry(option.key, { overview: event.target.checked })} />Show on overview</label>
+                        <label className="flex items-center gap-2"><input type="checkbox" checked={entry.quick ?? option.kind === 'date'} onChange={event => changeEntry(option.key, { quick: event.target.checked })} />Quick button</label>
                         <button type="button" aria-label={`Move ${option.label} up`} disabled={index === 0} onClick={() => move(option.key, -1)} className="rounded-sm p-1 text-gray-600 hover:bg-gray-100 disabled:opacity-40"><ArrowUp size={14} /></button>
                         <button type="button" aria-label={`Move ${option.label} down`} disabled={index === draft.filters.length - 1} onClick={() => move(option.key, 1)} className="rounded-sm p-1 text-gray-600 hover:bg-gray-100 disabled:opacity-40"><ArrowDown size={14} /></button>
                     </div>}

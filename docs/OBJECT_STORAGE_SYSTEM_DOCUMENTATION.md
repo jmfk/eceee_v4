@@ -94,11 +94,16 @@ Calls without `page_size` keep their existing response formats.
 
 Each Object type has a **Search and filters** tab in Settings → Object Types. Editors select
 additional searchable text fields and an ordered list of filters. Each filter has a label
-and can be enabled on the Objects overview. Title and slug are always searched. Status
-is always available. The control follows the data type: date range, yes/no, or a
+and can be enabled on the Objects overview or shown as an icon button in the search
+field. The first three chosen quick filters follow the configured order; additional
+ones remain under Add filter. Title and slug are always searched. Status is always a quick button, and the
+overview also has a quick Object type selector. The control follows the data type: date range, yes/no, or a
 searchable multiselect for tags and references. Text choices can use searchable or
 compact multiselect; long compact lists gain search automatically. Tag filters are offered
 only when the classification type already allows the selected Object type.
+Date filters offer today, yesterday, rolling 7-day and one-month ranges, current and
+previous calendar weeks and months, 30 days, and a custom from/to range. Weeks start
+on Monday. Filter selectors expand below the search field so they do not cover results.
 
 The configuration is stored in `ObjectTypeDefinition.metadata.browser`; the web API
 validates it against the current schema and classification permissions. The overview

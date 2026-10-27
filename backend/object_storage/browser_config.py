@@ -94,7 +94,7 @@ def validate_browser_config(definition, tenant, value):
         if (
             not isinstance(entry, dict)
             or not {"key", "label", "overview"} <= set(entry)
-            or set(entry) - {"key", "label", "overview", "control"}
+            or set(entry) - {"key", "label", "overview", "control", "quick"}
         ):
             raise serializers.ValidationError({"filters": "Each filter needs key, label and overview."})
         key, label = entry["key"], entry["label"]
@@ -109,6 +109,8 @@ def validate_browser_config(definition, tenant, value):
             raise serializers.ValidationError({"filters": f"{key} needs a short label and overview choice."})
         if entry.get("control", default_control(allowed[key]["kind"])) not in CONTROLS[allowed[key]["kind"]]:
             raise serializers.ValidationError({"filters": f"{key} has an incompatible control."})
+        if "quick" in entry and not isinstance(entry["quick"], bool):
+            raise serializers.ValidationError({"filters": f"{key} needs a yes/no quick button choice."})
         seen.add(key)
     return {
         "search_fields": search_fields,
@@ -117,6 +119,7 @@ def validate_browser_config(definition, tenant, value):
                 **entry,
                 "label": entry["label"].strip(),
                 "control": entry.get("control", default_control(allowed[entry["key"]]["kind"])),
+                "quick": entry.get("quick", allowed[entry["key"]]["kind"] == "date"),
             }
             for entry in filters
         ],
