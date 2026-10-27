@@ -1,8 +1,8 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useEffect, useRef } from 'react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import KanbanPage, { Attachments } from '../KanbanPage'
 import { kanbanApi, kanbanError } from '../../api/kanban'
 import { setCmsCopyLanguage } from '../../utils/cmsCopy'
@@ -38,17 +38,30 @@ const workspace = {
     notifications: [], members: [], labels: [],
 }
 const card = { id: 'card-1', column: 'column-1', shortId: 'ECE-1', title: 'Granska nyhet', assignees: [], checklist: [] }
-const renderKanban = (route = '/kanban') => render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <MemoryRouter initialEntries={[route]}>
-            <Routes>
-                <Route path="/kanban" element={<KanbanPage />} />
-                <Route path="/kanban/boards/:boardId" element={<KanbanPage />} />
-                <Route path="/kanban/cards/:cardId" element={<KanbanPage />} />
-            </Routes>
-        </MemoryRouter>
-    </QueryClientProvider>,
-)
+// jsdom's AbortSignal is from a different realm than Node's Request implementation.
+const NativeRequest = globalThis.Request
+globalThis.Request = class TestRequest extends NativeRequest {
+    constructor(url, options = {}) {
+        super(url, { ...options, signal: undefined })
+    }
+}
+afterAll(() => { globalThis.Request = NativeRequest })
+const renderKanban = (route = '/kanban', initialEntries = [route]) => {
+    const router = createMemoryRouter([
+        { path: '/kanban', element: <KanbanPage /> },
+        { path: '/kanban/boards/:boardId', element: <KanbanPage /> },
+        { path: '/kanban/cards/:cardId', element: <KanbanPage /> },
+        { path: '/outside', element: <div>Outside Kanban</div> },
+    ], { initialEntries, initialIndex: initialEntries.length - 1 })
+    return {
+        ...render(
+            <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+                <RouterProvider router={router} />
+            </QueryClientProvider>,
+        ),
+        router,
+    }
+}
 
 beforeEach(() => {
     setCmsCopyLanguage('sv-se')
@@ -202,6 +215,38 @@ describe('Kanban application navigation', () => {
         }
     })
 
+    it('warns before browser history navigation cancels image generation', async () => {
+        const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? {
+            ...workspace,
+            boards: [{ ...workspace.boards[0], revision: 1 }],
+            canGenerateImages: true,
+        } : {})
+        kanbanApi.post.mockImplementation((_path, _data, options) => new Promise((_resolve, reject) => {
+            options.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+        }))
+        try {
+            const { router } = renderKanban('/kanban/boards/board-1', ['/outside', '/kanban/boards/board-1'])
+            await screen.findByRole('heading', { name: 'Redaktionen' })
+            fireEvent.click(screen.getByRole('button', { name: 'Tavelåtgärder' }))
+            fireEvent.click(await screen.findByRole('button', { name: 'Redigera tavlan' }))
+            fireEvent.change(screen.getByLabelText('Beskriv bakgrundsbilden'), { target: { value: 'Hav vid gryningen' } })
+            fireEvent.click(screen.getByRole('button', { name: 'Generera från beskrivning' }))
+            expect(await screen.findByRole('status')).toHaveTextContent('Genererar bakgrundsbild')
+            const signal = kanbanApi.post.mock.calls[0][2].signal
+            await act(async () => { await router.navigate(-1) })
+            expect(confirm).toHaveBeenCalledOnce()
+            expect(router.state.location.pathname).toBe('/kanban/boards/board-1')
+            expect(signal.aborted).toBe(false)
+            confirm.mockReturnValue(true)
+            await act(async () => { await router.navigate('/outside') })
+            await waitFor(() => expect(router.state.location.pathname).toBe('/outside'))
+            expect(signal.aborted).toBe(true)
+        } finally {
+            confirm.mockRestore()
+        }
+    })
+
     it('places a board background behind the full screen instead of only the lists', async () => {
         const createObjectURL = URL.createObjectURL
         const revokeObjectURL = URL.revokeObjectURL
@@ -264,6 +309,10 @@ describe('Kanban card attachments', () => {
     it('opens the member popup from the card add menu', async () => {
         kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? workspace : attachmentCard)
         renderKanban('/kanban/cards/card-1')
+        const titleRow = (await screen.findByRole('textbox', { name: 'Rubrik' })).closest('.kb-detail-heading')
+        expect(titleRow).toContainElement(screen.getByRole('button', { name: 'Ändra medlemmar' }))
+        expect(titleRow).toContainElement(screen.getByRole('button', { name: 'Bilaga' }))
+        expect(screen.queryByRole('heading', { name: 'Medlemmar' })).not.toBeInTheDocument()
         fireEvent.click(await screen.findByRole('button', { name: 'Lägg till' }))
         fireEvent.click(screen.getByRole('button', { name: 'Medlemmar' }))
         expect(await screen.findByRole('searchbox', { name: 'Sök medlem' })).toBeVisible()

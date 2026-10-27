@@ -621,6 +621,71 @@ class KanbanTests(TestCase):
         self.card.refresh_from_db()
         self.assertEqual(self.card.revision, 1)
 
+    def test_attachment_comparison_happens_outside_tenant_write_transaction(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from django.db import connection
+
+        existing = Attachment.objects.create(
+            tenant=self.tenant,
+            card=self.card,
+            filename="old.txt",
+            path="old",
+            content_type="text/plain",
+            size=4,
+            uploaded_by=self.user,
+        )
+        baseline_depth = len(connection.atomic_blocks)
+        with patch("kanban.files.attachment_storage"), patch("kanban.files.matches_upload") as matches:
+
+            def compare_outside_lock(upload, candidate):
+                self.assertEqual(len(connection.atomic_blocks), baseline_depth)
+                return True
+
+            matches.side_effect = compare_outside_lock
+            request = self.factory.post(
+                "/",
+                {"revision": 1, "file": SimpleUploadedFile("new.txt", b"same", content_type="text/plain")},
+                format="multipart",
+            )
+            force_authenticate(request, user=self.user)
+            request.tenant = self.tenant
+            response = CardViewSet.as_view({"post": "attachments"})(request, pk=str(self.card.pk))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["id"], str(existing.pk))
+        matches.assert_called_once()
+
+    def test_identical_attachment_for_another_comment_keeps_its_comment_link(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        first = Comment.objects.create(tenant=self.tenant, card=self.card, author=self.user, body="First")
+        second = Comment.objects.create(tenant=self.tenant, card=self.card, author=self.user, body="Second")
+        Attachment.objects.create(
+            tenant=self.tenant,
+            card=self.card,
+            comment=first,
+            filename="old.txt",
+            path="old",
+            content_type="text/plain",
+            size=4,
+            uploaded_by=self.user,
+        )
+        with patch("kanban.files.attachment_storage") as storage:
+            request = self.factory.post(
+                "/",
+                {
+                    "revision": 1,
+                    "comment": str(second.pk),
+                    "file": SimpleUploadedFile("new.txt", b"same", content_type="text/plain"),
+                },
+                format="multipart",
+            )
+            force_authenticate(request, user=self.user)
+            request.tenant = self.tenant
+            response = CardViewSet.as_view({"post": "attachments"})(request, pk=str(self.card.pk))
+            storage.delete.assert_not_called()
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(Attachment.objects.get(pk=response.data["id"]).comment_id, second.pk)
+
     def test_delete_attachment_requires_current_revision_and_removes_file_after_commit(self):
         attachment = Attachment.objects.create(
             tenant=self.tenant,
@@ -642,6 +707,33 @@ class KanbanTests(TestCase):
             storage.delete.assert_called_once_with("portrait")
         self.card.refresh_from_db()
         self.assertEqual(self.card.revision, 2)
+
+    def test_read_only_member_cannot_delete_attachment(self):
+        attachment = Attachment.objects.create(
+            tenant=self.tenant,
+            card=self.card,
+            filename="portrait.png",
+            path="portrait",
+            content_type="image/png",
+            size=4,
+            uploaded_by=self.user,
+        )
+        self.tenant.members.add(self.other)
+        with (
+            patch("core.roles.permissions_for", return_value={"kanban.read"}),
+            patch("kanban.files.attachment_storage") as storage,
+        ):
+            response = self.call(
+                AttachmentViewSet,
+                "destroy",
+                {"revision": 1},
+                pk=attachment.pk,
+                method="delete",
+                user=self.other,
+            )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Attachment.objects.filter(pk=attachment.pk).exists())
+        storage.delete.assert_not_called()
 
     def test_imported_attachment_cannot_be_deleted(self):
         from .models import AttachmentImport

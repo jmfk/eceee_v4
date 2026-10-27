@@ -10,7 +10,7 @@ import RoleSettings from './pages/RoleSettings'
  */
 
 import InboxPage from './pages/InboxPage'
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
+import { createBrowserRouter, RouterProvider, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster, toast } from 'react-hot-toast'
 import { X } from 'lucide-react'
@@ -630,6 +630,8 @@ export const AppRoutes = () => {
   )
 }
 
+const router = createBrowserRouter([{ path: '*', element: <AppRoutes /> }])
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -640,9 +642,7 @@ function App() {
             <ClipboardProvider>
               <AuthProvider>
                 <SessionExpiredOverlay />
-                <Router>
-                  <AppRoutes />
-                </Router>
+                <RouterProvider router={router} />
               </AuthProvider>
             </ClipboardProvider>
           </UnifiedDataProvider>

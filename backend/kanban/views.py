@@ -470,13 +470,14 @@ class CardViewSet(BaseViewSet):
         path = files.save_upload(request.tenant, upload)
         duplicate = None
         try:
+            # Compare stored bytes before locking the tenant; large files can take time to stream.
+            for existing in card.attachments.filter(size=upload.size, comment=comment):
+                if files.matches_upload(upload, existing):
+                    duplicate = existing
+                    break
             with locked_tenant(request) as tenant:
                 card = self.record(Card, pk)
                 check_revision(card, revision)
-                for existing in card.attachments.filter(size=upload.size):
-                    if files.matches_upload(upload, existing):
-                        duplicate = existing
-                        break
                 if not duplicate:
                     attachment = Attachment.objects.create(
                         tenant=tenant,
@@ -579,6 +580,10 @@ class AttachmentViewSet(BaseViewSet):
     def destroy(self, request, pk=None):
         revision = validated(RevisionInput, request.data)["revision"]
         with locked_tenant(request) as tenant:
+            from core.roles import permissions_for
+
+            if not {"kanban.write", "tenant.admin"} & permissions_for(request.user, tenant):
+                raise PermissionDenied("Kanban write access is required to delete attachments.")
             attachment = self.record(Attachment, pk)
             card = attachment.card
             check_revision(card, revision)
