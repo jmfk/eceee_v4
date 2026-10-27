@@ -24,6 +24,17 @@ class SupportRole(TenantRecord):
         constraints = [models.UniqueConstraint(fields=["tenant", "user"], name="support_role_tenant_user")]
 
 
+class MessageLabel(TenantRecord):
+    name = models.CharField(max_length=40)
+    key = models.CharField(max_length=16, blank=True, default="")
+    active = models.BooleanField(default=True)
+    position = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["tenant", "name"], name="support_label_tenant_name")]
+        ordering = ["position", "name"]
+
+
 class PrivateVideo(TenantRecord):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     purpose = models.CharField(max_length=16, choices=[("bug", "Bug"), ("instruction", "Instruction")])
@@ -65,6 +76,7 @@ class SupportThread(TenantRecord):
     support_target = models.BooleanField(default=True)
     participants = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="private_threads", blank=True)
     recipient_specs = models.JSONField(default=list, blank=True)
+    labels = models.ManyToManyField(MessageLabel, related_name="threads", blank=True)
     board_card = models.OneToOneField("kanban.Card", null=True, blank=True, on_delete=models.PROTECT)
 
     creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)

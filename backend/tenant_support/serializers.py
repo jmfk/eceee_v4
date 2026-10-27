@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Instruction, Message, MessageAttachment, SupportThread
+from .models import Instruction, Message, MessageAttachment, MessageLabel, SupportThread
 
 
 class InstructionSerializer(serializers.ModelSerializer):
@@ -49,8 +49,19 @@ class MessageSerializer(serializers.ModelSerializer):
         fields = ["id", "body", "sender_id", "sender_name", "created_at", "attachments"]
 
 
+class MessageLabelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MessageLabel
+        fields = ["id", "name", "key", "active"]
+
+
+class MessageLabelInput(serializers.Serializer):
+    name = serializers.CharField(max_length=40, trim_whitespace=True)
+
+
 class ThreadSerializer(serializers.ModelSerializer):
     messages = serializers.SerializerMethodField()
+    labels = MessageLabelSerializer(many=True, read_only=True)
 
     def get_messages(self, obj):
         return MessageSerializer(obj.messages.select_related("sender").prefetch_related("attachments"), many=True).data
@@ -61,6 +72,7 @@ class ThreadSerializer(serializers.ModelSerializer):
             "id",
             "title",
             "kind",
+            "labels",
             "location",
             "status",
             "creator_id",
@@ -99,6 +111,7 @@ class ThreadInput(serializers.Serializer):
     title = serializers.CharField(max_length=150)
     body = serializers.CharField(max_length=4000)
     kind = serializers.ChoiceField(choices=["question", "bug"], default="question", required=False)
+    label_ids = serializers.ListField(child=serializers.UUIDField(), max_length=20, required=False)
     location = serializers.URLField(max_length=2000, allow_blank=True, default="")
     instruction_id = serializers.UUIDField(required=False, allow_null=True)
     video_id = serializers.UUIDField(required=False, allow_null=True)

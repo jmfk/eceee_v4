@@ -464,12 +464,40 @@ function RecipientField({ options, value, onChange, disabled }) {
     </fieldset>
 }
 
+function MessageLabelField({ options, value, onChange, disabled }) {
+    const selected = options.filter((label) => value.includes(label.id))
+    return <fieldset className="message-recipients">
+        <legend>Etiketter</legend>
+        <div className="message-recipient-line">
+            {selected.map((label) => <span className="message-recipient-chip" key={label.id}>
+                <span>{label.name}</span>
+                <button type="button" aria-label={`Ta bort etiketten ${label.name}`} disabled={disabled}
+                    onClick={() => onChange(value.filter((id) => id !== label.id))}><X size={14} /></button>
+            </span>)}
+            {options.length > 0 && <Popover className="message-recipient-popover">
+                <PopoverButton type="button" className="message-recipient-add" disabled={disabled}><Plus size={15} /> Lägg till etikett</PopoverButton>
+                <PopoverPanel anchor="bottom start" className="message-recipient-picker">
+                    <strong>Välj etiketter</strong>
+                    <div className="message-recipient-options">
+                        {options.map((label) => <label key={label.id}>
+                            <input type="checkbox" checked={value.includes(label.id)} disabled={disabled}
+                                onChange={(event) => onChange(event.target.checked ? [...value, label.id] : value.filter((id) => id !== label.id))} />
+                            <span>{label.name}</span>
+                        </label>)}
+                    </div>
+                </PopoverPanel>
+            </Popover>}
+            {!options.length && <span className="support-muted">Inga etiketter finns ännu. Lägg till dem i Supportinställningar.</span>}
+        </div>
+    </fieldset>
+}
+
 function Compose({ context, link, publish = false }) {
     const tenant = useSupportTenant()
     const navigate = useNavigate()
     const location = useLocation()
     const queryClient = useQueryClient()
-    const [kind, setKind] = useState('question')
+    const [labelIds, setLabelIds] = useState(() => context.messageLabels?.filter((label) => label.key === 'question').map((label) => label.id) || [])
     const [recipients, setRecipients] = useState(context.supportAvailable ? ['support'] : [])
     const [files, setFiles] = useState([])
     const [checkingFiles, setCheckingFiles] = useState(false)
@@ -542,7 +570,7 @@ function Compose({ context, link, publish = false }) {
                     : {
                           title,
                           body,
-                          kind,
+                          labelIds,
                           recipients,
                           attachmentIds: await uploadMessageFiles(tenant, files, fileCache.current),
                           ...(includeDiagnostics ? { diagnostics: reportDiagnostics() } : {}),
@@ -604,22 +632,7 @@ function Compose({ context, link, publish = false }) {
                         options={context.recipients || (context.supportAvailable ? [{ id: 'support', name: 'Support', kind: 'support' }] : [])}
                         value={recipients} onChange={setRecipients} disabled={send.isPending}
                     />}
-                    {!publish && (
-                        <label>
-                            Typ (valfri)
-                            <select
-                                value={kind}
-                                onChange={(e) => {
-                                    setKind(e.target.value)
-                                    setFile(null)
-                                    setValid(true)
-                                }}
-                            >
-                                <option value="bug">Felrapport</option>
-                                <option value="question">Fråga</option>
-                            </select>
-                        </label>
-                    )}
+                    {!publish && <MessageLabelField options={context.messageLabels || []} value={labelIds} onChange={setLabelIds} disabled={send.isPending} />}
                     {publish && (
                         <label>
                             Instruktionens språk
@@ -670,7 +683,6 @@ function Compose({ context, link, publish = false }) {
                     )}
                     {publish && (
                         <VideoField
-                            key={kind}
                             purpose={publish ? 'instruction' : 'bug'}
                             maxBytes={
                                 context.videoLimits[
@@ -784,10 +796,11 @@ function ThreadDetail({ id, context }) {
             {t ? (
                 <>
                     <h2>{t.title}</h2>
-                    <p>
-                        {t.kind === 'bug' ? 'Felrapport' : 'Fråga'} ·{' '}
-                        {cmsLegacyText(statusText[t.status], getCmsCopyLanguage())} · {t.supportTarget !== false ? 'Supporttråd' : 'Privat meddelande'}
-                    </p>
+                    <p>{cmsLegacyText(statusText[t.status], getCmsCopyLanguage())} · {t.supportTarget !== false ? 'Supporttråd' : 'Privat meddelande'}</p>
+                    <div className="message-thread-labels" aria-label="Meddelandets etiketter">
+                        {(t.labels || [{ id: t.kind, name: t.kind === 'bug' ? 'Bug Report' : 'Question' }]).map((label) =>
+                            <span className="message-recipient-chip" key={label.id}>{label.name}</span>)}
+                    </div>
                     {t.boardCardId && <Link to={`/kanban/cards/${t.boardCardId}`}>Öppna kortet i tavlans Inbox</Link>}
                     {t.location && (
                         <p>
@@ -879,6 +892,21 @@ function Manage({ context }) {
     const [userId, setUserId] = useState('')
     const [canSupport, setCanSupport] = useState(false)
     const [canPublish, setCanPublish] = useState(false)
+    const [newLabel, setNewLabel] = useState('')
+    const [editingLabel, setEditingLabel] = useState(null)
+    const [labelName, setLabelName] = useState('')
+    const labels = useMutation({
+        mutationFn: ({ id, name }) => supportRequest(tenant, id ? `labels/${id}/` : 'labels/', id ? 'patch' : 'post', { name }),
+        onSuccess: () => {
+            setNewLabel('')
+            setEditingLabel(null)
+            queryClient.invalidateQueries({ queryKey: ['support', tenant] })
+        },
+    })
+    const removeLabel = useMutation({
+        mutationFn: (id) => supportRequest(tenant, `labels/${id}/`, 'delete'),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['support', tenant] }),
+    })
     const roles = useMutation({
         mutationFn: () =>
             supportRequest(tenant, 'context/', 'post', {
@@ -914,6 +942,24 @@ function Manage({ context }) {
                 .
             </p>
             {context.canManage && <p><Link to="/settings/roles">Hantera arbetsytans roller och behörigheter</Link>. Formuläret nedan hanterar direkta supporttilldelningar. Behörigheter från andra roller gäller också.</p>}
+            {context.canManage && <section className="message-label-settings" aria-label="Meddelandeetiketter">
+                <h3>Meddelandeetiketter</h3>
+                <p>Etiketterna kan användas på nya meddelanden i den här arbetsytan.</p>
+                <ul>{context.messageLabels?.map((label) => <li key={label.id}>
+                    {editingLabel === label.id ? <form onSubmit={(event) => { event.preventDefault(); labels.mutate({ id: label.id, name: labelName.trim() }) }}>
+                        <input aria-label={`Nytt namn för ${label.name}`} autoFocus maxLength={40} required value={labelName} onChange={(event) => setLabelName(event.target.value)} />
+                        <button className="user-tools-primary" disabled={labels.isPending || !labelName.trim()}>Spara</button>
+                        <button type="button" onClick={() => setEditingLabel(null)}>Avbryt</button>
+                    </form> : <><span>{label.name}</span><button type="button" onClick={() => { setEditingLabel(label.id); setLabelName(label.name) }}>Byt namn</button><button type="button" disabled={removeLabel.isPending} onClick={() => { if (window.confirm(`Ta bort etiketten ${label.name} från valbara etiketter? Befintliga meddelanden behåller den.`)) removeLabel.mutate(label.id) }}>Ta bort</button></>}
+                </li>)}</ul>
+                <form onSubmit={(event) => { event.preventDefault(); labels.mutate({ name: newLabel.trim() }) }}>
+                    <label htmlFor="message-label-name">Ny etikett
+                        <input id="message-label-name" maxLength={40} required value={newLabel} onChange={(event) => setNewLabel(event.target.value)} />
+                    </label>
+                    <button className="user-tools-primary" disabled={labels.isPending || !newLabel.trim()}>Lägg till etikett</button>
+                </form>
+                <ErrorText error={labels.error || removeLabel.error} />
+            </section>}
             {context.canManage && (
                 <form
                     onSubmit={(e) => {
