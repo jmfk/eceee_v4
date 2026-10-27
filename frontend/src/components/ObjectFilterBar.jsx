@@ -100,7 +100,16 @@ const ObjectFilterBar = ({ search, onSearchChange, statuses, onStatusesChange, f
                 const Icon = quickIcon(item)
                 return <button key={item.key} type="button" aria-label={`Filter by ${item.label}`} title={item.label} aria-expanded={editing === item.key} onClick={event => show(item.key, event.currentTarget)} className={`flex min-h-7 min-w-7 items-center justify-center rounded-sm hover:bg-gray-100 focus-visible:outline focus-visible:outline-1 focus-visible:outline-blue-600 ${filters.some(filter => filter.key === item.key) ? 'bg-blue-50 text-blue-700' : 'text-gray-600'}`}><Icon size={16} aria-hidden="true" /></button>
             })}
-            {remainingOptions.length > 0 && <button type="button" aria-label="Add filter" title="Add filter" aria-expanded={menuOpen} onClick={event => { trigger.current = event.currentTarget; setEditing(''); setMenuOpen(!menuOpen) }} className="flex min-h-7 min-w-7 items-center justify-center rounded-sm text-gray-600 hover:bg-gray-100 focus-visible:outline focus-visible:outline-1 focus-visible:outline-blue-600"><ListFilterPlus size={17} aria-hidden="true" /></button>}
+            {remainingOptions.length > 0 && <button type="button" aria-label="Add filter" title={remainingOptions.length === 1 ? `Filter by ${remainingOptions[0].label}` : 'Add filter'} aria-expanded={menuOpen || (remainingOptions.length === 1 && editing === remainingOptions[0].key)} onClick={event => {
+                if (remainingOptions.length === 1) {
+                    if (editing === remainingOptions[0].key) close()
+                    else show(remainingOptions[0].key, event.currentTarget)
+                } else {
+                    trigger.current = event.currentTarget
+                    setEditing('')
+                    setMenuOpen(!menuOpen)
+                }
+            }} className="flex min-h-7 min-w-7 items-center justify-center rounded-sm text-gray-600 hover:bg-gray-100 focus-visible:outline focus-visible:outline-1 focus-visible:outline-blue-600"><ListFilterPlus size={17} aria-hidden="true" /></button>}
         </div>
         {menuOpen && <div className="mt-2 ml-auto w-full max-w-lg rounded-sm border border-gray-200 bg-white p-1 text-xs shadow-sm" role="menu" aria-label="Available Object filters">
             {remainingOptions.map(item => <button key={item.key} type="button" role="menuitem" onClick={() => show(item.key)} className="block w-full rounded-sm px-3 py-2 text-left hover:bg-blue-50 focus:bg-blue-50">{item.label}</button>)}
