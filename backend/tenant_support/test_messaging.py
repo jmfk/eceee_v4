@@ -1,8 +1,12 @@
+import importlib
 import uuid
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.apps import apps
+from django.db import connection
 from django.test import TestCase, override_settings
 from rest_framework.test import force_authenticate
 
@@ -11,7 +15,7 @@ from kanban.models import Board, Card
 from kanban.services import ensure_required_columns
 
 from . import views
-from .models import EmailDelivery, InboxEntry, MessageAttachment, PrivateVideo, SupportThread
+from .models import EmailDelivery, InboxEntry, MessageAttachment, MessageLabel, PrivateVideo, SupportThread
 from .recipients import directory
 from .tests import SupportAPITests
 
@@ -35,6 +39,7 @@ class MessagingTests(TestCase):
         self.assertEqual(response.status_code, 201, response.data)
         tid = response.data["id"]
         self.assertEqual(response.data["kind"], "question")
+        self.assertEqual([label["name"] for label in response.data["labels"]], ["Question"])
         self.assertEqual(response.data["location"], "")
         self.assertFalse(response.data["support_target"])
         self.assertEqual(self.call(views.ThreadView, pk=tid, user=self.support).status_code, 404)
@@ -50,6 +55,62 @@ class MessagingTests(TestCase):
         self.assertEqual(SupportThread.objects.count(), 1)
         self.tenant.members.remove(self.bob)
         self.assertEqual(self.call(views.ThreadView, pk=tid, user=self.bob).status_code, 403)
+
+    def test_workspace_message_labels_are_editable_and_scoped(self):
+        defaults = self.call(views.ContextView).data["message_labels"]
+        self.assertEqual([label["name"] for label in defaults], ["Question", "Suggestion", "Content", "Bug Report"])
+        self.assertEqual(self.call(views.MessageLabelsView, "post", {"name": "Urgent"}).status_code, 403)
+        added = self.call(views.MessageLabelsView, "post", {"name": "Urgent"}, user=self.owner)
+        self.assertEqual(added.status_code, 201, added.data)
+        label_id = added.data["id"]
+        self.assertEqual(
+            self.call(views.MessageLabelsView, "post", {"name": "urgent"}, user=self.owner).status_code, 400
+        )
+        renamed = self.call(views.MessageLabelView, "patch", {"name": "Priority"}, user=self.owner, pk=label_id)
+        self.assertEqual(renamed.status_code, 200, renamed.data)
+        self.assertEqual(
+            self.call(
+                views.MessageLabelView, "patch", {"name": "Foreign"}, user=self.owner, tenant=self.other, pk=label_id
+            ).status_code,
+            404,
+        )
+        self.assertEqual(self.call(views.MessageLabelView, "delete", user=self.owner, pk=label_id).status_code, 204)
+        self.assertNotIn(label_id, [label["id"] for label in self.call(views.ContextView).data["message_labels"]])
+
+    def test_message_can_have_multiple_labels_and_rejects_foreign_or_archived_labels(self):
+        labels = self.call(views.ContextView).data["message_labels"]
+        question = next(label for label in labels if label["key"] == "question")
+        bug = next(label for label in labels if label["key"] == "bug")
+        response, data = self.send(labelIds=[question["id"], bug["id"]])
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["kind"], "bug")
+        self.assertEqual({label["id"] for label in response.data["labels"]}, {question["id"], bug["id"]})
+        self.assertEqual(self.call(views.ThreadsView, "post", data).status_code, 200)
+        self.assertEqual(self.call(views.ThreadsView, "post", {**data, "labelIds": [question["id"]]}).status_code, 409)
+        foreign = MessageLabel.objects.create(tenant=self.other, name="Foreign")
+        self.assertEqual(self.send(labelIds=[str(foreign.pk)])[0].status_code, 400)
+        self.call(views.MessageLabelView, "delete", user=self.owner, pk=bug["id"])
+        self.assertEqual(self.call(views.ThreadsView, "post", data).status_code, 200)
+        self.assertEqual(self.send(labelIds=[bug["id"]])[0].status_code, 400)
+        self.assertIn(
+            "Bug Report",
+            [label["name"] for label in self.call(views.ThreadView, pk=response.data["id"]).data["labels"]],
+        )
+
+    def test_label_backfill_preserves_existing_thread_types_and_can_resume(self):
+        question = SupportThread.objects.create(
+            tenant=self.other, creator=self.owner, title="Old question", kind="question", request_id=uuid.uuid4()
+        )
+        bug = SupportThread.objects.create(
+            tenant=self.other, creator=self.owner, title="Old bug", kind="bug", request_id=uuid.uuid4()
+        )
+        migration = importlib.import_module("tenant_support.migrations.0005_message_labels")
+        editor = SimpleNamespace(connection=connection)
+        migration.seed_labels(apps, editor)
+        migration.seed_labels(apps, editor)
+        self.assertEqual(list(question.labels.values_list("name", flat=True)), ["Question"])
+        self.assertEqual(list(bug.labels.values_list("name", flat=True)), ["Bug Report"])
+        self.assertEqual(MessageLabel.objects.filter(tenant=self.other).count(), 4)
 
     def test_group_recipients_are_a_snapshot_and_foreign_recipients_rejected(self):
         group = TenantRole.objects.create(tenant=self.tenant, name="Redaktionen", permissions=[])

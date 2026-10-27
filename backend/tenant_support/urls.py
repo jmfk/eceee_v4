@@ -4,6 +4,8 @@ from . import views
 
 urlpatterns = [
     path("context/", views.ContextView.as_view()),
+    path("labels/", views.MessageLabelsView.as_view()),
+    path("labels/<uuid:pk>/", views.MessageLabelView.as_view()),
     path("inbox/", views.InboxView.as_view()),
     path("inbox/<uuid:pk>/", views.EntryView.as_view()),
     path("instructions/", views.InstructionsView.as_view()),

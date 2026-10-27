@@ -180,6 +180,17 @@
 .message-recipient-options input[type='checkbox'] { margin: 0; }
 .message-recipient-options p { margin: 8px 0 0; color: var(--color-gray-500); }
 .message-recipients :is(button, input):focus-visible, .message-recipient-picker :is(button, input):focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
+.message-thread-labels { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 16px; }
+.message-label-settings { padding: 16px 0; border-top: 1px solid var(--color-gray-200); border-bottom: 1px solid var(--color-gray-200); }
+.message-label-settings ul { list-style: none; margin: 12px 0; padding: 0; }
+.message-label-settings li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 38px; padding: 5px 0; border-bottom: 1px solid var(--color-gray-200); }
+.message-label-settings li > span { flex: 1; min-width: 120px; }
+.support-content .message-label-settings form { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; max-width: none; margin: 8px 0 0; }
+.support-content .message-label-settings form label { display: grid; gap: 4px; margin: 0; }
+.support-content .message-label-settings input:not([type]) { width: min(240px, 100%); min-height: 32px; margin: 0; }
+.message-label-settings button { min-height: 30px; padding: 4px 9px; border-radius: 3px; font-size: 12px; }
+.message-label-settings button:not(.user-tools-primary) { border: 1px solid var(--color-gray-300); background: white; }
+.message-label-settings :is(button, input):focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
 .support-message h3 { display: flex; align-items: center; gap: 0.5rem; }
 .message-files { margin: 1rem 0; }
 @media (max-width: 800px) {

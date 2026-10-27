@@ -20,12 +20,14 @@ from core.permissions import HasTenantAccess
 
 from . import storage
 from .access import can_read_thread, has_role, members, require_role, support_users
+from .message_labels import ensure_message_labels
 from .models import (
     EmailDelivery,
     InboxEntry,
     Instruction,
     Message,
     MessageAttachment,
+    MessageLabel,
     PrivateVideo,
     SupportRole,
     SupportThread,
@@ -36,6 +38,8 @@ from .serializers import (
     InstructionSerializer,
     InstructionStateInput,
     MessageAttachmentSerializer,
+    MessageLabelInput,
+    MessageLabelSerializer,
     PublishInput,
     ReplyInput,
     RoleInput,
@@ -107,6 +111,7 @@ def video_for(request, pk, purpose):
 class ContextView(SupportView):
     def get(self, request):
         tenant, user = request.tenant, request.user
+        ensure_message_labels(tenant)
         roles = SupportRole.objects.filter(tenant=tenant).select_related("user")
         from core.roles import can_manage_roles
 
@@ -128,6 +133,9 @@ class ContextView(SupportView):
                 "recipient_count": members(tenant).exclude(pk=user.pk).count(),
                 "support_available": bool(support_users(tenant)),
                 "recipients": directory(tenant, user),
+                "message_labels": MessageLabelSerializer(
+                    MessageLabel.objects.filter(tenant=tenant, active=True), many=True
+                ).data,
                 "storage_configured": bool(settings.SUPPORT_STORAGE_BUCKET_NAME),
                 "email_enabled": settings.SUPPORT_EMAIL_ENABLED,
                 "unread_count": visible_entries(user, tenant).filter(archived=False, read_at__isnull=True).count(),
@@ -163,6 +171,60 @@ class ContextView(SupportView):
         if role.can_support and not was_support:
             sync_support_inbox(request.tenant, user)
         return Response({"id": str(role.pk)})
+
+
+class MessageLabelsView(SupportView):
+    @transaction.atomic
+    def post(self, request):
+        from core.roles import can_manage_roles
+
+        if not can_manage_roles(request.user, request.tenant):
+            raise PermissionDenied("Du saknar behörighet att ändra meddelandeetiketter.")
+        name = validated(MessageLabelInput, request)["name"]
+        Tenant.objects.select_for_update().get(pk=request.tenant.pk)
+        ensure_message_labels(request.tenant)
+        existing = MessageLabel.objects.filter(tenant=request.tenant, name__iexact=name).first()
+        if existing:
+            if existing.active:
+                raise ValidationError({"name": "Etiketten finns redan."})
+            if MessageLabel.objects.filter(tenant=request.tenant, active=True).count() >= 30:
+                raise ValidationError({"name": "Arbetsytan kan ha högst 30 aktiva etiketter."})
+            existing.active = True
+            existing.save(update_fields=["active"])
+            return Response(MessageLabelSerializer(existing).data, status=status.HTTP_201_CREATED)
+        if MessageLabel.objects.filter(tenant=request.tenant, active=True).count() >= 30:
+            raise ValidationError({"name": "Arbetsytan kan ha högst 30 aktiva etiketter."})
+        label = MessageLabel.objects.create(tenant=request.tenant, name=name, position=30)
+        return Response(MessageLabelSerializer(label).data, status=status.HTTP_201_CREATED)
+
+
+class MessageLabelView(SupportView):
+    @transaction.atomic
+    def patch(self, request, pk):
+        from core.roles import can_manage_roles
+
+        if not can_manage_roles(request.user, request.tenant):
+            raise PermissionDenied("Du saknar behörighet att ändra meddelandeetiketter.")
+        name = validated(MessageLabelInput, request)["name"]
+        Tenant.objects.select_for_update().get(pk=request.tenant.pk)
+        label = get_object_or_404(MessageLabel, tenant=request.tenant, pk=pk, active=True)
+        if MessageLabel.objects.filter(tenant=request.tenant, name__iexact=name).exclude(pk=pk).exists():
+            raise ValidationError({"name": "Etiketten finns redan."})
+        label.name = name
+        label.save(update_fields=["name"])
+        return Response(MessageLabelSerializer(label).data)
+
+    @transaction.atomic
+    def delete(self, request, pk):
+        from core.roles import can_manage_roles
+
+        if not can_manage_roles(request.user, request.tenant):
+            raise PermissionDenied("Du saknar behörighet att ändra meddelandeetiketter.")
+        Tenant.objects.select_for_update().get(pk=request.tenant.pk)
+        label = get_object_or_404(MessageLabel, tenant=request.tenant, pk=pk, active=True)
+        label.active = False
+        label.save(update_fields=["active"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class InboxView(SupportView):
@@ -297,7 +359,17 @@ class ThreadsView(SupportView):
     def post(self, request):
         data = validated(ThreadInput, request)
         Tenant.objects.select_for_update().get(pk=request.tenant.pk)
+        ensure_message_labels(request.tenant)
         specs = sorted(set(data.pop("recipients")))
+        label_ids = data.pop("label_ids", None)
+        if label_ids is None:
+            labels = list(MessageLabel.objects.filter(tenant=request.tenant, key=data["kind"])[:1])
+        else:
+            labels = list(MessageLabel.objects.filter(tenant=request.tenant, pk__in=label_ids))
+            if len(labels) != len(set(label_ids)):
+                raise ValidationError({"label_ids": "Välj aktiva etiketter i den här arbetsytan."})
+            data["kind"] = "bug" if any(label.key == "bug" for label in labels) else "question"
+        selected_label_ids = {label.pk for label in labels}
         attachment_ids = data.pop("attachment_ids")
         diagnostics = data.pop("diagnostics", None)
         previous = SupportThread.objects.filter(
@@ -311,10 +383,15 @@ class ThreadsView(SupportView):
                 or previous.recipient_specs != specs
                 and not (previous.recipient_specs == [] and specs == ["support"])
                 or any(getattr(previous, field) != data.get(field) for field in fields)
+                or set(previous.labels.values_list("pk", flat=True)) != selected_label_ids
                 or set(initial.attachments.filter(inline_text="").values_list("pk", flat=True)) != set(attachment_ids)
             ):
                 return submission_conflict(previous.pk)
             return Response(ThreadSerializer(previous).data)
+        if label_ids is None:
+            labels = [label for label in labels if label.active]
+        elif any(not label.active for label in labels):
+            raise ValidationError({"label_ids": "Välj aktiva etiketter i den här arbetsytan."})
         support_target, participant_ids, boards = resolve(request.tenant, specs, request.user)
         if (
             SupportThread.objects.filter(
@@ -342,6 +419,7 @@ class ThreadsView(SupportView):
             **data,
         )
         thread.participants.set(participant_ids)
+        thread.labels.set(labels)
         message = Message.objects.create(thread=thread, sender=request.user, body=body, request_id=data["request_id"])
         attach_files(request, message, attachment_ids)
         if diagnostics is not None:

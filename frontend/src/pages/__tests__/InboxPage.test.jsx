@@ -29,6 +29,12 @@ const context = {
     unreadCount: 1,
     recipientCount: 2,
     supportAvailable: true,
+    messageLabels: [
+        { id: 'label-question', name: 'Question', key: 'question' },
+        { id: 'label-suggestion', name: 'Suggestion', key: 'suggestion' },
+        { id: 'label-content', name: 'Content', key: 'content' },
+        { id: 'label-bug', name: 'Bug Report', key: 'bug' },
+    ],
     videoLimits: { bug: 26214400, instruction: 209715200 },
 }
 const thread = {
@@ -91,6 +97,61 @@ beforeEach(() => {
 })
 
 describe('tenant inbox journey', () => {
+    it('adds several message labels instead of choosing one type', async () => {
+        renderInbox('/inbox/new?tenant=a')
+        await screen.findByRole('heading', { name: 'Nytt meddelande' })
+        expect(screen.queryByLabelText('Typ (valfri)')).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Ta bort etiketten Question' })).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Lägg till etikett' }))
+        fireEvent.click(screen.getByRole('checkbox', { name: 'Suggestion' }))
+        fireEvent.click(screen.getByRole('checkbox', { name: 'Bug Report' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Ta bort etiketten Question' }))
+        fireEvent.change(screen.getByLabelText('Titel'), { target: { value: 'Idé' } })
+        fireEvent.change(screen.getByLabelText('Beskrivning'), { target: { value: 'Förslag' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Skicka meddelande' }))
+        await waitFor(() => expect(supportRequest).toHaveBeenCalledWith('a', 'threads/', 'post', expect.objectContaining({
+            labelIds: ['label-suggestion', 'label-bug'],
+        })))
+    })
+
+    it('lets a workspace manager edit message labels in Support settings', async () => {
+        const labels = context.messageLabels.map((label) => ({ ...label }))
+        supportRequest.mockImplementation(async (_tenant, path, method, data) => {
+            if (path === 'context/') return { ...context, canManage: true, members: [], roles: [], messageLabels: [...labels] }
+            if (path === 'labels/' && method === 'post') {
+                const label = { id: 'label-new', name: data.name, key: '' }
+                labels.push(label)
+                return label
+            }
+            if (path === 'labels/label-question/' && method === 'patch') {
+                labels[0] = { ...labels[0], name: data.name }
+                return labels[0]
+            }
+            if (path === 'labels/label-new/' && method === 'delete') {
+                labels.splice(labels.findIndex((label) => label.id === 'label-new'), 1)
+                return null
+            }
+            throw new Error(`Unexpected ${path}`)
+        })
+        const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+        try {
+            renderInbox('/inbox/manage?tenant=a')
+            await screen.findByRole('heading', { name: 'Supportinställningar' })
+            fireEvent.click(screen.getAllByRole('button', { name: 'Byt namn' })[0])
+            fireEvent.change(screen.getByRole('textbox', { name: 'Nytt namn för Question' }), { target: { value: 'General question' } })
+            fireEvent.click(screen.getByRole('button', { name: 'Spara' }))
+            await waitFor(() => expect(supportRequest).toHaveBeenCalledWith('a', 'labels/label-question/', 'patch', { name: 'General question' }))
+
+            fireEvent.change(screen.getByRole('textbox', { name: 'Ny etikett' }), { target: { value: 'Priority' } })
+            fireEvent.click(screen.getByRole('button', { name: 'Lägg till etikett' }))
+            await screen.findByText('Priority')
+            fireEvent.click(screen.getAllByRole('button', { name: 'Ta bort' }).at(-1))
+            await waitFor(() => expect(supportRequest).toHaveBeenCalledWith('a', 'labels/label-new/', 'delete'))
+        } finally {
+            confirm.mockRestore()
+        }
+    })
+
     it('adds multiple existing users and roles from the To picker and sends the selection', async () => {
         const original = supportRequest.getMockImplementation()
         const directory = [
@@ -174,9 +235,6 @@ describe('tenant inbox journey', () => {
         await screen.findByRole('heading', {
             name: 'Nytt meddelande',
         })
-        fireEvent.change(screen.getByLabelText('Typ (valfri)'), {
-            target: { value: 'question' },
-        })
         fireEvent.change(screen.getByLabelText('Titel'), {
             target: { value: 'Fråga' },
         })
@@ -217,9 +275,6 @@ describe('tenant inbox journey', () => {
         renderInbox('/inbox/new?tenant=a')
         await screen.findByRole('heading', {
             name: 'Nytt meddelande',
-        })
-        fireEvent.change(screen.getByLabelText('Typ (valfri)'), {
-            target: { value: 'question' },
         })
         fireEvent.change(screen.getByLabelText('Titel'), {
             target: { value: 'Fråga' },
@@ -278,7 +333,7 @@ describe('tenant inbox journey', () => {
             'threads/',
             'post',
             expect.objectContaining({
-                kind: 'question',
+                labelIds: ['label-question'],
                 videoId: null,
                 requestId: expect.any(String),
                 location: 'https://cms.example.invalid/pages/4',
