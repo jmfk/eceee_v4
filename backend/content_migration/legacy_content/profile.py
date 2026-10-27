@@ -144,6 +144,7 @@ def initial_browser_config(key):
                 "label": labels.get(filter_key, source_field(filter_key).get("title", filter_key)),
                 "overview": filter_key in {"effective_date", "field:event_start_date", "field:country"},
                 "control": control(filter_key),
+                "quick": control(filter_key) == "date_range",
             }
             for filter_key in filter_keys
         ],

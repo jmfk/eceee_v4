@@ -243,7 +243,7 @@ describe('ObjectBrowser grouped type list', () => {
         } })
         mocks.updateBrowserConfiguration.mockResolvedValue({ data: { config: {
             searchFields: ['first_name'],
-            filters: [{ key: 'field:first_name', label: 'First name', overview: true, control: 'checklist' }],
+            filters: [{ key: 'field:first_name', label: 'First name', overview: true, control: 'checklist', quick: false }],
         } } })
         const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
         render(<QueryClientProvider client={queryClient}><ObjectBrowserConfiguration objectType={objectType} /></QueryClientProvider>)
@@ -251,11 +251,33 @@ describe('ObjectBrowser grouped type list', () => {
         await user.click(screen.getByRole('checkbox', { name: /First name choice/ }))
         fireEvent.change(screen.getByRole('combobox', { name: 'First name filter control' }), { target: { value: 'checklist' } })
         await user.click(screen.getByRole('checkbox', { name: 'Show on overview' }))
+        await user.click(screen.getByRole('checkbox', { name: 'Quick button' }))
         await user.click(screen.getByRole('button', { name: 'Save search and filters' }))
         await waitFor(() => expect(mocks.updateBrowserConfiguration).toHaveBeenCalledWith(1, {
             searchFields: ['first_name'],
-            filters: [{ key: 'field:first_name', label: 'First name', overview: true, control: 'checklist' }],
+            filters: [{ key: 'field:first_name', label: 'First name', overview: true, control: 'checklist', quick: true }],
         }))
+    })
+
+    it('applies a date preset from a quick button and sends its range to the server', async () => {
+        mocks.getBrowserConfiguration.mockResolvedValue({ data: {
+            config: { searchFields: [], filters: [{ key: 'effective_date', label: 'Publication date', overview: true, control: 'date_range', quick: true }] },
+            availableFilters: [{ key: 'effective_date', label: 'Publication date', kind: 'date' }],
+        } })
+        renderBrowser('/objects/news', '/objects/:typeName')
+        await userEvent.click(await screen.findByRole('button', { name: 'Filter by Publication date' }))
+        expect(screen.getByRole('dialog', { name: 'Filter Publication date' })).toBeInTheDocument()
+        await userEvent.click(screen.getByRole('button', { name: 'Previous month' }))
+
+        const current = new Date()
+        const first = new Date(current.getFullYear(), current.getMonth() - 1, 1)
+        const last = new Date(current.getFullYear(), current.getMonth(), 0)
+        const format = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+        await waitFor(() => expect(mocks.getRoots).toHaveBeenCalledWith({
+            type: 'news', page: 1, page_size: 20,
+            browser_filters: JSON.stringify([{ key: 'effective_date', values: [format(first), format(last)] }]),
+        }))
+        expect(screen.queryByRole('dialog', { name: 'Filter Publication date' })).not.toBeInTheDocument()
     })
 
     it('requests pages of 20, 50, or 100 and resets after changing the size', async () => {
