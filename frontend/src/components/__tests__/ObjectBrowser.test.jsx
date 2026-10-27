@@ -291,6 +291,21 @@ describe('ObjectBrowser grouped type list', () => {
         expect(screen.queryByRole('dialog', { name: 'Filter Publication date' })).not.toBeInTheDocument()
     })
 
+    it('opens the only available filter directly without an intermediate menu', async () => {
+        mocks.getBrowserConfiguration.mockResolvedValue({ data: {
+            config: { searchFields: [], filters: [{ key: 'field:summary', label: 'Innehållsslag', overview: false, control: 'searchable_multi', quick: false }] },
+            availableFilters: [{ key: 'field:summary', label: 'Innehållsslag', kind: 'choice' }],
+        } })
+        renderBrowser('/objects/news', '/objects/:typeName')
+
+        const addFilter = await screen.findByRole('button', { name: 'Add filter' })
+        await userEvent.click(addFilter)
+        expect(screen.getByRole('dialog', { name: 'Filter Innehållsslag' })).toBeInTheDocument()
+        expect(screen.queryByRole('menu', { name: 'Available Object filters' })).not.toBeInTheDocument()
+        await userEvent.click(addFilter)
+        expect(screen.queryByRole('dialog', { name: 'Filter Innehållsslag' })).not.toBeInTheDocument()
+    })
+
     it('requests pages of 20, 50, or 100 and resets after changing the size', async () => {
         mocks.getRoots.mockImplementation(async params => ({
             data: {
