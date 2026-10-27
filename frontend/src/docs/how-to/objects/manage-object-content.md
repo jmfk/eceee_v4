@@ -4,7 +4,7 @@ title: Manage object content
 summary: Choose an object type and create or edit its content items.
 order: 1
 sectionId: objects
-sectionTitle: Objects
+sectionTitle: Publisher
 sectionSummary: Work with reusable structured content such as articles, people, events, or other object types.
 sectionOrder: 3
 ---
@@ -15,7 +15,7 @@ Choose an object type and create or edit its content items.
 
 <!-- narration: Select an object type, create or edit an item, and check version and publishing status before making structured content live. -->
 
-1. Open Objects from the main navigation.
+1. Open Publisher from the main navigation.
 2. Choose a main object type on Main, or open Supporting objects to find supporting types grouped by their main type.
 3. Use the create action to add a new item, or open an existing item to edit it.
 4. Use the left column to navigate the root object, its sub-objects and related objects. Pure sub-object types appear here rather than in the overview.
@@ -28,7 +28,7 @@ Choose an object type and create or edit its content items.
   {
     "type": "goto",
     "path": "/objects",
-    "caption": "Start on Objects. First choose the content type you want to work with.",
+    "caption": "Start in Publisher. First choose the content type you want to work with.",
     "holdMs": 450
   },
   {

@@ -29,7 +29,7 @@ const itemCountLabel = (count) => `${count || 0} ${(count || 0) === 1 ? 'item' :
 
 const ObjectBrowser = () => {
     // Set document title
-    useDocumentTitle('Objects')
+    useDocumentTitle('Publisher')
 
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
@@ -299,8 +299,8 @@ const ObjectBrowser = () => {
                                 <div>
                                     <div className="text-2xl font-bold text-gray-900 flex items-center" role="heading" aria-level="1">
                                         <FolderOpen className="h-6 w-6 mr-3" />
-                                        Objects Publisher
-                                        <ContextualHelpLink topicId="objects" label="Open Objects help" className="ml-2" />
+                                        Publisher
+                                        <ContextualHelpLink topicId="objects" label="Open Publisher help" className="ml-2" />
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap items-center justify-end gap-2">
@@ -445,12 +445,12 @@ const ObjectBrowser = () => {
 
                         {overviewActive && <section className="mt-6" aria-label="Matching objects">
                             <h2 className="mb-2 text-lg font-semibold text-gray-900">Matching objects</h2>
-                            {overviewResultsError && <p role="alert" className="text-xs text-red-700">Could not search Objects.</p>}
-                            {overviewResultsLoading && <p className="text-xs text-gray-600">Searching Objects…</p>}
+                            {overviewResultsError && <p role="alert" className="text-xs text-red-700">Could not search objects.</p>}
+                            {overviewResultsLoading && <p className="text-xs text-gray-600">Searching objects…</p>}
                             {!overviewResultsLoading && !overviewResultsError && <>
                                 <div className="divide-y divide-gray-200 rounded-sm border border-gray-200 bg-white">
                                     {overviewInstances.length ? overviewInstances.map(instance => <ObjectListItem key={instance.id} instance={instance} definition={overviewTypeWithConfig ? { ...instance.objectType, ...overviewTypeWithConfig } : instance.objectType || objectTypes.find(type => type.name === instance.objectTypeName)} showType onEdit={() => handleEditInstance(instance)} onDelete={() => handleDeleteInstance(instance)} />)
-                                        : <p className="px-4 py-6 text-xs text-gray-600">No matching Objects.</p>}
+                                        : <p className="px-4 py-6 text-xs text-gray-600">No matching objects.</p>}
                                 </div>
                                 {overviewCount > 0 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-600">
                                     <span>Showing {(overviewPage - 1) * pageSize + 1}–{Math.min(overviewPage * pageSize, overviewCount)} of {overviewCount}</span>
@@ -521,7 +521,7 @@ const ObjectBrowser = () => {
                                                     )}
                                                 </div>
                                                 {selectedObjectType.pluralLabel}
-                                                <ContextualHelpLink topicId="objects" label="Open Objects help" className="ml-2" />
+                                                <ContextualHelpLink topicId="objects" label="Open Publisher help" className="ml-2" />
                                             </div>
                                         </div>
                                         <div className="text-gray-600 ml-9">
@@ -626,7 +626,7 @@ const ObjectBrowser = () => {
                         <div className="mb-6">
                             <div className="flex justify-between items-center mb-4">
                                 <div>
-                                    <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">Objects</div>
+                                    <div className="text-2xl font-bold text-gray-900" role="heading" aria-level="1">Publisher</div>
                                     <div className="text-gray-600 mt-1">Select an object type to view and manage objects</div>
                                 </div>
                             </div>
