@@ -14,6 +14,14 @@ SYSTEM_FILTERS = {
     "effective_date": ("Publication date", "date"),
     "expiry_date": ("Expiry date", "date"),
 }
+DEFAULT_LIST_FIELDS = ["status", "created_at", "publish_date"]
+SYSTEM_LIST_FIELDS = {
+    "status": ("Status", "status"),
+    "created_at": ("Created in CMS", "date"),
+    "updated_at": ("Last updated", "date"),
+    "publish_date": ("Publish date", "date"),
+    "unpublish_date": ("Unpublish date", "date"),
+}
 TEXT_COMPONENTS = {"text", "textarea", "url", "email", "select"}
 CONTROLS = {
     "date": {"date_range"},
@@ -71,9 +79,26 @@ def available_filters(definition, tenant):
     return result
 
 
+def available_list_fields(definition):
+    result = {key: {"key": key, "label": label, "kind": kind} for key, (label, kind) in SYSTEM_LIST_FIELDS.items()}
+    for key, field in (definition.schema or {}).get("properties", {}).items():
+        kind = field_kind(field)
+        if kind in {"choice", "date", "boolean"}:
+            result[f"field:{key}"] = {
+                "key": f"field:{key}",
+                "label": field.get("title") or key,
+                "kind": kind,
+            }
+    return result
+
+
 def validate_browser_config(definition, tenant, value):
-    if not isinstance(value, dict) or set(value) != {"search_fields", "filters"}:
-        raise serializers.ValidationError("Expected search_fields and filters.")
+    if (
+        not isinstance(value, dict)
+        or not {"search_fields", "filters"} <= set(value)
+        or set(value) - {"search_fields", "filters", "list_fields"}
+    ):
+        raise serializers.ValidationError("Expected search_fields, filters and optional list_fields.")
     fields = (definition.schema or {}).get("properties", {})
     search_fields = value["search_fields"]
     filters = value["filters"]
@@ -88,6 +113,15 @@ def validate_browser_config(definition, tenant, value):
             raise serializers.ValidationError({"search_fields": f"{key} is not a searchable text field."})
     if not isinstance(filters, list) or len(filters) > 30:
         raise serializers.ValidationError({"filters": "Choose at most 30 filters."})
+    list_fields = value.get("list_fields", DEFAULT_LIST_FIELDS)
+    allowed_list_fields = available_list_fields(definition)
+    if (
+        not isinstance(list_fields, list)
+        or len(list_fields) > 8
+        or any(not isinstance(key, str) or key not in allowed_list_fields for key in list_fields)
+        or len(list_fields) != len(set(list_fields))
+    ):
+        raise serializers.ValidationError({"list_fields": "Choose at most 8 distinct available list fields."})
     allowed = available_filters(definition, tenant)
     seen = set()
     for entry in filters:
@@ -114,6 +148,7 @@ def validate_browser_config(definition, tenant, value):
         seen.add(key)
     return {
         "search_fields": search_fields,
+        "list_fields": list_fields,
         "filters": [
             {
                 **entry,

@@ -13,6 +13,7 @@ import { buildObjectTypeGroups } from './objectBrowserGrouping'
 import RemoteObjectImport from './RemoteObjectImport'
 import CompactSelect from './classification/CompactSelect'
 import ObjectFilterBar from './ObjectFilterBar'
+import { listDetail, listFieldsFor } from './objectListDisplay'
 
 const browserFilterParams = filters => filters.length ? JSON.stringify(filters.map(({ key, values }) => ({ key, values }))) : undefined
 
@@ -448,7 +449,7 @@ const ObjectBrowser = () => {
                             {overviewResultsLoading && <p className="text-xs text-gray-600">Searching Objects…</p>}
                             {!overviewResultsLoading && !overviewResultsError && <>
                                 <div className="divide-y divide-gray-200 rounded-sm border border-gray-200 bg-white">
-                                    {overviewInstances.length ? overviewInstances.map(instance => <ObjectListItem key={instance.id} instance={instance} showType onEdit={() => handleEditInstance(instance)} onDelete={() => handleDeleteInstance(instance)} />)
+                                    {overviewInstances.length ? overviewInstances.map(instance => <ObjectListItem key={instance.id} instance={instance} definition={overviewTypeWithConfig ? { ...instance.objectType, ...overviewTypeWithConfig } : instance.objectType || objectTypes.find(type => type.name === instance.objectTypeName)} showType onEdit={() => handleEditInstance(instance)} onDelete={() => handleDeleteInstance(instance)} />)
                                         : <p className="px-4 py-6 text-xs text-gray-600">No matching Objects.</p>}
                                 </div>
                                 {overviewCount > 0 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-600">
@@ -559,6 +560,7 @@ const ObjectBrowser = () => {
                                             <ObjectListItem
                                                 key={instance.id}
                                                 instance={instance}
+                                                definition={{ ...instance.objectType, ...listObjectType }}
                                                 onEdit={() => handleEditInstance(instance)}
                                                 onDelete={() => handleDeleteInstance(instance)}
                                             />
@@ -771,7 +773,9 @@ const ObjectBrowser = () => {
 }
 
 // Object List Item Component
-const ObjectListItem = ({ instance, onEdit, onDelete, showType = false }) => {
+const ObjectListItem = ({ instance, definition, onEdit, onDelete, showType = false }) => {
+    const listFields = listFieldsFor(definition)
+    const details = listFields.map(key => listDetail(instance, definition, key)).filter(Boolean)
     const getStatusColor = (status) => {
         switch (status) {
             case 'published':
@@ -809,26 +813,14 @@ const ObjectListItem = ({ instance, onEdit, onDelete, showType = false }) => {
                         <div className="text-lg font-medium text-gray-900 truncate" role="heading" aria-level="3">
                             {instance.title}
                         </div>
-                        <span className={`ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(instance.status)}`}>
+                        {listFields.includes('status') && instance.status && <span className={`ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(instance.status)}`}>
                             {instance.status}
-                        </span>
+                        </span>}
                     </div>
-                    <div className="mt-1 flex items-center text-sm text-gray-500">
-                        {showType && <span className="mr-2 font-medium">{instance.objectType?.label || instance.objectType?.name}</span>}
-                        <span>Created {new Date(instance.createdAt).toLocaleDateString()}</span>
-                        {instance.publishDate && (
-                            <>
-                                <span className="mx-2">•</span>
-                                <span>Publish {new Date(instance.publishDate).toLocaleDateString()}</span>
-                            </>
-                        )}
-                        {instance.parent && (
-                            <>
-                                <span className="mx-2">•</span>
-                                <span>Child of {instance.parent.title}</span>
-                            </>
-                        )}
-                    </div>
+                    {(showType || details.length > 0) && <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500">
+                        {showType && <span className="font-medium">{instance.objectType?.label || instance.objectType?.name || definition?.label}</span>}
+                        {details.map(detail => <span key={detail.key} className="min-w-0 max-w-full truncate" title={`${detail.label}: ${detail.value}`}>{detail.label}: {detail.value}</span>)}
+                    </div>}
                 </div>
                 <div className="flex items-center ml-4">
                     <button

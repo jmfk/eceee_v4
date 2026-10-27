@@ -900,7 +900,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                     {[
                         { id: 'basic', label: 'Basic Info' },
                         { id: 'schema', label: 'Schema Fields' },
-                        { id: 'browse', label: 'Search and filters' },
+                        { id: 'browse', label: 'Browsing' },
                         { id: 'slots', label: 'Widget Slots' },
                         { id: 'relationships', label: 'Relationships' }
                     ].map((tab) => (
