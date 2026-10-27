@@ -28,10 +28,10 @@ const useTenant = () => {
     return tenant
 }
 
-function useBoardBackground(board) {
+function useBoardBackground(board, load = true) {
     const [imageUrl, setImageUrl] = useState('')
     useEffect(() => {
-        if (!board?.hasBackground) {
+        if (!load || !board?.hasBackground) {
             setImageUrl('')
             return undefined
         }
@@ -47,20 +47,37 @@ function useBoardBackground(board) {
             if (objectUrl) URL.revokeObjectURL(objectUrl)
             setImageUrl('')
         }
-    }, [board?.id, board?.hasBackground, board?.revision])
+    }, [board?.id, board?.hasBackground, board?.revision, load])
     return imageUrl
 }
 
 function BoardOverviewTile({ board, listCount, busy, onRename, onArchive, onDropCard }) {
     const navigate = useNavigate()
-    const imageUrl = useBoardBackground(board)
+    const tileRef = useRef(null)
+    const [loadBackground, setLoadBackground] = useState(false)
+    useEffect(() => {
+        if (!board.hasBackground || loadBackground) return
+        if (typeof IntersectionObserver === 'undefined') {
+            setLoadBackground(true)
+            return
+        }
+        const observer = new IntersectionObserver(([entry]) => {
+            if (entry.isIntersecting) {
+                setLoadBackground(true)
+                observer.disconnect()
+            }
+        }, { rootMargin: '200px' })
+        observer.observe(tileRef.current)
+        return () => observer.disconnect()
+    }, [board.hasBackground, loadBackground])
+    const imageUrl = useBoardBackground(board, loadBackground)
     const [editing, setEditing] = useState(false)
     const [title, setTitle] = useState(board.title)
     useEffect(() => { if (!editing) setTitle(board.title) }, [board.title, editing])
     const edit = () => { setTitle(board.title); setEditing(true) }
     const openSettings = (dialog) => navigate(`/kanban/boards/${board.id}`, { state: { boardDialog: dialog } })
     return (
-        <article className={`kb-board-tile ${imageUrl ? 'has-image' : ''}`}
+        <article ref={tileRef} className={`kb-board-tile ${imageUrl ? 'has-image' : ''}`}
             onDragOver={(event) => event.preventDefault()} onDrop={(event) => onDropCard(event, board)}>
             <Link className="kb-board-tile-open" to={`/kanban/boards/${board.id}`} aria-label={board.title}>
                 {imageUrl ? <img src={imageUrl} alt="" loading="lazy" /> : <span className="kb-board-tile-preview" aria-hidden="true"><span><i /><i /></span><span><i /></span><span><i /><i /></span></span>}
@@ -186,7 +203,6 @@ const matchingImageAttachment = async (file, attachments) => {
 function CardDetail({ card, workspace, run, busy, reload, error }) {
     const ticket = useKanbanAccess()
     const [draft, setDraft] = useState(card)
-    const boardMemberIds = workspace.boards.find((board) => board.id === card.board)?.members
     const navigate = useNavigate()
     const baselineRef = useRef(editableSignature(card))
     const draftRef = useRef(draft)
@@ -489,7 +505,6 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                                     const matches = (member) => `${member.name} ${member.username || ''}`.toLocaleLowerCase().includes(query)
                                                     const selected = workspace.members.filter((member) => draft.assignees.includes(member.id) && matches(member))
                                                     const available = workspace.members.filter((member) =>
-                                                        (!boardMemberIds || boardMemberIds.includes(member.id)) &&
                                                         !draft.assignees.includes(member.id) && matches(member))
                                                     return <>
                                                         <div className="kb-member-picker-header">
@@ -505,7 +520,7 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                                                 <Avatar userId={member.id} name={member.name} size={28} />
                                                                 <span>{member.name}</span><X size={15} aria-hidden="true" />
                                                             </button>) : <p>Inga kortmedlemmar</p>}
-                                                            <h4>Tavlemedlemmar</h4>
+                                                            <h4>Övriga medlemmar</h4>
                                                             {available.length ? available.map((member) => <button type="button" key={member.id}
                                                                 aria-label={`Lägg till ${member.name} på kortet`} onClick={() => toggle('assignees', member.id)}>
                                                                 <Avatar userId={member.id} name={member.name} size={28} />
