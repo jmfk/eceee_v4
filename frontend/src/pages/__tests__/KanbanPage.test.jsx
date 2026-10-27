@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useEffect, useRef } from 'react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -126,6 +126,35 @@ describe('Kanban application navigation', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Lägg till kort' }))
         await waitFor(() => expect(kanbanApi.post).toHaveBeenCalledWith('cards/', { title: 'Nytt kort', column: 'column-1' }))
         await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Kortrubrik' })).not.toBeInTheDocument())
+    })
+
+    it('edits a list name in its own header and saves or cancels there', async () => {
+        kanbanApi.patch.mockResolvedValue({})
+        renderKanban('/kanban/boards/board-1')
+        const heading = await screen.findByRole('heading', { name: 'Att göra' })
+        const column = heading.closest('.kb-column')
+        const openRename = async () => {
+            fireEvent.click(within(column).getByRole('button', { name: 'Liståtgärder för Att göra' }))
+            fireEvent.click(await screen.findByRole('button', { name: 'Byt namn' }))
+        }
+
+        await openRename()
+        const input = within(column).getByRole('textbox', { name: 'Listnamn för Att göra' })
+        expect(input).toHaveFocus()
+        expect(input.closest('header')).toBe(column.querySelector('header'))
+        expect(column.querySelector('header')).toHaveAttribute('draggable', 'false')
+        fireEvent.change(input, { target: { value: 'Pågår' } })
+        fireEvent.click(within(column).getByRole('button', { name: 'Spara listnamn' }))
+        await waitFor(() => expect(kanbanApi.patch).toHaveBeenCalledWith('columns/column-1/', expect.objectContaining({ title: 'Pågår' })))
+        await waitFor(() => expect(within(column).queryByRole('textbox', { name: 'Listnamn för Att göra' })).not.toBeInTheDocument())
+
+        await openRename()
+        fireEvent.click(within(column).getByRole('button', { name: 'Avbryt namnändring' }))
+        expect(within(column).queryByRole('textbox', { name: 'Listnamn för Att göra' })).not.toBeInTheDocument()
+
+        await openRename()
+        fireEvent.keyDown(within(column).getByRole('textbox', { name: 'Listnamn för Att göra' }), { key: 'Escape' })
+        expect(within(column).queryByRole('textbox', { name: 'Listnamn för Att göra' })).not.toBeInTheDocument()
     })
 
     it('keeps board creation in the overview and opens the created board', async () => {
