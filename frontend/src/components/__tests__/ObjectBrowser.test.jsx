@@ -350,8 +350,8 @@ describe('ObjectBrowser grouped type list', () => {
             availableFilters: [{ key: 'effective_date', label: 'Publication date', kind: 'date' }],
         } })
         renderBrowser('/objects/news', '/objects/:typeName')
-        await userEvent.click(await screen.findByRole('button', { name: 'Filter by Publication date' }))
-        expect(screen.getByRole('dialog', { name: 'Filter Publication date' })).toBeInTheDocument()
+        await userEvent.click(await screen.findByRole('button', { name: 'Filter by date' }))
+        expect(screen.getByRole('dialog', { name: 'Date filters' })).toBeInTheDocument()
         await userEvent.click(screen.getByRole('button', { name: 'Previous month' }))
 
         const current = new Date()
@@ -362,19 +362,44 @@ describe('ObjectBrowser grouped type list', () => {
             type: 'news', page: 1, page_size: 20,
             browser_filters: JSON.stringify([{ key: 'effective_date', values: [format(first), format(last)] }]),
         }))
-        expect(screen.queryByRole('dialog', { name: 'Filter Publication date' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('dialog', { name: 'Date filters' })).not.toBeInTheDocument()
     })
 
-    it('shows date filters saved in the shared Object type configuration cache', async () => {
+    it('groups saved date filters into one menu with keyboard-accessible tabs', async () => {
         const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
         queryClient.setQueryData(['objectTypeBrowserConfiguration', news.id], {
-            config: { searchFields: [], filters: ['created_at', 'effective_date', 'expiry_date'].map(key => ({ key, label: key, overview: true, control: 'date_range', quick: true })) },
-            availableFilters: ['created_at', 'effective_date', 'expiry_date'].map(key => ({ key, label: key, kind: 'date' })),
+            config: { searchFields: [], filters: [
+                { key: 'created_at', label: 'Created in CMS', overview: true, control: 'date_range', quick: true },
+                { key: 'effective_date', label: 'Publication date', overview: true, control: 'date_range', quick: true },
+                { key: 'expiry_date', label: 'Expiry date', overview: true, control: 'date_range', quick: true },
+            ] },
+            availableFilters: ['created_at', 'effective_date', 'expiry_date'].map(key => ({ key, kind: 'date' })),
         })
         renderBrowser('/objects/news', '/objects/:typeName', queryClient)
-        for (const key of ['created_at', 'effective_date', 'expiry_date']) {
-            expect(await screen.findByRole('button', { name: `Filter by ${key}` })).toBeInTheDocument()
-        }
+        const dateButton = await screen.findByRole('button', { name: 'Filter by date' })
+        expect(screen.getAllByRole('button', { name: 'Filter by date' })).toHaveLength(1)
+        expect(screen.queryByRole('button', { name: 'Add filter' })).not.toBeInTheDocument()
+        await userEvent.click(dateButton)
+        expect(screen.getByRole('dialog', { name: 'Date filters' })).toBeInTheDocument()
+        expect(screen.getByRole('tab', { name: 'Created in CMS' })).toHaveAttribute('aria-selected', 'true')
+        await userEvent.click(screen.getByRole('tab', { name: 'Publication date' }))
+        expect(screen.getByRole('tab', { name: 'Publication date' })).toHaveAttribute('aria-selected', 'true')
+        await userEvent.keyboard('{ArrowRight}')
+        expect(screen.getByRole('tab', { name: 'Expiry date' })).toHaveAttribute('aria-selected', 'true')
+        fireEvent.change(screen.getByLabelText('From'), { target: { value: '2026-10-01' } })
+        await waitFor(() => expect(mocks.getRoots).toHaveBeenCalledWith({
+            type: 'news', page: 1, page_size: 20,
+            browser_filters: JSON.stringify([{ key: 'expiry_date', values: ['2026-10-01', ''] }]),
+        }))
+        await userEvent.click(screen.getByRole('tab', { name: 'Created in CMS' }))
+        fireEvent.change(screen.getByLabelText('To'), { target: { value: '2026-10-27' } })
+        await waitFor(() => expect(mocks.getRoots).toHaveBeenCalledWith({
+            type: 'news', page: 1, page_size: 20,
+            browser_filters: JSON.stringify([
+                { key: 'expiry_date', values: ['2026-10-01', ''] },
+                { key: 'created_at', values: ['', '2026-10-27'] },
+            ]),
+        }))
     })
 
     it('opens the only available filter directly without an intermediate menu', async () => {
