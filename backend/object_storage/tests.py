@@ -270,7 +270,9 @@ class ObjectStorageAPITest(APITestCase):
             name="article", label="Article", plural_label="Articles", created_by=self.user
         )
         roots = [
-            ObjectInstance(object_type=obj_type, title=f"Article {number:03d}", created_by=self.user, tenant=self.tenant)
+            ObjectInstance(
+                object_type=obj_type, title=f"Article {number:03d}", created_by=self.user, tenant=self.tenant
+            )
             for number in range(55)
         ]
         # MPTT needs each root saved individually to assign tree coordinates.
@@ -288,7 +290,9 @@ class ObjectStorageAPITest(APITestCase):
         self.assertEqual(first.data["total_pages"], 3)
         self.assertEqual(len(first.data["results"]), 20)
         self.assertEqual(len(second.data["results"]), 20)
-        self.assertFalse({item["id"] for item in first.data["results"]} & {item["id"] for item in second.data["results"]})
+        self.assertFalse(
+            {item["id"] for item in first.data["results"]} & {item["id"] for item in second.data["results"]}
+        )
 
         search_url = reverse("api:object_storage:objectinstance-search")
         search = self.client.get(

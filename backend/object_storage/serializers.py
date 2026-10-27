@@ -5,18 +5,19 @@ Provides serialization and deserialization for object types and instances,
 following camelCase API conventions and existing patterns.
 """
 
+from types import SimpleNamespace
+
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from rest_framework import serializers
-from types import SimpleNamespace
 
 from content.models import Namespace
 from file_manager.imgproxy import imgproxy_service
 from utils.schema_system import validate_schema
 
-from .models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
 from .browser_config import browser_config, validate_browser_config
+from .models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -347,21 +348,6 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
 
         return value
 
-    def validate(self, attrs):
-        """Keep browser settings valid when metadata or the schema changes through regular APIs."""
-        attrs = super().validate(attrs)
-        metadata = attrs.get("metadata", self.instance.metadata if self.instance else {}) or {}
-        if "browser" in metadata and ("metadata" in attrs or "schema" in attrs):
-            definition = SimpleNamespace(
-                pk=self.instance.pk if self.instance else None,
-                schema=attrs.get("schema", self.instance.schema if self.instance else {}),
-            )
-            request = self.context.get("request")
-            if request is None or not getattr(request, "tenant", None):
-                raise serializers.ValidationError({"metadata": "A tenant is required for browser configuration."})
-            validate_browser_config(definition, request.tenant, metadata["browser"])
-        return attrs
-
     def validate_slot_configuration(self, value):
         """Validate slot configuration structure and convert to snake_case"""
         # Initialize warnings list
@@ -603,6 +589,17 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        # Keep browse choices valid when metadata or the schema changes through regular APIs.
+        metadata = attrs.get("metadata", self.instance.metadata if self.instance else {}) or {}
+        if "browser" in metadata and ("metadata" in attrs or "schema" in attrs):
+            definition = SimpleNamespace(
+                pk=self.instance.pk if self.instance else None,
+                schema=attrs.get("schema", self.instance.schema if self.instance else {}),
+            )
+            request = self.context.get("request")
+            if request is None or not getattr(request, "tenant", None):
+                raise serializers.ValidationError({"metadata": "A tenant is required for browser configuration."})
+            validate_browser_config(definition, request.tenant, metadata["browser"])
         browser_group = attrs.get("browser_group")
         if browser_group is None:
             return attrs

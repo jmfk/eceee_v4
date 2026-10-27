@@ -19,15 +19,14 @@ from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
-from rest_framework.exceptions import PermissionDenied
 
 from core.models import MachineAPIKey
 from core.permissions import HasTenantAccess
-
-from .models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
 from taxonomy.models import Tag
+
 from .browser_config import (
     apply_browser_filters,
     available_filters,
@@ -35,6 +34,7 @@ from .browser_config import (
     searchable_query,
     validate_browser_config,
 )
+from .models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
 from .serializers import (
     ObjectInstanceListSerializer,
     ObjectInstanceSerializer,

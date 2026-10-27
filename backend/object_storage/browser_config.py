@@ -9,7 +9,6 @@ from rest_framework import serializers
 from taxonomy.models import ClassificationType, Tag
 from taxonomy.services import matching_term_ids
 
-
 SYSTEM_FILTERS = {
     "created_at": ("Created in CMS", "date"),
     "effective_date": ("Publication date", "date"),
