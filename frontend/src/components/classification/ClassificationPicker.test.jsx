@@ -25,6 +25,7 @@ beforeEach(() => {
         { id: 'archived', name: 'Archived', path: 'Archived', status: 'archived' },
     ] })
     taxonomyApi.term.mockResolvedValue({ id: 'archived', name: 'Archived', path: 'Archived', status: 'archived' })
+    taxonomyApi.types.mockResolvedValue({ results: [] })
 })
 
 describe('classification picker', () => {
@@ -76,5 +77,23 @@ describe('classification picker', () => {
         await waitFor(() => expect(taxonomyApi.terms).toHaveBeenCalledWith(expect.objectContaining({ namespace: 'editorial', use: 'pages', search: 'Energy', page: 1 })))
         fireEvent.click(await screen.findByRole('button', { name: 'Next' }))
         await waitFor(() => expect(taxonomyApi.terms).toHaveBeenCalledWith(expect.objectContaining({ page: 2 })))
+    })
+    it('filters topic and keyword searches by their classification type', async () => {
+        taxonomyApi.types.mockResolvedValue({ results: [
+            { id: 'topic', name: 'Ämne', allowedUses: ['pages'] },
+            { id: 'keyword', name: 'Nyckelord', allowedUses: ['pages'] },
+        ] })
+        renderPicker({ namespace: 'editorial' })
+        fireEvent.click(await screen.findByRole('combobox', { name: 'Filter tag type' }))
+        fireEvent.click(await screen.findByRole('option', { name: 'Ämne' }))
+        fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'climate' } })
+        await waitFor(() => expect(taxonomyApi.terms).toHaveBeenCalledWith(expect.objectContaining({
+            namespace: 'editorial', classification_type: 'topic', search: 'climate', page: 1,
+        })))
+        fireEvent.click(screen.getByRole('combobox', { name: 'Filter tag type' }))
+        fireEvent.click(await screen.findByRole('option', { name: 'Nyckelord' }))
+        await waitFor(() => expect(taxonomyApi.terms).toHaveBeenCalledWith(expect.objectContaining({
+            namespace: 'editorial', classification_type: 'keyword', search: 'climate', page: 1,
+        })))
     })
 })
