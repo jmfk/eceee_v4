@@ -182,6 +182,30 @@ class EditorialImportTests(TestCase):
             unknown = {**source, "id": 9999, "name": "New source"}
             with self.assertRaisesRegex(BlockedRecord, "new_or_unmapped_source_term"):
                 self.stage([("news", record(pk=2, taxonomy={"sources": [unknown]}))], plan["mapping"])
+            reparented = {**source, "parentId": 99}
+            with self.assertRaisesRegex(BlockedRecord, "source_term_hierarchy_changed"):
+                self.stage([("news", record(pk=3, taxonomy={"sources": [reparented]}))], plan["mapping"])
+
+    def test_reviewed_term_with_removed_object_use_is_blocked(self):
+        plan = self._reviewed_source_plan()
+        mutate(
+            self.user,
+            self.facets["news_source"],
+            "create",
+            payload={"name": "Okänd källa", "slug": "group-okand-kalla"},
+        )
+        source = {"model": "eceeenews.eceeenewssource", "id": 4, "name": "", "parentId": None}
+        with patch("content_migration.legacy_content.service.compile_plan", return_value=plan):
+            run = self.stage([("news", record(taxonomy={"sources": [source]}))], plan["mapping"])
+            self.facets["news_source"].allowed_uses = []
+            self.facets["news_source"].save(update_fields=["allowed_uses"])
+            self.assertEqual(apply_run(run, self.user), {"blocked": 1})
+            self.assertEqual(run.items.get().error_category, "taxonomy_mapping_wrong_use")
+            kind_run = self.stage([("news", record(pk=2))], plan["mapping"])
+            self.facets["article_kind"].allowed_uses = []
+            self.facets["article_kind"].save(update_fields=["allowed_uses"])
+            self.assertEqual(apply_run(kind_run, self.user), {"blocked": 1})
+            self.assertEqual(kind_run.items.get().error_category, "taxonomy_mapping_wrong_use")
 
     def test_changed_reviewed_target_blocks_apply(self):
         from taxonomy.models import Tag

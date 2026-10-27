@@ -19,7 +19,7 @@ from taxonomy.services import require
 
 from .profile import OBJECT_TYPES, PROFILE
 from .source import validate_record
-from .term_plan import compile_plan
+from .term_plan import RESOURCE_TARGETS, compile_plan
 from .term_plan import identity as term_identity
 from .term_plan import source_names
 from .transform import BlockedRecord, checksum, normalize
@@ -150,6 +150,8 @@ def stage(*, tenant, namespace, user, source_scope, records, preset="dev", confi
                     key = term_identity(row["sourceSite"], source_key, value["model"], value["id"])
                     if value.get("name") != reviewed_names[key]:
                         raise BlockedRecord("source_term_name_changed")
+                    if value.get("parentId") is not None:
+                        raise BlockedRecord("source_term_hierarchy_changed")
         identity = (resource, str(row["legacyId"]))
         if identity in identities:
             raise BlockedRecord("duplicate_source_identity")
@@ -230,9 +232,13 @@ def _term(user, definition, name, slug=None, parent=None):
     raise BlockedRecord("unprepared_taxonomy_term")
 
 
-def terms_for(row, resource, facets, user, config):
+def terms_for(row, resource, types, facets, user, config):
     result = []
+    reviewed = config.get("format") == "eceee-reviewed-legacy-term-map"
+    target_use = f"object:{types[RESOURCE_TARGETS[resource]].pk}" if reviewed else None
     if resource in {"news", "columns"}:
+        if reviewed and target_use not in facets["article_kind"].allowed_uses:
+            raise BlockedRecord("taxonomy_mapping_wrong_use")
         kind = "column" if resource == "columns" else "news"
         if (
             resource == "news"
@@ -265,11 +271,14 @@ def terms_for(row, resource, facets, user, config):
             )
             if not facet_key:
                 raise BlockedRecord("unmapped_taxonomy_dimension")
+            facet = facets.get(facet_key)
+            if facet is None or target_use not in facet.allowed_uses:
+                raise BlockedRecord("taxonomy_mapping_wrong_use")
             term = Tag.objects.filter(
                 pk=pk,
-                classification_type=facets[facet_key],
-                namespace=facets[facet_key].namespace,
-                tenant=facets[facet_key].tenant,
+                classification_type=facet,
+                namespace=facet.namespace,
+                tenant=facet.tenant,
                 status="approved",
             ).first()
             if term is None:
@@ -475,7 +484,7 @@ def apply_item(run, item, user, types, facets):
         item.save()
         return item.status
     payload = normalize(row, item.resource, author_ids=author_ids)
-    tags = terms_for(row, item.resource, facets, user, config)
+    tags = terms_for(row, item.resource, types, facets, user, config)
     media_ids = config.get("mediaClassificationIds")
     has_media = payload["images"] or any(a.get("url") for a in row.get("attachments", []))
     if has_media:
