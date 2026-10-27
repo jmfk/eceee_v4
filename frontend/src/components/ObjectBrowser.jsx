@@ -10,6 +10,7 @@ import ContextualHelpLink from './help/ContextualHelpLink'
 import OptimizedImage from './media/OptimizedImage'
 import { buildObjectTypeGroups } from './objectBrowserGrouping'
 import RemoteObjectImport from './RemoteObjectImport'
+import CompactSelect from './classification/CompactSelect'
 
 const objectTypeTestId = (objectType) => (
     (objectType.name || objectType.label || 'object-type')
@@ -33,6 +34,8 @@ const ObjectBrowser = () => {
     const [selectedObjectType, setSelectedObjectType] = useState(null)
     const [searchTerm, setSearchTerm] = useState('')
     const [statusFilter, setStatusFilter] = useState('')
+    const [page, setPage] = useState(1)
+    const [pageSize, setPageSize] = useState(20)
     const [deleteModal, setDeleteModal] = useState({ isOpen: false, instance: null })
     const [showRemoteImport, setShowRemoteImport] = useState(false)
 
@@ -65,6 +68,7 @@ const ObjectBrowser = () => {
                         setCurrentView('list')
                         setSearchTerm('')
                         setStatusFilter('')
+                        setPage(1)
                     }
                 } catch (error) {
                     console.error('Failed to load object type from URL:', error)
@@ -105,24 +109,15 @@ const ObjectBrowser = () => {
 
     // Fetch filtered instances for list view
     const { data: instancesResponse, isLoading: instancesLoading, error: instancesError } = useQuery({
-        queryKey: ['objectInstances', 'filtered', selectedObjectType?.id, searchTerm, statusFilter],
+        queryKey: ['objectInstances', 'filtered', selectedObjectType?.id, searchTerm, statusFilter, page, pageSize],
         queryFn: async () => {
-            const params = {}
+            const params = { page, page_size: pageSize }
             if (selectedObjectType) params.type = selectedObjectType.name
-            if (searchTerm) params.search = searchTerm
             if (statusFilter && statusFilter !== '') params.status = statusFilter
 
             if (searchTerm) {
-                // For search, use the regular search endpoint but filter results to top-level only
-                return objectInstancesApi.search(searchTerm, params).then(response => ({
-                    ...response,
-                    data: {
-                        ...response.data,
-                        results: (response.data.results || response.data).filter(item => !item.parent)
-                    }
-                }))
+                return objectInstancesApi.search(searchTerm, { ...params, roots_only: 'true' })
             } else {
-                // Use dedicated roots endpoint for top-level objects
                 return objectInstancesApi.getRoots(params)
             }
         },
@@ -132,12 +127,19 @@ const ObjectBrowser = () => {
     const objectTypes = objectTypesResponse?.data || []
     const objectTypeGroups = buildObjectTypeGroups(objectTypes)
     const instances = instancesResponse?.data?.results || instancesResponse?.data || []
+    const resultCount = instancesResponse?.data?.count ?? instances.length
+    const totalPages = instancesResponse?.data?.totalPages ?? 1
+
+    useEffect(() => {
+        if (instancesResponse && page > totalPages) setPage(totalPages)
+    }, [instancesResponse, page, totalPages])
 
     const handleObjectTypeSelect = (objectType) => {
         setSelectedObjectType(objectType)
         setCurrentView('list')
         setSearchTerm('')
         setStatusFilter('')
+        setPage(1)
         // Update URL to reflect the selected type using the clean path
         navigate(`/objects/${objectType.name}`)
     }
@@ -147,6 +149,7 @@ const ObjectBrowser = () => {
         setSelectedObjectType(null)
         setSearchTerm('')
         setStatusFilter('')
+        setPage(1)
         // Clear URL parameters
         navigate('/objects')
     }
@@ -448,13 +451,13 @@ const ObjectBrowser = () => {
                                         type="text"
                                         placeholder={`Search ${selectedObjectType.pluralLabel?.toLowerCase()}...`}
                                         value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        onChange={(e) => { setSearchTerm(e.target.value); setPage(1) }}
                                         className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     />
                                 </div>
                                 <select
                                     value={statusFilter}
-                                    onChange={(e) => setStatusFilter(e.target.value)}
+                                    onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
                                     className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 >
                                     <option value="">All Status</option>
@@ -504,6 +507,21 @@ const ObjectBrowser = () => {
                                         )}
                                     </div>
                                 )}
+                            </div>
+                        )}
+                        {!instancesLoading && resultCount > 0 && (
+                            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-600" aria-label="Object pagination">
+                                <span>Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, resultCount)} of {resultCount}</span>
+                                <div className="flex items-center gap-3">
+                                    <CompactSelect label="Items per page" value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }} className="flex min-w-28 items-center justify-between gap-2 rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 focus-visible:border-blue-600 focus-visible:outline-none">
+                                        <option value="20">20 per page</option>
+                                        <option value="50">50 per page</option>
+                                        <option value="100">100 per page</option>
+                                    </CompactSelect>
+                                    <button type="button" onClick={() => setPage(current => current - 1)} disabled={page <= 1} className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Previous</button>
+                                    <span aria-live="polite">Page {page} of {totalPages}</span>
+                                    <button type="button" onClick={() => setPage(current => current + 1)} disabled={page >= totalPages} className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+                                </div>
                             </div>
                         )}
                     </div>

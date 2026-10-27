@@ -84,6 +84,12 @@ GET        /api/v1/objects/objects/roots/
 POST       /api/v1/objects/objects/bulk-operations/
 ```
 
+The CMS object browser requests `roots/` with `type`, `page` (starting at 1), and
+`page_size` (20, 50, or 100). Its search requests use the same pagination parameters,
+plus `q` and `roots_only=true`. Both endpoints return `results`, the total `count`,
+`page`, `pageSize`, `totalPages`, `hasNext`, and `hasPrevious` for these requests.
+Calls without `page_size` keep their existing response formats.
+
 #### Display Widgets
 ```python
 # Available Widgets

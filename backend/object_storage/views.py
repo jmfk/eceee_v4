@@ -12,6 +12,7 @@ import uuid
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
+from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Exists, OuterRef, Q
 from django.utils import timezone
@@ -553,6 +554,32 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
 
         queryset = requested_classifications(self.request, queryset, "current_version__canonical_tag_links__tag_id")
         return filter_publication_status(queryset, self.request.query_params.get("status"))
+
+    def browser_page(self, request, queryset, **metadata):
+        """Paginate browser requests; preserve the older response shape for other callers."""
+        raw_size = request.query_params.get("page_size")
+        if raw_size is None:
+            return None
+        try:
+            page_size = int(raw_size)
+            page = int(request.query_params.get("page", "1"))
+        except ValueError:
+            return Response({"error": "page and page_size must be integers"}, status=status.HTTP_400_BAD_REQUEST)
+        if page_size not in (20, 50, 100) or page < 1:
+            return Response({"error": "page_size must be 20, 50, or 100 and page must be positive"}, status=status.HTTP_400_BAD_REQUEST)
+
+        paginator = Paginator(queryset, page_size)
+        page_obj = paginator.get_page(page)
+        return Response({
+            "results": self.get_serializer(page_obj.object_list, many=True).data,
+            "count": paginator.count,
+            "page": page_obj.number,
+            "page_size": page_size,
+            "total_pages": paginator.num_pages,
+            "has_next": page_obj.has_next(),
+            "has_previous": page_obj.has_previous(),
+            **metadata,
+        })
 
     def perform_create(self, serializer):
         """Set the created_by and tenant fields when creating"""
@@ -1108,6 +1135,10 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         if status_filter and status_filter != "all":
             roots = roots.filter(status=status_filter)
 
+        page_response = self.browser_page(request, roots.order_by("-created_at", "-pk"))
+        if page_response is not None:
+            return page_response
+
         serializer = self.get_serializer(roots, many=True)
         return Response(serializer.data)
 
@@ -1151,6 +1182,9 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
             except ValueError:
                 pass
 
+        if request.query_params.get("roots_only", "").lower() == "true":
+            instances = instances.filter(parent__isnull=True)
+
         # Filter by published status (using version-based logic)
         published_only = request.query_params.get("published_only", "").lower() == "true"
         if published_only:
@@ -1179,9 +1213,13 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
                     default=0,
                     output_field=IntegerField(),
                 )
-            ).order_by("-relevance", "-created_at")
+            ).order_by("-relevance", "-created_at", "-pk")
         else:
-            instances = instances.order_by("-created_at")
+            instances = instances.order_by("-created_at", "-pk")
+
+        page_response = self.browser_page(request, instances, query=query)
+        if page_response is not None:
+            return page_response
 
         # Apply pagination
         limit = request.query_params.get("limit", "20")
