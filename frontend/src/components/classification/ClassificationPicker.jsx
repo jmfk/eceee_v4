@@ -1,15 +1,21 @@
 import '../user-tools.css'
-import React, { useId, useState, useEffect } from 'react'
+import React, { useId, useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { ListFilterPlus, Search, X } from 'lucide-react'
 import { taxonomyApi, classificationError } from '../../api/taxonomy'
 import { getCurrentTenantId } from '../../utils/tenant'
 import CompactSelect from './CompactSelect'
+import './classification.css'
 
 /** Controlled IDs belong to the editor's working copy, never to the live version. */
 export default function ClassificationPicker({ value = [], onChange, namespace, use, allowProposed = false, disabled = false }) {
     const id = useId()
     const [search, setSearch] = useState('')
     const [typeFilter, setTypeFilter] = useState('')
+    const [filterOpen, setFilterOpen] = useState(false)
+    const filterRef = useRef(null)
+    const filterButtonRef = useRef(null)
+    const filterId = useId()
     const [page, setPage] = useState(1)
     const [suggesting, setSuggesting] = useState(false)
     const [proposalName, setProposalName] = useState('')
@@ -19,7 +25,13 @@ export default function ClassificationPicker({ value = [], onChange, namespace, 
     const [proposalMessage, setProposalMessage] = useState('')
     const queryClient = useQueryClient()
     const tenant = getCurrentTenantId()
-    useEffect(() => { setSearch(''); setTypeFilter(''); setPage(1); setSuggesting(false); setProposalType(''); setProposalName(''); setProposalError(''); setProposalMessage('') }, [tenant, namespace, use])
+    useEffect(() => { setSearch(''); setTypeFilter(''); setFilterOpen(false); setPage(1); setSuggesting(false); setProposalType(''); setProposalName(''); setProposalError(''); setProposalMessage('') }, [tenant, namespace, use])
+    useEffect(() => {
+        if (!filterOpen) return
+        const dismiss = event => { if (!filterRef.current?.contains(event.target)) setFilterOpen(false) }
+        document.addEventListener('pointerdown', dismiss)
+        return () => document.removeEventListener('pointerdown', dismiss)
+    }, [filterOpen])
     const defaultNamespace = useQuery({
         queryKey: ['classification', tenant, 'defaultNamespace'],
         queryFn: async () => await taxonomyApi.defaultNamespace(),
@@ -42,6 +54,8 @@ export default function ClassificationPicker({ value = [], onChange, namespace, 
     })
     const availableTypes = (definitions.data?.results || []).filter(type => !use || type.allowedUses?.includes(use))
     const proposalTypes = (definitions.data?.results || []).filter(type => type.permissions?.includes('propose') && (!use || type.allowedUses?.includes(use)))
+    const activeType = availableTypes.find(type => String(type.id) === String(typeFilter))
+    const chooseType = typeId => { setTypeFilter(typeId); setPage(1); setFilterOpen(false); filterButtonRef.current?.focus() }
     const submitProposal = async () => {
         setProposalBusy(true); setProposalError('')
         try {
@@ -55,7 +69,7 @@ export default function ClassificationPicker({ value = [], onChange, namespace, 
     }
     const choices = (terms.data?.results || []).filter(term =>
         !value.includes(term.id) && (term.status === 'approved' || (allowProposed && term.status === 'proposed')))
-    return <fieldset disabled={disabled} className="user-tools-content min-w-0 space-y-3 text-gray-900">
+    return <fieldset disabled={disabled} className="classification-manager classification-picker user-tools-content min-w-0 space-y-3 text-gray-900">
         <legend className="font-medium">Tags</legend>
         <ul className="space-y-2" aria-label="Selected tags">
             {value.map(termId => {
@@ -66,13 +80,30 @@ export default function ClassificationPicker({ value = [], onChange, namespace, 
                 </li>
             })}
         </ul>
-        <label htmlFor={id} className="block text-sm">Find a tag</label>
-        <input id={id} value={search} onChange={event => { setSearch(event.target.value); setPage(1) }} className="w-full" type="search" />
-        {availableTypes.length > 1 && <CompactSelect label="Filter tag type" value={typeFilter}
-            onChange={event => { setTypeFilter(event.target.value); setPage(1) }}>
-            <option value="">All tag types</option>
-            {availableTypes.map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
-        </CompactSelect>}
+        <div ref={filterRef} className="classification-search-wrap" onKeyDown={event => {
+            if (event.key === 'Escape' && filterOpen) { event.stopPropagation(); setFilterOpen(false); filterButtonRef.current?.focus() }
+        }}>
+            <div className="classification-search" data-filled={Boolean(search || activeType)}>
+                <label htmlFor={id} className="classification-search-label">Find a tag</label>
+                <div className="classification-search-content">
+                    <Search size={16} aria-hidden="true" className="shrink-0 text-gray-400" />
+                    {activeType && <button type="button" className="classification-filter-pill inline-flex items-center" aria-label={`Remove type filter: ${activeType.name}`}
+                        onClick={() => chooseType('')}>{activeType.name}<X size={12} aria-hidden="true" /></button>}
+                    <input id={id} value={search} onChange={event => { setSearch(event.target.value); setPage(1) }} type="search" placeholder=" " />
+                    {availableTypes.length > 1 && <button ref={filterButtonRef} type="button" className="classification-icon" title="Add filter" aria-label="Add filter"
+                        aria-expanded={filterOpen} aria-controls={filterId} onClick={() => setFilterOpen(open => !open)}>
+                        <ListFilterPlus size={18} aria-hidden="true" />
+                    </button>}
+                </div>
+            </div>
+            {filterOpen && availableTypes.length > 1 && <div id={filterId} role="dialog" aria-label="Filter tag type" className="classification-filter-menu">
+                <div className="max-h-56 overflow-y-auto">
+                    <button type="button" aria-pressed={!typeFilter} onClick={() => chooseType('')} className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-gray-100">All tag types</button>
+                    {availableTypes.map(type => <button key={type.id} type="button" aria-pressed={String(type.id) === String(typeFilter)} onClick={() => chooseType(type.id)}
+                        className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-gray-100">{type.name}</button>)}
+                </div>
+            </div>}
+        </div>
         {definitions.error && <p role="alert">{classificationError(definitions.error)}</p>}
         {terms.isPending && <p role="status">Loading tags…</p>}
         {(terms.error || selected.error || defaultNamespace.error) && <p role="alert">{classificationError(terms.error || selected.error || defaultNamespace.error)}</p>}
