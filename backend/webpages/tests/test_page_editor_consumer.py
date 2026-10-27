@@ -97,14 +97,36 @@ class PageEditorConsumerTest(TransactionTestCase):
             self.assertEqual(presence["type"], "presence")
             self.assertEqual(presence["action"], "join")
             self.assertEqual(presence["user"]["username"], self.member.username)
-            self.assertEqual(
-                set(presence), {"type", "action", "page_id", "connection_id", "user", "section", "widget_id"}
-            )
+            self.assertEqual(presence["user"]["displayName"], self.member.username)
+            self.assertEqual(set(presence), {"type", "action", "pageId", "connectionId", "user", "section", "widgetId"})
+            self.assertNotIn("display_name", presence["user"])
             self.assertNotIn("widgets", presence)
             self.assertNotIn("page_data", presence)
 
             await member.disconnect()
             await owner.disconnect()
+
+        async_to_sync(scenario)()
+
+    def test_presence_input_accepts_camel_case_widget_id(self):
+        async def scenario():
+            communicator, connected = await self.connect_as(self.owner)
+            self.assertTrue(connected)
+            await communicator.receive_json_from()  # connection_established
+            await communicator.receive_json_from()  # own join
+
+            await communicator.send_json_to(
+                {
+                    "type": "presence_update",
+                    "section": "content",
+                    "widgetId": "widget-7",
+                }
+            )
+            presence = await communicator.receive_json_from()
+
+            self.assertEqual(presence["widgetId"], "widget-7")
+            self.assertNotIn("widget_id", presence)
+            await communicator.disconnect()
 
         async_to_sync(scenario)()
 

@@ -11,7 +11,8 @@ from typing import Optional, Type
 from django.db.models import F, OuterRef, Q, Subquery, Value
 from django.db.models.functions import Coalesce, NullIf
 from django.utils import timezone
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, validator
+from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
 from widget_contracts import catalog_widget
@@ -45,6 +46,8 @@ def _order_by_public_title(queryset, order_by, now):
 
 class ObjectListConfig(BaseModel):
     """Configuration for Object List widget"""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     object_type: str = Field(..., description="Object type to display (e.g., 'news', 'blog')")
     limit: int = Field(
@@ -103,6 +106,8 @@ class ObjectListConfig(BaseModel):
 class ObjectDetailConfig(BaseModel):
     """Configuration for Object Detail widget"""
 
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     object_id: Optional[int] = Field(
         default=None,
         description="Specific object ID to display (if not provided, uses context)",
@@ -126,6 +131,8 @@ class ObjectDetailConfig(BaseModel):
 
 class ObjectChildrenConfig(BaseModel):
     """Configuration for Object Children widget"""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     parent_object_id: Optional[int] = Field(
         default=None,

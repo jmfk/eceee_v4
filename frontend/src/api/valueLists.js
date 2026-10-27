@@ -74,7 +74,7 @@ export const valueListsApi = {
      */
     removeItem: async (valueListId, itemId) => {
         const response = await apiClient.delete(`${API_BASE}/value-lists/${valueListId}/remove_item/`, {
-            data: { item_id: itemId }
+            data: { itemId }
         })
         return response.status === 204
     },
@@ -84,7 +84,7 @@ export const valueListsApi = {
      */
     reorderItems: async (valueListId, itemOrders) => {
         const response = await apiClient.post(`${API_BASE}/value-lists/${valueListId}/reorder_items/`, {
-            item_orders: itemOrders
+            itemOrders
         })
         return response.data
     },

@@ -36,9 +36,9 @@ const ValueListsManager = () => {
         name: '',
         label: '',
         description: '',
-        value_type: 'string',
-        is_active: true,
-        items_data: []
+        valueType: 'string',
+        isActive: true,
+        itemsData: []
     })
 
     // Load value lists on mount
@@ -84,8 +84,8 @@ const ValueListsManager = () => {
             await valueListsApi.update(editingList.id, {
                 label: formData.label,
                 description: formData.description,
-                value_type: formData.value_type,
-                is_active: formData.is_active
+                valueType: formData.valueType,
+                isActive: formData.isActive
             })
             await loadValueLists()
             setEditingList(null)
@@ -137,9 +137,9 @@ const ValueListsManager = () => {
             name: '',
             label: '',
             description: '',
-            value_type: 'string',
-            is_active: true,
-            items_data: []
+            valueType: 'string',
+            isActive: true,
+            itemsData: []
         })
     }
 
@@ -148,9 +148,9 @@ const ValueListsManager = () => {
             name: valueList.name,
             label: valueList.label,
             description: valueList.description || '',
-            value_type: valueList.value_type,
-            is_active: valueList.is_active,
-            items_data: []
+            valueType: valueList.valueType,
+            isActive: valueList.isActive,
+            itemsData: []
         })
         setEditingList(valueList)
         setShowCreateForm(false)
@@ -239,7 +239,7 @@ const ValueListsManager = () => {
                     ) : (
                         <div className="space-y-2">
                             {valueLists.map((valueList) => {
-                                const ValueTypeIcon = getValueTypeIcon(valueList.value_type)
+                                const ValueTypeIcon = getValueTypeIcon(valueList.valueType)
                                 return (
                                     <div
                                         key={valueList.id}
@@ -261,11 +261,11 @@ const ValueListsManager = () => {
                                                 </div>
                                             </div>
                                             <div className="flex items-center space-x-2">
-                                                <span className={`px-2 py-1 text-xs rounded-full ${getValueTypeColor(valueList.value_type)}`}>
-                                                    {valueList.value_type}
+                                                <span className={`px-2 py-1 text-xs rounded-full ${getValueTypeColor(valueList.valueType)}`}>
+                                                    {valueList.valueType}
                                                 </span>
                                                 <span className="text-sm text-gray-500">
-                                                    {valueList.item_count} items
+                                                    {valueList.itemCount} items
                                                 </span>
                                                 <div className="flex items-center space-x-1">
                                                     <button
@@ -278,7 +278,7 @@ const ValueListsManager = () => {
                                                     >
                                                         <Edit className="w-4 h-4" />
                                                     </button>
-                                                    {!valueList.is_system && (
+                                                    {!valueList.isSystem && (
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation()
@@ -369,8 +369,8 @@ const ValueListsManager = () => {
                                         Value Type
                                     </label>
                                     <select
-                                        value={formData.value_type}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, value_type: e.target.value }))}
+                                        value={formData.valueType}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, valueType: e.target.value }))}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     >
                                         <option value="string">String</option>
@@ -385,12 +385,12 @@ const ValueListsManager = () => {
                                 <div className="flex items-center">
                                     <input
                                         type="checkbox"
-                                        id="is_active"
-                                        checked={formData.is_active}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
+                                        id="isActive"
+                                        checked={formData.isActive}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.target.checked }))}
                                         className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                                     />
-                                    <label htmlFor="is_active" className="ml-2 text-sm text-gray-700">
+                                    <label htmlFor="isActive" className="ml-2 text-sm text-gray-700">
                                         Active (available for use in forms)
                                     </label>
                                 </div>
@@ -418,7 +418,7 @@ const ValueListsManager = () => {
                         <div className="bg-white border border-gray-200 rounded-lg p-6">
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center space-x-3">
-                                    {React.createElement(getValueTypeIcon(selectedList.value_type), {
+                                    {React.createElement(getValueTypeIcon(selectedList.valueType), {
                                         className: "w-5 h-5 text-gray-600"
                                     })}
                                     <div>
@@ -441,9 +441,9 @@ const ValueListsManager = () => {
 
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between">
-                                    <div className="font-medium text-gray-900" role="heading" aria-level="4">Items ({selectedList.item_count})</div>
-                                    <span className={`px-2 py-1 text-xs rounded-full ${getValueTypeColor(selectedList.value_type)}`}>
-                                        {selectedList.value_type}
+                                    <div className="font-medium text-gray-900" role="heading" aria-level="4">Items ({selectedList.itemCount})</div>
+                                    <span className={`px-2 py-1 text-xs rounded-full ${getValueTypeColor(selectedList.valueType)}`}>
+                                        {selectedList.valueType}
                                     </span>
                                 </div>
 
@@ -455,15 +455,15 @@ const ValueListsManager = () => {
                                                     <span className="text-sm text-gray-500">#{item.order || index + 1}</span>
                                                     <div>
                                                         <div className="font-medium text-gray-900">{item.label}</div>
-                                                        {item.effective_value !== item.label && (
+                                                        {item.effectiveValue !== item.label && (
                                                             <div className="text-sm text-gray-500">
-                                                                Value: <code className="bg-gray-200 px-1 rounded">{item.effective_value}</code>
+                                                                Value: <code className="bg-gray-200 px-1 rounded">{item.effectiveValue}</code>
                                                             </div>
                                                         )}
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center space-x-2">
-                                                    {item.is_active ? (
+                                                    {item.isActive ? (
                                                         <Check className="w-4 h-4 text-green-500" />
                                                     ) : (
                                                         <X className="w-4 h-4 text-red-500" />
