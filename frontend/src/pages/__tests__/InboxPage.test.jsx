@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import InboxPage from '../InboxPage'
+import SupportSettingsPage from '../SupportSettingsPage'
 import { supportRequest, validateBugVideo } from '../../api/support'
 import { setCmsCopyLanguage } from '../../utils/cmsCopy'
 
@@ -64,6 +65,7 @@ const renderInbox = (route = '/inbox/?tenant=a') => {
             <MemoryRouter initialEntries={[route]}>
                 <Routes>
                     <Route path="/inbox/*" element={<InboxPage />} />
+                    <Route path="/settings/support" element={<SupportSettingsPage />} />
                 </Routes>
             </MemoryRouter>
         </QueryClientProvider>,
@@ -97,6 +99,17 @@ beforeEach(() => {
 })
 
 describe('tenant inbox journey', () => {
+    it('keeps support configuration in Settings and redirects the old Inbox link', async () => {
+        supportRequest.mockImplementation(async (_tenant, path) => {
+            if (path === 'context/') return { ...context, canManage: true, members: [], roles: [] }
+            if (path === 'deliveries/') return { results: [] }
+            throw new Error(`Unexpected ${path}`)
+        })
+        renderInbox('/inbox/manage?tenant=a')
+        expect(await screen.findByRole('heading', { name: 'Supportinställningar' })).toBeInTheDocument()
+        expect(screen.queryByRole('navigation', { name: 'Inboxnavigation' })).not.toBeInTheDocument()
+    })
+
     it('adds several message labels instead of choosing one type', async () => {
         renderInbox('/inbox/new?tenant=a')
         await screen.findByRole('heading', { name: 'Nytt meddelande' })
@@ -135,7 +148,7 @@ describe('tenant inbox journey', () => {
         })
         const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
         try {
-            renderInbox('/inbox/manage?tenant=a')
+            renderInbox('/settings/support?tenant=a')
             await screen.findByRole('heading', { name: 'Supportinställningar' })
             fireEvent.click(screen.getAllByRole('button', { name: 'Byt namn' })[0])
             fireEvent.change(screen.getByRole('textbox', { name: 'Nytt namn för Question' }), { target: { value: 'General question' } })

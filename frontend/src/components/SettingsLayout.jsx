@@ -19,6 +19,7 @@ const SettingsLayout = ({ children, statusContent }) => {
         if (path === '/settings') return 'Settings - Dashboard'
         if (path.includes('/experiments')) return 'Settings - A/B Testing'
         if (path.includes('/users')) return 'Settings - Users'
+        if (path === '/settings/support') return 'Settings - Support'
         if (path.includes('/layouts')) return 'Settings - Layouts'
         if (path.includes('/themes')) return 'Settings - Themes'
         if (path.includes('/widgets')) return 'Settings - Widgets'

@@ -1,0 +1,29 @@
+.support-settings .support-content input:not([type='checkbox']):not([type='radio']),
+.support-settings .support-content select {
+    min-height: 32px;
+    padding: 6px 10px;
+    border: 1px solid var(--color-gray-300, #d1d5db);
+    border-radius: 3px;
+    background: white;
+    font-size: 12px;
+}
+
+.support-settings .support-content input:focus-visible,
+.support-settings .support-content select:focus-visible {
+    outline: 2px solid var(--color-primary-600, #2563eb);
+    outline-offset: 1px;
+}
+
+.support-settings .message-label-settings form label {
+    margin: 0;
+    font-size: 12px;
+}
+
+.support-settings .message-label-settings form input:not([type]) {
+    width: min(240px, 100%);
+    margin-top: 4px;
+}
+
+.support-settings .message-label-settings form button {
+    min-height: 32px;
+}
