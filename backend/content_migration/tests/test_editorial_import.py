@@ -40,7 +40,9 @@ def record(resource="news", pk=1, **updates):
     data = (
         {"firstName": "Test", "lastName": "Writer"}
         if resource == "columnists"
-        else {"authorIds": [1]} if resource == "columns" else {}
+        else {"authorIds": [1]}
+        if resource == "columns"
+        else {}
     )
     return {
         "legacyId": pk,
@@ -375,9 +377,23 @@ class EditorialImportTests(TestCase):
             namespace=self.namespace,
             user=self.user,
             source_scope="legacy.example:site:2",
-            records=[("publications", row)],
+            records=[("news", row)],
             configuration=configuration,
         )
+
+    def test_publications_cannot_be_staged(self):
+        with self.assertRaisesRegex(BlockedRecord, "resource_not_in_editorial_import"):
+            self.stage([("publications", record("publications"))])
+        self.assertFalse(ObjectInstance.objects.exists())
+
+    def test_existing_publication_manifest_cannot_be_applied(self):
+        run = self.stage([("news", record())])
+        item = run.items.get()
+        item.resource = "publications"
+        item.save(update_fields=["resource"])
+        with self.assertRaisesRegex(BlockedRecord, "resource_not_in_editorial_import"):
+            apply_run(run, self.user)
+        self.assertFalse(ObjectInstance.objects.exists())
 
     def test_canonical_images_and_attachments_use_reviewed_terms_and_preserve_existing_assignments(self):
         from file_manager.models import MediaFile
@@ -389,7 +405,7 @@ class EditorialImportTests(TestCase):
         next_term = self._media_term("Reviewed")
         ClassificationRollout.objects.create(namespace=self.namespace, phase="canonical")
         row = record(
-            "publications",
+            "news",
             content='<p>Report <img src="https://legacy.example/cover.png"></p>',
             attachments=[{"title": "Report", "url": "https://legacy.example/report.pdf"}],
         )
@@ -443,7 +459,7 @@ class EditorialImportTests(TestCase):
 
         term = self._media_term("Imported")
         ClassificationRollout.objects.create(namespace=self.namespace, phase="canonical")
-        row = record("publications", content='<p><img src="https://legacy.example/recover.png"></p>')
+        row = record("news", content='<p><img src="https://legacy.example/recover.png"></p>')
         config = {"mediaClassificationIds": [str(term.pk)]}
         objects = {}
 
@@ -496,7 +512,7 @@ class EditorialImportTests(TestCase):
         from taxonomy.models import ClassificationRollout
 
         ClassificationRollout.objects.create(namespace=self.namespace, phase="canonical")
-        row = record("publications", attachments=[{"title": "Report", "url": "https://legacy.example/report.pdf"}])
+        row = record("news", attachments=[{"title": "Report", "url": "https://legacy.example/report.pdf"}])
         with (
             patch("content_migration.legacy_news.remote.get_public_url") as download,
             patch("file_manager.storage.storage") as storage,
@@ -774,27 +790,26 @@ class EditorialImportTests(TestCase):
             {"unchanged": 1},
         )
 
-    def test_all_six_resources_share_article_storage_and_preserve_dependencies_and_attachments(self):
+    def test_all_five_resources_share_article_storage_and_preserve_dependencies_and_attachments(self):
         mutate(self.user, self.facets["event_type"], "create", payload={"name": "Conference", "slug": "conference"})
         attachments = [
             {"title": "First report", "externalUrl": "https://example.org/first"},
             {"title": "Second report", "externalUrl": "https://example.org/second"},
         ]
         rows = [
-            ("news", record()),
+            ("news", record(attachments=attachments)),
             ("columns", record("columns")),
             ("columnists", record("columnists")),
             ("events", record("events", data={"eventStartDate": "2020-05-10", "eventType": "Conference"})),
-            ("publications", record("publications", attachments=attachments)),
             ("organizations", record("organizations", data={"fullName": "Public organization", "country": "SE"})),
         ]
         run = self.stage(rows)
-        self.assertEqual(apply_run(run, self.user), {"imported": 6})
+        self.assertEqual(apply_run(run, self.user), {"imported": 5})
         self.assertEqual(ObjectInstance.objects.filter(object_type=self.types["article"]).count(), 2)
         self.assertFalse(ObjectInstance.objects.filter(current_version__effective_date__isnull=False).exists())
-        library = EditorialImportBinding.objects.get(resource="publications").object_instance
-        self.assertEqual(library.current_version.workflow_metadata["legacy_editorial"]["attachments"], attachments)
-        self.assertEqual(apply_run(self.stage(rows), self.user), {"unchanged": 6})
+        article = EditorialImportBinding.objects.get(resource="news").object_instance
+        self.assertEqual(article.current_version.workflow_metadata["legacy_editorial"]["attachments"], attachments)
+        self.assertEqual(apply_run(self.stage(rows), self.user), {"unchanged": 5})
 
     @patch("content_migration.management.commands.migrate_legacy_editorial.NewsCommand._legacy_api_config")
     @patch("content_migration.legacy_content.source.EditorialSource._request")

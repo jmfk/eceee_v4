@@ -18,7 +18,7 @@ from taxonomy.models import ClassificationRollout, ClassificationType, Tag
 from taxonomy.services import require
 
 from .profile import OBJECT_TYPES, PROFILE
-from .source import validate_record
+from .source import DEFAULT_RESOURCES, validate_record
 from .term_plan import RESOURCE_TARGETS, compile_plan
 from .term_plan import identity as term_identity
 from .term_plan import source_names
@@ -136,10 +136,10 @@ def stage(*, tenant, namespace, user, source_scope, records, preset="dev", confi
     prepared = []
     identities = set()
     for resource, row in records:
+        if resource not in DEFAULT_RESOURCES:
+            raise BlockedRecord("resource_not_in_editorial_import")
         validate_record(row, resource)
         if "resolvedTermMap" in config:
-            if resource == "publications":
-                raise BlockedRecord("resource_not_in_reviewed_import")
             if row["sourceSite"] != config["sourceSite"]:
                 raise BlockedRecord("reviewed_term_map_wrong_site")
             for key in _reviewed_keys(row, resource):
@@ -402,6 +402,8 @@ def _attachments(row, media_importer):
 @transaction.atomic
 def apply_item(run, item, user, types, facets):
     item = EditorialImportItem.objects.select_for_update().get(pk=item.pk)
+    if item.resource not in DEFAULT_RESOURCES:
+        raise BlockedRecord("resource_not_in_editorial_import")
     if item.status in {"imported", "unchanged", "excluded"}:
         return item.status
     row = item.record
@@ -584,6 +586,8 @@ def apply_item(run, item, user, types, facets):
 
 
 def apply_run(run, user):
+    if run.items.exclude(resource__in=DEFAULT_RESOURCES).exists():
+        raise BlockedRecord("resource_not_in_editorial_import")
     types, facets, definition_hash = preflight(run.tenant, run.namespace, user)
     if definition_hash != run.configuration["definitionHash"]:
         raise BlockedRecord("definitions_changed_since_staging")
@@ -626,7 +630,7 @@ def apply_run(run, user):
         run.status = "running"
         run.save(update_fields=["status", "updated_at"])
         # Dependencies always precede referencing articles, independent of manifest order.
-        for resource in ("columnists", "organizations", "news", "columns", "events", "publications"):
+        for resource in DEFAULT_RESOURCES:
             for item in run.items.filter(resource=resource).order_by("pk").iterator():
                 try:
                     apply_item(run, item, user, types, facets)
