@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import HowToHelpPage from '../HowToHelpPage'
 
@@ -65,5 +65,16 @@ describe('HowToHelpPage', () => {
         mocks.language = 'sv-se'
         renderPage('/help/how-to/pages-create')
         expect(screen.getByRole('heading', { name: 'Skapa en sida' })).toBeInTheDocument()
+    })
+
+    it('keeps the report workspace while navigating within help', () => {
+        renderPage('/help/how-to/record-bug-video?tenant=report-workspace')
+        const sectionLink = screen.getAllByRole('link', { name: 'Inbox and support' })[0]
+        expect(sectionLink).toHaveAttribute('href', '/help/how-to/section/support?lang=en&tenant=report-workspace')
+        fireEvent.click(sectionLink)
+        expect(screen.getByRole('heading', { name: 'Inbox and support' })).toBeInTheDocument()
+        expect(screen.getAllByRole('link', { name: 'Record a five-second bug report' })[0]).toHaveAttribute(
+            'href', '/help/how-to/record-bug-video?lang=en&tenant=report-workspace',
+        )
     })
 })

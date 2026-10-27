@@ -225,6 +225,12 @@ describe('tenant inbox journey', () => {
         expect(screen.getByLabelText('Länk till platsen')).toHaveValue(
             'https://cms.example.invalid/pages/4',
         )
+        expect(screen.getByRole('link', { name: /Så spelar du in en femsekunders buggrapport/ })).toHaveAttribute(
+            'href', '/help/how-to/record-bug-video?tenant=a',
+        )
+        expect(screen.getByRole('link', { name: /Så spelar du in en femsekunders buggrapport/ })).toHaveAttribute(
+            'target', '_blank',
+        )
         fireEvent.change(screen.getByLabelText('Titel'), {
             target: { value: thread.title },
         })

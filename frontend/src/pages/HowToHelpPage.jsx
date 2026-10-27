@@ -22,9 +22,10 @@ const getAllGuides = () => howToDocs.flatMap(doc => doc.guides.map(guide => ({ .
 
 const findGuide = (guideId) => getAllGuides().find(guide => guide.id === guideId)
 
-const withLanguage = (path, language) => `${path}?lang=${normalizeHelpLanguage(language)}`
+const withLanguage = (path, language, tenant) =>
+    `${path}?lang=${normalizeHelpLanguage(language)}${tenant ? `&tenant=${encodeURIComponent(tenant)}` : ''}`
 
-const LanguageSwitcher = ({ language }) => {
+const LanguageSwitcher = ({ language, tenant }) => {
     const text = getHelpText(language)
 
     return (
@@ -34,7 +35,7 @@ const LanguageSwitcher = ({ language }) => {
                 id="help-language"
                 value={normalizeHelpLanguage(language)}
                 onChange={(event) => {
-                    window.location.assign(withLanguage(window.location.pathname, event.target.value))
+                    window.location.assign(withLanguage(window.location.pathname, event.target.value, tenant))
                 }}
                 className="rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-600 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
             >
@@ -51,7 +52,7 @@ const LanguageSwitcher = ({ language }) => {
                 {text.openAdmin}
             </a>
             <Link
-                to={withLanguage('/help/script-editor', language)}
+                to={withLanguage('/help/script-editor', language, tenant)}
                 className="text-sm font-medium text-gray-500 hover:text-blue-600"
             >
                 {text.scriptEditor}
@@ -60,7 +61,7 @@ const LanguageSwitcher = ({ language }) => {
     )
 }
 
-const HelpShell = ({ title, subtitle, children, language }) => {
+const HelpShell = ({ title, subtitle, children, language, tenant }) => {
     const [isMenuExpanded, setIsMenuExpanded] = useState(false)
     const text = getHelpText(language)
     useDocumentTitle(title)
@@ -69,7 +70,7 @@ const HelpShell = ({ title, subtitle, children, language }) => {
         <div className={`min-h-screen bg-gray-50 text-gray-900 ${isMenuExpanded ? 'lg:pl-80' : 'lg:pl-20'}`}>
             <div className="border-b border-gray-200 bg-white">
                 <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-                    <Link to={withLanguage(getHelpIndexPath(), language)} className="flex items-center gap-3">
+                    <Link to={withLanguage(getHelpIndexPath(), language, tenant)} className="flex items-center gap-3">
                         <span className="flex h-10 w-10 items-center justify-center rounded bg-blue-50 text-blue-600">
                             <BookOpen className="h-5 w-5" />
                         </span>
@@ -78,7 +79,7 @@ const HelpShell = ({ title, subtitle, children, language }) => {
                             <span className="block text-xs text-gray-500">{text.subtitle}</span>
                         </span>
                     </Link>
-                    <LanguageSwitcher language={language} />
+                    <LanguageSwitcher language={language} tenant={tenant} />
                 </div>
             </div>
 
@@ -112,7 +113,7 @@ const HelpShell = ({ title, subtitle, children, language }) => {
                             return (
                                 <div key={doc.id}>
                                     <Link
-                                        to={withLanguage(getHelpSectionPath(doc.id), language)}
+                                        to={withLanguage(getHelpSectionPath(doc.id), language, tenant)}
                                         title={localizedDoc.title}
                                         className="block rounded px-2 py-1 text-sm font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700"
                                     >
@@ -125,7 +126,7 @@ const HelpShell = ({ title, subtitle, children, language }) => {
                                             return (
                                                 <Link
                                                     key={guide.id}
-                                                    to={withLanguage(getHelpGuidePath(guide.id), language)}
+                                                    to={withLanguage(getHelpGuidePath(guide.id), language, tenant)}
                                                     className="block rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-50 hover:text-blue-700"
                                                 >
                                                     {localizedGuide.title}
@@ -153,9 +154,9 @@ const HelpShell = ({ title, subtitle, children, language }) => {
     )
 }
 
-const GuideCard = ({ guide, language }) => (
+const GuideCard = ({ guide, language, tenant }) => (
     <Link
-        to={withLanguage(getHelpGuidePath(guide.id), language)}
+        to={withLanguage(getHelpGuidePath(guide.id), language, tenant)}
         className="block rounded border border-gray-200 bg-white p-4 transition-colors hover:border-blue-200 hover:bg-blue-50"
     >
         <span className="flex items-start justify-between gap-3">
@@ -168,11 +169,11 @@ const GuideCard = ({ guide, language }) => (
     </Link>
 )
 
-const HelpIndexPage = ({ language }) => {
+const HelpIndexPage = ({ language, tenant }) => {
     const text = getHelpText(language)
 
     return (
-        <HelpShell title={text.indexTitle} subtitle={text.indexSubtitle} language={language}>
+        <HelpShell title={text.indexTitle} subtitle={text.indexSubtitle} language={language} tenant={tenant}>
             <div className="space-y-6">
                 {howToDocs.map(doc => {
                     const localizedDoc = localizeSection(doc, language)
@@ -180,14 +181,14 @@ const HelpIndexPage = ({ language }) => {
                     return (
                         <section key={doc.id} className="rounded border border-gray-200 bg-white p-5">
                             <div className="mb-4">
-                                <Link to={withLanguage(getHelpSectionPath(doc.id), language)} className="text-xl font-semibold text-gray-900 hover:text-blue-700">
+                                <Link to={withLanguage(getHelpSectionPath(doc.id), language, tenant)} className="text-xl font-semibold text-gray-900 hover:text-blue-700">
                                     {localizedDoc.title}
                                 </Link>
                                 <p className="mt-1 text-sm text-gray-600">{localizedDoc.summary}</p>
                             </div>
                             <div className="grid gap-3 md:grid-cols-2">
                                 {doc.guides.map(guide => (
-                                    <GuideCard key={guide.id} guide={localizeGuide(guide, language)} language={language} />
+                                    <GuideCard key={guide.id} guide={localizeGuide(guide, language)} language={language} tenant={tenant} />
                                 ))}
                             </div>
                         </section>
@@ -198,30 +199,30 @@ const HelpIndexPage = ({ language }) => {
     )
 }
 
-const HelpSectionPage = ({ language }) => {
+const HelpSectionPage = ({ language, tenant }) => {
     const { sectionId } = useParams()
     const doc = howToDocs.find(item => item.id === sectionId)
 
-    if (!doc) return <Navigate to={withLanguage(getHelpIndexPath(), language)} replace />
+    if (!doc) return <Navigate to={withLanguage(getHelpIndexPath(), language, tenant)} replace />
 
     const localizedDoc = localizeSection(doc, language)
 
     return (
-        <HelpShell title={localizedDoc.title} subtitle={localizedDoc.summary} language={language}>
+        <HelpShell title={localizedDoc.title} subtitle={localizedDoc.summary} language={language} tenant={tenant}>
             <div className="grid gap-3 md:grid-cols-2">
                 {doc.guides.map(guide => (
-                    <GuideCard key={guide.id} guide={localizeGuide(guide, language)} language={language} />
+                    <GuideCard key={guide.id} guide={localizeGuide(guide, language)} language={language} tenant={tenant} />
                 ))}
             </div>
         </HelpShell>
     )
 }
 
-const HelpGuidePage = ({ language }) => {
+const HelpGuidePage = ({ language, tenant }) => {
     const { guideId } = useParams()
     const guide = findGuide(guideId)
 
-    if (!guide) return <Navigate to={withLanguage(getHelpIndexPath(), language)} replace />
+    if (!guide) return <Navigate to={withLanguage(getHelpIndexPath(), language, tenant)} replace />
 
     const localizedSection = localizeSection(guide.section, language)
     const localizedGuide = localizeGuide(guide, language)
@@ -229,10 +230,10 @@ const HelpGuidePage = ({ language }) => {
     const text = getHelpText(language)
 
     return (
-        <HelpShell title={localizedGuide.title} subtitle={localizedGuide.summary} language={language}>
+        <HelpShell title={localizedGuide.title} subtitle={localizedGuide.summary} language={language} tenant={tenant}>
             <article className="rounded border border-gray-200 bg-white p-5 sm:p-6">
                 <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-gray-500">
-                    <Link to={withLanguage(getHelpSectionPath(guide.section.id), language)} className="font-medium text-blue-600 hover:text-blue-700">
+                    <Link to={withLanguage(getHelpSectionPath(guide.section.id), language, tenant)} className="font-medium text-blue-600 hover:text-blue-700">
                         {localizedSection.title}
                     </Link>
                     <ChevronRight className="h-4 w-4" />
@@ -276,6 +277,7 @@ const HelpGuidePage = ({ language }) => {
 const HowToHelpPage = () => {
     const [searchParams] = useSearchParams()
     const { language: cmsLanguage } = useAuth()
+    const tenant = searchParams.get('tenant') || ''
     const requestedLanguage = searchParams.get('lang')
     const language = normalizeHelpLanguage(
         HELP_LANGUAGES.some(candidate => candidate.code === requestedLanguage)
@@ -290,13 +292,13 @@ const HowToHelpPage = () => {
 
     return (
         <Routes>
-            <Route index element={<HelpIndexPage language={language} />} />
+            <Route index element={<HelpIndexPage language={language} tenant={tenant} />} />
             <Route path="script-editor" element={<HowToScriptEditorPage />} />
             <Route path="script-editor/:language/:guideId" element={<HowToScriptEditorPage />} />
-            <Route path="how-to" element={<HelpIndexPage language={language} />} />
-            <Route path="how-to/section/:sectionId" element={<HelpSectionPage language={language} />} />
-            <Route path="how-to/:guideId" element={<HelpGuidePage language={language} />} />
-            <Route path="*" element={<Navigate to={withLanguage(getHelpIndexPath(), language)} replace />} />
+            <Route path="how-to" element={<HelpIndexPage language={language} tenant={tenant} />} />
+            <Route path="how-to/section/:sectionId" element={<HelpSectionPage language={language} tenant={tenant} />} />
+            <Route path="how-to/:guideId" element={<HelpGuidePage language={language} tenant={tenant} />} />
+            <Route path="*" element={<Navigate to={withLanguage(getHelpIndexPath(), language, tenant)} replace />} />
         </Routes>
     )
 }

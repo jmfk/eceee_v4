@@ -61,8 +61,8 @@ test('contextual reports provide safe URL, diagnostics and the uploadable help v
     const helpWindowPromise = page.waitForEvent('popup')
     await page.getByRole('link', { name: /Så spelar du in en femsekunders buggrapport/ }).click()
     const helpWindow = await helpWindowPromise
-    await expect(helpWindow).toHaveURL(/\/help\/how-to\/record-bug-video\?lang=sv$/)
-    await expect(helpWindow.getByRole('heading', { name: 'Spela in en femsekunders buggrapport' })).toBeVisible()
+    await expect(helpWindow).toHaveURL(/\/help\/how-to\/record-bug-video\?tenant=test$/)
+    await expect(helpWindow.getByRole('heading', { name: /Spela in en femsekunders buggrapport|Record a five-second bug report/ })).toBeVisible()
     await expect(page.getByLabel('Länk till platsen', { exact: true })).toHaveValue('https://cms.example.invalid/pages/42')
     await page.screenshot({ path: testInfo.outputPath('compose-desktop.png') })
 })

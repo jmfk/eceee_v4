@@ -18,6 +18,7 @@ export async function uploadMessageFiles(tenant, files, cache) {
 }
 
 export function MessageFilePicker({ files, setFiles, disabled = false, onCheckingChange }) {
+    const tenant = useSupportTenant()
     const [error, setError] = useState('')
     const [checking, setChecking] = useState(false)
     const sequence = useRef(0)
@@ -44,7 +45,7 @@ export function MessageFilePicker({ files, setFiles, disabled = false, onCheckin
         {files.map((file, index) => <div key={index} className="flex items-center gap-2 my-2"><span>{file.name}</span><button type="button" disabled={disabled || checking} onClick={() => setFiles(files.filter((_, i) => i !== index))}>Ta bort {file.name}</button></div>)}
         {checking && <p role="status">Kontrollerar bilagorna…</p>}
         {error && <p role="alert" className="support-error">{error}</p>}
-        <Link className="text-xs font-medium text-blue-600 underline hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" to="/help/how-to/record-bug-video?lang=sv" target="_blank" rel="noopener noreferrer">
+        <Link className="text-xs font-medium text-blue-600 underline hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" to={`/help/how-to/record-bug-video?tenant=${encodeURIComponent(tenant || '')}`} target="_blank" rel="noopener noreferrer">
             Så spelar du in en femsekunders buggrapport (öppnas i nytt fönster)
         </Link>
     </section>
