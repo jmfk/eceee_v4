@@ -6,7 +6,7 @@ Den fristående [objektmodellen](legacy-editorial-object-model.md) beskriver exa
 
 ## Granskad termkarta
 
-`backend/content_migration/legacy_content/site2_terms.json` innehåller de 698 använda källidentiteterna med originalnamn och användningsantal. `site2_decisions.json` innehåller de beslutade grenarna, barnrelationerna, namnen och sammanslagningarna. `term_plan.py` validerar täckning, identiteter, sammanslagningar och föräldragraf och kompilerar ett portabelt paket med 703 måltermer inklusive de tre innehållsslagen. Källidentitet är site, dimension, modell och ID; evenemangens textval använder site, fältnamn och exakt värde. En ny eller omdöpt källterm stoppar den berörda stage-körningen. Källorna med tomt namn respektive `external-resource` är uttryckligen mappade till Okänd källa.
+`backend/content_migration/legacy_content/site2_terms.json` innehåller de 698 använda källidentiteterna med originalnamn och användningsantal. `site2_decisions.json` innehåller de beslutade grenarna, barnrelationerna, namnen och sammanslagningarna. `term_plan.py` validerar täckning, identiteter, sammanslagningar och föräldragraf och kompilerar ett portabelt paket med 703 måltermer inklusive de tre innehållsslagen. Källidentitet är site, dimension, modell och ID; evenemangens textval använder site, fältnamn och exakt värde. En ny, omdöpt eller omföräldrad källterm stoppar den berörda stage-körningen. Källorna med tomt namn respektive `external-resource` är uttryckligen mappade till Okänd källa.
 
 ```sh
 python3 scripts/compile_legacy_terms.py --bundle /secure/path/site2-bundle.json --mapping /secure/path/site2-map.json --review /secure/path/site2-review.json
