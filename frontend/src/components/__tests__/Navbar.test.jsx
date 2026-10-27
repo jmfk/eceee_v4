@@ -20,8 +20,8 @@ describe('Navbar', () => {
   let resizeCallback
   let observers
 
-  const renderNavbar = () => render(
-    <MemoryRouter initialEntries={['/pages']}>
+  const renderNavbar = (initialEntry = '/pages') => render(
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Navbar />
     </MemoryRouter>,
   )
@@ -69,7 +69,7 @@ describe('Navbar', () => {
     expect(screen.getByRole('link', { name: 'Tags' })).toHaveAttribute('href', '/tags')
     expect(screen.getByRole('link', { name: 'Designer' })).toHaveAttribute('href', '/designer/themes')
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
-    expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/profile')
+    expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/inbox')
     expect(screen.queryByRole('button', { name: 'Logout' })).not.toBeInTheDocument()
     for (const name of ['Inbox', 'Kanban']) {
       expect(screen.queryByRole('link', { name })).not.toBeInTheDocument()
@@ -77,6 +77,23 @@ describe('Navbar', () => {
     expect(screen.getByRole('link', { name: 'Report a problem' })).toHaveAttribute('href', expect.stringContaining('/inbox/new?from='))
     expect(screen.queryByText('EASY v4')).not.toBeInTheDocument()
     expect(screen.queryByText('›')).not.toBeInTheDocument()
+  })
+
+  it('opens the scoped Inbox first from Profile in both main menu modes', () => {
+    const { unmount } = renderNavbar('/settings?tenant=other')
+    expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/inbox?tenant=other')
+    unmount()
+
+    availableWidth = 800
+    renderNavbar('/settings?tenant=other')
+    fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
+    expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/inbox?tenant=other')
+  })
+
+  it('keeps Profile as the entry for board guests without Inbox access', () => {
+    useAuth.mockReturnValue({ logout: vi.fn(), user: { isKanbanBoardGuest: true, permissions: ['kanban.read'] } })
+    renderNavbar()
+    expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/profile')
   })
 
   it('keeps personal tools but hides denied CMS navigation for an empty role', () => {
