@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from content.models import Namespace
 from content_migration.legacy_content.service import apply_run, preflight, stage
-from content_migration.legacy_content.source import DEFAULT_RESOURCES, DEV_LIMITS, RESOURCES, EditorialSource
+from content_migration.legacy_content.source import DEFAULT_RESOURCES, DEV_LIMITS, EditorialSource
 from content_migration.legacy_content.transform import checksum
 from content_migration.legacy_news.api import LegacyMigrationApiError, LegacyNewsApi
 from content_migration.management.commands.migrate_legacy_news import Command as NewsCommand
@@ -116,7 +116,7 @@ class Command(BaseCommand):
             )
             return
         resources = o["resources"].split(",")
-        if len(resources) != len(set(resources)) or any(r not in RESOURCES for r in resources):
+        if len(resources) != len(set(resources)) or any(r not in DEFAULT_RESOURCES for r in resources):
             raise CommandError("Choose explicit supported resources")
         if o["preset"] == "all" and o["limit"] is not None:
             raise CommandError("--limit cannot restrict an all preset")

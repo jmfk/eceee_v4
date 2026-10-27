@@ -2,6 +2,8 @@
 
 Importen omfattar `news`, `columns`, `columnists`, `events` och `organizations`. De ger Artikel, Krönikör, Evenemang och Organisation. `publications` och `ReportPage` ingår inte; måltypen `library_item` finns kvar. Alla importerade objekt är utkast.
 
+Ett uttryckligt `--resources publications` avvisas också. Äldre manifest som innehåller resursen kan läsas för rapportering men körs inte igen.
+
 Den fristående [objektmodellen](legacy-editorial-object-model.md) beskriver exakt vilka typer, fält, relationer och klassificeringar ett annat projekt behöver bygga för denna import.
 
 ## Sökning och filter efter import
