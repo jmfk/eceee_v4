@@ -1,9 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
 import { supportRequest, supportError, validateBugVideo } from '../../api/support'
-import { useSupportTenant, useSupportIdentity } from './useSupportContext'
-import PrivatePlayer from './PrivateVideoPlayer'
+import { useSupportTenant } from './useSupportContext'
 
 export async function uploadMessageFiles(tenant, files, cache) {
     const ids = []
@@ -20,16 +18,8 @@ export async function uploadMessageFiles(tenant, files, cache) {
 }
 
 export function MessageFilePicker({ files, setFiles, disabled = false, onCheckingChange }) {
-    const tenant = useSupportTenant()
-    const identity = useSupportIdentity()
     const [error, setError] = useState('')
     const [checking, setChecking] = useState(false)
-    const [showHelp, setShowHelp] = useState(false)
-    const help = useQuery({
-        queryKey: ['support', tenant, identity, 'bug-video-help'],
-        queryFn: () => supportRequest(tenant, 'instructions/?help_guide_id=record-bug-video'),
-        enabled: showHelp,
-    })
     const sequence = useRef(0)
     const select = async (event) => {
         const selected = [...event.target.files]
@@ -54,12 +44,9 @@ export function MessageFilePicker({ files, setFiles, disabled = false, onCheckin
         {files.map((file, index) => <div key={index} className="flex items-center gap-2 my-2"><span>{file.name}</span><button type="button" disabled={disabled || checking} onClick={() => setFiles(files.filter((_, i) => i !== index))}>Ta bort {file.name}</button></div>)}
         {checking && <p role="status">Kontrollerar bilagorna…</p>}
         {error && <p role="alert" className="support-error">{error}</p>}
-        <button type="button" aria-expanded={showHelp} onClick={() => setShowHelp(!showHelp)}>Så spelar du in en femsekunders buggrapport</button>
-        {showHelp && <div className="mt-3">
-            {help.data?.results?.[0] ? <PrivatePlayer id={help.data.results[0].videoId} /> : <p>Instruktionsfilmen kan laddas upp av en publicerare under Instruktionsfilmer → Publicera instruktion och kopplas till ”Spela in en femsekunders buggrapport”.</p>}
-            <Link to="/help/how-to/record-bug-video">Läs instruktionen</Link>
-            {help.error && <p role="alert">{supportError(help.error)}</p>}
-        </div>}
+        <Link className="text-xs font-medium text-blue-600 underline hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" to="/help/how-to/record-bug-video?lang=sv" target="_blank" rel="noopener noreferrer">
+            Så spelar du in en femsekunders buggrapport (öppnas i nytt fönster)
+        </Link>
     </section>
 }
 
