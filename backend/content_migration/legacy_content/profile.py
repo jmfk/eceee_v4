@@ -97,6 +97,58 @@ CLASSIFICATIONS = {
     "organization_affiliation": ("Organisationstillhörighet", ["organization"]),
 }
 
+# Initial browse choices. Editors can change these on the Object type's Search and filters tab.
+# Tag filters are added there after classification types exist in the target tenant.
+BROWSER_DEFAULTS = {
+    "article": ("summary", ["effective_date", "created_at", "expiry_date", "field:authors", "field:source_date"]),
+    "columnist": ("first_name", "last_name", "affiliation", ["created_at", "field:affiliation"]),
+    "event": (
+        "organiser",
+        "venue",
+        "focus_areas",
+        ["field:event_start_date", "field:event_end_date", "effective_date", "field:organiser"],
+    ),
+    "organization": ("full_name", "country", ["field:country", "field:is_international", "created_at"]),
+}
+
+
+def initial_browser_config(key):
+    choices = BROWSER_DEFAULTS.get(key)
+    if not choices:
+        return {"search_fields": [], "filters": []}
+    *search_fields, filter_keys = choices
+    labels = {
+        "created_at": "Skapad i CMS",
+        "effective_date": "Publiceringsdatum",
+        "expiry_date": "Avpubliceringsdatum",
+    }
+    fields = DEFINITIONS[key][2]
+
+    def source_field(filter_key):
+        field_key = filter_key.removeprefix("field:")
+        camel_key = field_key.split("_")[0] + "".join(part.title() for part in field_key.split("_")[1:])
+        return fields.get(camel_key, {})
+
+    def control(filter_key):
+        if filter_key in {"effective_date", "created_at", "expiry_date"} or source_field(filter_key).get(
+            "componentType"
+        ) in {"date", "datetime"}:
+            return "date_range"
+        return "checklist" if source_field(filter_key).get("componentType") == "boolean" else "searchable_multi"
+
+    return {
+        "search_fields": list(search_fields),
+        "filters": [
+            {
+                "key": filter_key,
+                "label": labels.get(filter_key, source_field(filter_key).get("title", filter_key)),
+                "overview": filter_key in {"effective_date", "field:event_start_date", "field:country"},
+                "control": control(filter_key),
+            }
+            for filter_key in filter_keys
+        ],
+    }
+
 
 def initial_bundle():
     definitions = []
@@ -124,7 +176,7 @@ def initial_bundle():
                         }
                     ]
                 },
-                "metadata": {"content_profile": {"id": PROFILE, "version": 1}},
+                "metadata": {"content_profile": {"id": PROFILE, "version": 1}, "browser": initial_browser_config(key)},
                 "browser_group_name": None,
             }
         )

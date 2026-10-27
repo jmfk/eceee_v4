@@ -164,9 +164,16 @@ def export_bundle(api, ns):
         group = row.get("browser_group")
         item["browser_group_name"] = group.get("name") if isinstance(group, dict) else id_names.get(group)
         # Runtime sample acceptance belongs to its environment, not the portable configuration.
+        metadata = item.get("metadata", {})
         item["metadata"] = {
-            "content_profile": item.get("metadata", {}).get("content_profile", {"id": profile.PROFILE, "version": 1})
+            "content_profile": metadata.get("content_profile", metadata.get("contentProfile", {"id": profile.PROFILE, "version": 1}))
         }
+        if metadata.get("browser"):
+            browser = metadata["browser"]
+            item["metadata"]["browser"] = {
+                "search_fields": browser.get("search_fields", browser.get("searchFields", [])),
+                "filters": browser.get("filters", []),
+            }
         portable.append(item)
     types = api.list("taxonomy/types/?namespace=" + str(ns["id"]))
     keys = set(profile.CLASSIFICATIONS)
@@ -239,6 +246,9 @@ def apply_bundle(api, ns, bundle, apply=False):
         desired["namespace_id"] = ns["id"]
         if existing:
             desired["metadata"] = {**existing.get("metadata", {}), **desired.get("metadata", {})}
+            # Browse choices edited in the target UI take precedence over import defaults.
+            if "browser" in existing.get("metadata", {}):
+                desired["metadata"]["browser"] = existing["metadata"]["browser"]
             different = [k for k, v in desired.items() if k != "namespace_id" and existing.get(k) != v]
         else:
             different = ["new"]
