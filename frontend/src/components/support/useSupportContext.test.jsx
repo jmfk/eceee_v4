@@ -21,3 +21,13 @@ it('keeps the inbox workspace when its help article opens separately', () => {
     )
     expect(screen.getByText('report-workspace')).toBeInTheDocument()
 })
+
+it('uses the scoped workspace on the Settings dashboard', () => {
+    act(() => setCurrentTenantId('current-workspace'))
+    render(
+        <MemoryRouter initialEntries={['/settings?tenant=report-workspace']}>
+            <TenantProbe />
+        </MemoryRouter>,
+    )
+    expect(screen.getByText('report-workspace')).toBeInTheDocument()
+})

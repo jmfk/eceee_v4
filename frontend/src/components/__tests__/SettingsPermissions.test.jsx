@@ -49,12 +49,24 @@ describe('Settings permissions', () => {
 
     it('keeps a scoped workspace in Support and Roles links', () => {
         useAuth.mockReturnValue({ user: { permissions: ['roles.manage'] } })
-        useSupportContext.mockReturnValue({ data: { canSupport: true } })
+        useSupportContext.mockReturnValue({ data: { canManage: true, canSupport: true } })
         const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
         render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/settings/support?tenant=a']}>
             <SettingsSidebar /><SettingsDashboard />
         </MemoryRouter></QueryClientProvider>)
         for (const path of ['/settings/support?tenant=a', '/settings/roles?tenant=a']) {
+            expect(screen.getAllByRole('link').filter((link) => link.getAttribute('href') === path)).toHaveLength(2)
+        }
+    })
+
+    it('shows scoped Support and Roles to a manager of another workspace', () => {
+        useAuth.mockReturnValue({ user: { permissions: [] } })
+        useSupportContext.mockReturnValue({ data: { canManage: true, canSupport: false } })
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/settings?tenant=other-workspace']}>
+            <SettingsSidebar /><SettingsDashboard />
+        </MemoryRouter></QueryClientProvider>)
+        for (const path of ['/settings/support?tenant=other-workspace', '/settings/roles?tenant=other-workspace']) {
             expect(screen.getAllByRole('link').filter((link) => link.getAttribute('href') === path)).toHaveLength(2)
         }
     })

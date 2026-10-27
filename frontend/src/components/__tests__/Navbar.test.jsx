@@ -113,6 +113,32 @@ describe('Navbar', () => {
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings/support?tenant=a')
   })
 
+  it('keeps the scoped workspace when a role manager opens Settings', () => {
+    useAuth.mockReturnValue({ logout: vi.fn(), user: { permissions: ['roles.manage'] } })
+    render(<MemoryRouter initialEntries={['/inbox?tenant=other-workspace']}><Navbar /></MemoryRouter>)
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings?tenant=other-workspace')
+  })
+
+  it('shows scoped Settings to a manager of the viewed workspace', () => {
+    useAuth.mockReturnValue({ logout: vi.fn(), user: { permissions: [] } })
+    useSupportContext.mockReturnValue({ data: { unreadCount: 0, canManage: true, canSupport: false } })
+    render(<MemoryRouter initialEntries={['/inbox?tenant=other-workspace']}><Navbar /></MemoryRouter>)
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings?tenant=other-workspace')
+  })
+
+  it('keeps the viewed workspace when returning to CMS Settings', () => {
+    useAuth.mockReturnValue({ logout: vi.fn(), user: { permissions: ['roles.manage'] } })
+    render(<MemoryRouter initialEntries={['/inbox?tenant=other-workspace']}><UserToolsNav tenant="other-workspace" /></MemoryRouter>)
+    expect(screen.getByRole('link', { name: 'Till CMS' })).toHaveAttribute('href', '/settings?tenant=other-workspace')
+  })
+
+  it('offers scoped CMS Settings to a manager without current workspace permissions', () => {
+    useAuth.mockReturnValue({ logout: vi.fn(), user: { permissions: [] } })
+    useSupportContext.mockReturnValue({ data: { unreadCount: 0, canManage: true, canSupport: false } })
+    render(<MemoryRouter initialEntries={['/inbox?tenant=other-workspace']}><UserToolsNav tenant="other-workspace" /></MemoryRouter>)
+    expect(screen.getByRole('link', { name: 'Till CMS' })).toHaveAttribute('href', '/settings?tenant=other-workspace')
+  })
+
   it('stays collapsed across measurements and menu interaction, then expands when space is available', () => {
     availableWidth = 800
     const { unmount } = renderNavbar()

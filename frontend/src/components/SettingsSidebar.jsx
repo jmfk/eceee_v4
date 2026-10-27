@@ -28,6 +28,11 @@ export default function SettingsSidebar({ onNavigate }) {
     const { user, language } = useAuth()
     const support = useSupportContext()
     const scopedTenant = new URLSearchParams(location.search).get('tenant')
+    const allowed = (href) => {
+        if (scopedTenant && href === '/settings/roles') return Boolean(support.data?.canManage)
+        if (scopedTenant && href === '/settings/support') return Boolean(support.data?.canManage || support.data?.canSupport)
+        return canAccessCmsPath(user, href) || (href === '/settings/support' && (support.data?.canManage || support.data?.canSupport))
+    }
     const scopedHref = (href) => scopedTenant && ['/settings/support', '/settings/roles'].includes(href)
         ? `${href}?tenant=${encodeURIComponent(scopedTenant)}` : href
     const [isCollapsed, setIsCollapsed] = useState(false)
@@ -183,7 +188,7 @@ export default function SettingsSidebar({ onNavigate }) {
 
     const visibleNavigation = navigation.flatMap((item) => {
         if (item.href) return canAccessCmsPath(user, item.href) ? [item] : []
-        const items = item.items.filter((child) => canAccessCmsPath(user, child.href) || (child.href === '/settings/support' && support.data?.canSupport))
+        const items = item.items.filter((child) => allowed(child.href))
         return items.length ? [{ ...item, items }] : []
     })
 

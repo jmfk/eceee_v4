@@ -52,8 +52,12 @@ const SettingsDashboard = () => {
     const { user } = useAuth()
     const location = useLocation()
     const support = useSupportContext()
-    const allowed = (path) => canAccessCmsPath(user, path) || (path === '/settings/support' && support.data?.canSupport)
     const scopedTenant = new URLSearchParams(location.search).get('tenant')
+    const allowed = (path) => {
+        if (scopedTenant && path === '/settings/roles') return Boolean(support.data?.canManage)
+        if (scopedTenant && path === '/settings/support') return Boolean(support.data?.canManage || support.data?.canSupport)
+        return canAccessCmsPath(user, path) || (path === '/settings/support' && (support.data?.canManage || support.data?.canSupport))
+    }
     const scopedHref = (path) => scopedTenant ? `${path}?tenant=${encodeURIComponent(scopedTenant)}` : path
     // Fetch only counts available to this role
     const { data: themes = [] } = useQuery({
