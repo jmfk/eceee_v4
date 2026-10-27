@@ -4,7 +4,6 @@ import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import ParentObjectSelector from '../ParentObjectSelector'
-import ClassificationPicker from '../classification/ClassificationPicker'
 
 const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onSave, onCancel, onUnsavedChanges, context }) => {
     const [formData, setFormData] = useState({
@@ -102,10 +101,6 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onS
                     <div className="space-y-6">
 
                         <div className="space-y-6">
-                            <ClassificationPicker value={formData.classificationIds || []}
-                                onChange={(ids) => handleInputChange('classificationIds', ids)}
-                                namespace={objectType?.namespace?.id}
-                                use={`object:${objectType?.id}`} allowProposed />
                             {/* Parent Object */}
                             <ParentObjectSelector
                                 value={formData.parent}

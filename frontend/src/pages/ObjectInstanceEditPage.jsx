@@ -486,7 +486,7 @@ const ObjectInstanceEditPage = () => {
             </div>
             <GlobalWysiwygToolbar />
             <div className="flex flex-1 min-h-0 overflow-x-auto">
-                <ObjectEditorPanel side="left" title="Objects">
+                <ObjectEditorPanel side="left">
                     <ObjectNavigation instanceId={instanceId}
                         anchorId={urlParams.get('root') || instanceId || parentIdFromUrl}
                         disabled={isSaving}

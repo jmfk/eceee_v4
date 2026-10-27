@@ -12,6 +12,7 @@ from rest_framework.test import APITestCase
 
 from core.models import Tenant
 from utils.schema_system import validate_schema
+from .serializers import ObjectTypeDefinitionSerializer
 
 from .models import ObjectInstance, ObjectTypeDefinition
 
@@ -46,6 +47,28 @@ class ObjectSchemaValidationTest(SimpleTestCase):
         }
 
         validate_schema(schema, "object_type")
+
+    def test_editor_groups_require_existing_unique_fields(self):
+        schema = {
+            "type": "object",
+            "properties": {"start_date": {"type": "string", "field_type": "text"}},
+            "editorGroups": [{"id": "schedule", "label": "Schedule", "fields": ["start_date"]}],
+        }
+        validate_schema(schema, "object_type")
+        schema["editorGroups"].append({"id": "other", "label": "Other", "fields": ["start_date"]})
+        with self.assertRaisesMessage(ValidationError, "belong to only one group"):
+            validate_schema(schema, "object_type")
+
+    def test_editor_group_field_names_follow_schema_key_conversion(self):
+        serializer = ObjectTypeDefinitionSerializer()
+        schema = {
+            "type": "object",
+            "properties": {"startDate": {"type": "string", "field_type": "text"}},
+            "editorGroups": [{"id": "schedule", "label": "Schedule", "fields": ["startDate"]}],
+        }
+        stored = serializer._convert_schema_keys_to_snake(schema)
+        self.assertEqual(stored["editorGroups"][0]["fields"], ["start_date"])
+        self.assertEqual(serializer._convert_schema_keys_to_camel(stored)["editorGroups"][0]["fields"], ["startDate"])
 
 
 class ObjectStorageModelTestBase(TestCase):

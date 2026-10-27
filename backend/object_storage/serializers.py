@@ -301,6 +301,12 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
         if "propertyOrder" in converted and isinstance(converted["propertyOrder"], list):
             converted["propertyOrder"] = [self._camel_to_snake(key) for key in converted["propertyOrder"]]
 
+        if isinstance(converted.get("editorGroups"), list):
+            converted["editorGroups"] = [
+                {**group, "fields": [self._camel_to_snake(key) for key in group.get("fields", [])]}
+                if isinstance(group, dict) else group for group in converted["editorGroups"]
+            ]
+
         return converted
 
     def _convert_schema_keys_to_camel(self, schema: dict) -> dict:
@@ -322,6 +328,12 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
         # Convert propertyOrder array items
         if "propertyOrder" in converted and isinstance(converted["propertyOrder"], list):
             converted["propertyOrder"] = [self._snake_to_camel(key) for key in converted["propertyOrder"]]
+
+        if isinstance(converted.get("editorGroups"), list):
+            converted["editorGroups"] = [
+                {**group, "fields": [self._snake_to_camel(key) for key in group.get("fields", [])]}
+                if isinstance(group, dict) else group for group in converted["editorGroups"]
+            ]
 
         return converted
 
