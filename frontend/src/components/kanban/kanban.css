@@ -262,6 +262,13 @@
 .kb-board-dialog-panel > header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .kb-board-dialog-panel > header h2 { font-size: 16px; font-weight: 600; }
 .kb-board-dialog-panel > header button { min-width: 28px; min-height: 28px; display: grid; place-items: center; }
+.kb-activity-dialog-panel { width: min(560px, calc(100vw - 24px)); }
+.kb-activity-dialog-list { list-style: none; margin: 0; padding: 0; }
+.kb-activity-dialog-list li { display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid #e5e7eb; }
+.kb-activity-dialog-list li > div { min-width: 0; }
+.kb-activity-dialog-list strong { font-weight: 600; }
+.kb-activity-dialog-list p { margin: 3px 0; overflow-wrap: anywhere; }
+.kb-activity-dialog-list time { color: #6b7280; }
 .kb-board-dialog-panel :is(input[type="text"], input:not([type])) { width: 100%; min-height: 32px; margin: 8px 0 14px; padding: 6px 10px; border: 1px solid #9ca3af; border-radius: 3px; background: white; }
 .kb-board-dialog-panel :is(input, button):focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 .kb-board-upload { display: grid; gap: 6px; margin: 12px 0 16px; }

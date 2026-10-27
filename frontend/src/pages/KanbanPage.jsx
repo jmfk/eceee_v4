@@ -987,27 +987,6 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                             ) : (
                                                 <>
                                                     <p>{item.message}</p>
-                                                    {item.canUndo && (
-                                                        <div className="kb-activity-actions">
-                                                            <button
-                                                                type="button"
-                                                                disabled={busy}
-                                                                onClick={() =>
-                                                                    run(
-                                                                        async () =>
-                                                                            await kanbanApi.post(
-                                                                                'workspace/undo/',
-                                                                                {
-                                                                                    activityId: item.id,
-                                                                                },
-                                                                            ),
-                                                                    )
-                                                                }
-                                                            >
-                                                                Ångra
-                                                            </button>
-                                                        </div>
-                                                    )}
                                                 </>
                                             )}
                                         </div>
@@ -1430,8 +1409,8 @@ export default function KanbanPage() {
                         <button onClick={() => setShowNotices(!showNotices)} aria-expanded={showNotices}>
                             Aviseringar ({workspace.notifications.filter((item) => !item.read).length})
                         </button>
-                        <button onClick={() => { setActivityMember(null); setShowActivity(!showActivity) }} aria-expanded={showActivity}>
-                            Aktivitet / Ångra
+                        <button onClick={() => { setActivityMember(null); setShowActivity(true) }}>
+                            Aktivitet
                         </button>
                         {board && <ActionsMenu label="Tavelåtgärder">
                             {(close) => <>
@@ -1473,35 +1452,30 @@ export default function KanbanPage() {
                             ))}
                         </section>
                     )}
-                    {showActivity && (
-                        <section aria-label="Aktivitet" className="user-tools-panel mb-6 max-h-64 overflow-auto">
+                    <Dialog open={showActivity} onClose={() => setShowActivity(false)} className="kb-board-dialog">
+                        <DialogBackdrop className="kb-board-dialog-backdrop" />
+                        <DialogPanel className="kb-board-dialog-panel kb-activity-dialog-panel">
+                            <header>
+                                <DialogTitle>Aktivitet</DialogTitle>
+                                <button type="button" aria-label="Stäng aktivitet" onClick={() => setShowActivity(false)}><X size={18} /></button>
+                            </header>
                             {activityMember && <div className="kb-activity-filter">
-                                <span>Aktivitet: {workspace.members.find((member) => member.id === activityMember)?.name}</span>
+                                <span>{workspace.members.find((member) => member.id === activityMember)?.name}</span>
                                 <button type="button" onClick={() => setActivityMember(null)}>Visa alla</button>
                             </div>}
-                            {activities.data?.filter((item) => !activityMember || item.actor?.id === activityMember).map((item) => (
-                                <div key={item.id} className="flex flex-wrap gap-2 mb-2">
-                                    <span>
-                                        {item.actor.name}: {item.message}
-                                    </span>
-                                    {item.canUndo && (
-                                        <button
-                                            onClick={() =>
-                                                run(
-                                                    async () =>
-                                                        await kanbanApi.post('workspace/undo/', {
-                                                            activityId: item.id,
-                                                        }),
-                                                )
-                                            }
-                                        >
-                                            Ångra
-                                        </button>
-                                    )}
-                                </div>
-                            ))}
-                        </section>
-                    )}
+                            {activities.isPending && <p role="status">Läser aktivitet…</p>}
+                            {activities.error && <p role="alert">{kanbanError(activities.error)}</p>}
+                            {activities.data && !activities.data.some((item) => !activityMember || item.actor?.id === activityMember) && <p>Ingen aktivitet ännu.</p>}
+                            <ol className="kb-activity-dialog-list">
+                                {activities.data?.filter((item) => !activityMember || item.actor?.id === activityMember).map((item) => (
+                                    <li key={item.id}>
+                                        <Avatar userId={item.actor?.id} name={item.actor?.name || ''} size={28} />
+                                        <div><strong>{item.actor?.name || 'Okänd medlem'}</strong><p>{item.message}</p><time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString()}</time></div>
+                                    </li>
+                                ))}
+                            </ol>
+                        </DialogPanel>
+                    </Dialog>
                     <>
                             {!boardId && <>
                             <div className="flex items-center justify-between mb-4">

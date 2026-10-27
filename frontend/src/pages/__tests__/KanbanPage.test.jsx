@@ -110,6 +110,25 @@ describe('Kanban application navigation', () => {
         expect(avatar.querySelector('[role="img"]')).toHaveAttribute('aria-label', 'Johan Berg')
     })
 
+    it('shows board activity in a dialog without a partial undo action', async () => {
+        kanbanApi.get.mockImplementation(async (path) => {
+            if (path === 'workspace/') return workspace
+            if (path === 'workspace/activity/') return [{
+                id: 'activity-1', actor: { id: 42, name: 'Johan Berg' },
+                message: 'Flyttade kortet', createdAt: '2026-10-27T10:00:00Z', canUndo: true,
+            }]
+            return []
+        })
+        renderKanban('/kanban/boards/board-1')
+        await screen.findByRole('heading', { name: 'Redaktionen' })
+        fireEvent.click(screen.getByRole('button', { name: 'Aktivitet' }))
+        const dialog = await screen.findByRole('dialog', { name: 'Aktivitet' })
+        expect(await within(dialog).findByText('Flyttade kortet')).toBeInTheDocument()
+        expect(within(dialog).queryByRole('button', { name: 'Ångra' })).not.toBeInTheDocument()
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Stäng aktivitet' }))
+        await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Aktivitet' })).not.toBeInTheDocument())
+    })
+
     it('creates a card from the inline composer and clears cancelled text', async () => {
         kanbanApi.post.mockResolvedValue({})
         renderKanban('/kanban/boards/board-1')
