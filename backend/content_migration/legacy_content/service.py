@@ -19,7 +19,9 @@ from taxonomy.services import require
 
 from .profile import OBJECT_TYPES, PROFILE
 from .source import validate_record
-from .term_plan import compile_plan, identity as term_identity, source_names
+from .term_plan import compile_plan
+from .term_plan import identity as term_identity
+from .term_plan import source_names
 from .transform import BlockedRecord, checksum, normalize
 
 PIPELINE_VERSION = "2"

@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 """Install, diff or export a portable API-owned ECEEE editorial definition bundle."""
 import argparse
-from copy import deepcopy
 import hashlib
 import importlib.util
 import json
-from pathlib import Path
 import sys
 import urllib.error
 import urllib.request
-from urllib.parse import urlsplit
+from copy import deepcopy
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "skills/eceee-api-operations/scripts"))
-from eceee_api import read_env_file, resolve_profile, NoRedirectHandler
+import eceee_api  # noqa: E402
+
+NoRedirectHandler = eceee_api.NoRedirectHandler
+read_env_file = eceee_api.read_env_file
+resolve_profile = eceee_api.resolve_profile
 
 spec = importlib.util.spec_from_file_location(
     "content_profile", ROOT / "backend/content_migration/legacy_content/profile.py"

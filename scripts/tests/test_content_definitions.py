@@ -1,7 +1,7 @@
 import importlib.util
+import unittest
 from copy import deepcopy
 from pathlib import Path
-import unittest
 
 SPEC = importlib.util.spec_from_file_location(
     "editorial_definitions", Path(__file__).resolve().parents[1] / "eceee_content_definitions.py"
@@ -20,16 +20,29 @@ class MemoryAPI:
             row.update(id=ids[row["name"]], namespace={"id": 2}, browser_group=ids.get(group))
             self.objects[row["id"]] = row
         self.types = [
-            dict(id=index + 1, key=t["key"], name=t["name"], description=t.get("description", ""),
-                 allowed_uses=[f"object:{ids[name]}" for name in t["object_types"]] + t.get("resource_uses", []))
+            dict(
+                id=index + 1,
+                key=t["key"],
+                name=t["name"],
+                description=t.get("description", ""),
+                allowed_uses=[f"object:{ids[name]}" for name in t["object_types"]] + t.get("resource_uses", []),
+            )
             for index, t in enumerate(bundle["classification_types"])
         ]
         self.terms = []
         for index, t in enumerate(bundle["terms"]):
             parent = next((old["id"] for old in self.terms if old["slug"] == t.get("parent")), None)
-            self.terms.append(dict(id=str(index + 1), tag_type=t["type"], slug=t["slug"],
-                                   name=t["name"], parent=parent, status="approved",
-                                   classification_type=next(row["id"] for row in self.types if row["key"] == t["type"])))
+            self.terms.append(
+                dict(
+                    id=str(index + 1),
+                    tag_type=t["type"],
+                    slug=t["slug"],
+                    name=t["name"],
+                    parent=parent,
+                    status="approved",
+                    classification_type=next(row["id"] for row in self.types if row["key"] == t["type"]),
+                )
+            )
 
     def list(self, path):
         if path.startswith("objects/"):

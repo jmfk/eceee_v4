@@ -5,7 +5,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "backend"))
 
-from content_migration.legacy_content.term_plan import compile_plan, identity, load_plan  # noqa: E402
+from content_migration.legacy_content import term_plan  # noqa: E402
+
+compile_plan = term_plan.compile_plan
+identity = term_plan.identity
+load_plan = term_plan.load_plan
 
 
 class LegacyTermPlanTests(unittest.TestCase):
@@ -35,9 +39,7 @@ class LegacyTermPlanTests(unittest.TestCase):
             ref = refs[identity(2, dimension, model, source_id)]
             return terms[ref["type"], ref["slug"]]
 
-        self.assertEqual(
-            term("topics", "eceeenews.relatednews", 62)["parent"], "group-un-climate-conferences"
-        )
+        self.assertEqual(term("topics", "eceeenews.relatednews", 62)["parent"], "group-un-climate-conferences")
         self.assertEqual(
             term("topics", "eceeenews.relatednews", 76)["parent"],
             term("topics", "eceeenews.relatednews", 129)["slug"],
