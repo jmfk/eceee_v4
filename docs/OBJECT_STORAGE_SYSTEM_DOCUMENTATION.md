@@ -122,8 +122,9 @@ existing non-browser callers retain their prior search behavior.
 #### Object editor panels
 
 The left editor panel shows the object tree without a heading. Related objects are
-grouped into collapsible sections by object type. The right panel starts with the
-expanded **Properties** section (title and unassigned schema fields), followed by
+grouped into collapsible sections by object type. The object title is edited inline
+in the editor header. The right panel starts with the expanded **Properties** section
+(unassigned schema fields), followed by
 any configured field groups and a separate **Tags** section. Tags are edited here
 instead of on the Settings tab. In an Object type's **Schema Fields** tab, use
 **Editor accordions** to name additional sections and assign existing fields.

@@ -21,6 +21,7 @@ import ObjectSettingsView from '../components/objectEdit/ObjectSettingsView'
 import ObjectPublishingView from '../components/objectEdit/ObjectPublishingView'
 import ObjectEditorPanel from '../components/objectEdit/ObjectEditorPanel'
 import ObjectNavigation from '../components/objectEdit/ObjectNavigation'
+import InlineObjectTitle from '../components/objectEdit/InlineObjectTitle'
 import ObjectSubObjectsView from '../components/objectEdit/ObjectSubObjectsView'
 
 const ObjectInstanceEditPage = () => {
@@ -461,7 +462,7 @@ const ObjectInstanceEditPage = () => {
                                 <Breadcrumbs items={breadcrumbItems} className="mb-0.5" />
                                 <div className="text-lg font-semibold text-gray-900 truncate flex items-center" role="heading" aria-level="1">
                                     {objectType?.iconImage ? <img src={objectType.iconImage} alt={objectType.label} className="w-5 h-5 object-cover rounded mr-2" /> : <Layout className="h-5 w-5 mr-2" />}
-                                    {isNewInstance ? `New ${objectType?.label}` : instance?.title || 'Untitled'}
+                                    {isNewInstance ? `New ${objectType?.label}` : <InlineObjectTitle key={instanceId} instanceId={instanceId} title={instance?.title} disabled={isSaving} />}
                                     <ContextualHelpLink topicId="objects-manage" label="Open Object editor help" className="ml-2" />
                                 </div>
                                 <div className="text-sm text-gray-500">{isNewInstance ? `Create a new ${objectType?.label?.toLowerCase()}` : `Edit ${objectType?.label?.toLowerCase()}`}</div>
