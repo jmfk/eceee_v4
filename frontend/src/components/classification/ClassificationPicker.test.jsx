@@ -36,6 +36,10 @@ describe('classification picker', () => {
         expect(screen.queryByRole('button', { name: /pending approval/ })).toBeNull()
         expect(screen.queryByRole('button', { name: 'Archived' })).toBeNull()
         expect(await screen.findByText('Archived (archived)')).toBeTruthy()
+        const remove = screen.getByRole('button', { name: 'Remove Archived' })
+        expect(remove).toHaveTextContent('')
+        fireEvent.click(remove)
+        expect(changed).toHaveBeenCalledWith([])
     })
     it('allows pending terms in drafts and clearly labels them', async () => {
         const changed = renderPicker({ allowProposed: true })

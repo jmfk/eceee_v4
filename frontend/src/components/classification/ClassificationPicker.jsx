@@ -70,13 +70,16 @@ export default function ClassificationPicker({ value = [], onChange, namespace, 
     const choices = (terms.data?.results || []).filter(term =>
         !value.includes(term.id) && (term.status === 'approved' || (allowProposed && term.status === 'proposed')))
     return <fieldset disabled={disabled} className="classification-manager classification-picker user-tools-content min-w-0 space-y-3 text-gray-900">
-        <legend className="font-medium">Tags</legend>
+        <legend className="sr-only">Tags</legend>
         <ul className="space-y-2" aria-label="Selected tags">
             {value.map(termId => {
                 const term = selected.data?.find(item => item.id === termId)
-                return <li key={termId} className="flex items-center gap-3">
-                    <span>{term?.path || term?.name || termId}{term && term.status !== 'approved' ? ` (${term.status})` : ''}</span>
-                    <button type="button" className="px-2 py-1 underline focus-visible:outline" onClick={() => onChange(value.filter(item => item !== termId))}>Remove<span className="sr-only"> {term?.name || termId}</span></button>
+                return <li key={termId} className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 flex-1 break-words">{term?.path || term?.name || termId}{term && term.status !== 'approved' ? ` (${term.status})` : ''}</span>
+                    <button type="button" className="classification-selected-remove ml-auto shrink-0" aria-label={`Remove ${term?.name || termId}`}
+                        title={`Remove ${term?.name || termId}`} onClick={() => onChange(value.filter(item => item !== termId))}>
+                        <X size={14} aria-hidden="true" />
+                    </button>
                 </li>
             })}
         </ul>

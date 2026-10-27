@@ -66,6 +66,33 @@
     border-radius: .1875rem;
     background: transparent;
 }
+.classification-manager .classification-search .classification-icon:hover { background: #f3f4f6; }
+.classification-manager .classification-search .classification-icon[aria-expanded='true'] { background: #eff6ff; color: #1d4ed8; }
+.classification-manager .classification-search :is(.classification-icon, .classification-filter-pill):focus-visible {
+    outline: none;
+    box-shadow: none;
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+.classification-picker .classification-selected-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    min-width: 1.5rem;
+    min-height: 1.5rem;
+    padding: 0;
+    border: 0;
+    border-radius: .1875rem;
+    background: transparent;
+    color: #6b7280;
+}
+.classification-picker .classification-selected-remove:hover,
+.classification-picker .classification-selected-remove:focus-visible {
+    outline: none;
+    background: #eff6ff;
+    color: #1d4ed8;
+}
 .classification-manager .classification-search .classification-filter-pill {
     gap: .375rem;
     min-height: 1.375rem;
