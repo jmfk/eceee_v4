@@ -165,12 +165,18 @@ const ObjectBrowser = () => {
 
     const objectTypes = overviewTypes
     const objectTypeGroups = buildObjectTypeGroups(objectTypes)
+    const hasSupportingTypes = objectTypeGroups.some(group => group.supporting.length > 0)
+    const activeCategoryTab = hasSupportingTypes ? categoryTab : 'main'
     const overviewTypeMatches = type => !overviewSearch.trim() || `${type.name} ${type.label} ${type.pluralLabel} ${type.description || ''}`.toLocaleLowerCase().includes(overviewSearch.trim().toLocaleLowerCase())
     const visibleGroups = objectTypeGroups
         .map(group => ({ ...group, supporting: group.supporting.filter(type => overviewTypeMatches(type) && (!overviewTypeId || String(type.id) === overviewTypeId)) }))
-        .filter(group => categoryTab === 'main'
+        .filter(group => activeCategoryTab === 'main'
             ? overviewTypeMatches(group.primary) && (!overviewTypeId || String(group.primary.id) === overviewTypeId)
             : group.supporting.length > 0)
+
+    useEffect(() => {
+        if (!hasSupportingTypes && categoryTab !== 'main') setCategoryTab('main')
+    }, [hasSupportingTypes, categoryTab])
     const instances = instancesResponse?.data?.results || instancesResponse?.data || []
     const resultCount = instancesResponse?.data?.count ?? instances.length
     const totalPages = instancesResponse?.data?.totalPages ?? 1
@@ -320,15 +326,15 @@ const ObjectBrowser = () => {
                             </div>
                         </div>
 
-                        <div className="mb-6 flex gap-2" role="tablist" aria-label="Object categories">
+                        {hasSupportingTypes && <div className="mb-6 flex gap-2" role="tablist" aria-label="Object categories">
                             {[['main', 'Main'], ['supporting', 'Supporting objects']].map(([id, label]) => (
-                                <button key={id} type="button" role="tab" aria-selected={categoryTab === id}
+                                <button key={id} type="button" role="tab" aria-selected={activeCategoryTab === id}
                                     onClick={() => setCategoryTab(id)}
-                                    className={`rounded-md px-4 py-2 text-sm font-medium focus-visible:ring-2 focus-visible:ring-blue-500 ${categoryTab === id ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>
+                                    className={`rounded-md px-4 py-2 text-sm font-medium focus-visible:ring-2 focus-visible:ring-blue-500 ${activeCategoryTab === id ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>
                                     {label}
                                 </button>
                             ))}
-                        </div>
+                        </div>}
                         <div className="mb-5">
                             <ObjectFilterBar
                                 overview search={overviewSearch} onSearchChange={value => { setOverviewSearch(value); setOverviewPage(1) }}
@@ -349,12 +355,9 @@ const ObjectBrowser = () => {
                             </div>
                         ) : (
                             <ul className="space-y-4" aria-label="Object type groups">
-                                {categoryTab === 'supporting' && !objectTypeGroups.some(group => group.supporting.length > 0) && (
-                                    <li className="py-8 text-sm text-gray-500">No supporting object types.</li>
-                                )}
                                 {visibleGroups.map(({ primary, supporting }) => (
                                     <li key={primary.id} className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-                                        {categoryTab === 'main' && <button
+                                        {activeCategoryTab === 'main' && <button
                                             type="button"
                                             data-testid={`object-type-card-${objectTypeTestId(primary)}`}
                                             onClick={() => handleObjectTypeSelect(primary)}
@@ -389,7 +392,7 @@ const ObjectBrowser = () => {
                                             </div>
                                         </button>}
 
-                                        {categoryTab === 'supporting' && supporting.length > 0 && (
+                                        {activeCategoryTab === 'supporting' && supporting.length > 0 && (
                                             <div className="border-t border-gray-200 bg-gray-50 px-4 py-3 sm:px-6 sm:py-4">
                                                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
                                                     {primary.pluralLabel || primary.label}
