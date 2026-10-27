@@ -54,6 +54,15 @@ class MemoryAPI:
         return self.objects[int(path.rstrip("/").split("/")[-1])]
 
 
+class MutableMemoryAPI(MemoryAPI):
+    def request(self, path, method="GET", data=None):
+        if method == "PATCH" and path.startswith("objects/object-types/"):
+            row = self.objects[int(path.rstrip("/").split("/")[-1])]
+            row.update(deepcopy(data))
+            return row
+        return super().request(path, method, data)
+
+
 class DefinitionDiffTests(unittest.TestCase):
     def setUp(self):
         self.bundle = module.profile.initial_bundle()
@@ -70,6 +79,28 @@ class DefinitionDiffTests(unittest.TestCase):
         self.assertEqual(next(t["name"] for t in exported["terms"] if t["slug"] == "news"), "News")
         article = next(item for item in exported["definitions"] if item["name"] == "article")
         self.assertIn("summary", article["metadata"]["browser"]["search_fields"])
+
+    def test_exported_browser_fields_and_tag_filters_apply_with_target_type_ids(self):
+        self.api.objects[1]["metadata"]["browser"]["list_fields"] = ["status", "field:summary"]
+        self.api.objects[1]["metadata"]["browser"]["filters"].append({
+            "key": "tag:1", "label": "Innehållsslag", "overview": True, "control": "searchable_multi"
+        })
+        exported = module.export_bundle(self.api, {"id": 2})
+        article = next(item for item in exported["definitions"] if item["name"] == "article")
+        self.assertEqual(article["metadata"]["browser"]["list_fields"], ["status", "field:summary"])
+        self.assertIn("tag-type:article_kind", [item["key"] for item in article["metadata"]["browser"]["filters"]])
+
+        target = MutableMemoryAPI(self.bundle)
+        target.objects[1]["metadata"].pop("browser")
+        for row in target.types:
+            row["id"] += 100
+        for row in target.terms:
+            row["classification_type"] += 100
+        result = module.apply_bundle(target, {"id": 2}, exported, apply=True)
+        self.assertEqual(result["classificationTypes"], len(target.types))
+        browser = target.objects[1]["metadata"]["browser"]
+        self.assertEqual(browser["list_fields"], ["status", "field:summary"])
+        self.assertIn("tag:101", [item["key"] for item in browser["filters"]])
 
     def test_target_browser_configuration_takes_precedence_over_profile_default(self):
         self.api.objects[1]["metadata"]["browser"] = {"search_fields": [], "filters": []}

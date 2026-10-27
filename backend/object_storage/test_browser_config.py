@@ -9,11 +9,13 @@ from rest_framework.exceptions import ValidationError
 
 from content_migration.legacy_content.profile import initial_bundle
 from object_storage.browser_config import (
+    apply_browser_filters,
     available_list_fields,
     field_kind,
     parse_browser_filters,
     validate_browser_config,
 )
+from object_storage.serializers import ObjectInstanceListSerializer, ObjectTypeDefinitionListSerializer
 
 
 class BrowserConfigurationTests(SimpleTestCase):
@@ -110,3 +112,50 @@ class BrowserConfigurationTests(SimpleTestCase):
         for invalid in (["field:photo"], ["status", "status"], ["field:authors"]):
             with self.subTest(invalid=invalid), self.assertRaises(ValidationError):
                 validate_browser_config(self.definition, None, {**value, "list_fields": invalid})
+
+    def test_list_serializer_includes_only_configured_schema_details(self):
+        self.definition.metadata = {"browser": {"list_fields": ["status", "field:summary"]}}
+        instance = SimpleNamespace(object_type=self.definition, data={"summary": "Visible", "private_note": "Hidden"})
+        self.assertEqual(ObjectInstanceListSerializer().get_data(instance), {"summary": "Visible"})
+
+    def test_type_list_exposes_selected_field_labels_without_full_schema(self):
+        self.definition.metadata = {"browser": {"list_fields": ["status", "field:summary"]}}
+        self.definition.schema["properties"]["summary"]["title"] = "Ingress"
+        self.assertEqual(
+            ObjectTypeDefinitionListSerializer().get_browser_list_fields(self.definition)[1]["label"], "Ingress"
+        )
+
+    @patch("object_storage.browser_config.available_filters")
+    def test_json_datetime_filter_includes_the_entire_to_date(self, options):
+        options.return_value = {"field:source_date": {"key": "field:source_date", "kind": "date"}}
+        self.definition.metadata = {"browser": {"filters": [{"key": "field:source_date"}]}}
+        request = SimpleNamespace(
+            query_params={
+                "browser_filters": json.dumps([{"key": "field:source_date", "values": ["2026-10-01", "2026-10-27"]}])
+            },
+            tenant=None,
+        )
+
+        class RecordingQueryset:
+            def __init__(self):
+                self.calls = []
+
+            def filter(self, *args, **kwargs):
+                self.calls.append((args, kwargs))
+                return self
+
+        queryset = RecordingQueryset()
+        apply_browser_filters(request, queryset, self.definition)
+        self.assertEqual(queryset.calls[0][1], {"current_version__data__source_date__gte": "2026-10-01"})
+        self.assertEqual(queryset.calls[1][1], {"current_version__data__source_date__lt": "2026-10-28"})
+
+    @patch("object_storage.browser_config.available_filters")
+    def test_invalid_calendar_date_returns_validation_error(self, options):
+        options.return_value = {"created_at": {"key": "created_at", "kind": "date"}}
+        self.definition.metadata = {"browser": {"filters": [{"key": "created_at"}]}}
+        request = SimpleNamespace(
+            query_params={"browser_filters": json.dumps([{"key": "created_at", "values": ["", "2026-13-10"]}])},
+            tenant=None,
+        )
+        with self.assertRaises(ValidationError):
+            apply_browser_filters(request, None, self.definition)

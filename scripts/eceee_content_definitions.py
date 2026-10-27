@@ -147,6 +147,8 @@ def export_bundle(api, ns):
             definitions.append(detail)
     if len(definitions) != len(profile.OBJECT_TYPES):
         raise ValueError("definition_export=incomplete_profile")
+    types = api.list("taxonomy/types/?namespace=" + str(ns["id"]))
+    type_keys = {str(row["id"]): row["key"] for row in types}
     allowed = {
         "name",
         "label",
@@ -172,12 +174,22 @@ def export_bundle(api, ns):
         }
         if metadata.get("browser"):
             browser = metadata["browser"]
+            filters = deepcopy(browser.get("filters", []))
+            for entry in filters:
+                if entry["key"].startswith("tag:"):
+                    type_key = type_keys.get(entry["key"][4:])
+                    if not type_key:
+                        raise ValueError("definition_export=unknown_tag_filter_type")
+                    entry["key"] = "tag-type:" + type_key
             item["metadata"]["browser"] = {
                 "search_fields": browser.get("search_fields", browser.get("searchFields", [])),
-                "filters": browser.get("filters", []),
+                "filters": filters,
             }
+            if "list_fields" in browser or "listFields" in browser:
+                item["metadata"]["browser"]["list_fields"] = browser.get(
+                    "list_fields", browser.get("listFields")
+                )
         portable.append(item)
-    types = api.list("taxonomy/types/?namespace=" + str(ns["id"]))
     keys = set(profile.CLASSIFICATIONS)
     type_ids = {t["id"]: t["key"] for t in types if t["key"] in keys}
     terms = api.list("taxonomy/terms/?namespace=" + str(ns["id"]))
@@ -238,6 +250,8 @@ def apply_bundle(api, ns, bundle, apply=False):
     }
     changes = []
     ids = {}
+    deferred_browser_metadata = {}
+    bundle_type_keys = {row["key"] for row in bundle["classification_types"]}
     # Definitions must be installed before remapping references and UI grouping.
     for item in bundle["definitions"]:
         name = item["name"]
@@ -246,14 +260,33 @@ def apply_bundle(api, ns, bundle, apply=False):
             raise ValueError(f"definition_namespace=conflict type={name}")
         desired = {k: deepcopy(v) for k, v in item.items() if k != "browser_group_name"}
         desired["namespace_id"] = ns["id"]
+        source_browser = desired.get("metadata", {}).get("browser")
+        if source_browser:
+            for entry in source_browser.get("filters", []):
+                key = entry["key"]
+                if key.startswith("tag:"):
+                    raise ValueError("bundle_browser=nonportable_tag_filter")
+                if key.startswith("tag-type:") and key[9:] not in bundle_type_keys:
+                    raise ValueError("bundle_browser=unknown_tag_filter_type")
+            if any(entry["key"].startswith("tag-type:") for entry in source_browser.get("filters", [])):
+                # The target classification UUIDs exist only after taxonomy setup below.
+                deferred_browser_metadata[name] = deepcopy(desired["metadata"])
+                desired["metadata"]["browser"]["filters"] = [
+                    entry for entry in source_browser["filters"] if not entry["key"].startswith("tag-type:")
+                ]
         if existing:
             desired["metadata"] = {**existing.get("metadata", {}), **desired.get("metadata", {})}
             # Browse choices edited in the target UI take precedence over import defaults.
             if "browser" in existing.get("metadata", {}):
                 desired["metadata"]["browser"] = existing["metadata"]["browser"]
+                deferred_browser_metadata.pop(name, None)
             different = [k for k, v in desired.items() if k != "namespace_id" and existing.get(k) != v]
         else:
             different = ["new"]
+        if name in deferred_browser_metadata:
+            deferred_browser_metadata[name] = {
+                **desired["metadata"], "browser": deferred_browser_metadata[name]["browser"]
+            }
         if different:
             changes.append({"type": name, "fields": different})
             if apply:
@@ -343,6 +376,13 @@ def apply_bundle(api, ns, bundle, apply=False):
                 },
             )
         existing_types[item["key"]] = t
+    if apply:
+        for name, metadata in deferred_browser_metadata.items():
+            browser = metadata["browser"]
+            for entry in browser["filters"]:
+                if entry["key"].startswith("tag-type:"):
+                    entry["key"] = "tag:" + str(existing_types[entry["key"][9:]]["id"])
+            api.request(f'objects/object-types/{ids[name]}/', "PATCH", {"metadata": metadata})
     terms = api.list("taxonomy/terms/?namespace=" + str(ns["id"]))
     term_map = {(t["tag_type"], t["slug"]): t for t in terms}
     pending = list(bundle["terms"])

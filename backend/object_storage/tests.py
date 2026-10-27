@@ -306,6 +306,49 @@ class ObjectStorageAPITest(APITestCase):
         invalid = self.client.get(roots_url, {"type": "article", "page_size": 30})
         self.assertEqual(invalid.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_browser_rows_include_only_selected_schema_details(self):
+        obj_type = ObjectTypeDefinition.objects.create(
+            name="article",
+            label="Article",
+            plural_label="Articles",
+            created_by=self.user,
+            metadata={"browser": {"list_fields": ["status", "field:summary"]}},
+        )
+        item = ObjectInstance.objects.create(
+            object_type=obj_type, title="Article", created_by=self.user, tenant=self.tenant
+        )
+        item.create_version(self.user, data={"summary": "Visible", "private_note": "Not a list detail"})
+        response = self.client.get(
+            reverse("api:object_storage:objectinstance-roots"),
+            {"type": "article", "page_size": 20},
+            HTTP_X_TENANT_ID=self.tenant.identifier,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["results"][0]["data"], {"summary": "Visible"})
+
+    def test_unrestricted_reference_filter_offers_tenant_objects(self):
+        owner_type = ObjectTypeDefinition.objects.create(
+            name="owner",
+            label="Owner",
+            plural_label="Owners",
+            created_by=self.user,
+            schema={"type": "object", "properties": {"related": {"type": "array", "field_type": "object_reference"}}},
+            metadata={"browser": {"filters": [{"key": "field:related", "label": "Related", "overview": False}]}},
+        )
+        target_type = ObjectTypeDefinition.objects.create(
+            name="target", label="Target", plural_label="Targets", created_by=self.user
+        )
+        target = ObjectInstance.objects.create(
+            object_type=target_type, title="Tenant target", created_by=self.user, tenant=self.tenant
+        )
+        response = self.client.get(
+            reverse("api:object_storage:objectinstance-filter-options"),
+            {"type": owner_type.name, "filter": "field:related"},
+            HTTP_X_TENANT_ID=self.tenant.identifier,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn({"value": str(target.pk), "label": target.title}, response.data["results"])
+
     def test_create_object_type_with_browser_group(self):
         main_type = ObjectTypeDefinition.objects.create(
             name="news", label="News", plural_label="News Articles", created_by=self.user
