@@ -227,7 +227,6 @@ const ObjectWidgetFactory = ({
                     showControls={true}
                     // ObjectEditor-specific props
                     objectType={objectType}
-                    slotConfig={slotConfig}
                     onSlotAction={handleSlotAction}
                     isRequired={slotConfig?.required && index === 0}
                     maxWidgets={maxWidgets}
