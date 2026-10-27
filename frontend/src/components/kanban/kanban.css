@@ -236,8 +236,8 @@
 .kb-column .kb-add-card { border-radius: 6px; font-size: 13px; }
 .kb-column .kb-add-card:hover { background: rgb(9 30 66 / 0.08); }
 .kb-card-composer { display: grid; gap: 8px; }
-.kb-card-composer textarea { display: block; width: 100%; min-height: 58px; padding: 9px 12px; resize: vertical; border: 0; border-radius: 8px; background: #fff; box-shadow: 0 1px 2px rgb(9 30 66 / 0.2); font-size: 13px; line-height: 1.5; }
-.kb-card-composer textarea:focus { outline: 2px solid #2563eb; outline-offset: 0; box-shadow: 0 1px 2px rgb(9 30 66 / 0.2); }
+.kb-card-composer textarea { display: block; width: 100%; min-height: 58px; padding: 9px 12px; resize: vertical; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; box-shadow: 0 1px 2px rgb(9 30 66 / 0.2); font-size: 13px; line-height: 1.5; }
+.kb-card-composer textarea:focus { border-color: #2563eb; outline: none; box-shadow: inset 0 0 0 1px #2563eb, 0 1px 2px rgb(9 30 66 / 0.2); }
 .kb-card-composer textarea::placeholder { color: #6b7280; opacity: 1; }
 .kb-card-composer-actions { display: flex; align-items: center; gap: 8px; }
 .kb-card-composer-actions .user-tools-primary { min-height: 30px; padding: 5px 12px; }
