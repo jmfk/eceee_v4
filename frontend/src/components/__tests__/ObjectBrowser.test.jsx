@@ -210,6 +210,17 @@ describe('ObjectBrowser grouped type list', () => {
         expect(mocks.navigate).toHaveBeenCalledWith('/objects/news_category')
     })
 
+    it('hides category tabs when there are no supporting Object types', async () => {
+        mocks.getMainBrowserTypes.mockResolvedValue({ data: [news, event] })
+        renderBrowser()
+
+        const groupList = await screen.findByRole('list', { name: 'Object type groups' })
+        expect(await within(groupList).findByTestId('object-type-card-news')).toBeInTheDocument()
+        expect(within(groupList).getByTestId('object-type-card-event')).toBeInTheDocument()
+        expect(screen.queryByRole('tablist', { name: 'Object categories' })).not.toBeInTheDocument()
+        expect(screen.queryByText('No supporting object types.')).not.toBeInTheDocument()
+    })
+
     it('keeps the existing selected-type search behavior', async () => {
         renderBrowser('/objects/news', '/objects/:typeName')
 
