@@ -166,7 +166,9 @@ def export_bundle(api, ns):
         # Runtime sample acceptance belongs to its environment, not the portable configuration.
         metadata = item.get("metadata", {})
         item["metadata"] = {
-            "content_profile": metadata.get("content_profile", metadata.get("contentProfile", {"id": profile.PROFILE, "version": 1}))
+            "content_profile": metadata.get(
+                "content_profile", metadata.get("contentProfile", {"id": profile.PROFILE, "version": 1})
+            )
         }
         if metadata.get("browser"):
             browser = metadata["browser"]
