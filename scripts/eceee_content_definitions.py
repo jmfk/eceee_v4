@@ -186,9 +186,7 @@ def export_bundle(api, ns):
                 "filters": filters,
             }
             if "list_fields" in browser or "listFields" in browser:
-                item["metadata"]["browser"]["list_fields"] = browser.get(
-                    "list_fields", browser.get("listFields")
-                )
+                item["metadata"]["browser"]["list_fields"] = browser.get("list_fields", browser.get("listFields"))
         portable.append(item)
     keys = set(profile.CLASSIFICATIONS)
     type_ids = {t["id"]: t["key"] for t in types if t["key"] in keys}
@@ -285,7 +283,8 @@ def apply_bundle(api, ns, bundle, apply=False):
             different = ["new"]
         if name in deferred_browser_metadata:
             deferred_browser_metadata[name] = {
-                **desired["metadata"], "browser": deferred_browser_metadata[name]["browser"]
+                **desired["metadata"],
+                "browser": deferred_browser_metadata[name]["browser"],
             }
         if different:
             changes.append({"type": name, "fields": different})
@@ -382,7 +381,7 @@ def apply_bundle(api, ns, bundle, apply=False):
             for entry in browser["filters"]:
                 if entry["key"].startswith("tag-type:"):
                     entry["key"] = "tag:" + str(existing_types[entry["key"][9:]]["id"])
-            api.request(f'objects/object-types/{ids[name]}/', "PATCH", {"metadata": metadata})
+            api.request(f"objects/object-types/{ids[name]}/", "PATCH", {"metadata": metadata})
     terms = api.list("taxonomy/terms/?namespace=" + str(ns["id"]))
     term_map = {(t["tag_type"], t["slug"]): t for t in terms}
     pending = list(bundle["terms"])
