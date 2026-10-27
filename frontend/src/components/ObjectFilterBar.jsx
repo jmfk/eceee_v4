@@ -84,7 +84,7 @@ const ObjectFilterBar = ({ search, onSearchChange, statuses, onStatusesChange, f
     ]
     const quickIcon = item => item.kind === 'date' ? CalendarDays : item.kind === 'tag' ? Tag : SlidersHorizontal
 
-    return <div ref={root} className="min-w-0 flex-1" onKeyDown={event => {
+    return <div ref={root} className="relative z-30 min-w-0 flex-1" onKeyDown={event => {
         if (event.key === 'Escape' && (editing || menuOpen)) { event.stopPropagation(); close() }
     }}>
         <div className="flex min-h-9 flex-wrap items-center gap-1 rounded-sm border border-gray-300 bg-white px-2 py-1 text-xs focus-within:border-blue-600">
@@ -111,10 +111,10 @@ const ObjectFilterBar = ({ search, onSearchChange, statuses, onStatusesChange, f
                 }
             }} className="flex min-h-7 min-w-7 items-center justify-center rounded-sm text-gray-600 hover:bg-gray-100 focus-visible:outline focus-visible:outline-1 focus-visible:outline-blue-600"><ListFilterPlus size={17} aria-hidden="true" /></button>}
         </div>
-        {menuOpen && <div className="mt-2 ml-auto w-full max-w-lg rounded-sm border border-gray-200 bg-white p-1 text-xs shadow-sm" role="menu" aria-label="Available Object filters">
+        {menuOpen && <div className="absolute right-0 top-full z-50 mt-2 w-full max-w-lg rounded-sm border border-gray-200 bg-white p-1 text-xs shadow-lg" role="menu" aria-label="Available Object filters">
             {remainingOptions.map(item => <button key={item.key} type="button" role="menuitem" onClick={() => show(item.key)} className="block w-full rounded-sm px-3 py-2 text-left hover:bg-blue-50 focus:bg-blue-50">{item.label}</button>)}
         </div>}
-        {editing && <div role="dialog" aria-label={`Filter ${editing === 'status' ? 'Status' : editing === 'type' ? 'Object type' : option?.label || editing}`} className="mt-2 ml-auto w-full max-w-lg rounded-sm border border-gray-200 bg-white p-3 text-xs shadow-sm">
+        {editing && <div role="dialog" aria-label={`Filter ${editing === 'status' ? 'Status' : editing === 'type' ? 'Object type' : option?.label || editing}`} className="absolute right-0 top-full z-50 mt-2 w-full max-w-lg rounded-sm border border-gray-200 bg-white p-3 text-xs shadow-lg">
             <div className="mb-2 flex items-center justify-between font-semibold"><span>{editing === 'status' ? 'Status' : editing === 'type' ? 'Object type' : option?.label}</span><button type="button" aria-label="Close filter" onClick={close} className="rounded-sm p-1 hover:bg-gray-100"><X size={14} /></button></div>
             {editing === 'type' ? <div className="max-h-60 overflow-y-auto">
                 {typeOptions.length > 8 && <input type="search" aria-label="Find object type" placeholder="Find an object type…" value={optionSearch} onChange={event => setOptionSearch(event.target.value)} className="mb-2 w-full rounded-sm border border-gray-300 px-2 py-1.5 text-xs focus:border-blue-600 focus:outline-none" />}
