@@ -38,8 +38,8 @@ const ValueListEditor = () => {
     const [formData, setFormData] = useState({
         name: '',
         description: '',
-        value_type: 'string',
-        is_active: true
+        valueType: 'string',
+        isActive: true
     })
 
     // Item management state
@@ -138,8 +138,8 @@ const ValueListEditor = () => {
         setFormData({
             name: '',
             description: '',
-            value_type: 'string',
-            is_active: true
+            valueType: 'string',
+            isActive: true
         })
         setItems([])
     }
@@ -151,8 +151,8 @@ const ValueListEditor = () => {
         setFormData({
             name: valueList.name,
             description: valueList.description || '',
-            value_type: valueList.value_type,
-            is_active: valueList.is_active
+            valueType: valueList.valueType,
+            isActive: valueList.isActive
         })
         loadValueListDetails(valueList.id)
     }
@@ -200,14 +200,14 @@ const ValueListEditor = () => {
         // Validate value based on value type
         let validatedValue = newItemValue.trim() || undefined
         if (validatedValue) {
-            if (formData.value_type === 'integer') {
+            if (formData.valueType === 'integer') {
                 const intValue = parseInt(validatedValue, 10)
                 if (isNaN(intValue)) {
                     addNotification('Value must be a valid integer', 'error')
                     return
                 }
                 validatedValue = String(intValue)
-            } else if (formData.value_type === 'decimal') {
+            } else if (formData.valueType === 'decimal') {
                 const floatValue = parseFloat(validatedValue)
                 if (isNaN(floatValue)) {
                     addNotification('Value must be a valid decimal number', 'error')
@@ -267,7 +267,7 @@ const ValueListEditor = () => {
     const saveEditItem = async (itemId, field, newValue) => {
         // Validate value based on type if editing value field
         if (field === 'value' && newValue.trim()) {
-            if (formData.value_type === 'integer') {
+            if (formData.valueType === 'integer') {
                 const intValue = parseInt(newValue, 10)
                 if (isNaN(intValue)) {
                     addNotification('Value must be a valid integer', 'error')
@@ -275,7 +275,7 @@ const ValueListEditor = () => {
                     return
                 }
                 newValue = String(intValue)
-            } else if (formData.value_type === 'decimal') {
+            } else if (formData.valueType === 'decimal') {
                 const floatValue = parseFloat(newValue)
                 if (isNaN(floatValue)) {
                     addNotification('Value must be a valid decimal number', 'error')
@@ -464,7 +464,7 @@ const ValueListEditor = () => {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {filteredValueLists.map((valueList) => {
-                            const ValueTypeIcon = getValueTypeIcon(valueList.value_type)
+                            const ValueTypeIcon = getValueTypeIcon(valueList.valueType)
                             return (
                                 <div
                                     key={valueList.id}
@@ -480,10 +480,10 @@ const ValueListEditor = () => {
                                             </div>
                                         </div>
                                         <div className="flex items-center space-x-2">
-                                            <span className={`px-2 py-1 text-xs rounded-full ${getValueTypeColor(valueList.value_type)}`}>
-                                                {valueList.value_type}
+                                            <span className={`px-2 py-1 text-xs rounded-full ${getValueTypeColor(valueList.valueType)}`}>
+                                                {valueList.valueType}
                                             </span>
-                                            {!valueList.is_active && (
+                                            {!valueList.isActive && (
                                                 <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
                                                     Inactive
                                                 </span>
@@ -499,7 +499,7 @@ const ValueListEditor = () => {
 
                                     <div className="flex items-center justify-between text-sm">
                                         <span className="text-gray-500">
-                                            {valueList.item_count} item{valueList.item_count !== 1 ? 's' : ''}
+                                            {valueList.itemCount} item{valueList.itemCount !== 1 ? 's' : ''}
                                         </span>
                                         <div className="flex items-center space-x-2">
                                             <button
@@ -512,7 +512,7 @@ const ValueListEditor = () => {
                                             >
                                                 <Edit3 className="w-4 h-4" />
                                             </button>
-                                            {!valueList.is_system && (
+                                            {!valueList.isSystem && (
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation()
@@ -570,7 +570,7 @@ const ValueListEditor = () => {
                         <Save className="w-4 h-4" />
                         <span>{createMutation.isPending || updateMutation.isPending ? 'Saving...' : 'Save'}</span>
                     </button>
-                    {!isCreating && selectedValueList && !selectedValueList.is_system && (
+                    {!isCreating && selectedValueList && !selectedValueList.isSystem && (
                         <button
                             onClick={() => handleDelete(selectedValueList)}
                             className="flex items-center space-x-2 px-4 py-2 text-red-600 border border-red-300 rounded-md hover:bg-red-50 transition-colors"
@@ -629,15 +629,15 @@ const ValueListEditor = () => {
                                     )}
                                 </label>
                                 <select
-                                    value={formData.value_type}
+                                    value={formData.valueType}
                                     onChange={(e) => {
-                                        setFormData(prev => ({ ...prev, value_type: e.target.value }))
+                                        setFormData(prev => ({ ...prev, valueType: e.target.value }))
                                         // Clear validation error and value when type changes
                                         setValueValidationError('')
                                         setNewItemValue('')
                                     }}
                                     disabled={
-                                        (!isCreating && selectedValueList?.is_system) || // System lists can't change type
+                                        (!isCreating && selectedValueList?.isSystem) || // System lists can't change type
                                         (!isCreating && items.length > 0) // Can't change type when items exist
                                     }
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
@@ -649,7 +649,7 @@ const ValueListEditor = () => {
                                 <div className="text-xs text-gray-500 mt-1">
                                     {(!isCreating && items.length > 0)
                                         ? 'Cannot change type when items exist (delete all items first)'
-                                        : (!isCreating && selectedValueList?.is_system)
+                                        : (!isCreating && selectedValueList?.isSystem)
                                             ? 'Cannot change type of system-managed value lists'
                                             : 'Type of values that will be stored in this list'
                                     }
@@ -659,12 +659,12 @@ const ValueListEditor = () => {
                             <div className="flex items-center">
                                 <input
                                     type="checkbox"
-                                    id="is_active"
-                                    checked={formData.is_active}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
+                                    id="isActive"
+                                    checked={formData.isActive}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.target.checked }))}
                                     className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                                 />
-                                <label htmlFor="is_active" className="ml-2 text-sm text-gray-700">
+                                <label htmlFor="isActive" className="ml-2 text-sm text-gray-700">
                                     Active (available for use in forms)
                                 </label>
                             </div>
@@ -686,8 +686,8 @@ const ValueListEditor = () => {
                                     </div>
                                 )}
                             </div>
-                            <span className={`px-2 py-1 text-xs rounded-full ${getValueTypeColor(formData.value_type)}`}>
-                                {formData.value_type}
+                            <span className={`px-2 py-1 text-xs rounded-full ${getValueTypeColor(formData.valueType)}`}>
+                                {formData.valueType}
                             </span>
                         </div>
 
@@ -709,10 +709,10 @@ const ValueListEditor = () => {
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-gray-700 mb-1">
-                                            Value (optional) - {formData.value_type}
+                                            Value (optional) - {formData.valueType}
                                         </label>
                                         <input
-                                            type={formData.value_type === 'string' ? 'text' : 'number'}
+                                            type={formData.valueType === 'string' ? 'text' : 'number'}
                                             value={newItemValue}
                                             onChange={(e) => {
                                                 const value = e.target.value
@@ -720,14 +720,14 @@ const ValueListEditor = () => {
 
                                                 // Real-time validation
                                                 if (value.trim()) {
-                                                    if (formData.value_type === 'integer') {
+                                                    if (formData.valueType === 'integer') {
                                                         const intValue = parseInt(value, 10)
                                                         if (isNaN(intValue)) {
                                                             setValueValidationError('Must be a valid integer')
                                                         } else {
                                                             setValueValidationError('')
                                                         }
-                                                    } else if (formData.value_type === 'decimal') {
+                                                    } else if (formData.valueType === 'decimal') {
                                                         const floatValue = parseFloat(value)
                                                         if (isNaN(floatValue)) {
                                                             setValueValidationError('Must be a valid decimal number')
@@ -742,11 +742,11 @@ const ValueListEditor = () => {
                                                 }
                                             }}
                                             placeholder={
-                                                formData.value_type === 'string' ? 'Custom text value' :
-                                                    formData.value_type === 'integer' ? '123' :
+                                                formData.valueType === 'string' ? 'Custom text value' :
+                                                    formData.valueType === 'integer' ? '123' :
                                                         '123.45'
                                             }
-                                            step={formData.value_type === 'decimal' ? '0.01' : '1'}
+                                            step={formData.valueType === 'decimal' ? '0.01' : '1'}
                                             className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${valueValidationError ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
                                                 }`}
                                         />
@@ -754,9 +754,9 @@ const ValueListEditor = () => {
                                             <div className="text-xs text-red-600 mt-1">{valueValidationError}</div>
                                         )}
                                         <div className="text-xs text-gray-500 mt-1">
-                                            {formData.value_type === 'string' && 'Enter a custom text value or leave empty to use slug'}
-                                            {formData.value_type === 'integer' && 'Enter a whole number or leave empty to use slug'}
-                                            {formData.value_type === 'decimal' && 'Enter a decimal number or leave empty to use slug'}
+                                            {formData.valueType === 'string' && 'Enter a custom text value or leave empty to use slug'}
+                                            {formData.valueType === 'integer' && 'Enter a whole number or leave empty to use slug'}
+                                            {formData.valueType === 'decimal' && 'Enter a decimal number or leave empty to use slug'}
                                         </div>
                                     </div>
                                 </div>
@@ -835,7 +835,7 @@ const ValueListEditor = () => {
                                             {/* Editable Value */}
                                             {editingItemId === `${item.id}-value` ? (
                                                 <input
-                                                    type={formData.value_type === 'string' ? 'text' : 'number'}
+                                                    type={formData.valueType === 'string' ? 'text' : 'number'}
                                                     defaultValue={item.value || ''}
                                                     autoFocus
                                                     onBlur={(e) => {
@@ -849,11 +849,11 @@ const ValueListEditor = () => {
                                                             setEditingItemId(null)
                                                         }
                                                     }}
-                                                    step={formData.value_type === 'decimal' ? '0.01' : '1'}
+                                                    step={formData.valueType === 'decimal' ? '0.01' : '1'}
                                                     className="w-full px-2 py-1 text-sm text-gray-700 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                                                     placeholder={
-                                                        formData.value_type === 'string' ? 'Custom value' :
-                                                            formData.value_type === 'integer' ? '123' :
+                                                        formData.valueType === 'string' ? 'Custom value' :
+                                                            formData.valueType === 'integer' ? '123' :
                                                                 '123.45'
                                                     }
                                                 />

@@ -38,8 +38,8 @@ class PageEditorConsumer(AsyncWebsocketConsumer):
             text_data=json.dumps(
                 {
                     "type": "connection_established",
-                    "page_id": self.page_id,
-                    "connection_id": self.connection_id,
+                    "pageId": self.page_id,
+                    "connectionId": self.connection_id,
                 }
             )
         )
@@ -71,7 +71,7 @@ class PageEditorConsumer(AsyncWebsocketConsumer):
         if message_type in {"presence_update", "presence_announce", "presence_heartbeat"}:
             section = data.get("section")
             self.section = section if section in ALLOWED_EDITOR_SECTIONS else "content"
-            widget_id = data.get("widget_id")
+            widget_id = data.get("widgetId", data.get("widget_id"))
             self.widget_id = str(widget_id)[:255] if widget_id else None
             action = "heartbeat" if message_type == "presence_heartbeat" else "update"
             await self._broadcast_presence(action)
@@ -91,14 +91,14 @@ class PageEditorConsumer(AsyncWebsocketConsumer):
             text_data=json.dumps(
                 {
                     "type": "version_updated",
-                    "page_id": event["page_id"],
-                    "version_id": event["version_id"],
-                    "version_number": event.get("version_number"),
-                    "updated_at": event["updated_at"],
+                    "pageId": event["page_id"],
+                    "versionId": event["version_id"],
+                    "versionNumber": event.get("version_number"),
+                    "updatedAt": event["updated_at"],
                     "revision": event.get("revision"),
-                    "updated_by": event.get("updated_by"),
-                    "session_id": event.get("session_id"),
-                    "mutation_type": event.get("mutation_type", "saved"),
+                    "updatedBy": event.get("updated_by"),
+                    "sessionId": event.get("session_id"),
+                    "mutationType": event.get("mutation_type", "saved"),
                 }
             )
         )
@@ -111,11 +111,15 @@ class PageEditorConsumer(AsyncWebsocketConsumer):
                 {
                     "type": "presence",
                     "action": event["action"],
-                    "page_id": event["page_id"],
-                    "connection_id": event["connection_id"],
-                    "user": event["user"],
+                    "pageId": event["page_id"],
+                    "connectionId": event["connection_id"],
+                    "user": {
+                        "id": event["user"]["id"],
+                        "username": event["user"]["username"],
+                        "displayName": event["user"].get("display_name"),
+                    },
                     "section": event["section"],
-                    "widget_id": event["widget_id"],
+                    "widgetId": event["widget_id"],
                 }
             )
         )
@@ -130,7 +134,7 @@ class PageEditorConsumer(AsyncWebsocketConsumer):
             text_data=json.dumps(
                 {
                     "type": "presence_sync_request",
-                    "requester_connection_id": requester,
+                    "requesterConnectionId": requester,
                 }
             )
         )

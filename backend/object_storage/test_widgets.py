@@ -46,6 +46,19 @@ class PublicObjectWidgetTest(TestCase):
             created_by=self.user,
         )
 
+    def test_widget_configuration_schemas_use_camel_case_contracts(self):
+        list_schema = ObjectListConfig.model_json_schema(by_alias=True)
+        detail_schema = ObjectDetailConfig.model_json_schema(by_alias=True)
+        children_schema = ObjectChildrenConfig.model_json_schema(by_alias=True)
+
+        self.assertIn("objectType", list_schema["properties"])
+        self.assertEqual(list_schema["required"], ["objectType"])
+        self.assertIn("objectId", detail_schema["properties"])
+        self.assertIn("parentObjectId", children_schema["properties"])
+
+        parsed = ObjectDetailConfig(objectId=self.object_type.id)
+        self.assertEqual(parsed.object_id, self.object_type.id)
+
     def create_object(
         self,
         title,

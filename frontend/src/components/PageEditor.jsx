@@ -2023,10 +2023,10 @@ const PageEditor = () => {
                                     {activeEditors.slice(0, 3).map(editor => (
                                         <span
                                             key={editor.user.id}
-                                            title={`${editor.user.display_name} — ${editor.section}${editor.widgetId ? ` (${editor.widgetId})` : ''}`}
+                                            title={`${editor.user.displayName} — ${editor.section}${editor.widgetId ? ` (${editor.widgetId})` : ''}`}
                                             className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700 ring-2 ring-white"
                                         >
-                                            {(editor.user.display_name || editor.user.username || '?')
+                                            {(editor.user.displayName || editor.user.username || '?')
                                                 .split(/\s+/)
                                                 .map(part => part[0])
                                                 .join('')

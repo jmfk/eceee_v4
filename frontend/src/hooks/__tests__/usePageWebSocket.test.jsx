@@ -34,6 +34,22 @@ describe('usePageWebSocket', () => {
         vi.unstubAllGlobals()
     })
 
+    it('sends presence metadata with camelCase fields', async () => {
+        const { rerender } = renderHook(
+            ({ activeWidgetId }) => usePageWebSocket(7, { activeWidgetId }),
+            { initialProps: { activeWidgetId: null } },
+        )
+        const socket = MockWebSocket.instances[0]
+
+        rerender({ activeWidgetId: 'widget-7' })
+        await waitFor(() => expect(socket.send).toHaveBeenCalled())
+        expect(JSON.parse(socket.send.mock.calls.at(-1)[0])).toEqual({
+            type: 'presence_update',
+            section: 'content',
+            widgetId: 'widget-7',
+        })
+    })
+
     it('ignores duplicate and out-of-order revisions', async () => {
         const onVersionUpdated = vi.fn()
         renderHook(() => usePageWebSocket(7, {
@@ -45,9 +61,9 @@ describe('usePageWebSocket', () => {
         const socket = MockWebSocket.instances[0]
 
         act(() => {
-            socket.message({ type: 'version_updated', page_id: 7, version_id: 9, version_number: 3, revision: 6 })
-            socket.message({ type: 'version_updated', page_id: 7, version_id: 9, version_number: 3, revision: 5 })
-            socket.message({ type: 'version_updated', page_id: 7, version_id: 9, version_number: 3, revision: 6 })
+            socket.message({ type: 'version_updated', pageId: 7, versionId: 9, versionNumber: 3, revision: 6 })
+            socket.message({ type: 'version_updated', pageId: 7, versionId: 9, versionNumber: 3, revision: 5 })
+            socket.message({ type: 'version_updated', pageId: 7, versionId: 9, versionNumber: 3, revision: 6 })
         })
 
         await waitFor(() => expect(onVersionUpdated).toHaveBeenCalledTimes(1))
@@ -65,8 +81,8 @@ describe('usePageWebSocket', () => {
         const socket = MockWebSocket.instances[0]
 
         act(() => {
-            socket.message({ type: 'version_updated', page_id: 7, version_id: 10, version_number: 4, revision: 2 })
-            socket.message({ type: 'version_updated', page_id: 7, version_id: 9, version_number: 3, revision: 9 })
+            socket.message({ type: 'version_updated', pageId: 7, versionId: 10, versionNumber: 4, revision: 2 })
+            socket.message({ type: 'version_updated', pageId: 7, versionId: 9, versionNumber: 3, revision: 9 })
         })
 
         await waitFor(() => expect(onVersionUpdated).toHaveBeenCalledTimes(1))
@@ -100,8 +116,8 @@ describe('usePageWebSocket', () => {
         const socket = MockWebSocket.instances[0]
 
         act(() => {
-            socket.message({ type: 'version_updated', page_id: 7, version_id: 9, version_number: 3, revision: 5 })
-            socket.message({ type: 'version_updated', page_id: 7, version_id: 9, version_number: 3, revision: 6 })
+            socket.message({ type: 'version_updated', pageId: 7, versionId: 9, versionNumber: 3, revision: 5 })
+            socket.message({ type: 'version_updated', pageId: 7, versionId: 9, versionNumber: 3, revision: 6 })
         })
 
         await waitFor(() => expect(appliedRevisions).toEqual([6]))
@@ -119,16 +135,16 @@ describe('usePageWebSocket', () => {
         const socket = MockWebSocket.instances[0]
 
         act(() => {
-            socket.message({ type: 'connection_established', connection_id: 'self' })
+            socket.message({ type: 'connection_established', connectionId: 'self' })
             socket.message({
-                type: 'presence', action: 'join', connection_id: 'tab-a',
-                user: { id: 2, username: 'editor', display_name: 'Editor' },
-                section: 'content', widget_id: null,
+                type: 'presence', action: 'join', connectionId: 'tab-a',
+                user: { id: 2, username: 'editor', displayName: 'Editor' },
+                section: 'content', widgetId: null,
             })
             socket.message({
-                type: 'presence', action: 'join', connection_id: 'tab-b',
-                user: { id: 2, username: 'editor', display_name: 'Editor' },
-                section: 'settings', widget_id: 'widget-2',
+                type: 'presence', action: 'join', connectionId: 'tab-b',
+                user: { id: 2, username: 'editor', displayName: 'Editor' },
+                section: 'settings', widgetId: 'widget-2',
             })
         })
 
@@ -138,9 +154,9 @@ describe('usePageWebSocket', () => {
         }))
 
         act(() => socket.message({
-            type: 'presence', action: 'leave', connection_id: 'tab-b',
-            user: { id: 2, username: 'editor', display_name: 'Editor' },
-            section: 'settings', widget_id: 'widget-2',
+            type: 'presence', action: 'leave', connectionId: 'tab-b',
+            user: { id: 2, username: 'editor', displayName: 'Editor' },
+            section: 'settings', widgetId: 'widget-2',
         }))
 
         await waitFor(() => expect(result.current.activeEditors[0].connectionId).toBe('tab-a'))
@@ -152,9 +168,9 @@ describe('usePageWebSocket', () => {
         const socket = MockWebSocket.instances[0]
 
         act(() => socket.message({
-            type: 'presence', action: 'join', connection_id: 'abandoned',
-            user: { id: 3, username: 'gone', display_name: 'Gone Editor' },
-            section: 'content', widget_id: null,
+            type: 'presence', action: 'join', connectionId: 'abandoned',
+            user: { id: 3, username: 'gone', displayName: 'Gone Editor' },
+            section: 'content', widgetId: null,
         }))
         expect(result.current.activeEditors).toHaveLength(1)
 
@@ -171,9 +187,9 @@ describe('usePageWebSocket', () => {
         const firstSocket = MockWebSocket.instances[0]
 
         act(() => firstSocket.message({
-            type: 'presence', action: 'join', connection_id: 'page-seven-editor',
-            user: { id: 2, username: 'editor', display_name: 'Editor' },
-            section: 'content', widget_id: null,
+            type: 'presence', action: 'join', connectionId: 'page-seven-editor',
+            user: { id: 2, username: 'editor', displayName: 'Editor' },
+            section: 'content', widgetId: null,
         }))
         expect(result.current.activeEditors).toHaveLength(1)
 

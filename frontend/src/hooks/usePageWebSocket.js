@@ -71,7 +71,7 @@ export function usePageWebSocket(pageId, options = {}) {
         wsRef.current.send(JSON.stringify({
             type,
             section: activeSectionRef.current,
-            widget_id: activeWidgetIdRef.current,
+            widgetId: activeWidgetIdRef.current,
         }));
     }, []);
 
@@ -144,14 +144,14 @@ export function usePageWebSocket(pageId, options = {}) {
                     const data = JSON.parse(event.data);
                     
                     if (data.type === 'connection_established') {
-                        connectionIdRef.current = data.connection_id;
+                        connectionIdRef.current = data.connectionId;
                         sendPresence('presence_update');
                     } else if (data.type === 'auth_failure') {
                         // Explicit auth failure from backend
                         authFailureDetectedRef.current = true;
                     } else if (data.type === 'version_updated') {
-                        const eventVersionId = data.version_id == null ? null : String(data.version_id);
-                        const versionNumber = Number(data.version_number || 0);
+                        const eventVersionId = data.versionId == null ? null : String(data.versionId);
+                        const versionNumber = Number(data.versionNumber || 0);
                         const revision = Number(data.revision || 0);
                         const latestVersionNumber = Math.max(
                             Number(knownVersionNumberRef.current || 0),
@@ -171,20 +171,20 @@ export function usePageWebSocket(pageId, options = {}) {
                             latestAcceptedRevisionRef.current = revision;
                         }
                         const updateInfo = {
-                            pageId: data.page_id,
-                            versionId: data.version_id,
+                            pageId: data.pageId,
+                            versionId: data.versionId,
                             versionNumber,
-                            updatedAt: data.updated_at,
-                            updatedBy: data.updated_by,
+                            updatedAt: data.updatedAt,
+                            updatedBy: data.updatedBy,
                             revision,
-                            mutationType: data.mutation_type,
-                            sessionId: data.session_id,
+                            mutationType: data.mutationType,
+                            sessionId: data.sessionId,
                             timestamp: new Date().toISOString()
                         };
                         latestAcceptedUpdateRef.current = updateInfo;
                         
                         // Check if this is our own session's save
-                        if (data.session_id === sessionIdRef.current) {
+                        if (data.sessionId === sessionIdRef.current) {
                             return; // Don't set stale or trigger callback for own saves
                         }
                         
@@ -196,13 +196,13 @@ export function usePageWebSocket(pageId, options = {}) {
                         }
                     } else if (data.type === 'presence') {
                         if (data.action === 'leave') {
-                            presenceRef.current.delete(data.connection_id);
+                            presenceRef.current.delete(data.connectionId);
                         } else {
-                            presenceRef.current.set(data.connection_id, {
-                                connectionId: data.connection_id,
+                            presenceRef.current.set(data.connectionId, {
+                                connectionId: data.connectionId,
                                 user: data.user,
                                 section: data.section,
-                                widgetId: data.widget_id,
+                                widgetId: data.widgetId,
                                 lastSeen: Date.now(),
                             });
                         }
