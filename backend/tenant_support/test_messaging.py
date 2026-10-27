@@ -112,6 +112,18 @@ class MessagingTests(TestCase):
         self.assertEqual(list(bug.labels.values_list("name", flat=True)), ["Bug Report"])
         self.assertEqual(MessageLabel.objects.filter(tenant=self.other).count(), 4)
 
+    def test_thread_accepts_all_thirty_active_message_labels(self):
+        self.call(views.ContextView)
+        MessageLabel.objects.bulk_create(
+            [MessageLabel(tenant=self.tenant, name=f"Extra {number}") for number in range(26)]
+        )
+        label_ids = [
+            str(label_id) for label_id in MessageLabel.objects.filter(tenant=self.tenant).values_list("pk", flat=True)
+        ]
+        response, _ = self.send(labelIds=label_ids)
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(len(response.data["labels"]), 30)
+
     def test_group_recipients_are_a_snapshot_and_foreign_recipients_rejected(self):
         group = TenantRole.objects.create(tenant=self.tenant, name="Redaktionen", permissions=[])
         group.users.add(self.bob)

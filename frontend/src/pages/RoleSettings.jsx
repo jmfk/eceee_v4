@@ -22,24 +22,25 @@ const permissionName = (permission, language) => {
 
 export default function RoleSettings() {
     const tenant = useSupportTenant()
+    const tenantConfig = tenant ? { headers: { 'X-Tenant-ID': tenant } } : undefined
     const { checkAuthStatus, language, user } = useAuth()
     const queryClient = useQueryClient()
     const [draft, setDraft] = useState(null)
     const [memberDraft, setMemberDraft] = useState(null)
     const [newMember, setNewMember] = useState(null)
     const [status, setStatus] = useState('')
-    const query = useQuery({ queryKey: ['roles', tenant], queryFn: async () => (await client.get('/api/v1/utils/roles/')).data })
+    const query = useQuery({ queryKey: ['roles', tenant], queryFn: async () => (await client.get('/api/v1/utils/roles/', tenantConfig)).data })
     const accounts = useQuery({ queryKey: ['system-accounts'], enabled: Boolean(user?.isSuperuser), queryFn: async () => (await client.get('/api/v1/utils/users/')).data.users })
     const save = useMutation({
-        mutationFn: async () => client.post('/api/v1/utils/roles/', draft),
+        mutationFn: async () => client.post('/api/v1/utils/roles/', draft, tenantConfig),
         onSuccess: () => { checkAuthStatus?.(); setDraft(null); setStatus(language === 'sv-se' ? 'Rollen har sparats.' : 'Role saved.'); queryClient.invalidateQueries({ queryKey: ['roles', tenant] }); queryClient.invalidateQueries({ queryKey: ['support', tenant] }) },
     })
     const saveMember = useMutation({
-        mutationFn: async () => client.patch('/api/v1/utils/roles/', { userId: memberDraft.id, roleIds: memberDraft.roleIds }),
+        mutationFn: async () => client.patch('/api/v1/utils/roles/', { userId: memberDraft.id, roleIds: memberDraft.roleIds }, tenantConfig),
         onSuccess: () => { checkAuthStatus?.(); setMemberDraft(null); setStatus(language === 'sv-se' ? 'Användarens roller har sparats.' : 'Member roles saved.'); queryClient.invalidateQueries({ queryKey: ['roles', tenant] }) },
     })
     const addMember = useMutation({
-        mutationFn: async () => client.post('/api/v1/utils/roles/members/', { userId: Number(newMember.userId), roleIds: newMember.roleIds }),
+        mutationFn: async () => client.post('/api/v1/utils/roles/members/', { userId: Number(newMember.userId), roleIds: newMember.roleIds }, tenantConfig),
         onSuccess: () => { setNewMember(null); setStatus(language === 'sv-se' ? 'Medlemmen har lagts till.' : 'Member added.'); queryClient.invalidateQueries({ queryKey: ['roles', tenant] }) },
     })
     const toggle = (field, value) => setDraft({ ...draft, [field]: draft[field].includes(value) ? draft[field].filter((item) => item !== value) : [...draft[field], value] })

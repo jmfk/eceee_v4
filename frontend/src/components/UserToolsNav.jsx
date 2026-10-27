@@ -3,15 +3,17 @@ import { canAccessCmsPath } from '../utils/cmsNavigation'
 import { Link, useLocation } from 'react-router-dom'
 import { ArrowLeft, User, Inbox, Columns3, Flag, LogOut } from 'lucide-react'
 import { safeReportLocation } from '../api/support'
+import { useSupportContext } from './support/useSupportContext'
 import './user-tools.css'
 
 export default function UserToolsNav({ tenant, unreadCount = 0 }) {
     const { user, logout } = useAuth()
+    const support = useSupportContext()
     const location = useLocation()
     const reportFrom = safeReportLocation(location.state?.reportFrom || window.location.href)
     const cmsPath = user?.isKanbanBoardGuest ? undefined :
         ['/pages', '/objects', '/media', '/statistics', '/tags', '/designer/themes', '/settings']
-            .find((path) => canAccessCmsPath(user, path))
+            .find((path) => canAccessCmsPath(user, path)) || (support.data?.canSupport ? `/settings/support${tenant ? `?tenant=${encodeURIComponent(tenant)}` : ''}` : undefined)
     const links = [
         { title: `Inbox${unreadCount ? ` (${unreadCount})` : ''}`, href: tenant ? `/inbox?tenant=${encodeURIComponent(tenant)}` : '/inbox', icon: Inbox, active: location.pathname.startsWith('/inbox') && !location.pathname.startsWith('/inbox/new'), requiresWorkspaceAccess: true },
         { title: 'Kanban', href: '/kanban', icon: Columns3, active: location.pathname.startsWith('/kanban') },

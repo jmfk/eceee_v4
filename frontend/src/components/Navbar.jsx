@@ -26,7 +26,11 @@ const Navbar = () => {
   const inboxCount = support.data?.unreadCount || 0
   const { user, language } = useAuth()
   const t = (key) => cmsText(key, language)
-  const visibleNavigation = navigation.filter((item) => canAccessCmsPath(user, item.href))
+  const supportSettingsOnly = support.data?.canSupport && !canAccessCmsPath(user, '/settings')
+  const scopedTenant = new URLSearchParams(location.search).get('tenant')
+  const supportSettingsHref = scopedTenant ? `/settings/support?tenant=${encodeURIComponent(scopedTenant)}` : '/settings/support'
+  const visibleNavigation = navigation.filter((item) =>
+    canAccessCmsPath(user, item.href) || (item.href === '/settings' && support.data?.canSupport))
   const navRef = useRef(null)
   const navContainerRef = useRef(null)
   const desktopNavRef = useRef(null)
@@ -93,7 +97,7 @@ const Navbar = () => {
             {visibleNavigation.map((item) => (
               <Link
                 key={item.name}
-                to={item.href}
+                to={item.href === '/settings' && supportSettingsOnly ? supportSettingsHref : item.href}
                 state={item.name === 'Profile' ? { reportFrom: location.state?.reportFrom || safeReportLocation(window.location.href) } : undefined}
                 className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive(item.href)
                   ? 'text-primary-600 bg-primary-50'
@@ -137,7 +141,7 @@ const Navbar = () => {
               {visibleNavigation.map((item) => (
                 <Link
                   key={item.name}
-                  to={item.href}
+                  to={item.href === '/settings' && supportSettingsOnly ? supportSettingsHref : item.href}
                   state={item.name === 'Profile' ? { reportFrom: location.state?.reportFrom || safeReportLocation(window.location.href) } : undefined}
                   onClick={() => setIsOpen(false)}
                   className={`flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium transition-colors ${isActive(item.href)
