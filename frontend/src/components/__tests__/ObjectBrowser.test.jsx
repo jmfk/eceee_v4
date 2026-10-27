@@ -1,6 +1,7 @@
 import React from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ObjectBrowser from '../ObjectBrowser'
@@ -239,13 +240,16 @@ describe('ObjectBrowser grouped type list', () => {
         expect(await screen.findByText('Page 1 of 1')).toBeInTheDocument()
     })
 
-    it('opens the import catalog and keeps remote v4 transfer as a separate action', async () => {
+    it('lets editors choose an import source', async () => {
+        const user = userEvent.setup()
         renderBrowser()
 
-        fireEvent.click(await screen.findByRole('button', { name: 'Imports' }))
+        await user.click(await screen.findByRole('button', { name: 'Import' }))
+        await user.click(await screen.findByRole('menuitem', { name: 'Legacy import scripts' }))
         expect(mocks.navigate).toHaveBeenCalledWith('/settings/content-migration')
 
-        fireEvent.click(screen.getByRole('button', { name: 'Transfer from v4 site' }))
+        await user.click(screen.getByRole('button', { name: 'Import' }))
+        await user.click(await screen.findByRole('menuitem', { name: 'Another ECEEE v4 site' }))
         expect(await screen.findByRole('dialog', { name: 'Import remote objects' })).toBeInTheDocument()
         expect(await screen.findByText(/No remote site connection is configured/)).toBeInTheDocument()
     })

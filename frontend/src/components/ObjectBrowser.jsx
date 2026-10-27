@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
+import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams, useParams } from 'react-router-dom'
-import { Search, ArrowLeft, Plus, ChevronRight, AlertCircle, Image, FolderOpen, Trash2, Download } from 'lucide-react'
+import { Search, ArrowLeft, Plus, ChevronDown, ChevronRight, AlertCircle, Image, FolderOpen, Trash2, Download } from 'lucide-react'
 import { objectTypesApi, objectInstancesApi } from '../api/objectStorage'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import DeleteConfirmationModal from './DeleteConfirmationModal'
@@ -243,21 +244,25 @@ const ObjectBrowser = () => {
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap items-center justify-end gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => navigate('/settings/content-migration')}
-                                        className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-                                    >
-                                        <Download className="h-4 w-4" />
-                                        Imports
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowRemoteImport(true)}
-                                        className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                                    >
-                                        Transfer from v4 site
-                                    </button>
+                                    <Menu>
+                                        <MenuButton className="inline-flex min-h-8 items-center gap-2 rounded border border-blue-600 bg-blue-600 px-3 text-xs font-medium text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
+                                            <Download className="h-4 w-4" aria-hidden="true" />
+                                            Import
+                                            <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                                        </MenuButton>
+                                        <MenuItems anchor={{ to: 'bottom end', gap: 4, padding: 8 }} className="z-50 w-64 rounded border border-gray-200 bg-white p-1 text-xs text-gray-900 shadow-lg focus:outline-none">
+                                            <MenuItem>
+                                                <button type="button" onClick={() => navigate('/settings/content-migration')} className="block w-full rounded-sm px-3 py-2 text-left data-focus:bg-blue-50 data-focus:text-blue-700">
+                                                    Legacy import scripts
+                                                </button>
+                                            </MenuItem>
+                                            <MenuItem>
+                                                <button type="button" onClick={() => setShowRemoteImport(true)} className="block w-full rounded-sm px-3 py-2 text-left data-focus:bg-blue-50 data-focus:text-blue-700">
+                                                    Another ECEEE v4 site
+                                                </button>
+                                            </MenuItem>
+                                        </MenuItems>
+                                    </Menu>
                                 </div>
                             </div>
                         </div>
