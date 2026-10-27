@@ -81,6 +81,8 @@ Den befintliga Next-publishern renderar utan Django vid förfrågningar, men reg
 
 - 2026-10-21: Shared widget contract pilot implementation started in `codex/widget-contract-pilot`. [ADR-0041](../adrs/active/0041-shared-widget-contract-source.md) records source ownership and comparison-only Node validation.
 
+- 2026-10-27: Nästa föreslagna etapp dokumenteras i [PLAN-0006](../plans/0006-widget-contract-http-pilot.md): isolerad HTTP-kandidat, strikt kontraktsjämförelse och hybridklientresa. Planering enbart; ingen runtimeflytt eller ny verifiering genomförd.
+
 ## Linked ADRs
 
 - [ADR-0039](../adrs/active/0039-frozen-pilot-behavior-baseline.md): frysta kontrakt, isolerad referenskörning och separat kandidatstatus.
