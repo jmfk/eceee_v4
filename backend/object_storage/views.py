@@ -30,6 +30,7 @@ from taxonomy.models import Tag
 from .browser_config import (
     apply_browser_filters,
     available_filters,
+    available_list_fields,
     browser_config,
     searchable_query,
     validate_browser_config,
@@ -213,6 +214,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
                 {
                     "config": browser_config(definition),
                     "available_filters": list(available_filters(definition, request.tenant).values()),
+                    "available_list_fields": list(available_list_fields(definition).values()),
                 }
             )
         if not definition.namespace_id and not request.user.is_superuser:

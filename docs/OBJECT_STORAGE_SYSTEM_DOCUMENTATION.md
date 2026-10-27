@@ -92,8 +92,11 @@ Calls without `page_size` keep their existing response formats.
 
 #### Object browser search and filters
 
-Each Object type has a **Search and filters** tab in Settings → Object Types. Editors select
-additional searchable text fields and an ordered list of filters. Each filter has a label
+Each Object type has a **Browsing** tab in Settings → Object Types. Editors choose an
+ordered list of details shown beneath the title in Object lists and overview results,
+additional searchable text fields, and an ordered list of filters. Status, created/updated
+dates, publish/unpublish dates, and scalar schema fields can be chosen for the list;
+the title remains visible. Each filter has a label
 and can be enabled on the Objects overview or shown as an icon button in the search
 field. The first three chosen quick filters follow the configured order; additional
 ones remain under Add filter. Title and slug are always searched. Status is always a quick button, and the
@@ -106,7 +109,9 @@ previous calendar weeks and months, 30 days, and a custom from/to range. Weeks s
 on Monday. Filter selectors expand below the search field so they do not cover results.
 
 The configuration is stored in `ObjectTypeDefinition.metadata.browser`; the web API
-validates it against the current schema and classification permissions. The overview
+validates `list_fields` against the current schema and checks the search/filter choices
+against classification permissions. Older configurations default to status, creation
+date and publish date until an editor saves a different list. The overview
 requires an Object type selection before showing type-specific filters. Both views send
 their search and filters to the server and paginate the filtered result count. The
 configuration endpoint is `GET/PUT object-types/{id}/browser_configuration/`, and

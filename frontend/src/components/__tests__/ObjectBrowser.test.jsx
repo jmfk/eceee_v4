@@ -8,6 +8,7 @@ import ObjectBrowser from '../ObjectBrowser'
 import ObjectTypeForm from '../ObjectTypeForm'
 import ObjectBrowserConfiguration from '../ObjectBrowserConfiguration'
 import { buildObjectTypeGroups } from '../objectBrowserGrouping'
+import { listDetail } from '../objectListDisplay'
 
 const mocks = vi.hoisted(() => ({
     navigate: vi.fn(),
@@ -138,6 +139,18 @@ describe('buildObjectTypeGroups', () => {
     })
 })
 
+describe('Object list details', () => {
+    it('shows false booleans and date-only values without timezone shifts', () => {
+        const definition = { schema: { properties: {
+            is_international: { title: 'International', componentType: 'boolean' },
+            event_start_date: { title: 'Start date', componentType: 'date' },
+        } } }
+        const instance = { data: { is_international: false, event_start_date: '2026-03-01' } }
+        expect(listDetail(instance, definition, 'field:is_international')).toEqual({ key: 'field:is_international', label: 'International', value: 'No' })
+        expect(listDetail(instance, definition, 'field:event_start_date')).toEqual({ key: 'field:event_start_date', label: 'Start date', value: '01/03/2026' })
+    })
+})
+
 describe('ObjectBrowser grouped type list', () => {
     beforeEach(() => {
         vi.clearAllMocks()
@@ -263,11 +276,66 @@ describe('ObjectBrowser grouped type list', () => {
         fireEvent.change(screen.getByRole('combobox', { name: 'First name filter control' }), { target: { value: 'checklist' } })
         await user.click(screen.getByRole('checkbox', { name: 'Show on overview' }))
         await user.click(screen.getByRole('checkbox', { name: 'Quick button' }))
-        await user.click(screen.getByRole('button', { name: 'Save search and filters' }))
+        await user.click(screen.getByRole('button', { name: 'Save browser settings' }))
         await waitFor(() => expect(mocks.updateBrowserConfiguration).toHaveBeenCalledWith(1, {
             searchFields: ['first_name'],
             filters: [{ key: 'field:first_name', label: 'First name', overview: true, control: 'checklist', quick: true }],
+            listFields: ['status', 'created_at', 'publish_date'],
         }))
+    })
+
+    it('saves the selected list details and their order in the Object type definition', async () => {
+        const user = userEvent.setup()
+        mocks.getBrowserConfiguration.mockResolvedValue({ data: {
+            config: { searchFields: [], filters: [], listFields: ['status', 'created_at', 'updated_at'] },
+            availableFilters: [],
+            availableListFields: [
+                { key: 'status', label: 'Status', kind: 'status' },
+                { key: 'created_at', label: 'Created in CMS', kind: 'date' },
+                { key: 'updated_at', label: 'Last updated', kind: 'date' },
+                { key: 'field:summary', label: 'Summary', kind: 'choice' },
+            ],
+        } })
+        mocks.updateBrowserConfiguration.mockResolvedValue({ data: { config: { searchFields: [], filters: [], listFields: ['status', 'field:summary', 'updated_at'] } } })
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        render(<QueryClientProvider client={queryClient}><ObjectBrowserConfiguration objectType={news} /></QueryClientProvider>)
+
+        await user.click(await screen.findByRole('checkbox', { name: 'Created in CMS' }))
+        await user.click(screen.getByRole('checkbox', { name: 'Summary' }))
+        await user.click(screen.getByRole('button', { name: 'Move Summary up in list' }))
+        await user.click(screen.getByRole('button', { name: 'Save browser settings' }))
+        await waitFor(() => expect(mocks.updateBrowserConfiguration).toHaveBeenCalledWith(1, {
+            searchFields: [], filters: [], listFields: ['status', 'field:summary', 'updated_at'],
+        }))
+    })
+
+    it('renders configured schema details and hides unselected system details', async () => {
+        mocks.getBrowserConfiguration.mockResolvedValue({ data: {
+            config: { searchFields: [], filters: [], listFields: ['field:summary'] }, availableFilters: [],
+        } })
+        mocks.getRoots.mockResolvedValue({ data: { results: [{
+            id: 18, title: 'Climate meeting', status: 'draft', createdAt: '2025-01-01',
+            objectType: { ...news, schema: { properties: { summary: { title: 'Summary', componentType: 'textarea' } } } },
+            data: { summary: 'Short editorial summary' },
+        }], count: 1, totalPages: 1 } })
+        renderBrowser('/objects/news', '/objects/:typeName')
+
+        expect(await screen.findByText('Summary: Short editorial summary')).toBeInTheDocument()
+        expect(screen.queryByText(/Created: 01\/01\/2025/)).not.toBeInTheDocument()
+        expect(screen.queryByText('draft')).not.toBeInTheDocument()
+    })
+
+    it('uses each Object type definition for details in overview results', async () => {
+        mocks.search.mockResolvedValue({ data: { results: [{
+            id: 18, title: 'Climate meeting', status: 'draft', createdAt: '2025-01-01',
+            objectType: { ...event, schema: { properties: { venue: { title: 'Venue', componentType: 'text' } } }, browserConfig: { listFields: ['field:venue'] } },
+            data: { venue: 'Stockholm' },
+        }], count: 1, totalPages: 1 } })
+        renderBrowser()
+        fireEvent.change(await screen.findByRole('searchbox', { name: 'Search all objects' }), { target: { value: 'climate' } })
+
+        expect(await screen.findByText('Venue: Stockholm')).toBeInTheDocument()
+        expect(screen.queryByText('Created: 01/01/2025')).not.toBeInTheDocument()
     })
 
     it('applies a date preset from a quick button and sends its range to the server', async () => {

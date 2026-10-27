@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { objectTypesApi } from '../api/objectStorage'
+import { DEFAULT_LIST_FIELDS } from './objectListDisplay'
 
 const textField = field => ['text', 'textarea', 'url', 'email', 'select'].includes(field.componentType || field.field_type || field.type)
     || (!field.componentType && field.type === 'string')
@@ -24,12 +25,12 @@ const ObjectBrowserConfiguration = ({ objectType, onDirtyChange }) => {
     })
 
     useEffect(() => {
-        if (data) setDraft({ searchFields: data.config?.searchFields || [], filters: data.config?.filters || [] })
+        if (data) setDraft({ searchFields: data.config?.searchFields || [], filters: data.config?.filters || [], listFields: data.config?.listFields ?? DEFAULT_LIST_FIELDS })
     }, [data])
 
     useEffect(() => {
         if (!draft || !data) return undefined
-        const changed = JSON.stringify(draft) !== JSON.stringify({ searchFields: data.config?.searchFields || [], filters: data.config?.filters || [] })
+        const changed = JSON.stringify(draft) !== JSON.stringify({ searchFields: data.config?.searchFields || [], filters: data.config?.filters || [], listFields: data.config?.listFields ?? DEFAULT_LIST_FIELDS })
         onDirtyChange?.(changed)
         if (!changed) return undefined
         const beforeUnload = event => { event.preventDefault(); event.returnValue = '' }
@@ -46,6 +47,24 @@ const ObjectBrowserConfiguration = ({ objectType, onDirtyChange }) => {
         .filter(([, field]) => textField(field))
         .map(([key, field]) => [storedFieldKey(key), field])
     const selected = new Map(draft.filters.map((filter, index) => [filter.key, index]))
+    const listOptions = data.availableListFields || []
+    const listFields = new Map(listOptions.map(option => [option.key, option]))
+    const orderedDetails = draft.listFields.filter(key => key !== 'status')
+    const toggleListField = key => setDraft(current => ({
+        ...current,
+        listFields: current.listFields.includes(key) ? current.listFields.filter(item => item !== key) : [...current.listFields, key],
+    }))
+    const moveListField = (key, direction) => setDraft(current => {
+        const listFields = [...current.listFields]
+        const details = listFields.filter(item => item !== 'status')
+        const index = details.indexOf(key)
+        const next = index + direction
+        if (next < 0 || next >= details.length) return current
+        const currentIndex = listFields.indexOf(key)
+        const nextIndex = listFields.indexOf(details[next])
+        ;[listFields[currentIndex], listFields[nextIndex]] = [listFields[nextIndex], listFields[currentIndex]]
+        return { ...current, listFields }
+    })
     const changeSearch = key => setDraft(current => ({
         ...current,
         searchFields: current.searchFields.includes(key)
@@ -79,7 +98,7 @@ const ObjectBrowserConfiguration = ({ objectType, onDirtyChange }) => {
             setSaved(true)
         } catch (value) {
             const details = value.response?.data
-            setError(details?.filters || details?.searchFields || details?.detail || 'Could not save search and filters.')
+            setError(details?.listFields || details?.filters || details?.searchFields || details?.detail || 'Could not save browser settings.')
         } finally {
             setSaving(false)
         }
@@ -87,11 +106,28 @@ const ObjectBrowserConfiguration = ({ objectType, onDirtyChange }) => {
 
     return <div className="space-y-5 text-xs text-gray-900">
         <div>
-            <h2 className="text-lg font-semibold">Search and filters</h2>
-            <p className="mt-1 text-gray-600">Title and slug are always searchable. Select additional text fields and filters for this Object type.</p>
+            <h2 className="text-lg font-semibold">Object browsing</h2>
+            <p className="mt-1 text-gray-600">Choose what each row shows, which fields are searchable, and which filters editors can use.</p>
         </div>
         <fieldset className="space-y-2">
+            <legend className="font-semibold">List display</legend>
+            <p className="text-gray-600">Title is always shown. Status appears beside it. Choose up to eight details; the others appear below in this order on this Object type's list and in overview results.</p>
+            <div className="space-y-1">
+                {orderedDetails.map((key, index) => <div key={key} className="flex min-h-8 items-center gap-2 rounded-sm border border-gray-200 bg-white px-2">
+                    <span className="min-w-0 flex-1 truncate">{listFields.get(key)?.label || key}</span>
+                    <button type="button" aria-label={`Move ${listFields.get(key)?.label || key} up in list`} disabled={index === 0} onClick={() => moveListField(key, -1)} className="rounded-sm p-1 text-gray-600 hover:bg-gray-100 disabled:opacity-40"><ArrowUp size={14} /></button>
+                    <button type="button" aria-label={`Move ${listFields.get(key)?.label || key} down in list`} disabled={index === orderedDetails.length - 1} onClick={() => moveListField(key, 1)} className="rounded-sm p-1 text-gray-600 hover:bg-gray-100 disabled:opacity-40"><ArrowDown size={14} /></button>
+                </div>)}
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+                {listOptions.map(option => <label key={option.key} className="flex items-center gap-2">
+                    <input type="checkbox" checked={draft.listFields.includes(option.key)} disabled={!draft.listFields.includes(option.key) && draft.listFields.length >= 8} onChange={() => toggleListField(option.key)} />{option.label}
+                </label>)}
+            </div>
+        </fieldset>
+        <fieldset className="space-y-2">
             <legend className="font-semibold">Searchable fields</legend>
+            <p className="text-gray-600">Title and slug are always searchable.</p>
             {fieldNames.length ? fieldNames.map(([key, field]) => <label key={key} className="flex items-center gap-2">
                 <input type="checkbox" checked={draft.searchFields.includes(key)} onChange={() => changeSearch(key)} />
                 {field.title || key}
@@ -128,7 +164,7 @@ const ObjectBrowserConfiguration = ({ objectType, onDirtyChange }) => {
         </fieldset>
         {error && <p role="alert" className="text-red-700">{String(error)}</p>}
         {saved && <p role="status" className="text-green-700">Search and filters saved.</p>}
-        <button type="button" onClick={save} disabled={saving} className="min-h-8 rounded-sm bg-blue-600 px-3 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">{saving ? 'Saving…' : 'Save search and filters'}</button>
+        <button type="button" onClick={save} disabled={saving} className="min-h-8 rounded-sm bg-blue-600 px-3 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">{saving ? 'Saving…' : 'Save browser settings'}</button>
     </div>
 }
 

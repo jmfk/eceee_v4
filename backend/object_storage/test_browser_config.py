@@ -8,7 +8,12 @@ from django.test import SimpleTestCase
 from rest_framework.exceptions import ValidationError
 
 from content_migration.legacy_content.profile import initial_bundle
-from object_storage.browser_config import field_kind, parse_browser_filters, validate_browser_config
+from object_storage.browser_config import (
+    available_list_fields,
+    field_kind,
+    parse_browser_filters,
+    validate_browser_config,
+)
 
 
 class BrowserConfigurationTests(SimpleTestCase):
@@ -94,3 +99,14 @@ class BrowserConfigurationTests(SimpleTestCase):
         self.assertTrue(saved["filters"][0]["quick"])
         with self.assertRaises(ValidationError):
             validate_browser_config(self.definition, None, {"search_fields": [], "filters": [{**item, "quick": "yes"}]})
+
+    @patch("object_storage.browser_config.available_filters")
+    def test_list_fields_keep_order_and_reject_unsupported_or_duplicate_fields(self, options):
+        options.return_value = self.options
+        self.assertIn("field:summary", available_list_fields(self.definition))
+        self.assertNotIn("field:photo", available_list_fields(self.definition))
+        value = {"search_fields": [], "filters": [], "list_fields": ["field:summary", "status", "updated_at"]}
+        self.assertEqual(validate_browser_config(self.definition, None, value)["list_fields"], value["list_fields"])
+        for invalid in (["field:photo"], ["status", "status"], ["field:authors"]):
+            with self.subTest(invalid=invalid), self.assertRaises(ValidationError):
+                validate_browser_config(self.definition, None, {**value, "list_fields": invalid})
