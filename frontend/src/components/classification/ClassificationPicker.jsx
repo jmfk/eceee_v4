@@ -3,11 +3,13 @@ import React, { useId, useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { taxonomyApi, classificationError } from '../../api/taxonomy'
 import { getCurrentTenantId } from '../../utils/tenant'
+import CompactSelect from './CompactSelect'
 
 /** Controlled IDs belong to the editor's working copy, never to the live version. */
 export default function ClassificationPicker({ value = [], onChange, namespace, use, allowProposed = false, disabled = false }) {
     const id = useId()
     const [search, setSearch] = useState('')
+    const [typeFilter, setTypeFilter] = useState('')
     const [page, setPage] = useState(1)
     const [suggesting, setSuggesting] = useState(false)
     const [proposalName, setProposalName] = useState('')
@@ -17,7 +19,7 @@ export default function ClassificationPicker({ value = [], onChange, namespace, 
     const [proposalMessage, setProposalMessage] = useState('')
     const queryClient = useQueryClient()
     const tenant = getCurrentTenantId()
-    useEffect(() => { setSearch(''); setPage(1); setSuggesting(false); setProposalType(''); setProposalName(''); setProposalError(''); setProposalMessage('') }, [tenant, namespace, use])
+    useEffect(() => { setSearch(''); setTypeFilter(''); setPage(1); setSuggesting(false); setProposalType(''); setProposalName(''); setProposalError(''); setProposalMessage('') }, [tenant, namespace, use])
     const defaultNamespace = useQuery({
         queryKey: ['classification', tenant, 'defaultNamespace'],
         queryFn: async () => await taxonomyApi.defaultNamespace(),
@@ -25,8 +27,8 @@ export default function ClassificationPicker({ value = [], onChange, namespace, 
     })
     const effectiveNamespace = namespace || defaultNamespace.data?.results?.[0]?.id
     const terms = useQuery({
-        queryKey: ['classification', tenant, 'picker', effectiveNamespace, use, search, page],
-        queryFn: async () => await taxonomyApi.terms({ namespace: effectiveNamespace, use, search, page }),
+        queryKey: ['classification', tenant, 'picker', effectiveNamespace, use, typeFilter, search, page],
+        queryFn: async () => await taxonomyApi.terms({ namespace: effectiveNamespace, use, classification_type: typeFilter || undefined, search, page }),
         enabled: !!effectiveNamespace,
     })
     const selected = useQuery({
@@ -36,8 +38,9 @@ export default function ClassificationPicker({ value = [], onChange, namespace, 
     const definitions = useQuery({
         queryKey: ['classification', tenant, 'proposalTypes', effectiveNamespace, use],
         queryFn: async () => await taxonomyApi.types({ namespace: effectiveNamespace, page_size: 200, ordering: 'name' }),
-        enabled: suggesting && !!effectiveNamespace,
+        enabled: !!effectiveNamespace,
     })
+    const availableTypes = (definitions.data?.results || []).filter(type => !use || type.allowedUses?.includes(use))
     const proposalTypes = (definitions.data?.results || []).filter(type => type.permissions?.includes('propose') && (!use || type.allowedUses?.includes(use)))
     const submitProposal = async () => {
         setProposalBusy(true); setProposalError('')
@@ -65,6 +68,12 @@ export default function ClassificationPicker({ value = [], onChange, namespace, 
         </ul>
         <label htmlFor={id} className="block text-sm">Find a tag</label>
         <input id={id} value={search} onChange={event => { setSearch(event.target.value); setPage(1) }} className="w-full" type="search" />
+        {availableTypes.length > 1 && <CompactSelect label="Filter tag type" value={typeFilter}
+            onChange={event => { setTypeFilter(event.target.value); setPage(1) }}>
+            <option value="">All tag types</option>
+            {availableTypes.map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
+        </CompactSelect>}
+        {definitions.error && <p role="alert">{classificationError(definitions.error)}</p>}
         {terms.isPending && <p role="status">Loading tags…</p>}
         {(terms.error || selected.error || defaultNamespace.error) && <p role="alert">{classificationError(terms.error || selected.error || defaultNamespace.error)}</p>}
         {!terms.isPending && !terms.error && choices.length === 0 && <p className="text-sm">No matching tags.</p>}

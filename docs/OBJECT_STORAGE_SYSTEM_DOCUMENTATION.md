@@ -129,7 +129,9 @@ any configured field groups and a separate **Tags** section. Tags are edited her
 instead of on the Settings tab. In an Object type's **Schema Fields** tab, use
 **Editor accordions** to name additional sections and assign existing fields.
 Each field can belong to at most one section; unassigned fields remain in Properties.
-These groups are stored as `schema.editorGroups` and saved with the schema.
+These groups are stored as `schema.editorGroups` and saved with the schema. The
+tag picker can narrow its name search to an allowed classification type, such as
+Ämne or Nyckelord.
 
 #### Display Widgets
 ```python
