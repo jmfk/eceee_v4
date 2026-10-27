@@ -12,9 +12,9 @@ from rest_framework.test import APITestCase
 
 from core.models import Tenant
 from utils.schema_system import validate_schema
-from .serializers import ObjectTypeDefinitionSerializer
 
 from .models import ObjectInstance, ObjectTypeDefinition
+from .serializers import ObjectTypeDefinitionSerializer
 
 
 class ObjectSchemaValidationTest(SimpleTestCase):
