@@ -160,9 +160,26 @@
 .mail-preview { font-weight: 400; color: var(--color-gray-500); }
 .mail-time { font-size: 0.75rem; white-space: nowrap; }
 .mail-row button { min-height: 30px; padding: 0.25rem; border: 0; background: transparent; }
-.message-recipients { display: flex; flex-wrap: wrap; gap: 0.5rem; max-height: 180px; overflow: auto; }
-.support-content .message-recipients label { display: inline-flex; align-items: center; gap: 0.5rem; margin: 0; border: 1px solid var(--color-gray-200); border-radius: 1rem; padding: 0.375rem 0.75rem; font-weight: 400; }
+.message-recipients { margin-bottom: 1rem; }
 .message-recipients legend { margin-bottom: 0.5rem; font-weight: 600; }
+.message-recipient-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 34px; }
+.message-recipient-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; min-height: 28px; padding: 2px 4px 2px 9px; border: 1px solid var(--color-gray-200); border-radius: 3px; background: var(--color-gray-50); font-size: 12px; }
+.message-recipient-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.message-recipient-chip button { display: grid; place-items: center; min-width: 24px; min-height: 24px; border-radius: 3px; }
+.message-recipient-popover { position: relative; }
+.message-recipient-add { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 4px 9px; border: 1px solid var(--color-gray-300); border-radius: 3px; background: white; font-size: 12px; }
+.message-recipient-picker { z-index: 120; width: min(340px, calc(100vw - 24px)); max-height: min(360px, calc(100dvh - 24px)); overflow: auto; padding: 12px; border: 1px solid var(--color-gray-300); border-radius: 4px; background: white; box-shadow: 0 12px 30px rgb(0 0 0 / 0.14); color: var(--color-gray-900); font: 12px/1.5 Inter, sans-serif; }
+.message-recipient-picker > strong { display: block; margin-bottom: 8px; font-weight: 600; }
+.message-recipient-picker input[type='search'] { width: 100%; height: 32px; padding: 5px 9px; border: 1px solid var(--color-gray-300); border-radius: 3px; background: white; }
+.message-recipient-options { margin-top: 8px; }
+.message-recipient-options section + section { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--color-gray-200); }
+.message-recipient-options h3 { margin: 0 0 3px; color: var(--color-gray-500); font-size: 11px; font-weight: 600; }
+.support-content .message-recipient-options label, .message-recipient-options label { display: flex; align-items: center; gap: 8px; min-height: 30px; margin: 0; padding: 4px 6px; border-radius: 3px; cursor: pointer; }
+.message-recipient-options label:hover { background: var(--color-gray-50); }
+.message-recipient-options label:has(input:disabled) { opacity: 0.5; cursor: not-allowed; }
+.message-recipient-options input[type='checkbox'] { margin: 0; }
+.message-recipient-options p { margin: 8px 0 0; color: var(--color-gray-500); }
+.message-recipients :is(button, input):focus-visible, .message-recipient-picker :is(button, input):focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
 .support-message h3 { display: flex; align-items: center; gap: 0.5rem; }
 .message-files { margin: 1rem 0; }
 @media (max-width: 800px) {

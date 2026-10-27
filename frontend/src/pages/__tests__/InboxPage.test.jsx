@@ -91,6 +91,38 @@ beforeEach(() => {
 })
 
 describe('tenant inbox journey', () => {
+    it('adds multiple existing users and roles from the To picker and sends the selection', async () => {
+        const original = supportRequest.getMockImplementation()
+        const directory = [
+            { id: 'support', name: 'Support', kind: 'support' },
+            { id: 'user:12', name: 'Dev User', kind: 'user' },
+            { id: 'role:8', name: 'Redaktör', kind: 'group' },
+        ]
+        supportRequest.mockImplementation(async (tenant, path, method, data) =>
+            path === 'context/' ? { ...context, recipients: directory } : original(tenant, path, method, data),
+        )
+        renderInbox('/inbox/new?tenant=a')
+        await screen.findByRole('heading', { name: 'Nytt meddelande' })
+        expect(screen.getByRole('button', { name: 'Ta bort Support' })).toBeInTheDocument()
+        expect(screen.queryByRole('checkbox', { name: 'Dev User' })).not.toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Lägg till' }))
+        fireEvent.change(screen.getByRole('searchbox', { name: 'Sök mottagare' }), { target: { value: 'Dev' } })
+        fireEvent.click(screen.getByRole('checkbox', { name: 'Dev User' }))
+        fireEvent.change(screen.getByRole('searchbox', { name: 'Sök mottagare' }), { target: { value: 'Red' } })
+        fireEvent.click(screen.getByRole('checkbox', { name: 'Redaktör' }))
+        expect(screen.getByRole('button', { name: 'Ta bort Dev User' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Ta bort Redaktör' })).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Ta bort Support' }))
+
+        fireEvent.change(screen.getByLabelText('Titel'), { target: { value: 'Fråga' } })
+        fireEvent.change(screen.getByLabelText('Beskrivning'), { target: { value: 'Behöver hjälp' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Skicka meddelande' }))
+        await waitFor(() => expect(supportRequest).toHaveBeenCalledWith('a', 'threads/', 'post', expect.objectContaining({
+            recipients: ['user:12', 'role:8'],
+        })))
+    })
+
     it('shows an English sender fallback in English mode', async () => {
         setCmsCopyLanguage('en-us')
         renderInbox()
