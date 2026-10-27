@@ -265,6 +265,43 @@ class ObjectStorageAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # Might be empty if tenant filtering is active
 
+    def test_browser_roots_and_search_are_paginated_with_root_counts(self):
+        obj_type = ObjectTypeDefinition.objects.create(
+            name="article", label="Article", plural_label="Articles", created_by=self.user
+        )
+        roots = [
+            ObjectInstance(object_type=obj_type, title=f"Article {number:03d}", created_by=self.user, tenant=self.tenant)
+            for number in range(55)
+        ]
+        # MPTT needs each root saved individually to assign tree coordinates.
+        for root in roots:
+            root.save()
+        ObjectInstance.objects.create(
+            object_type=obj_type, title="Article child", parent=roots[0], created_by=self.user, tenant=self.tenant
+        )
+
+        roots_url = reverse("api:object_storage:objectinstance-roots")
+        first = self.client.get(roots_url, {"type": "article", "page_size": 20, "page": 1})
+        second = self.client.get(roots_url, {"type": "article", "page_size": 20, "page": 2})
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+        self.assertEqual(first.data["count"], 55)
+        self.assertEqual(first.data["total_pages"], 3)
+        self.assertEqual(len(first.data["results"]), 20)
+        self.assertEqual(len(second.data["results"]), 20)
+        self.assertFalse({item["id"] for item in first.data["results"]} & {item["id"] for item in second.data["results"]})
+
+        search_url = reverse("api:object_storage:objectinstance-search")
+        search = self.client.get(
+            search_url, {"q": "Article", "type": "article", "roots_only": "true", "page_size": 50, "page": 2}
+        )
+        self.assertEqual(search.status_code, status.HTTP_200_OK)
+        self.assertEqual(search.data["count"], 55)
+        self.assertEqual(len(search.data["results"]), 5)
+        self.assertEqual(search.data["page"], 2)
+
+        invalid = self.client.get(roots_url, {"type": "article", "page_size": 30})
+        self.assertEqual(invalid.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_create_object_type_with_browser_group(self):
         main_type = ObjectTypeDefinition.objects.create(
             name="news", label="News", plural_label="News Articles", created_by=self.user

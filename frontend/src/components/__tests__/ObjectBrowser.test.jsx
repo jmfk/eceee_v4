@@ -204,13 +204,39 @@ describe('ObjectBrowser grouped type list', () => {
         renderBrowser('/objects/news', '/objects/:typeName')
 
         const searchInput = await screen.findByTestId('objects-search-input')
-        await waitFor(() => expect(mocks.getRoots).toHaveBeenCalledWith({ type: 'news' }))
+        await waitFor(() => expect(mocks.getRoots).toHaveBeenCalledWith({ type: 'news', page: 1, page_size: 20 }))
 
         fireEvent.change(searchInput, { target: { value: 'climate' } })
 
         await waitFor(() => {
-            expect(mocks.search).toHaveBeenCalledWith('climate', { type: 'news', search: 'climate' })
+            expect(mocks.search).toHaveBeenCalledWith('climate', { type: 'news', page: 1, page_size: 20, roots_only: 'true' })
         })
+    })
+
+    it('requests pages of 20, 50, or 100 and resets after changing the size', async () => {
+        mocks.getRoots.mockImplementation(async params => ({
+            data: {
+                results: [{ id: params.page, title: `Article page ${params.page}`, status: 'draft' }],
+                count: 55,
+                totalPages: Math.ceil(55 / params.page_size),
+            },
+        }))
+        renderBrowser('/objects/news', '/objects/:typeName')
+
+        expect(await screen.findByText('Showing 1–20 of 55')).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+        await waitFor(() => expect(mocks.getRoots).toHaveBeenCalledWith({ type: 'news', page: 2, page_size: 20 }))
+        await screen.findByText('Page 2 of 3')
+
+        fireEvent.click(screen.getByRole('combobox', { name: 'Items per page' }))
+        fireEvent.click(await screen.findByRole('option', { name: '50 per page' }))
+        await waitFor(() => expect(mocks.getRoots).toHaveBeenCalledWith({ type: 'news', page: 1, page_size: 50 }))
+        expect(await screen.findByText('Page 1 of 2')).toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('combobox', { name: 'Items per page' }))
+        fireEvent.click(await screen.findByRole('option', { name: '100 per page' }))
+        await waitFor(() => expect(mocks.getRoots).toHaveBeenCalledWith({ type: 'news', page: 1, page_size: 100 }))
+        expect(await screen.findByText('Page 1 of 1')).toBeInTheDocument()
     })
 
     it('opens the import catalog and keeps remote v4 transfer as a separate action', async () => {
