@@ -90,6 +90,25 @@ plus `q` and `roots_only=true`. Both endpoints return `results`, the total `coun
 `page`, `pageSize`, `totalPages`, `hasNext`, and `hasPrevious` for these requests.
 Calls without `page_size` keep their existing response formats.
 
+#### Object browser search and filters
+
+Each Object type has a **Search and filters** tab in Settings → Object Types. Editors select
+additional searchable text fields and an ordered list of filters. Each filter has a label
+and can be enabled on the Objects overview. Title and slug are always searched. Status
+is always available. The control follows the data type: date range, yes/no, or a
+searchable multiselect for tags and references. Text choices can use searchable or
+compact multiselect; long compact lists gain search automatically. Tag filters are offered
+only when the classification type already allows the selected Object type.
+
+The configuration is stored in `ObjectTypeDefinition.metadata.browser`; the web API
+validates it against the current schema and classification permissions. The overview
+requires an Object type selection before showing type-specific filters. Both views send
+their search and filters to the server and paginate the filtered result count. The
+configuration endpoint is `GET/PUT object-types/{id}/browser_configuration/`, and
+`GET object-instances/filter-options/` provides bounded searchable choices. Browser
+requests use `browser=true`, `statuses`, and JSON `browser_filters` query parameters;
+existing non-browser callers retain their prior search behavior.
+
 #### Display Widgets
 ```python
 # Available Widgets

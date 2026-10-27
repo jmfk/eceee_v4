@@ -6,6 +6,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ObjectBrowser from '../ObjectBrowser'
 import ObjectTypeForm from '../ObjectTypeForm'
+import ObjectBrowserConfiguration from '../ObjectBrowserConfiguration'
 import { buildObjectTypeGroups } from '../objectBrowserGrouping'
 
 const mocks = vi.hoisted(() => ({
@@ -13,6 +14,9 @@ const mocks = vi.hoisted(() => ({
     getMainBrowserTypes: vi.fn(),
     listObjectTypes: vi.fn(),
     getObjectType: vi.fn(),
+    getBrowserConfiguration: vi.fn(),
+    updateBrowserConfiguration: vi.fn(),
+    filterOptions: vi.fn(),
     getRoots: vi.fn(),
     search: vi.fn(),
     deleteObject: vi.fn(),
@@ -30,11 +34,14 @@ vi.mock('../../api/objectStorage', () => ({
         getMainBrowserTypes: mocks.getMainBrowserTypes,
         list: mocks.listObjectTypes,
         get: mocks.getObjectType,
+        getBrowserConfiguration: mocks.getBrowserConfiguration,
+        updateBrowserConfiguration: mocks.updateBrowserConfiguration,
         updateRelationships: mocks.updateRelationships,
     },
     objectInstancesApi: {
         getRoots: mocks.getRoots,
         search: mocks.search,
+        filterOptions: mocks.filterOptions,
         delete: mocks.deleteObject,
     },
 }))
@@ -138,6 +145,8 @@ describe('ObjectBrowser grouped type list', () => {
         mocks.listObjectTypes.mockResolvedValue({ data: [news, category, event] })
         mocks.getRoots.mockResolvedValue({ data: { results: [] } })
         mocks.search.mockResolvedValue({ data: { results: [] } })
+        mocks.getBrowserConfiguration.mockResolvedValue({ data: { config: { searchFields: [], filters: [] }, availableFilters: [] } })
+        mocks.filterOptions.mockResolvedValue({ data: { results: [] } })
         mocks.updateRelationships.mockResolvedValue({ data: {} })
         mocks.remoteConnections.mockResolvedValue({ results: [] })
     })
@@ -204,14 +213,49 @@ describe('ObjectBrowser grouped type list', () => {
     it('keeps the existing selected-type search behavior', async () => {
         renderBrowser('/objects/news', '/objects/:typeName')
 
-        const searchInput = await screen.findByTestId('objects-search-input')
+        const searchInput = await screen.findByRole('searchbox', { name: 'Search News Articles' })
         await waitFor(() => expect(mocks.getRoots).toHaveBeenCalledWith({ type: 'news', page: 1, page_size: 20 }))
 
         fireEvent.change(searchInput, { target: { value: 'climate' } })
 
         await waitFor(() => {
-            expect(mocks.search).toHaveBeenCalledWith('climate', { type: 'news', page: 1, page_size: 20, roots_only: 'true' })
+            expect(mocks.search).toHaveBeenCalledWith('climate', { type: 'news', page: 1, page_size: 20, roots_only: 'true', browser: 'true' })
         })
+    })
+
+    it('searches the overview across Object types and shows paginated results', async () => {
+        mocks.search.mockResolvedValue({ data: { results: [{ id: 18, title: 'Climate meeting', status: 'draft', objectType: event, createdAt: '2025-01-01' }], count: 1, totalPages: 1 } })
+        renderBrowser()
+        fireEvent.change(await screen.findByRole('searchbox', { name: 'Search all objects' }), { target: { value: 'climate' } })
+        await waitFor(() => expect(mocks.search).toHaveBeenCalledWith('climate', {
+            page: 1, page_size: 20, roots_only: 'true', browser: 'true',
+        }))
+        expect(await screen.findByText('Climate meeting')).toBeInTheDocument()
+        expect(screen.getByText('Showing 1–1 of 1')).toBeInTheDocument()
+    })
+
+    it('saves searchable fields and overview filters in the Object type editor', async () => {
+        const user = userEvent.setup()
+        const objectType = { ...news, schema: { properties: { firstName: { title: 'First name', componentType: 'text', type: 'string' } } } }
+        mocks.getBrowserConfiguration.mockResolvedValue({ data: {
+            config: { searchFields: [], filters: [] },
+            availableFilters: [{ key: 'field:first_name', label: 'First name', kind: 'choice' }],
+        } })
+        mocks.updateBrowserConfiguration.mockResolvedValue({ data: { config: {
+            searchFields: ['first_name'],
+            filters: [{ key: 'field:first_name', label: 'First name', overview: true, control: 'checklist' }],
+        } } })
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        render(<QueryClientProvider client={queryClient}><ObjectBrowserConfiguration objectType={objectType} /></QueryClientProvider>)
+        await user.click(await screen.findByRole('checkbox', { name: 'First name' }))
+        await user.click(screen.getByRole('checkbox', { name: /First name choice/ }))
+        fireEvent.change(screen.getByRole('combobox', { name: 'First name filter control' }), { target: { value: 'checklist' } })
+        await user.click(screen.getByRole('checkbox', { name: 'Show on overview' }))
+        await user.click(screen.getByRole('button', { name: 'Save search and filters' }))
+        await waitFor(() => expect(mocks.updateBrowserConfiguration).toHaveBeenCalledWith(1, {
+            searchFields: ['first_name'],
+            filters: [{ key: 'field:first_name', label: 'First name', overview: true, control: 'checklist' }],
+        }))
     })
 
     it('requests pages of 20, 50, or 100 and resets after changing the size', async () => {

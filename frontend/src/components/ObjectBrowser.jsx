@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams, useParams } from 'react-router-dom'
-import { Search, ArrowLeft, Plus, ChevronDown, ChevronRight, AlertCircle, Image, FolderOpen, Trash2, Download } from 'lucide-react'
+import { ArrowLeft, Plus, ChevronDown, ChevronRight, AlertCircle, Image, FolderOpen, Trash2, Download } from 'lucide-react'
 import { objectTypesApi, objectInstancesApi } from '../api/objectStorage'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import DeleteConfirmationModal from './DeleteConfirmationModal'
@@ -12,6 +12,9 @@ import OptimizedImage from './media/OptimizedImage'
 import { buildObjectTypeGroups } from './objectBrowserGrouping'
 import RemoteObjectImport from './RemoteObjectImport'
 import CompactSelect from './classification/CompactSelect'
+import ObjectFilterBar from './ObjectFilterBar'
+
+const browserFilterParams = filters => filters.length ? JSON.stringify(filters.map(({ key, values }) => ({ key, values }))) : undefined
 
 const objectTypeTestId = (objectType) => (
     (objectType.name || objectType.label || 'object-type')
@@ -34,7 +37,13 @@ const ObjectBrowser = () => {
     const [currentView, setCurrentView] = useState('grid') // 'grid', 'list'
     const [selectedObjectType, setSelectedObjectType] = useState(null)
     const [searchTerm, setSearchTerm] = useState('')
-    const [statusFilter, setStatusFilter] = useState('')
+    const [statuses, setStatuses] = useState([])
+    const [fieldFilters, setFieldFilters] = useState([])
+    const [overviewSearch, setOverviewSearch] = useState('')
+    const [overviewStatuses, setOverviewStatuses] = useState([])
+    const [overviewFilters, setOverviewFilters] = useState([])
+    const [overviewTypeId, setOverviewTypeId] = useState('')
+    const [overviewPage, setOverviewPage] = useState(1)
     const [page, setPage] = useState(1)
     const [pageSize, setPageSize] = useState(20)
     const [deleteModal, setDeleteModal] = useState({ isOpen: false, instance: null })
@@ -68,7 +77,8 @@ const ObjectBrowser = () => {
                         setSelectedObjectType(objectType)
                         setCurrentView('list')
                         setSearchTerm('')
-                        setStatusFilter('')
+                        setStatuses([])
+                        setFieldFilters([])
                         setPage(1)
                     }
                 } catch (error) {
@@ -108,16 +118,44 @@ const ObjectBrowser = () => {
         enabled: currentView === 'grid'
     })
 
+    const overviewTypes = objectTypesResponse?.data || []
+    const overviewObjectType = overviewTypes.find(type => String(type.id) === overviewTypeId) || null
+    const { data: listConfiguration } = useQuery({
+        queryKey: ['objectTypeBrowserConfiguration', selectedObjectType?.id],
+        queryFn: async () => await objectTypesApi.getBrowserConfiguration(selectedObjectType.id),
+        enabled: currentView === 'list' && !!selectedObjectType,
+    })
+    const { data: overviewConfiguration } = useQuery({
+        queryKey: ['objectTypeBrowserConfiguration', overviewObjectType?.id],
+        queryFn: async () => await objectTypesApi.getBrowserConfiguration(overviewObjectType.id),
+        enabled: currentView === 'grid' && !!overviewObjectType,
+    })
+    const listObjectType = selectedObjectType ? { ...selectedObjectType, browserConfig: listConfiguration?.data?.config || selectedObjectType.browserConfig } : null
+    const overviewTypeWithConfig = overviewObjectType ? { ...overviewObjectType, browserConfig: overviewConfiguration?.data?.config || overviewObjectType.browserConfig } : null
+    const overviewActive = Boolean(overviewSearch.trim() || overviewStatuses.length || overviewFilters.length || overviewTypeId)
+    const { data: overviewResults, isLoading: overviewResultsLoading, error: overviewResultsError } = useQuery({
+        queryKey: ['objectInstances', 'overview', overviewSearch, overviewStatuses, overviewFilters, overviewTypeId, overviewPage, pageSize],
+        queryFn: async () => {
+            const params = { page: overviewPage, page_size: pageSize, roots_only: 'true', browser: 'true' }
+            if (overviewObjectType) params.type = overviewObjectType.name
+            if (overviewStatuses.length) params.statuses = overviewStatuses.join(',')
+            if (overviewFilters.length) params.browser_filters = browserFilterParams(overviewFilters)
+            return objectInstancesApi.search(overviewSearch, params)
+        },
+        enabled: currentView === 'grid' && overviewActive && (!overviewTypeId || !!overviewObjectType),
+    })
+
     // Fetch filtered instances for list view
     const { data: instancesResponse, isLoading: instancesLoading, error: instancesError } = useQuery({
-        queryKey: ['objectInstances', 'filtered', selectedObjectType?.id, searchTerm, statusFilter, page, pageSize],
+        queryKey: ['objectInstances', 'filtered', selectedObjectType?.id, searchTerm, statuses, fieldFilters, page, pageSize],
         queryFn: async () => {
             const params = { page, page_size: pageSize }
             if (selectedObjectType) params.type = selectedObjectType.name
-            if (statusFilter && statusFilter !== '') params.status = statusFilter
+            if (statuses.length) params.statuses = statuses.join(',')
+            if (fieldFilters.length) params.browser_filters = browserFilterParams(fieldFilters)
 
             if (searchTerm) {
-                return objectInstancesApi.search(searchTerm, { ...params, roots_only: 'true' })
+                return objectInstancesApi.search(searchTerm, { ...params, roots_only: 'true', browser: 'true' })
             } else {
                 return objectInstancesApi.getRoots(params)
             }
@@ -125,21 +163,35 @@ const ObjectBrowser = () => {
         enabled: currentView === 'list' && !!selectedObjectType
     })
 
-    const objectTypes = objectTypesResponse?.data || []
+    const objectTypes = overviewTypes
     const objectTypeGroups = buildObjectTypeGroups(objectTypes)
+    const overviewTypeMatches = type => !overviewSearch.trim() || `${type.name} ${type.label} ${type.pluralLabel} ${type.description || ''}`.toLocaleLowerCase().includes(overviewSearch.trim().toLocaleLowerCase())
+    const visibleGroups = objectTypeGroups
+        .map(group => ({ ...group, supporting: group.supporting.filter(type => overviewTypeMatches(type) && (!overviewTypeId || String(type.id) === overviewTypeId)) }))
+        .filter(group => categoryTab === 'main'
+            ? overviewTypeMatches(group.primary) && (!overviewTypeId || String(group.primary.id) === overviewTypeId)
+            : group.supporting.length > 0)
     const instances = instancesResponse?.data?.results || instancesResponse?.data || []
     const resultCount = instancesResponse?.data?.count ?? instances.length
     const totalPages = instancesResponse?.data?.totalPages ?? 1
+    const overviewInstances = overviewResults?.data?.results || []
+    const overviewCount = overviewResults?.data?.count ?? 0
+    const overviewTotalPages = overviewResults?.data?.totalPages ?? 1
 
     useEffect(() => {
         if (instancesResponse && page > totalPages) setPage(totalPages)
     }, [instancesResponse, page, totalPages])
 
+    useEffect(() => {
+        if (overviewResults && overviewPage > overviewTotalPages) setOverviewPage(overviewTotalPages)
+    }, [overviewResults, overviewPage, overviewTotalPages])
+
     const handleObjectTypeSelect = (objectType) => {
         setSelectedObjectType(objectType)
         setCurrentView('list')
         setSearchTerm('')
-        setStatusFilter('')
+        setStatuses([])
+        setFieldFilters([])
         setPage(1)
         // Update URL to reflect the selected type using the clean path
         navigate(`/objects/${objectType.name}`)
@@ -149,7 +201,8 @@ const ObjectBrowser = () => {
         setCurrentView('grid')
         setSelectedObjectType(null)
         setSearchTerm('')
-        setStatusFilter('')
+        setStatuses([])
+        setFieldFilters([])
         setPage(1)
         // Clear URL parameters
         navigate('/objects')
@@ -276,6 +329,20 @@ const ObjectBrowser = () => {
                                 </button>
                             ))}
                         </div>
+                        <div className="mb-5">
+                            <ObjectFilterBar
+                                overview search={overviewSearch} onSearchChange={value => { setOverviewSearch(value); setOverviewPage(1) }}
+                                statuses={overviewStatuses} onStatusesChange={value => { setOverviewStatuses(value); setOverviewPage(1) }}
+                                filters={overviewFilters} onFiltersChange={value => { setOverviewFilters(value); setOverviewPage(1) }}
+                                objectType={overviewTypeWithConfig} availableFilters={overviewConfiguration?.data?.availableFilters || []}
+                                typeOptions={objectTypes} overviewType={overviewTypeId}
+                                onOverviewTypeChange={value => {
+                                    setOverviewTypeId(value); setOverviewFilters([]); setOverviewPage(1)
+                                    const type = overviewTypes.find(item => String(item.id) === value)
+                                    if (type) setCategoryTab(type.browserGroup ? 'supporting' : 'main')
+                                }}
+                            />
+                        </div>
                         {typesLoading ? (
                             <div className="flex justify-center py-12">
                                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -285,7 +352,7 @@ const ObjectBrowser = () => {
                                 {categoryTab === 'supporting' && !objectTypeGroups.some(group => group.supporting.length > 0) && (
                                     <li className="py-8 text-sm text-gray-500">No supporting object types.</li>
                                 )}
-                                {objectTypeGroups.filter(group => categoryTab === 'main' || group.supporting.length > 0).map(({ primary, supporting }) => (
+                                {visibleGroups.map(({ primary, supporting }) => (
                                     <li key={primary.id} className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
                                         {categoryTab === 'main' && <button
                                             type="button"
@@ -372,6 +439,27 @@ const ObjectBrowser = () => {
                             </ul>
                         )}
 
+                        {overviewActive && <section className="mt-6" aria-label="Matching objects">
+                            <h2 className="mb-2 text-lg font-semibold text-gray-900">Matching objects</h2>
+                            {overviewResultsError && <p role="alert" className="text-xs text-red-700">Could not search Objects.</p>}
+                            {overviewResultsLoading && <p className="text-xs text-gray-600">Searching Objects…</p>}
+                            {!overviewResultsLoading && !overviewResultsError && <>
+                                <div className="divide-y divide-gray-200 rounded-sm border border-gray-200 bg-white">
+                                    {overviewInstances.length ? overviewInstances.map(instance => <ObjectListItem key={instance.id} instance={instance} showType onEdit={() => handleEditInstance(instance)} onDelete={() => handleDeleteInstance(instance)} />)
+                                        : <p className="px-4 py-6 text-xs text-gray-600">No matching Objects.</p>}
+                                </div>
+                                {overviewCount > 0 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-600">
+                                    <span>Showing {(overviewPage - 1) * pageSize + 1}–{Math.min(overviewPage * pageSize, overviewCount)} of {overviewCount}</span>
+                                    <div className="flex items-center gap-3">
+                                        <CompactSelect label="Items per page" value={pageSize} onChange={event => { setPageSize(Number(event.target.value)); setOverviewPage(1) }} className="min-w-28"><option value="20">20 per page</option><option value="50">50 per page</option><option value="100">100 per page</option></CompactSelect>
+                                        <button type="button" onClick={() => setOverviewPage(current => current - 1)} disabled={overviewPage <= 1} className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Previous</button>
+                                        <span>Page {overviewPage} of {overviewTotalPages}</span>
+                                        <button type="button" onClick={() => setOverviewPage(current => current + 1)} disabled={overviewPage >= overviewTotalPages} className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+                                    </div>
+                                </div>}
+                            </>}
+                        </section>}
+
                         {!typesLoading && objectTypes.length === 0 && (
                             <div className="text-center py-12">
                                 <FolderOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -448,29 +536,12 @@ const ObjectBrowser = () => {
                             </div>
 
                             {/* Search and Filters */}
-                            <div className="flex flex-col sm:flex-row gap-4">
-                                <div className="relative flex-1">
-                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                                    <input
-                                        data-testid="objects-search-input"
-                                        type="text"
-                                        placeholder={`Search ${selectedObjectType.pluralLabel?.toLowerCase()}...`}
-                                        value={searchTerm}
-                                        onChange={(e) => { setSearchTerm(e.target.value); setPage(1) }}
-                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
-                                </div>
-                                <select
-                                    value={statusFilter}
-                                    onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
-                                    className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                >
-                                    <option value="">All Status</option>
-                                    <option value="draft">Draft</option>
-                                    <option value="published">Published</option>
-                                    <option value="archived">Archived</option>
-                                </select>
-                            </div>
+                            <ObjectFilterBar
+                                search={searchTerm} onSearchChange={value => { setSearchTerm(value); setPage(1) }}
+                                statuses={statuses} onStatusesChange={value => { setStatuses(value); setPage(1) }}
+                                filters={fieldFilters} onFiltersChange={value => { setFieldFilters(value); setPage(1) }}
+                                objectType={listObjectType} availableFilters={listConfiguration?.data?.availableFilters || []}
+                            />
                         </div>
 
                         {instancesLoading ? (
@@ -497,12 +568,12 @@ const ObjectBrowser = () => {
                                             No {selectedObjectType.pluralLabel} Found
                                         </div>
                                         <div className="text-gray-500 mb-4">
-                                            {searchTerm || statusFilter
+                                            {searchTerm || statuses.length || fieldFilters.length
                                                 ? 'Try adjusting your search or filters.'
                                                 : `Create your first ${selectedObjectType.label?.toLowerCase()} to get started.`
                                             }
                                         </div>
-                                        {!searchTerm && !statusFilter && (
+                                        {!searchTerm && !statuses.length && !fieldFilters.length && (
                                             <button
                                                 onClick={handleCreateNew}
                                                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors"
@@ -697,7 +768,7 @@ const ObjectBrowser = () => {
 }
 
 // Object List Item Component
-const ObjectListItem = ({ instance, onEdit, onDelete }) => {
+const ObjectListItem = ({ instance, onEdit, onDelete, showType = false }) => {
     const getStatusColor = (status) => {
         switch (status) {
             case 'published':
@@ -740,6 +811,7 @@ const ObjectListItem = ({ instance, onEdit, onDelete }) => {
                         </span>
                     </div>
                     <div className="mt-1 flex items-center text-sm text-gray-500">
+                        {showType && <span className="mr-2 font-medium">{instance.objectType?.label || instance.objectType?.name}</span>}
                         <span>Created {new Date(instance.createdAt).toLocaleDateString()}</span>
                         {instance.publishDate && (
                             <>

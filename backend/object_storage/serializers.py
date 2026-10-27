@@ -9,12 +9,14 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from rest_framework import serializers
+from types import SimpleNamespace
 
 from content.models import Namespace
 from file_manager.imgproxy import imgproxy_service
 from utils.schema_system import validate_schema
 
 from .models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
+from .browser_config import browser_config, validate_browser_config
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -139,6 +141,7 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
     child_types_count = serializers.SerializerMethodField()
     instance_count = serializers.SerializerMethodField()
     icon_image = serializers.SerializerMethodField()
+    browser_config = serializers.SerializerMethodField()
 
     class Meta:
         model = ObjectTypeDefinition
@@ -163,12 +166,16 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
             "updated_at",
             "created_by",
             "metadata",
+            "browser_config",
             "schema_fields_count",
             "slots_count",
             "child_types_count",
             "instance_count",
         ]
         read_only_fields = ["id", "created_at", "updated_at", "created_by"]
+
+    def get_browser_config(self, obj):
+        return browser_config(obj)
 
     def get_schema_fields_count(self, obj):
         """Return count of schema fields"""
@@ -339,6 +346,21 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(str(e))
 
         return value
+
+    def validate(self, attrs):
+        """Keep browser settings valid when metadata or the schema changes through regular APIs."""
+        attrs = super().validate(attrs)
+        metadata = attrs.get("metadata", self.instance.metadata if self.instance else {}) or {}
+        if "browser" in metadata and ("metadata" in attrs or "schema" in attrs):
+            definition = SimpleNamespace(
+                pk=self.instance.pk if self.instance else None,
+                schema=attrs.get("schema", self.instance.schema if self.instance else {}),
+            )
+            request = self.context.get("request")
+            if request is None or not getattr(request, "tenant", None):
+                raise serializers.ValidationError({"metadata": "A tenant is required for browser configuration."})
+            validate_browser_config(definition, request.tenant, metadata["browser"])
+        return attrs
 
     def validate_slot_configuration(self, value):
         """Validate slot configuration structure and convert to snake_case"""
@@ -640,6 +662,7 @@ class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
     allowed_child_types = serializers.SerializerMethodField()
     icon_image = serializers.SerializerMethodField()
     browser_group = serializers.SerializerMethodField()
+    browser_config = serializers.SerializerMethodField()
 
     class Meta:
         model = ObjectTypeDefinition
@@ -658,8 +681,12 @@ class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
             "instance_count",
             "allowed_child_types",
             "browser_group",
+            "browser_config",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def get_browser_config(self, obj):
+        return browser_config(obj)
 
     def get_instance_count(self, obj):
         """Return count of object instances of this type"""

@@ -68,6 +68,12 @@ class DefinitionDiffTests(unittest.TestCase):
         exported = module.export_bundle(self.api, {"id": 2})
         self.assertEqual({t["slug"] for t in exported["terms"]}, {"news", "column", "press-release"})
         self.assertEqual(next(t["name"] for t in exported["terms"] if t["slug"] == "news"), "News")
+        article = next(item for item in exported["definitions"] if item["name"] == "article")
+        self.assertIn("summary", article["metadata"]["browser"]["search_fields"])
+
+    def test_target_browser_configuration_takes_precedence_over_profile_default(self):
+        self.api.objects[1]["metadata"]["browser"] = {"search_fields": [], "filters": []}
+        self.assertFalse(any(change.get("type") == "article" for change in self.diff()))
 
     def test_export_requires_approved_core_terms_and_expected_hierarchy(self):
         self.api.terms[-1]["status"] = "proposed"

@@ -4,6 +4,23 @@ Importen omfattar `news`, `columns`, `columnists`, `events` och `organizations`.
 
 Den fristående [objektmodellen](legacy-editorial-object-model.md) beskriver exakt vilka typer, fält, relationer och klassificeringar ett annat projekt behöver bygga för denna import.
 
+## Sökning och filter efter import
+
+Objekttypens flik **Search and filters** i webbgränssnittet styr vilka schemafält som
+söks och filtreras i både typlistan och Objects-översikten. Startprofilen föreslår
+följande. Taggfilter väljs i webben efter att klassificeringstyperna skapats, så att
+de alltid kopplas till rätt tenant och tillåten objekttyp.
+
+| Objekttyp | Extra sökfält | Föreslagna filter |
+| --- | --- | --- |
+| Artikel | Ingress | Publiceringsdatum, skapad, avpubliceringsdatum, krönikör, källdatum; innehållsslag, nyhetstyp, nyhetskategori, källa, ämne, nyckelord |
+| Krönikör | Förnamn, efternamn, organisationstillhörighet | Skapad, organisationstillhörighet, nyckelord |
+| Evenemang | Arrangör, plats, fokusområde | Start- och slutdatum, publiceringsdatum, arrangör; evenemangstyp, evenemangskategori, ämne, nyckelord |
+| Organisation | Publikt namn, land | Land, internationell ja/nej, skapad; organisationskategori, organisationstillhörighet, nyckelord |
+
+`library_item` behålls utan importanpassade förval. Sök- och filterinställningarna kan
+ändras i webben utan att importprofilen eller källtermkartan ändras.
+
 ## Granskad termkarta
 
 `backend/content_migration/legacy_content/site2_terms.json` innehåller de 698 använda källidentiteterna med originalnamn och användningsantal. `site2_decisions.json` innehåller de beslutade grenarna, barnrelationerna, namnen och sammanslagningarna. `term_plan.py` validerar täckning, identiteter, sammanslagningar och föräldragraf och kompilerar ett portabelt paket med 703 måltermer inklusive de tre innehållsslagen. Källidentitet är site, dimension, modell och ID; evenemangens textval använder site, fältnamn och exakt värde. En ny, omdöpt eller omföräldrad källterm stoppar den berörda stage-körningen. Källorna med tomt namn respektive `external-resource` är uttryckligen mappade till Okänd källa.

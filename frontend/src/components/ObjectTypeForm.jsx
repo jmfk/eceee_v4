@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { Plus, Trash2, Settings, Hash, Type, Calendar, ToggleLeft, Check, Users, CheckCircle, XCircle, FolderOpen, AlertTriangle, Wrench } from 'lucide-react'
 import { objectTypesApi } from '../api/objectStorage'
+import ObjectBrowserConfiguration from './ObjectBrowserConfiguration'
 import { namespacesApi } from '../api'
 import { SchemaEditor } from './schema-editor'
 import InlineImageUpload from './InlineImageUpload'
@@ -70,6 +71,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
     const [originalRelationships, setOriginalRelationships] = useState(null)
     const [isSavingRelationships, setIsSavingRelationships] = useState(false)
     const [relationshipsError, setRelationshipsError] = useState(null)
+    const [browserConfigurationDirty, setBrowserConfigurationDirty] = useState(false)
 
     // Load existing object types for child type selection
     const { data: existingTypesResponse } = useQuery({
@@ -819,6 +821,10 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
 
     // Navigation guard for unsaved changes
     const handleTabChangeWithGuard = useCallback((newTab) => {
+        if (activeTab === 'browse' && browserConfigurationDirty) {
+            if (!window.confirm('You have unsaved search and filter changes. Leave without saving?')) return
+            setBrowserConfigurationDirty(false)
+        }
         // Check for unsaved schema changes
         if (activeTab === 'schema' && hasUnsavedSchemaChanges) {
             const confirmLeave = window.confirm(
@@ -860,7 +866,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
         }
 
         onTabChange?.(newTab)
-    }, [activeTab, hasUnsavedSchemaChanges, hasUnsavedBasicChanges, hasUnsavedSlotsChanges, hasUnsavedRelationshipsChanges, onTabChange])
+    }, [activeTab, browserConfigurationDirty, hasUnsavedSchemaChanges, hasUnsavedBasicChanges, hasUnsavedSlotsChanges, hasUnsavedRelationshipsChanges, onTabChange])
 
     // Browser navigation guard
     useEffect(() => {
@@ -894,6 +900,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                     {[
                         { id: 'basic', label: 'Basic Info' },
                         { id: 'schema', label: 'Schema Fields' },
+                        { id: 'browse', label: 'Search and filters' },
                         { id: 'slots', label: 'Widget Slots' },
                         { id: 'relationships', label: 'Relationships' }
                     ].map((tab) => (
@@ -1167,6 +1174,9 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                     />
                 </div>
             )}
+
+            {/* Widget Slots Tab */}
+            {activeTab === 'browse' && <ObjectBrowserConfiguration objectType={objectType} onDirtyChange={setBrowserConfigurationDirty} />}
 
             {/* Widget Slots Tab */}
             {activeTab === 'slots' && (
@@ -1453,7 +1463,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                             </>
                         )}
                     </button>
-                ) : (
+                ) : activeTab === 'browse' ? null : (
                     // Regular form submit button for other tabs
                     <button
                         type="submit"

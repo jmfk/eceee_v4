@@ -21,11 +21,20 @@ from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
+from rest_framework.exceptions import PermissionDenied
 
 from core.models import MachineAPIKey
 from core.permissions import HasTenantAccess
 
 from .models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
+from taxonomy.models import Tag
+from .browser_config import (
+    apply_browser_filters,
+    available_filters,
+    browser_config,
+    searchable_query,
+    validate_browser_config,
+)
 from .serializers import (
     ObjectInstanceListSerializer,
     ObjectInstanceSerializer,
@@ -54,6 +63,31 @@ def filter_publication_status(queryset, requested_status):
     if requested_status == "published":
         return queryset.filter(_has_live_version=True)
     return queryset.filter(_has_live_version=False, _has_scheduled_version=requested_status == "scheduled")
+
+
+def filter_browser_statuses(queryset, request):
+    raw = request.query_params.get("statuses")
+    if not raw:
+        return queryset
+    selected = set(raw.split(","))
+    if not selected or not selected <= {"draft", "scheduled", "published"}:
+        raise serializers.ValidationError({"statuses": "Choose draft, scheduled or published."})
+    if len(selected) == 3:
+        return queryset
+    now = timezone.now()
+    live = ObjectVersion.objects.filter(object_instance_id=OuterRef("pk"), effective_date__lte=now).filter(
+        Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
+    )
+    scheduled = ObjectVersion.objects.filter(object_instance_id=OuterRef("pk"), effective_date__gt=now)
+    queryset = queryset.annotate(_has_live_version=Exists(live), _has_scheduled_version=Exists(scheduled))
+    choices = Q()
+    if "published" in selected:
+        choices |= Q(_has_live_version=True)
+    if "scheduled" in selected:
+        choices |= Q(_has_live_version=False, _has_scheduled_version=True)
+    if "draft" in selected:
+        choices |= Q(_has_live_version=False, _has_scheduled_version=False)
+    return queryset.filter(choices)
 
 
 class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
@@ -167,6 +201,26 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
         queryset = self.get_queryset().filter(is_active=True, hierarchy_level__in=["top_level_only", "both"])
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+    @action(detail=True, methods=["get", "put"], permission_classes=[permissions.IsAuthenticated, HasTenantAccess])
+    def browser_configuration(self, request, pk=None):
+        """Edit browse choices through the same Object type permissions and tenant scope."""
+        definition = self.get_object()
+        if definition.namespace_id and definition.namespace.tenant_id != request.tenant.pk:
+            raise PermissionDenied("This Object type belongs to another workspace.")
+        if request.method == "GET":
+            return Response(
+                {
+                    "config": browser_config(definition),
+                    "available_filters": list(available_filters(definition, request.tenant).values()),
+                }
+            )
+        if not definition.namespace_id and not request.user.is_superuser:
+            raise PermissionDenied("Only a superuser can change a global Object type.")
+        config = validate_browser_config(definition, request.tenant, request.data)
+        definition.metadata = {**(definition.metadata or {}), "browser": config}
+        definition.save(update_fields=["metadata", "updated_at"])
+        return Response({"config": config})
 
     @action(detail=True, methods=["get"])
     def schema(self, request, pk=None):
@@ -566,20 +620,25 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         except ValueError:
             return Response({"error": "page and page_size must be integers"}, status=status.HTTP_400_BAD_REQUEST)
         if page_size not in (20, 50, 100) or page < 1:
-            return Response({"error": "page_size must be 20, 50, or 100 and page must be positive"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "page_size must be 20, 50, or 100 and page must be positive"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         paginator = Paginator(queryset, page_size)
         page_obj = paginator.get_page(page)
-        return Response({
-            "results": self.get_serializer(page_obj.object_list, many=True).data,
-            "count": paginator.count,
-            "page": page_obj.number,
-            "page_size": page_size,
-            "total_pages": paginator.num_pages,
-            "has_next": page_obj.has_next(),
-            "has_previous": page_obj.has_previous(),
-            **metadata,
-        })
+        return Response(
+            {
+                "results": self.get_serializer(page_obj.object_list, many=True).data,
+                "count": paginator.count,
+                "page": page_obj.number,
+                "page_size": page_size,
+                "total_pages": paginator.num_pages,
+                "has_next": page_obj.has_next(),
+                "has_previous": page_obj.has_previous(),
+                **metadata,
+            }
+        )
 
     def perform_create(self, serializer):
         """Set the created_by and tenant fields when creating"""
@@ -1120,8 +1179,6 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
     def roots(self, request):
         """Get all root objects (objects without parents)"""
         object_type = request.query_params.get("type")
-        status_filter = request.query_params.get("status")
-
         roots = self.get_queryset().filter(parent__isnull=True)
 
         if object_type:
@@ -1131,9 +1188,11 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
             except ObjectTypeDefinition.DoesNotExist:
                 return Response({"error": "Object type not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Filter by status
-        if status_filter and status_filter != "all":
-            roots = roots.filter(status=status_filter)
+        if request.query_params.get("browser_filters"):
+            if not object_type:
+                raise serializers.ValidationError({"type": "Choose an Object type for its filters."})
+            roots = apply_browser_filters(request, roots, obj_type)
+        roots = filter_browser_statuses(roots, request)
 
         page_response = self.browser_page(request, roots.order_by("-created_at", "-pk"))
         if page_response is not None:
@@ -1146,19 +1205,28 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
     def search(self, request):
         """Advanced search across objects with multiple criteria"""
         query = request.query_params.get("q", "")
+        if request.query_params.get("browser") == "true":
+            query = query[:200]
 
         # Start with all instances
         instances = self.get_queryset()
 
         # Text search across multiple fields
         if query:
-            instances = instances.filter(
-                Q(title__icontains=query)
-                | Q(slug__icontains=query)
-                | Q(current_version__data__icontains=query)
-                | Q(object_type__label__icontains=query)
-                | Q(object_type__name__icontains=query)
-            )
+            if request.query_params.get("browser") == "true":
+                definitions = ObjectTypeDefinition.objects.filter(is_active=True)
+                if request.query_params.get("type"):
+                    definitions = definitions.filter(name=request.query_params["type"])
+                definitions = definitions.filter(Q(namespace__tenant=request.tenant) | Q(namespace__isnull=True))
+                instances = instances.filter(searchable_query(definitions, query))
+            else:
+                instances = instances.filter(
+                    Q(title__icontains=query)
+                    | Q(slug__icontains=query)
+                    | Q(current_version__data__icontains=query)
+                    | Q(object_type__label__icontains=query)
+                    | Q(object_type__name__icontains=query)
+                )
 
         # Filter by object type
         object_type = request.query_params.get("type")
@@ -1169,10 +1237,16 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
             except ObjectTypeDefinition.DoesNotExist:
                 return Response({"error": "Object type not found"}, status=status.HTTP_404_NOT_FOUND)
 
+        if request.query_params.get("browser_filters"):
+            if not object_type:
+                raise serializers.ValidationError({"type": "Choose an Object type for its filters."})
+            instances = apply_browser_filters(request, instances, obj_type)
+
         # Filter by status
         status_filter = request.query_params.get("status")
         if status_filter and status_filter != "all":
             instances = filter_publication_status(instances, status_filter)
+        instances = filter_browser_statuses(instances, request)
 
         # Filter by hierarchy level
         level = request.query_params.get("level")
@@ -1243,6 +1317,75 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
                     "level": level,
                     "published_only": published_only,
                 },
+            }
+        )
+
+    @action(detail=False, methods=["get"], url_path="filter-options")
+    def filter_options(self, request):
+        """Bounded choices for configured Object filters, scoped to the selected tenant."""
+        type_name = request.query_params.get("type")
+        filter_key = request.query_params.get("filter")
+        query = request.query_params.get("q", "")[:100]
+        definition = ObjectTypeDefinition.objects.filter(name=type_name, is_active=True).first()
+        if not definition or (definition.namespace_id and definition.namespace.tenant_id != request.tenant.pk):
+            raise serializers.ValidationError({"type": "Choose an available Object type."})
+        configured = {item["key"] for item in browser_config(definition).get("filters", [])}
+        option = available_filters(definition, request.tenant).get(filter_key)
+        if filter_key not in configured or not option or option["kind"] == "date":
+            raise serializers.ValidationError({"filter": "Choose a configured choice filter."})
+        if option["kind"] == "tag":
+            terms = (
+                Tag.objects.filter(tenant=request.tenant, classification_type_id=filter_key[4:], status="approved")
+                .select_related("parent")
+                .order_by("name", "pk")
+            )
+            if query:
+                terms = terms.filter(Q(name__icontains=query) | Q(alternative_names__icontains=query))
+            terms = list(terms[:51])
+            return Response(
+                {
+                    "results": [
+                        {
+                            "value": str(term.pk),
+                            "label": term.name,
+                            "parent": str(term.parent_id) if term.parent_id else None,
+                        }
+                        for term in terms[:50]
+                    ],
+                    "has_more": len(terms) > 50,
+                }
+            )
+        field = (definition.schema or {}).get("properties", {})[filter_key[6:]]
+        if option["kind"] == "reference":
+            allowed = field.get("allowed_object_types") or field.get("allowedObjectTypes") or []
+            values = ObjectInstance.objects.filter(tenant=request.tenant, object_type__name__in=allowed)
+            if query:
+                values = values.filter(title__icontains=query)
+            values = list(values.order_by("title", "pk")[:51])
+            return Response(
+                {
+                    "results": [{"value": str(item.pk), "label": item.title} for item in values[:50]],
+                    "has_more": len(values) > 50,
+                }
+            )
+        if option["kind"] == "boolean":
+            return Response(
+                {"results": [{"value": "true", "label": "Yes"}, {"value": "false", "label": "No"}], "has_more": False}
+            )
+        path = f"current_version__data__{filter_key[6:]}"
+        values = (
+            self.get_queryset()
+            .filter(object_type=definition)
+            .exclude(**{path: ""})
+            .exclude(**{f"{path}__isnull": True})
+        )
+        if query:
+            values = values.filter(**{f"{path}__icontains": query})
+        choices = list(values.order_by(path).values_list(path, flat=True).distinct()[:51])
+        return Response(
+            {
+                "results": [{"value": item, "label": item} for item in choices[:50] if isinstance(item, str)],
+                "has_more": len(choices) > 50,
             }
         )
 

@@ -67,6 +67,14 @@ export const objectTypesApi = {
         return response
     },
 
+    async getBrowserConfiguration(id) {
+        return await api.get(`${BASE_URL}/object-types/${id}/browser_configuration/`)
+    },
+
+    async updateBrowserConfiguration(id, config) {
+        return await api.put(`${BASE_URL}/object-types/${id}/browser_configuration/`, config)
+    },
+
     /**
      * Update basic info for object type
      */
@@ -332,6 +340,10 @@ export const objectInstancesApi = {
             params: { ...(requestConfig.params || {}), ...allParams },
         })
         return response
+    },
+
+    async filterOptions(params = {}) {
+        return await api.get(`${BASE_URL}/objects/filter-options/`, { params })
     },
 
     /**
