@@ -81,6 +81,12 @@ const renderForm = () => renderWithStateProviders(
 )
 
 describe('ObjectDataForm dirty state', () => {
+    it('hides the standard title from the Properties panel in the object editor', async () => {
+        await act(async () => { renderWithStateProviders(<ObjectDataForm objectType={objectType} instance={instance}
+            initializeObject={false} showTitle={false} />) })
+        expect(screen.queryByPlaceholderText('Enter object title...')).not.toBeInTheDocument()
+    })
+
     it('renders before a page-managed Object instance exists', async () => {
         await act(async () => { renderWithStateProviders(<ObjectDataForm objectType={objectType} initializeObject={false} />, {
             initialState: createAppState({ objects: {}, metadata: { currentObjectId: undefined } }),

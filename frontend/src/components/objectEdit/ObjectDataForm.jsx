@@ -21,6 +21,7 @@ const ObjectDataForm = forwardRef(({
     onValidationChange,
     onFormChange,
     initializeObject = true,
+    showTitle = true,
     context
 }, ref) => {
     const [namespace, setNamespace] = useState(null)
@@ -386,7 +387,7 @@ const ObjectDataForm = forwardRef(({
             )}
 
             {/* Title - Model Field */}
-            <div>
+            {showTitle && <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                     Object Title <span className="text-red-500">*</span>
                 </label>
@@ -407,7 +408,7 @@ const ObjectDataForm = forwardRef(({
                 <div className="text-gray-500 text-sm mt-1">
                     The display title is saved with the working copy and becomes public when published.
                 </div>
-            </div>
+            </div>}
 
             {/* Dynamic Schema Fields */}
             {objectType && propertiesFields.length > 0 && (

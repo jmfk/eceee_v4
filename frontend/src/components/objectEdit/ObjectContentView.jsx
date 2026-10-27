@@ -170,6 +170,7 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                                     objectType={objectType}
                                     instance={instance}
                                     initializeObject={false}
+                                    showTitle={false}
                                     isNewInstance={isNewInstance}
                                     onFormChange={handleFormChange}
                                     onValidationChange={handleValidationChange}
