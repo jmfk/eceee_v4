@@ -14,9 +14,9 @@ export const useSupportTenant = () => {
         subscribeToCurrentTenantId,
         getCurrentTenantId,
     )
-    // Email deep links scope only this screen; the server verifies membership.
+    // Inbox deep links and their help articles retain workspace scope; the server verifies membership.
     return (
-        (location.pathname.startsWith('/inbox') &&
+        ((location.pathname.startsWith('/inbox') || location.pathname.startsWith('/help/how-to/')) &&
             new URLSearchParams(location.search).get('tenant')) ||
         current
     )
