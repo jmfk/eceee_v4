@@ -64,11 +64,7 @@ def available_filters(definition, tenant):
                 "key": f"field:{key}",
                 "label": field.get("title") or key,
                 "kind": kind,
-                **(
-                    {"multiple": bool(field.get("multiple") or field.get("type") == "array")}
-                    if kind == "reference"
-                    else {}
-                ),
+                **({"multiple": bool(field.get("multiple", False))} if kind == "reference" else {}),
             }
     for classification in ClassificationType.objects.filter(tenant=tenant).order_by("sort_order", "name"):
         if f"object:{definition.pk}" in classification.allowed_uses:
@@ -133,7 +129,7 @@ def validate_browser_config(definition, tenant, value):
         ):
             raise serializers.ValidationError({"filters": "Each filter needs key, label and overview."})
         key, label = entry["key"], entry["label"]
-        if key not in allowed or key in seen:
+        if not isinstance(key, str) or key not in allowed or key in seen:
             raise serializers.ValidationError({"filters": f"{key} is unavailable or duplicated."})
         if (
             not isinstance(label, str)
@@ -192,7 +188,7 @@ def parse_browser_filters(request, definition):
         if not isinstance(item, dict) or set(item) != {"key", "values"}:
             raise serializers.ValidationError({"browser_filters": "Each filter needs key and values."})
         key, values = item["key"], item["values"]
-        if key not in configured or key not in available or key in seen:
+        if not isinstance(key, str) or key not in configured or key not in available or key in seen:
             raise serializers.ValidationError({"browser_filters": f"Filter {key} is unavailable."})
         if (
             not isinstance(values, list)

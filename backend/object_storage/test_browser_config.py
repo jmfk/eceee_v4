@@ -2,7 +2,7 @@
 
 import json
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.test import SimpleTestCase
 from rest_framework.exceptions import ValidationError
@@ -10,6 +10,7 @@ from rest_framework.exceptions import ValidationError
 from content_migration.legacy_content.profile import initial_bundle
 from object_storage.browser_config import (
     apply_browser_filters,
+    available_filters,
     available_list_fields,
     field_kind,
     parse_browser_filters,
@@ -159,3 +160,37 @@ class BrowserConfigurationTests(SimpleTestCase):
         )
         with self.assertRaises(ValidationError):
             apply_browser_filters(request, None, self.definition)
+
+    @patch("object_storage.browser_config.ClassificationType.objects.filter")
+    def test_single_reference_filter_uses_scalar_value_despite_array_schema_type(self, classifications):
+        classifications.return_value.order_by.return_value = []
+        self.definition.schema["properties"]["authors"] = {
+            "componentType": "object_reference",
+            "type": "array",
+            "multiple": False,
+        }
+        self.definition.metadata = {"browser": {"filters": [{"key": "field:authors"}]}}
+        self.assertFalse(available_filters(self.definition, None)["field:authors"]["multiple"])
+        request = SimpleNamespace(
+            query_params={"browser_filters": json.dumps([{"key": "field:authors", "values": ["7"]}])},
+            tenant=None,
+        )
+        queryset = MagicMock()
+        apply_browser_filters(request, queryset, self.definition)
+        self.assertEqual(queryset.filter.call_args.args[0].children, [("current_version__data__authors", 7)])
+        self.definition.schema["properties"]["authors"]["multiple"] = True
+        self.assertTrue(available_filters(self.definition, None)["field:authors"]["multiple"])
+
+    @patch("object_storage.browser_config.available_filters")
+    def test_unhashable_filter_keys_return_validation_errors(self, options):
+        options.return_value = self.options
+        invalid_filter = {"key": [], "label": "Invalid", "overview": False}
+        with self.assertRaises(ValidationError):
+            validate_browser_config(self.definition, None, {"search_fields": [], "filters": [invalid_filter]})
+        self.definition.metadata = {"browser": {"filters": [{"key": "field:summary"}]}}
+        request = SimpleNamespace(
+            query_params={"browser_filters": json.dumps([{"key": [], "values": ["x"]}])},
+            tenant=None,
+        )
+        with self.assertRaises(ValidationError):
+            parse_browser_filters(request, self.definition)
