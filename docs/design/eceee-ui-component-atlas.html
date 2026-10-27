@@ -122,9 +122,72 @@
     .index-card small{display:block;color:#667085;margin-bottom:7px}
     .index-card strong{font-size:14px}
     .index-card p{font-size:11px;color:#667085;line-height:1.5;margin:7px 0 0}
+    .page-preview{border:1px solid #dce3ea;border-radius:5px;background:#f7f8fa;overflow:hidden;min-height:360px}
+    .page-preview .preview-bar{display:flex;align-items:center;gap:7px;padding:8px 12px;background:#fff;border-bottom:1px solid #e2e7ed;color:#667085;font-size:10px}
+    .page-preview .preview-dot{width:7px;height:7px;border-radius:50%;background:#cbd5e1}
+    .page-preview .preview-path{margin-left:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .page-preview .preview-app{display:grid;grid-template-columns:112px minmax(0,1fr);min-height:345px}
+    .page-preview .preview-nav{padding:13px 8px;border-right:1px solid #e2e7ed;background:#fff}
+    .page-preview .preview-nav b{display:block;margin:0 6px 10px;font-size:11px}
+    .page-preview .preview-nav span{display:block;padding:6px;border-radius:3px;color:#667085;font-size:10px;overflow-wrap:anywhere}
+    .page-preview .preview-nav span.selected{background:#eff6ff;color:#1d4ed8;font-weight:700}
+    .page-preview .preview-main{min-width:0;padding:15px}
+    .page-preview .preview-main h3{font-size:16px;margin:0}
+    .page-preview .preview-title{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+    .page-preview .preview-title p{margin:3px 0 0}
+    .page-preview .preview-panel{background:white;border:1px solid #e1e6eb;border-radius:4px;padding:12px;margin-top:9px}
+    .page-preview .preview-panel.flat{border:0;background:transparent;padding:0}
+    .page-preview .preview-row{display:flex;align-items:center;justify-content:space-between;gap:9px;padding:8px 3px;border-bottom:1px solid #edf0f3;min-width:0}
+    .page-preview .preview-row:last-child{border-bottom:0}
+    .page-preview .preview-row > span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .page-preview .preview-muted{color:#718096;font-size:10px}
+    .page-preview .preview-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:8px 0}
+    .page-preview .preview-toolbar input{flex:1 1 150px;min-width:0}
+    .page-preview .preview-card{background:white;border:1px solid #e1e6eb;border-radius:4px;padding:10px}
+    .page-preview .preview-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+    .page-preview .preview-split{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(120px,.8fr);gap:10px}
+    .page-preview .preview-tag{display:inline-block;padding:2px 6px;border-radius:3px;background:#eff6ff;color:#1d4ed8;font-size:10px}
+    .page-preview .preview-photo{height:64px;border-radius:3px;background:linear-gradient(130deg,#7895ab,#d8e7e9 55%,#89a9a4)}
+    .page-preview .preview-photo.small-photo{width:53px;height:40px;flex:none}
+    .page-preview .preview-form{display:grid;gap:9px}
+    .page-preview .preview-form label{display:grid;gap:4px;color:#536070;font-size:10px}
+    .page-preview .preview-form input,.page-preview .preview-form textarea{width:100%}
+    .page-preview .preview-form textarea{min-height:70px;resize:vertical}
+    .page-preview .preview-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+    .page-preview .preview-grid > div{min-width:0}
+    .page-preview .preview-grid b{display:block;font-size:15px}
+    .page-preview .preview-state{padding:17px 8px;text-align:center;color:#536070}
+    .page-preview .preview-state b{display:block;color:#172033;margin-bottom:4px}
+    .page-preview .preview-skeleton{height:12px;width:70%;margin:11px 0;border-radius:3px;background:#e4eaf0}
+    .page-preview .preview-skeleton.wide{width:94%}
+    .page-preview .preview-tabs{display:flex;overflow:auto;gap:4px;border-bottom:1px solid #cbd5e1;margin:9px 0}
+    .page-preview .preview-tabs button{flex:none;border:0;border-radius:3px 3px 0 0;background:transparent}
+    .page-preview .preview-tabs button.active{color:#1d4ed8;background:white;border:1px solid #cbd5e1;border-bottom:1px solid white;margin-bottom:-1px}
+    .page-preview .preview-menu{display:grid;gap:3px;max-width:180px;padding:6px;background:white;border:1px solid #dce3ea;border-radius:4px;box-shadow:0 8px 20px #0002}
+    .page-preview .preview-menu button{text-align:left;border:0}
+    .page-preview .preview-menu[hidden]{display:none}
+    .page-preview .preview-older{background:#fff;border:1px solid #dde3e9;border-radius:10px;padding:17px;min-height:250px;box-shadow:0 2px 5px #0000000b}
+    .page-preview .preview-older h3{font-size:20px;margin-bottom:14px}
+    .page-preview .preview-older .old-button{display:inline-block;margin:4px 3px 4px 0;padding:8px 10px}
+    .page-preview .preview-older p{line-height:1.5}
+    .page-preview .preview-scroll{overflow-x:auto}
+    .component-map{width:100%;border-collapse:collapse;background:#fff;font-size:12px}
+    .component-map th,.component-map td{padding:10px 12px;border-bottom:1px solid #e6ebf0;text-align:left;vertical-align:top;line-height:1.45}
+    .component-map th{position:sticky;top:58px;background:#f5f7fa;color:#475569;font-size:11px;z-index:2}
+    .component-map td:first-child{font-weight:650;color:#172033}
+    .component-map a{white-space:nowrap}
+    .review-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin:16px 0}
+    .review-item{padding:15px;background:white;border:1px solid #dce3ea;border-radius:4px;line-height:1.5}
+    .review-item h3{margin:0 0 7px;font-size:14px}
+    .review-item p{margin:0;color:#536070;font-size:12px}
+    .page-note{margin-top:14px;color:#475569;font-size:12px;line-height:1.5}
+    .slide[id^="cms-"] .compare-grid{grid-template-columns:1fr}
+    .slide[id^="cms-"] .compare-body{min-height:0}
+    .slide[id^="cms-"] .compare.after{order:-1}
     [hidden]{display:none!important}
     @media(max-width:900px){.app{grid-template-columns:1fr}.rail{position:static;height:auto;max-height:185px;border-right:0;border-bottom:1px solid #e0e5eb}.rail nav{display:flex;gap:5px;overflow:auto}.rail p{display:none}.rail button{flex:0 0 auto;width:auto;white-space:nowrap}.rail-search{display:none}.compare-grid{grid-template-columns:1fr}.main{padding-top:24px}}
     @media(max-width:520px){.topbar{gap:7px;padding:8px 16px}.topbar strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.main{padding-inline:16px}.compare-body{padding:16px}.intro{font-size:14px}}
+    @media(max-width:620px){.page-preview .preview-app{grid-template-columns:1fr}.page-preview .preview-nav{display:none}.page-preview .preview-split,.page-preview .preview-columns{grid-template-columns:1fr}.page-preview .preview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.component-map th,.component-map td{padding:8px}}
     @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
   </style>
 </head>
@@ -138,7 +201,7 @@
     <div class="workspace">
       <header class="topbar">
         <strong id="top-title">Komponentatlas</strong>
-        <span class="progress-label" id="progress-label">1 / 16</span>
+        <span class="progress-label" id="progress-label">1 / 41</span>
         <div class="pager" aria-label="Bläddra">
           <button type="button" id="previous" aria-label="Föregående">←</button>
           <button type="button" id="next" aria-label="Nästa">→</button>
@@ -149,8 +212,8 @@
           <div class="eyebrow">Designstudie · oktober 2026</div>
           <h1>ECEEE v4<br>komponentatlas</h1>
           <p class="intro">En klickbar genomgång av vanliga och mer specifika komponenter i CMS:et. Varje uppslag visar ett representativt nuläge, ett konkret förbättringsförslag och en liten demo som går att prova.</p>
-          <div class="meta"><span>15 komponenter och layouter</span><span>Före / förslag</span><span>Fristående HTML</span><span>Ingen backend krävs</span></div>
-          <div class="principle">Riktning: behåll ECEEE:s ljusa skal, Inter, neutral chrome och blå aktiv färg. Minska upprepade ramar, ge innehåll tydligare hierarki och låt verktyg visas nära uppgiften. Förslagen är prototyper, inte beslut om en generell redesign.</div>
+          <div class="meta"><span>15 komponentuppslag</span><span>23 CMS-sidexempel</span><span>Komponent- och tillståndskarta</span><span>Före / förslag</span><span>Fristående HTML</span></div>
+          <div class="principle"><b>Granskningsplan, inte implementation.</b> Nulägena är schematiska rekonstruktioner av mönster i dagens frontend, inte skärmdumpar eller löften om exakt nuvarande data. Förslagen visar riktning för ECEEE:s ljusa skal, Inter, neutral chrome och blå aktiv färg. Varje sida kan provas med innehåll, tomt läge, laddning och fel. Ingen backend anropas och ingen CMS-vy ändras.</div>
           <div class="index-grid" id="index-grid"></div>
           <p class="source">Referenser: <a href="https://component.gallery/" target="_blank" rel="noreferrer">The Component Gallery</a> · <a href="https://m3.material.io/components" target="_blank" rel="noreferrer">Material 3 components</a>. Inspirationen gäller beteende och struktur; ECEEE:s egna mönster styr utseendet.</p>
         </section>
@@ -247,7 +310,286 @@
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
   <script>
     (() => {
+      // Static review fixtures. They describe current UI patterns and proposed composition;
+      // they never read or write CMS data.
+      const action = (label, kind = '') => `<button type="button" class="${kind}" data-demo-action="${label}">${label}</button>`;
+      const line = (title, detail = '', badge = '') => `<div class="preview-row" data-page-item><span>${title}</span><span class="preview-muted">${detail}</span>${badge ? `<span class="preview-tag">${badge}</span>` : ''}</div>`;
+      const panel = (content, extra = '') => `<div class="preview-panel ${extra}">${content}</div>`;
+      const tabsAt = (activeIndex, ...labels) => `<div class="preview-tabs" role="tablist">${labels.map((label, index) => `<button type="button" role="tab" aria-selected="${index === activeIndex}" class="${index === activeIndex ? 'active' : ''}" data-page-tab>${label}</button>`).join('')}</div>`;
+      const tabs = (...labels) => tabsAt(0, ...labels);
+      const search = (label) => `<input type="search" data-page-search aria-label="${label}" placeholder="${label}…">`;
+      const mockForm = (fields) => `<div class="preview-form">${fields.map(([label, value, type]) => `<label>${label}${type === 'textarea' ? `<textarea>${value}</textarea>` : `<input value="${value}" placeholder="${label}">`}</label>`).join('')}</div>`;
+      const pageExamples = [
+        {
+          id: 'cms-pages', title: 'Sidor och sidträd', route: '/pages', source: 'TreePageManager.jsx · PageTreeNode.jsx',
+          intro: 'Hitta en sida, förstå hierarkin och utför en handling utan att tappa platsen i trädet.',
+          before: 'Sökfält, träd, radmenyer och massåtgärder samsas i en tät arbetsyta. Radens nivå och publiceringsstatus kan bli svåra att avläsa.',
+          content: `<div class="preview-title"><div><h3>Sidor</h3><p>Redaktionens struktur</p></div>${action('Ny sida', 'primary')}</div><div class="preview-toolbar">${search('Sök sidor')}${action('＋ Filter')}</div>${panel(`<div class="preview-row"><b>▾ eceee.org</b><span class="preview-muted">Rot</span></div>${line('　▾ Nyheter', '12 undersidor')}${line('　　 Artikel: Energieffektiva hus', '/nyheter/energieffektiva-hus', 'Publicerad')}${line('　　 Artikel: Vår konferens', '/nyheter/konferens', 'Utkast')}${line('　Om oss', '/om-oss', 'Publicerad')}`)}<div class="preview-toolbar">${action('Markera flera')}${action('Importera')}${action('Exportera')}</div>`,
+          decision: 'En sökpunkt, tydliga indrag, status nära titeln och få kontextuella radåtgärder. Behåll import/export som explicita arbetsflöden.'
+        },
+        {
+          id: 'cms-page-editor', title: 'Sidredigeraren', route: '/pages/:id/edit', source: 'PageEditor.jsx · ContentEditor.jsx · WidgetLibrary.jsx',
+          intro: 'Redigera, förhandsgranska och publicera samma sida med tydlig version och sparstatus.',
+          before: 'Många kontroller för redigering, version, preview och publicering kan bilda flera parallella toppnivåer.',
+          content: `<div class="preview-title"><div><span class="preview-muted">Sidor / Nyheter</span><h3>Energieffektiva hus</h3><p>Utkast · sparat 14:32</p></div><div class="preview-toolbar">${action('Förhandsgranska')}${action('Publicera', 'primary')}</div></div>${tabs('Innehåll','Egenskaper','Versioner')}<div class="preview-split">${panel(`<div class="preview-title"><b>Innehåll</b>${action('＋ Widget')}</div>${panel('<b>Rubrik</b><p>Energieffektiva hus</p>','flat')}${panel('<b>Brödtext</b><p>Redigera text och infoga media i sammanhang.</p>','flat')}`)}${panel(`<b>Sidinformation</b>${line('URL', '/nyheter/energieffektiva-hus')}${line('Layout', 'Artikel')}${line('Språk', 'Svenska')}<p class="preview-muted">Ändringar i metadata visas vid relevant fält.</p>`)}</div>`,
+          decision: 'Samla primär handling i en stabil rad. Gör version, status och osparade ändringar synliga utan fler dialoger.'
+        },
+        {
+          id: 'cms-objects', title: 'Objekt och relationer', route: '/objects', source: 'ObjectInstanceEditPage.jsx · ObjectInstanceEditor.jsx',
+          intro: 'Skapa och koppla strukturerat innehåll utan att förväxla objekt, sidor och relationer.',
+          before: 'Typer, instanser, fält och relationer har skilda verktyg; användaren behöver kontext för vilket objekt som ändras.',
+          content: `<div class="preview-title"><div><h3>Objekt</h3><p>Personer och organisationer</p></div>${action('Nytt objekt', 'primary')}</div><div class="preview-toolbar">${search('Sök objekt')}${action('Typ: Person')}</div><div class="preview-split">${panel(`<b>Personer</b>${line('Johan Berg', 'Redaktör')}${line('Ylva Blume', 'Designer')}${line('Kim Nilsson', 'Skribent')}`)}${panel(`<b>Johan Berg</b><p>Person · senast ändrad i dag</p>${mockForm([['Namn','Johan Berg'],['Roll','Redaktör']])}<div class="preview-toolbar">${action('Spara', 'primary')}${action('Relationer')}</div>`)}</div>`,
+          decision: 'Vald instans och typ förblir synliga medan fälten redigeras. Relationer får egen kontext i stället för att blandas med textfält.'
+        },
+        {
+          id: 'cms-media', title: 'Mediabibliotek', route: '/media', source: 'MediaManagerPage.jsx · MediaManager.jsx · MediaBrowser.jsx · UploadQueue.jsx',
+          intro: 'Sök, ladda upp, välj och granska användning av media i samma flöde.',
+          before: 'Uppladdning, godkännande, samlingar och dubbletthantering ligger i flera vyer med skiftande knapphierarki.',
+          content: `<div class="preview-title"><div><h3>Media</h3><p>Filer i arbetsytan</p></div>${action('Ladda upp', 'primary')}</div><div class="preview-toolbar">${search('Sök filer')}${action('＋ Filter')}</div><div class="preview-columns"><div class="preview-card"><div class="preview-photo"></div><b>coast.jpg</b><p class="preview-muted">Används på 2 sidor</p></div><div class="preview-card"><div class="preview-photo" style="background:linear-gradient(130deg,#baa99c,#ebded3 55%,#8a9ca4)"></div><b>portrait.jpg</b><p class="preview-muted">1,1 MB · godkänd</p></div></div>${panel(`<b>Vald fil: coast.jpg</b>${line('Användning', '2 sidor')}${line('Liknande fil', 'coast-copy.jpg')}<div class="preview-toolbar">${action('Infoga')}${action('Visa referenser')}${action('Fler åtgärder')}</div>`)}`,
+          decision: 'Visa miniatyr, urval, uppladdningskö och referenser tydligt. Dubblettbeslut sker innan ny fil sparas.'
+        },
+        {
+          id: 'cms-tags', title: 'Taggar och klassificering', route: '/tags', source: 'TagsPage.jsx · ClassificationManager.jsx · CompactSelect.jsx',
+          intro: 'Nuvarande kompakta Tags-vy är referens för sök, filter, flikar och fält i övriga CMS.',
+          before: 'Tags är redan en starkare referens än äldre delar av appen. Det som behöver planeras är återanvändningen i andra vyer.',
+          content: `<div class="preview-title"><div><h3>Taggar</h3><p>Hantera termer och taggtyper</p></div>${action('Ny tagg', 'primary')}</div>${tabs('Taggar','Typer','Historik','Behörigheter')}<div class="preview-toolbar">${search('Sök taggar')}${action('＋ Filter')}</div><div class="preview-split">${panel(`<b>Energi</b>${line('　Byggnader', '12 användningar')}${line('　Effektivisering', '8 användningar')}${line('Klimat', '24 användningar')}`)}${panel(`<b>Effektivisering</b><p>Godkänd tagg · Energi</p>${line('Användning', '8 objekt')}<div class="preview-toolbar">${action('Redigera')}${action('Flytta')}${action('Mer')}</div>`)}</div>`,
+          decision: 'Behåll 12 px-kontroller, flytande etiketter, filterpiller och sammanhängande flikar. Visa rättigheter och historik utan dubbletter av metadata.'
+        },
+        {
+          id: 'cms-kanban', title: 'Kanban-tavla', route: '/kanban/boards/:id', source: 'KanbanPage.jsx · kanban.css',
+          intro: 'Tavlans bakgrund och kort ska ge orientering utan att listornas grå ytor tar över.',
+          before: 'Listor, filterrad, räknare och kort kan konkurrera om utrymmet, särskilt när tavlan har bakgrundsbild.',
+          content: `<div class="preview-title"><div><h3>eceee 2026</h3><p>5 listor · 2 kort</p></div><div class="preview-toolbar">${action('Filtrera')}${action('Aktivitet')}${action('···')}</div></div><div class="preview-toolbar">${search('Sök kort')}${action('＋ Filter')}</div><div class="preview-columns"><div class="preview-card" style="background:#eff0f2"><div class="preview-title"><b>Att göra <span class="preview-muted">1</span></b>${action('···')}</div><div class="preview-card"><span class="preview-muted">TASK-24</span><b>Granska startsida</b><span class="preview-tag">Redaktion</span></div>${action('＋ Lägg till kort')}</div><div class="preview-card" style="background:#eff0f2"><div class="preview-title"><b>Klart <span class="preview-muted">1</span></b>${action('···')}</div><div class="preview-card"><span class="preview-muted">TASK-1</span><b>Publicera nyhet</b></div>${action('＋ Lägg till kort')}</div></div>`,
+          decision: 'Ljusare listbakgrund, läsbara antal och en kompakt filterväg. Tavlans bakgrund får synas där den finns.'
+        },
+        {
+          id: 'cms-card', title: 'Kanban-kort', route: '/kanban/cards/:id', source: 'KanbanPage.jsx · MarkdownEditor.jsx',
+          intro: 'Ett kort ska hålla titel, status, innehåll, bilagor, medlemmar och aktivitet i en begriplig läsordning.',
+          before: 'Lång vertikal detaljvy kan skilja åtgärd från objekt. Stora bilagor och rich text-bilder behöver kontrollerat flöde.',
+          content: `<div class="preview-title"><div><span class="preview-muted">eceee 2026 / Pågår · TASK-24</span><h3>Granska startsida</h3></div>${action('Stäng')}</div><div class="preview-toolbar">${action('＋ Medlem')}${action('Etikett')}${action('Datum')}${action('Checklista')}${action('Bilaga')}</div><div class="preview-split">${panel(`<b>Beskrivning</b><p>Granska den nya startsidan och kommentera ändringarna.</p>${action('Redigera text')}<div class="preview-photo" style="margin-top:10px;max-width:180px"></div><p class="preview-muted">Bilden ligger i textflödet.</p>`)}${panel(`${tabs('Aktivitet','Filer')}<p>Johan flyttade kortet till Pågår.</p>${line('Bilaga', 'coast.jpg')}${action('Skriv kommentar')}`)}</div>`,
+          decision: 'Åtgärder på titelraden, bildval där bilden finns och kompakta bilagekort. Aktivitet kan läsas utan att flytta huvudtexten.'
+        },
+        {
+          id: 'cms-inbox', title: 'Inbox och trådar', route: '/inbox', source: 'InboxPage.jsx · InboxPage.css',
+          intro: 'Sök och sortera meddelanden; välj en tråd utan att tappa listans sammanhang.',
+          before: 'Sök, flikar, arkivering och tråddetalj har olika täthet. Olikformiga rader gör olästa meddelanden svåra att upptäcka.',
+          content: `<div class="preview-title"><div><h3>Inbox</h3><p>3 meddelanden · 1 oläst</p></div>${action('Nytt meddelande', 'primary')}</div>${tabs('Inbox','Arkiverat','Instruktionsfilmer')}<div class="preview-toolbar">${search('Sök meddelanden')}${action('＋ Filter')}</div>${panel(`${line('<b>Fråga om publicering</b>', 'Johan · i dag', 'Oläst')}${line('Förslag: ny startsida', 'Ylva · i går')}${line('Rapporterat fel i media', 'Kim · 24 okt')}`)}<div class="preview-toolbar">${action('Markera läst')}${action('Arkivera')}</div>`,
+          decision: 'En skannbar trådlista med tydligt oläst tillstånd och kontextuella åtgärder. Trådens innehåll får egen huvudvy.'
+        },
+        {
+          id: 'cms-message', title: 'Nytt meddelande', route: '/inbox/compose', source: 'InboxPage.jsx · user-tools.css',
+          intro: 'Välj mottagare bland befintliga användare och roller; lägg till redigerbara meddelandeetiketter.',
+          before: 'Mottagarval som många kryssrutor och en separat typ-dropdown fyller formuläret innan meddelandet ens skrivs.',
+          content: `<div class="preview-title"><div><h3>Nytt meddelande</h3><p>Till mottagare i arbetsytan</p></div>${action('Skicka', 'primary')}</div>${panel(`<div class="preview-toolbar"><b>Till</b><span class="preview-tag">Support ×</span>${action('＋ Lägg till mottagare')}</div><div class="preview-toolbar"><b>Etiketter</b><span class="preview-tag">Fråga ×</span>${action('＋ Lägg till etikett')}</div>${mockForm([['Rubrik','Fråga om publicering'],['Beskrivning','Hej, jag behöver hjälp med…','textarea']])}<p class="preview-muted">Etiketter hanteras under Inställningar.</p>`)}`,
+          decision: 'Mottagare och etiketter som valbara piller nära Till-raden. Ett tydligt redigeringsflöde för etiketter i Inställningar.'
+        },
+        {
+          id: 'cms-designer', title: 'Theme Designer', route: '/designer/themes/:id', source: 'DesignerThemeWorkspacePage.jsx · DesignerLayoutWorkspacePage.jsx',
+          intro: 'Separera verktyg, aktuell redigering och preview utan att status för draft/publicering försvinner.',
+          before: 'Många toppknappar för viewport, export, draft, publicering och återställning skapar hög kognitiv belastning.',
+          content: `<div class="preview-title"><div><h3>Theme Designer</h3><p>eceee theme · utkast sparat</p></div><div class="preview-toolbar">${action('Spara utkast')}${action('Publicera', 'primary')}</div></div><div class="preview-toolbar"><div class="segmented"><button class="active" data-page-segment>Mobil</button><button data-page-segment>Surfplatta</button><button data-page-segment>Desktop</button></div>${action('Exportera')}${action('Mer')}</div><div class="preview-split">${panel(`<b>Layout och widgets</b>${line('Header', 'Aktiv')}${line('Hero', 'Redigera')}${line('Content', '3 widgets')}${action('＋ Lägg till widget')}`)}${panel(`<b>Förhandsvisning</b><div class="preview-photo" style="margin-top:9px;height:95px"></div><p>Rubrik och innehåll visas i vald bredd.</p>`)}</div>`,
+          decision: 'Håll Spara och Publicera synliga; samla sällsynta verktyg. Visa osparat, draft och publicerad version med ord.'
+        },
+        {
+          id: 'cms-settings', title: 'Inställningar', route: '/settings', source: 'SettingsDashboard.jsx · SettingsSidebar.jsx · SettingsManager.jsx',
+          intro: 'Ge en tydlig väg till system, teman, datastrukturer och supportinställningar.',
+          before: 'Stora statistikplattor och en djup inställningsmeny kan dölja vilket område som är aktivt.',
+          content: `<div class="preview-title"><div><h3>Inställningar</h3><p>Arbetsytans konfiguration</p></div></div><div class="preview-split">${panel(`<b>System</b>${line('Support', 'Mottagare, roller och etiketter')}${line('Användare och behörigheter', 'Medlemmar och roller')}${line('Publicering', 'Arbetsflöde')}${line('Versioner', 'Historik')}`)}${panel(`<b>Innehåll och design</b>${line('Teman', '8 teman')}${line('Objekttyper', '12 typer')}${line('Värdelistor', '6 listor')}${line('Widgets', '22 typer')}`)}</div>`,
+          decision: 'Samla inställningar efter arbetsuppgift. Support leder till konfiguration i inställningar, inte en orelaterad supportlänk.'
+        },
+        {
+          id: 'cms-roles', title: 'Användare och roller', route: '/settings/roles', source: 'RoleSettings.jsx · UserManagementPage.jsx',
+          intro: 'Se vem som har tillgång och redigera behörighet i kontext för användare eller roll.',
+          before: 'Rollistan, medlemslistan och nya formulär kan upplevas som likvärdiga block trots olika risk och frekvens.',
+          content: `<div class="preview-title"><div><h3>Användare och behörigheter</h3><p>Arbetsytans medlemmar</p></div>${action('Lägg till medlem', 'primary')}</div>${tabs('Medlemmar','Roller')}<div class="preview-toolbar">${search('Sök medlem')}</div>${panel(`${line('Johan Berg', 'Administratör')}${line('Ylva Blume', 'Designer')}${line('Kim Nilsson', 'Redaktör')}`)}<p class="preview-muted">Behörighetsändringar behöver tydligt mål, räckvidd och återkoppling.</p>`,
+          decision: 'Skilj medlemskap från rolldefinitioner. Redigera nära vald person med exakt förklaring av tillgång.'
+        },
+        {
+          id: 'cms-statistics', title: 'Statistik', route: '/statistics', source: 'StatisticsDashboard.jsx',
+          intro: 'Låt period, viktigaste nyckeltal och detaljlista berätta samma sak.',
+          before: 'Flera lika stora mätkort kan sakna tydlig ordning mellan överblick och nästa åtgärd.',
+          content: `<div class="preview-title"><div><h3>Statistik</h3><p>Publicerat innehåll och aktivitet</p></div><div class="segmented"><button class="active" data-page-segment>7 dagar</button><button data-page-segment>30 dagar</button></div></div><div class="preview-grid">${panel('<span class="preview-muted">Publicerade sidor</span><b>18</b>')}${panel('<span class="preview-muted">Väntar på granskning</span><b>4</b>')}${panel('<span class="preview-muted">Utkast</span><b>23</b>')}</div>${panel(`<b>Senaste aktivitet</b>${line('Publicerad nyhet', 'i dag 14:32')}${line('Uppdaterat tema', 'i går 11:05')}${action('Visa alla händelser')}`)}`,
+          decision: 'En gemensam period, tabulära tal och detaljer i nästa nivå. Visa källa och tid för mätvärden när det är relevant.'
+        },
+        {
+          id: 'cms-publishing', title: 'Publicering och bulk', route: '/settings/publishing', source: 'SettingsManager.jsx · BulkPublishingOperations.jsx · PublishingEditor.tsx',
+          intro: 'Granska status, planera publicering och utför många ändringar med tydlig räckvidd.',
+          before: 'Statusdashboard, tidslinje och bulkåtgärder visas som separata arbetsytor med olika kontroller.',
+          content: `<div class="preview-title"><div><h3>Publicering</h3><p>4 väntande · 2 schemalagda</p></div>${action('Planera publicering', 'primary')}</div>${tabs('Status','Tidslinje','Massåtgärder')}<div class="preview-toolbar">${search('Sök publicering')}${action('＋ Filter')}</div>${panel(`${line('Startsida', 'Väntar på granskning', 'Väntar')}${line('Konferensnyhet', 'I morgon 09:00', 'Planerad')}${line('Om oss', 'Publicerad i går', 'Klar')}`)}<div class="preview-toolbar">${action('Markera flera')}${action('Visa historik')}</div>`,
+          decision: 'Visa status och datum på samma rad. Massåtgärder ska ange vilka poster och versioner som berörs före körning.'
+        },
+        {
+          id: 'cms-versions', title: 'Versioner och återställning', route: '/pages/:id/versions', source: 'VersionTimelinePage.jsx · PageVersionHistoryPanel.jsx · VersionManager.jsx',
+          intro: 'Jämför ändringar, identifiera aktuell version och förstå följden av återställning.',
+          before: 'Versionslistor och återställningsknappar kan sakna tydlig skillnad mellan utkast, publicerad och historisk version.',
+          content: `<div class="preview-title"><div><h3>Versioner · Startsida</h3><p>Aktuell version 12 · publicerad</p></div>${action('Jämför versioner')}</div><div class="preview-split">${panel(`${line('v12 · aktuell', 'Johan · i dag', 'Publicerad')}${line('v11', 'Ylva · i går')}${line('v10', 'Kim · 22 okt')}`)}${panel(`<b>v11 → v12</b><p>Rubrik ändrad och en bild tillagd.</p>${line('Rubrik', 'Ändrad')}${line('Bild', 'Tillagd')}<div class="preview-toolbar">${action('Visa v11')}${action('Återställ v11')}</div>`)}</div>`,
+          decision: 'Återställning visar vald källa, målversion och möjlig väg tillbaka. Skillnader presenteras före åtgärd.'
+        },
+        {
+          id: 'cms-themes', title: 'Temabibliotek', route: '/settings/themes', source: 'DesignerThemesPage.jsx · ThemeVersionsTab.jsx',
+          intro: 'Se temats status och välj vilket tema eller vilken version som ska öppnas.',
+          before: 'Temaöversikt, lokala checkpoints och fjärrversioner kan visas med många likvärdiga knappar på varje rad.',
+          content: `<div class="preview-title"><div><h3>Teman</h3><p>8 teman i arbetsytan</p></div>${action('Nytt tema', 'primary')}</div><div class="preview-toolbar">${search('Sök teman')}</div>${panel(`${line('ECEEE main', 'v12 · publicerad', 'Aktivt')}${line('Conference 2026', 'v4 · utkast')}${line('Archive', 'v2 · publicerad')}`)}${panel(`<b>ECEEE main</b><p>Senast sparat av Johan i dag.</p><div class="preview-toolbar">${action('Öppna Designer')}${action('Versioner')}${action('Exportera')}</div>`)}`,
+          decision: 'Temastatus, version och nästa handling ska läsas tillsammans. Export och fjärrsynk är sekundära val.'
+        },
+        {
+          id: 'cms-schema', title: 'Objekttyper och schema', route: '/settings/object-types', source: 'ObjectTypeEditorPage.jsx · VisualSchemaEditor.jsx · SchemaFormPreview.jsx',
+          intro: 'Definiera fält, validering och relationer med en samtidig formulärförhandsvisning.',
+          before: 'Schema- och formulärverktyg kan visa tekniska egenskaper före den redaktionella effekten av fältet.',
+          content: `<div class="preview-title"><div><h3>Objekttyp · Person</h3><p>12 instanser · utkast</p></div>${action('Spara schema', 'primary')}</div>${tabs('Fält','Relationer','Förhandsvisning')}<div class="preview-split">${panel(`<b>Fält</b>${line('Namn', 'Text · obligatoriskt')}${line('Porträtt', 'Media')}${line('Roll', 'Värdelista')}${action('＋ Lägg till fält')}`)}${panel(`<b>Så ser formuläret ut</b>${mockForm([['Namn','Johan Berg'],['Roll','Redaktör']])}<p class="preview-muted">Förhandsvisningen använder exempeldata.</p>`)}</div>`,
+          decision: 'Fälttyp, krav och den resulterande redaktörsvyn ska kunna jämföras på samma sida.'
+        },
+        {
+          id: 'cms-data-connections', title: 'Datakopplingar', route: '/settings/data-connections', source: 'DataConnectionsManager.jsx · RemoteSitesSettings.jsx',
+          intro: 'Se källa, ägare, senaste körning och fel utan att exponera hemligheter.',
+          before: 'Anslutningar och fjärrsajter är tekniska listor där hälsostatus och åtgärd kan hamna långt från varandra.',
+          content: `<div class="preview-title"><div><h3>Datakopplingar</h3><p>3 källor · 1 behöver åtgärd</p></div>${action('Ny koppling', 'primary')}</div>${panel(`${line('Produktkatalog', 'Synkroniserad 14:12', 'OK')}${line('Konferensdata', 'Inloggning måste uppdateras', 'Åtgärd')}${line('Arkiv', 'Senast i går', 'OK')}`)}${panel(`<b>Konferensdata</b><p class="notice warning">Anslutningen kan inte verifieras. Uppdatera autentisering i inställningen.</p><div class="preview-toolbar">${action('Visa logg')}${action('Redigera koppling')}</div>`)}`,
+          decision: 'Kopplingens senaste resultat och åtgärd är synliga; nycklar och hemliga värden visas aldrig i sidmodellen.'
+        },
+        {
+          id: 'cms-migration', title: 'Import och migrering', route: '/settings/content-migration', source: 'MigrationManager.jsx · MigrationPlanEditor.jsx · MigrationJobDashboard.jsx',
+          intro: 'Kartlägg källa till mål, granska konsekvensen och följ ett långt jobb.',
+          before: 'Importplan, körning och jobbstatus ligger i separata steg där mål och omfattning behöver repeteras.',
+          content: `<div class="preview-title"><div><h3>Innehållsmigrering</h3><p>Plan: legacy-sidor → eceee.org</p></div>${action('Granska plan', 'primary')}</div>${tabs('Kartläggning','Förhandsgranskning','Jobb')}<div class="preview-split">${panel(`<b>Källa → mål</b>${line('Legacy article', 'Artikel')}${line('Legacy image', 'Media')}${line('Legacy author', 'Person')}`)}${panel(`<b>Beräknad omfattning</b>${line('Sidor', '128')}${line('Mediafiler', '74')}${line('Konflikter', '3')}<p class="notice warning">Granska konflikter före import.</p>`)}</div>`,
+          decision: 'Källa, mål, antal och konflikter följer alla steg. Körning kräver ett granskat beslutsunderlag.'
+        },
+        {
+          id: 'cms-experiments', title: 'A/B-testning', route: '/settings/experiments', source: 'ExperimentManager.jsx · SettingsSidebar.jsx',
+          intro: 'Koppla variant, mål, period och resultat till samma experiment.',
+          before: 'Experimentkonfiguration och resultat kan visas separat trots att beslutsunderlaget kräver båda.',
+          content: `<div class="preview-title"><div><h3>A/B-testning</h3><p>2 aktiva experiment</p></div>${action('Nytt experiment', 'primary')}</div>${panel(`${line('Startsiderubrik', 'Variant A / B', 'Pågår')}${line('Nyhetslayout', 'Variant A / B', 'Pågår')}`)}${panel(`<b>Startsiderubrik</b>${line('Mål', 'Klick till nyhet')}${line('Period', '1–30 november')}${line('Variant A', '51 %')}${line('Variant B', '49 %')}<p class="preview-muted">Beslut tas först efter tillräckligt underlag.</p>`)}`,
+          decision: 'Visa variant, mätmål och dataperiod tillsammans. Resultat märks som preliminära när underlaget inte räcker.'
+        },
+        {
+          id: 'cms-support', title: 'Supportkonfiguration', route: '/settings/support → /inbox/manage', source: 'InboxPage.jsx · SettingsSidebar.jsx',
+          intro: 'Konfigurera supportmottagare, rolltilldelning och meddelandeetiketter i inställningar.',
+          before: 'Supportlänken leder till Inboxens hanteringsvy; etiketter och mottagare behöver en tydlig inställningskontext.',
+          content: `<div class="preview-title"><div><h3>Supportinställningar</h3><p>Arbetsytans mottagning</p></div>${action('Spara ändringar', 'primary')}</div>${tabs('Mottagare','Meddelandeetiketter')}<div class="preview-split">${panel(`<b>Mottagare</b>${line('Support', '3 användare')}${line('Administratör', '2 användare')}${action('＋ Lägg till roll')}`)}${panel(`<b>Meddelandeetiketter</b>${line('Fråga', 'Aktiv')}${line('Förslag', 'Aktiv')}${line('Innehåll', 'Aktiv')}${line('Buggrapport', 'Aktiv')}${action('＋ Ny etikett')}`)}</div>`,
+          decision: 'Support är en inställningsyta. Standardetiketter är redigerbara och väljs sedan i meddelandeformuläret.'
+        },
+        {
+          id: 'cms-login', title: 'Inloggning och kontosäkerhet', route: '/login', source: 'LoginPage.jsx · AuthenticationForm.jsx · AccountSecurityPanel.jsx',
+          intro: 'Inloggning, återställning och kontosäkerhet behöver lugn och tydlig återkoppling.',
+          before: 'Flera kontoflöden delar formulärmönster men fel och återställning kan visas på olika sätt.',
+          content: `<div class="preview-title"><div><h3>Logga in</h3><p>Välkommen till ECEEE</p></div></div>${panel(`${mockForm([['E-post','johan@example.org'],['Lösenord','']])}<div class="preview-toolbar">${action('Logga in', 'primary')}${action('Glömt lösenord?')}</div><p class="preview-muted">Ett eventuellt fel visas vid det fält eller steg där det inträffar.</p>`)}`,
+          decision: 'Återställningsvägen är synlig. Feltext är specifik utan att röja om ett konto finns.'
+        },
+        {
+          id: 'cms-profile', title: 'Profil och arbetsyta', route: '/profile', source: 'ProfilePage.jsx · Navbar.jsx',
+          intro: 'Personliga uppgifter, språk, arbetsyta och genvägar ligger nära användaren.',
+          before: 'Profilen rymmer både kontoformulär och länkar till Inbox, Kanban och felrapportering; de behöver olika hierarki.',
+          content: `<div class="preview-title"><div><h3>Profil</h3><p>Johan Berg · eceee.org</p></div>${action('Spara ändringar', 'primary')}</div>${tabsAt(2,'Inbox','Kanban','Profil','Rapportera fel')}<div class="preview-split">${panel(`<b>Personliga uppgifter</b>${mockForm([['Namn','Johan Berg'],['E-post','johan@example.org']])}`)}${panel(`<b>Arbetsyta och språk</b>${line('Aktuell arbetsyta', 'eceee.org')}${line('Språk', 'Svenska')}${action('Byt arbetsyta')}`)}</div>`,
+          decision: 'Profil näst sist bland personliga verktyg. Konto och arbetsyta får tydliga avsnitt utan att duplicera appnavigeringen.'
+        }
+      ];
+      const legacyButtons = (...labels) => labels.map((label) => `<span class="old-button">${label}</span>`).join('');
+      const legacyExamples = {
+        'cms-pages': `<div class="preview-toolbar">${legacyButtons('Search pages…','Search','All layouts','More ▾')}</div>${panel(`${line('▾ eceee.org', 'Root page')}${line('　▾ News', 'Section')}${line('　　Energy efficient buildings', 'Published')}${line('　　Spring conference', 'Draft')}${line('　About us', 'Published')}`)}<div class="preview-toolbar">${legacyButtons('Cut','Copy','Duplicate','Publish','Unpublish','Delete')}</div>`,
+        'cms-page-editor': `${legacyButtons('Edit','Preview','Versions','Publish','More ▾')}${panel(`<b>Page: Energy efficient buildings</b><div class="divider"></div>${line('Status', 'Draft')}${line('Layout', 'Article')}${line('Language', 'Swedish')}`)}${panel('<b>Content widgets</b><p>Headline · Text · Image</p>')}`,
+        'cms-objects': `${legacyButtons('All types','Add instance','Filter ▾')}${panel(`${line('Person', '12 instances')}${line('Organisation', '8 instances')}${line('Project', '4 instances')}`)}${panel('<b>Selected object</b><p>Name · Type · Relations</p>')}`,
+        'cms-media': `${legacyButtons('All media','Upload','Collections','Pending','Search ▾')}${panel(`<div class="preview-columns"><div><div class="preview-photo"></div><p>coast.jpg</p>${legacyButtons('Select')}</div><div><div class="preview-photo"></div><p>coast-copy.jpg</p>${legacyButtons('Select')}</div></div>`)}`,
+        'cms-tags': `${legacyButtons('Tags','Types','History','Rights')}${panel(`<b>Search tags</b><div class="preview-toolbar">${legacyButtons('Search…','Filter')}</div>${line('Energy', 'Approved')}${line('Climate', 'Approved')}`)}<p class="preview-muted">Här är nuvarande kompakta Tags-vy referens, inte ett problem som ska ritas om.</p>`,
+        'cms-kanban': `${legacyButtons('Search card','Sök','All assignees','All labels','All deadlines','Active')}${panel(`<div class="preview-columns"><div class="preview-card" style="background:#e2e5e9"><b>To do 0</b><p>Add card</p></div><div class="preview-card" style="background:#e2e5e9"><b>Done 1</b><p>New card</p></div></div>`)}`,
+        'cms-card': `${legacyButtons('eceee / Done ▾','TASK-1','Add','Labels','Date','Checklist','Attachment')}${panel('<b>Description</b><p>Text and images</p><div class="preview-photo" style="height:115px"></div>')}${panel('<b>Attachments</b><p>Headshot.jpg · 1.1 MB</p>')}`,
+        'cms-inbox': `${legacyButtons('Search','All','Unread','Archived','Refresh')}${panel(`${line('Question about publishing', 'Johan · today')}${line('New home page suggestion', 'Ylva · yesterday')}${line('Media bug report', 'Kim · 24 Oct')}`)}${legacyButtons('Previous','Next')}`,
+        'cms-message': `${panel(`<b>Recipients</b><p>☐ Dev User　☐ codex-local　☐ Administratör</p><p>☐ Designer　☐ Support　☐ Redaktör</p>`)}<div class="preview-form"><label>Type (optional)<input value="Question"></label><label>Title<input value=""></label><label>Description<textarea></textarea></label></div>${legacyButtons('Send')}`,
+        'cms-designer': `${legacyButtons('Phone','Tablet','Desktop','Widget types','Edit layouts','Export','Undo publish','Discard draft','Save draft','Publish changes')}${panel('<b>Widget editor</b><p>Header · Hero · Content</p>')}${panel('<b>Preview</b><div class="preview-photo" style="height:60px"></div>')}`,
+        'cms-settings': `${panel('<b>Settings Dashboard</b><p>System overview and quick management</p>')}${panel('<b>Pages</b><p>128 total managed web pages</p>')}${panel('<b>Themes</b><p>8 visual style configurations</p>')}${legacyButtons('Users','Versions','Publishing','Support')}`,
+        'cms-roles': `${legacyButtons('Add existing account','Create role')}${panel(`${line('Johan Berg', 'Administrator · Edit roles')}${line('Ylva Blume', 'Designer · Edit roles')}`)}${panel('<b>Roles</b><p>Administratör · 2 users · 14 permissions</p><p>Redaktör · 4 users · 5 permissions</p>')}`,
+        'cms-statistics': `${panel('<b>Pages</b><h3>128</h3><p>Total managed web pages</p>')}${panel('<b>Themes</b><h3>8</h3><p>Visual style configurations</p>')}${panel('<b>Activity</b><p>Recent system events</p>')}`,
+        'cms-publishing': `${legacyButtons('Status Dashboard','Publication Timeline','Bulk Operations')}${panel('<b>Pending publication</b><p>Startsida · Review</p><p>Konferensnyhet · Scheduled</p>')}${legacyButtons('Publish','Unpublish','Delete')}`,
+        'cms-versions': `${legacyButtons('Version 12','Version 11','Version 10')}${panel('<b>Version history</b><p>v12 Current · Published</p><p>v11 Johan · yesterday</p><p>v10 Kim · 22 Oct</p>')}${legacyButtons('Compare','Restore')}`,
+        'cms-themes': `${legacyButtons('All Themes','Upload','Remote versions')}${panel(`${line('ECEEE main', 'Current · v12')}${line('Conference 2026', 'Draft · v4')}`)}${legacyButtons('Open','Export','Save version','Restore')}`,
+        'cms-schema': `${legacyButtons('Fields','Relationships','Settings','Preview')}${panel('<b>Person</b><p>Name · Text · Required</p><p>Portrait · Media</p><p>Role · Value list</p>')}${legacyButtons('Add property','Save')}`,
+        'cms-data-connections': `${legacyButtons('New connection','Remote Sites','Refresh')}${panel(`${line('Product catalogue', 'Connected')}${line('Conference data', 'Error')}${line('Archive', 'Connected')}`)}${legacyButtons('Edit','Test','Delete')}`,
+        'cms-migration': `${legacyButtons('Source','Mapping','Preview','Run','Jobs')}${panel('<b>Legacy import plan</b><p>128 pages · 74 media files</p><p>3 possible conflicts</p>')}${legacyButtons('Validate','Start migration')}`,
+        'cms-experiments': `${legacyButtons('Experiments','New experiment','Results')}${panel(`${line('Homepage headline', 'Running')}${line('News layout', 'Running')}`)}${panel('<b>Variant A / B</b><p>Clicks · 51% / 49%</p>')}`,
+        'cms-support': `${legacyButtons('Support','Roles','Pending email')}${panel('<b>Support roles</b><p>Administratör · Designer · Support</p>')}${panel('<b>Message type</b><p>Question · Suggestion · Content · Bugg Report</p>')}`,
+        'cms-login': `${panel('<b>Sign in</b><div class="preview-form"><label>Email<input value=""></label><label>Password<input value=""></label></div>')}${legacyButtons('Sign in','Forgot password')}`,
+        'cms-profile': `${legacyButtons('Profile','Inbox','Kanban','Report a bug')}${panel('<b>Language</b><p>Swedish　English</p>')}${panel('<b>Account information</b><p>Name · Email · Current workspace</p>')}`
+      };
+
+      const pageMarkup = (page) => `<section class="slide" id="${page.id}" data-category="CMS-sidor" data-title="${page.title}">
+        <div class="eyebrow">CMS-sida · designförslag</div><h1>${page.title}</h1><p class="intro">${page.intro}</p>
+        <div class="meta"><span>Nuvarande route: ${page.route}</span><span>Interaktiv sidmodell</span><span>Data är exempel</span></div>
+        <div class="compare-grid"><article class="compare before"><div class="compare-head">Före · schematisk nulägeskarta</div><div class="compare-body demo"><div class="page-preview"><div class="preview-bar"><span class="preview-dot"></span><span class="preview-dot"></span><span class="preview-dot"></span><span class="preview-path">${page.route}</span></div><div class="preview-app"><div class="preview-nav"><b>ECEEE</b><span>Sidor</span><span>Media</span><span>Inställningar</span></div><div class="preview-main"><div class="preview-older"><h3>${page.title}</h3>${legacyExamples[page.id]}<div class="divider"></div><p class="preview-muted">Före-bilden visar identifierade UI-mönster, inte en exakt skärmdump.</p></div></div></div></div></div><p class="caption"><b>Utmaning:</b> ${page.before}</p></article>
+        <article class="compare after"><div class="compare-head">Förslag · prova sidan och tillstånden</div><div class="compare-body demo"><div class="preview-toolbar"><span class="preview-muted">Visa:</span><div class="segmented"><button type="button" class="active" aria-pressed="true" data-page-state="content">Innehåll</button><button type="button" aria-pressed="false" data-page-state="empty">Tomt</button><button type="button" aria-pressed="false" data-page-state="loading">Laddar</button><button type="button" aria-pressed="false" data-page-state="error">Fel</button></div></div><div class="page-preview"><div class="preview-bar"><span class="preview-dot"></span><span class="preview-dot"></span><span class="preview-dot"></span><span class="preview-path">${page.route}</span></div><div class="preview-app"><div class="preview-nav"><b>ECEEE</b><span class="selected">${page.title}</span><span>Media</span><span>Inställningar</span><span>Profil</span></div><div class="preview-main" data-page-content data-page-title="${page.title}">${page.content}</div></div></div></div><p class="caption"><b>Föreslagen ändring:</b> ${page.decision}</p></article></div>
+        <p class="source">Kartlagt mot: <code>${page.source}</code>. Interaktionerna är lokala demonstrationer och sparar ingenting.</p></section>`;
+      document.getElementById('slides').insertAdjacentHTML('beforeend', pageExamples.map(pageMarkup).join(''));
+
+      const componentFamilies = [
+        ['Skal','Huvudnavigation, aktiv plats, mobil meny','Navbar.jsx · StatusBar.jsx','Stabil orientering; ett aktivt mål i taget.','cms-pages'],
+        ['Skal','Sidhuvud, brödsmulor, titel, antal','TreePageManager.jsx · PageEditor.jsx','Titel och primär åtgärd delar rad; metadata hålls sekundär.','cms-page-editor'],
+        ['Skal','Sidomeny, hopfällbara grupper','SettingsSidebar.jsx','Högst två nivåer till vanligt arbete.','cms-settings'],
+        ['Skal','Personliga verktyg, profil, arbetsyta','ProfilePage.jsx','Profil näst sist; arbetsytekontext visas där den behövs.','cms-profile'],
+        ['Hitta','Sökfält, sökförslag, kommandopalett','ClassificationManager.jsx · InboxPage.jsx','Sök först; visa tomt, träffar och noll träffar.','cms-inbox'],
+        ['Hitta','Filterpopup, filterpiller, rensa','ClassificationManager.jsx · KanbanPage.jsx','Valda filter syns i sökraden; kontrollen ligger nära resultat.','cms-tags'],
+        ['Hitta','Flikar, segment, periodval','ClassificationManager.jsx · StatisticsDashboard.jsx','Flikar med baslinje; segment för snabba lokala val.','cms-statistics'],
+        ['Hitta','Paginering, antal och sortering','InboxPage.jsx · TreePageManager.jsx','Håll resultatantal och sortering nära listan.','cms-pages'],
+        ['Hitta','Träd, expansion, aktuell nod','PageTreeNode.jsx · ClassificationManager.jsx','Indrag och vald rad visar hierarkin utan metadata på varje rad.','cms-pages'],
+        ['Hitta','Tabell, radmeny, urval','UserManagementPage.jsx · BulkActionsToolbar.jsx','Kompakta rader; åtgärder för vald rad eller urval.','cms-roles'],
+        ['Formulär','Textfält, sök, textarea','ClassificationManager.jsx · ProfilePage.jsx','En etikett per fält, flytande vid fokus eller värde.','cms-profile'],
+        ['Formulär','Select, multiselect, mottagare','CompactSelect.jsx · InboxPage.jsx','Sökbara val med tydligt valt tillstånd och tangentbord.','cms-message'],
+        ['Formulär','Checkbox, radio, toggle','RoleSettings.jsx · SettingsManager.jsx','Valet och dess konsekvens beskrivs i samma rad.','cms-roles'],
+        ['Formulär','Datum, tid, intervall','KanbanPage.jsx · SettingsManager.jsx','Datum i lokalt sammanhang med format och tidszon.','cms-card'],
+        ['Formulär','Filväljare, släppzon, uppladdningskö','MediaUploader.jsx · UploadQueue.jsx','Tydlig uppladdningsknapp, filkrav och per-fil-status.','cms-media'],
+        ['Formulär','Validering, hjälptråd, obligatoriskt','SchemaFieldRenderer.jsx · CompactSelect.jsx','Fel vid fältet; fokusera första korrigerbara fel.','cms-objects'],
+        ['Handling','Primär, sekundär, text- och ikonknapp','Button.tsx · user-tools.css','En primär handling per yta och namngivna ikonknappar.','cms-page-editor'],
+        ['Handling','Kontextmeny, popup, dialog','FloatingDialog.jsx · KanbanPage.jsx','Kontextuella val nära objektet; dialog bara för korta avbrott.','cms-card'],
+        ['Handling','Inline-redigering, avbryt, spara','PageTreeNode.jsx · KanbanPage.jsx','Fältet öppnas på objektets plats och återgår vid Escape.','cms-pages'],
+        ['Handling','Massåtgärder, bekräftelse, ångra','BulkActionsToolbar.jsx · DeleteConfirmationModal.jsx','Visa antal och följd. Föreslå ångra där datamodellen medger det.','cms-pages'],
+        ['Handling','Disabled, busy, progress','DesignerThemeWorkspacePage.jsx · UploadQueue.jsx','Förklara varför åtgärd är spärrad och visa förlopp.','cms-designer'],
+        ['Innehåll','Rich text, bildval, float, alignment','MarkdownEditor.jsx · ContentEditor.jsx','Bildverktyg på bilden; textflöde påverkar dokumenthöjd korrekt.','cms-card'],
+        ['Innehåll','Bilagekort, filstorlek, referenser','KanbanPage.jsx · MediaReferencesDisplay.jsx','Små kort, tydlig borttagning och information om användning.','cms-card'],
+        ['Innehåll','Mediaurval, snabbvy, dubbletter','MediaBrowser.jsx · DuplicateResolveDialog.jsx','Förhandsvisa och välj befintlig fil före ny uppladdning.','cms-media'],
+        ['Innehåll','Widgets, layoutslot, preview','WidgetLibrary.jsx · LayoutWorkspacePage.jsx','Vald widget och dess målplats hålls synliga.','cms-designer'],
+        ['Innehåll','Objektfält, relationer, värdelistor','ObjectInstanceEditor.jsx · ValueListEditor.jsx','Separera relationer från grundfält och visa källobjekt.','cms-objects'],
+        ['Arbete','Kanbanlista, kort, etikett, räknare','KanbanPage.jsx · kanban.css','Ljus lista, innehållsfokus och vertikalt centrerad header.','cms-kanban'],
+        ['Arbete','Kortmedlemmar, avatarer, tilldelning','KanbanPage.jsx · Avatar.jsx','Sökbar medlemsväljare och valt tillstånd nära kortet.','cms-card'],
+        ['Arbete','Checklista, status, deadline','KanbanPage.jsx','Progress och tid visas på kortet och i detaljvyn.','cms-card'],
+        ['Arbete','Inboxtråd, oläst, arkiv, svar','InboxPage.jsx','Skannbar lista och egen detaljvy för samtalet.','cms-inbox'],
+        ['Arbete','Meddelandeetiketter, mottagarroller','InboxPage.jsx · SettingsSidebar.jsx','Etiketter väljs i formulär och redigeras i inställningar.','cms-message'],
+        ['Arbete','Versionstidslinje, jämförelse, återställ','VersionTimelinePage.jsx · PageEditor.jsx','Markera aktuell version och risk vid återställning.','cms-page-editor'],
+        ['Arbete','Draft, publicering, schemaläggning','PageEditor.jsx · SettingsManager.jsx','Tydlig skillnad mellan spara, publicera och planera.','cms-page-editor'],
+        ['Återkoppling','Tomt, inga träffar, laddar, fel','InboxPage.jsx · ClassificationManager.jsx','Samma sidskal finns kvar; nästa steg syns i tillståndet.','cms-inbox'],
+        ['Återkoppling','Toast, inline-status, varning','user-tools.css · alert.jsx','Feedback nära handling; undvik generiska popupfel.','cms-media'],
+        ['Återkoppling','Lång uppgift, procent, avbryt','KanbanPage.jsx · AIAgentTaskManager.jsx','Fas och progress visas; varna vid avbruten generering.','cms-kanban'],
+        ['Återkoppling','Behörighet saknas, låst handling','RoleSettings.jsx · PrivateRoute.jsx','Beskriv varför tillgång saknas och vem som kan hjälpa.','cms-roles'],
+        ['Design','Viewportväljare, preview, export','DesignerThemeWorkspacePage.jsx','Edit och preview har gemensam statusrad.','cms-designer'],
+        ['Design','Temaversion, draft, publicera, ångra','DesignerThemesPage.jsx · DesignerThemeWorkspacePage.jsx','Nuvarande och föreslagen version får tydliga namn.','cms-designer'],
+        ['System','Roller, medlemskap, rättighetsmallar','RoleSettings.jsx','Visa rättigheternas räckvidd före ändring.','cms-roles'],
+        ['System','Supportinställningar, etikettadministration','InboxPage.jsx · SettingsSidebar.jsx','Support konfigureras i inställningar.','cms-settings'],
+        ['System','Statistik, period, nyckeltal','StatisticsDashboard.jsx','Tal, period och detaljlista måste vara jämförbara.','cms-statistics'],
+        ['System','Publiceringsstatus, planerad tid, granskning','PublishingEditor.tsx · SettingsManager.jsx','Visa status, datum och berörda poster tillsammans.','cms-publishing'],
+        ['System','Versionslista, diff, återställning','PageVersionHistoryPanel.jsx · VersionManager.jsx','Visa källa och mål före återställning.','cms-versions'],
+        ['System','Temalista, checkpoints, fjärrversioner','DesignerThemesPage.jsx · ThemeVersionsTab.jsx','Aktiv version och utkast syns på samma rad.','cms-themes'],
+        ['System','Schemafält, fälttyp, obligatoriskt','VisualSchemaEditor.jsx · SchemaFormPreview.jsx','Visa redaktörseffekt samtidigt som schema ändras.','cms-schema'],
+        ['System','Datakoppling, status, logg, test','DataConnectionsManager.jsx','Källa och senaste resultat syns utan hemligheter.','cms-data-connections'],
+        ['System','Fjärrsajt, anslutning, synk','RemoteSitesSettings.jsx','Synkstatus och åtgärd nära den berörda sajten.','cms-data-connections'],
+        ['System','Migreringsplan, mapping, preview','MigrationPlanEditor.jsx','Omfattning och konflikter följer genom stegen.','cms-migration'],
+        ['System','Långt migreringsjobb, logg, återuppta','MigrationJobDashboard.jsx','Visa fas, framsteg och återhämtningsväg.','cms-migration'],
+        ['System','A/B-variant, mål, period, resultat','ExperimentManager.jsx','Beslutet kopplas till tillräckligt underlag.','cms-experiments'],
+        ['System','Supportroller och etikettstandard','InboxPage.jsx · SettingsSidebar.jsx','Konfiguration ligger i inställningar och återanvänds i compose.','cms-support'],
+        ['Konto','Inloggning, lösenordsåterställning','AuthenticationForm.jsx · LoginPage.jsx','Fel och nästa steg visas i formulärkontext.','cms-login'],
+        ['Konto','Kontosäkerhet och sessionsstatus','AccountSecurityPanel.jsx','Känsliga ändringar får tydligt resultat och trygg återgång.','cms-login']
+      ];
+      document.getElementById('slides').insertAdjacentHTML('beforeend', `<section class="slide" id="coverage" data-category="Plan" data-title="Komponentkarta">
+        <div class="eyebrow">Plan · täckning</div><h1>Komponentkarta</h1><p class="intro">${componentFamilies.length} komponentfamiljer från dagens CMS-kod. Tabellen kopplar användning till sidexempel och visar vilken konsekvent designregel som ska granskas. Detta är en karta över UI-beslut, inte en lista över färdiga implementationer.</p>
+        <div class="page-preview preview-scroll"><table class="component-map"><thead><tr><th>Område</th><th>Komponent och användning</th><th>Nuvarande kod</th><th>Föreslagen regel</th><th>Prova</th></tr></thead><tbody>${componentFamilies.map(([area,name,source,rule,page]) => `<tr><td>${area}</td><td>${name}</td><td><code>${source}</code></td><td>${rule}</td><td><button type="button" data-goto="${page}">Visa sida</button></td></tr>`).join('')}</tbody></table></div>
+        <p class="page-note">Komponenter som bara finns i sällsynta specialflöden bör återanvända samma grundregler. Inventeringen avser CMS-appen; publika tenantteman och render-widgets omfattas inte av denna designplan.</p></section>`);
+      document.getElementById('slides').insertAdjacentHTML('beforeend', `<section class="slide" id="review-plan" data-category="Plan" data-title="Granskningsbeslut">
+        <div class="eyebrow">Plan · beslut före implementation</div><h1>Vad ska godkännas?</h1><p class="intro">Gå igenom varje sidexempel i bred och smal vy. Välj riktning, prioritera ytor och dokumentera avvikelser innan produktionskod ändras.</p>
+        <div class="review-list"><div class="review-item"><h3>1. Visuell grund</h3><p>Inter, ljusa ytor, neutral chrome, blå primär/aktiv färg, 12 px verktygskontroller, små hörn och tydlig hierarki.</p></div>
+        <div class="review-item"><h3>2. Sidkomposition</h3><p>En huvuduppgift per sida; titel och primär åtgärd på samma rad; listor, redigering och preview får olika täthet.</p></div>
+        <div class="review-item"><h3>3. Komponentkontrakt</h3><p>Flikar, fält, filter, val, menyer, bilagor och progress beter sig konsekvent på alla CMS-ytor.</p></div>
+        <div class="review-item"><h3>4. Tillstånd och tillgänglighet</h3><p>Innehåll, tomt, laddning och fel; fokus, tangentbord, smal skärm, zoom och Reduce Motion granskas för varje mönster.</p></div>
+        <div class="review-item"><h3>5. Beteende före kod</h3><p>Avgör om åtgärden ska ske inline, i popup eller på egen sida. Identifiera datarisk och möjlig ångra-väg separat.</p></div>
+        <div class="review-item"><h3>6. Införande</h3><p>Godkända mönster införs senare i sammanhållna arbetsflöden. Denna PR ändrar ingen CMS-funktion och ingen backend.</p></div></div>
+        <div class="principle">Granskningsordning: börja med <button type="button" data-goto="cms-pages">Sidor</button>, <button type="button" data-goto="cms-page-editor">Sidredigeraren</button>, <button type="button" data-goto="cms-media">Media</button>, <button type="button" data-goto="cms-kanban">Kanban</button> och <button type="button" data-goto="cms-inbox">Inbox</button>. Jämför sedan samma komponent i <button type="button" data-goto="coverage">komponentkartan</button>.</div>
+      </section>`);
+
       const slides = [...document.querySelectorAll('.slide')];
+      const pageContent = new WeakMap([...document.querySelectorAll('[data-page-content]')].map((element) => [element, element.innerHTML]));
       const nav = document.getElementById('slide-nav');
       const index = document.getElementById('index-grid');
       const toast = document.getElementById('toast');
@@ -300,6 +642,66 @@
       });
       document.getElementById('previous').addEventListener('click', () => show(current - 1));
       document.getElementById('next').addEventListener('click', () => show(current + 1));
+      window.addEventListener('hashchange', () => {
+        const index = slides.findIndex((slide) => '#' + slide.id === location.hash);
+        if (index >= 0 && index !== current) show(index);
+      });
+      document.addEventListener('click', (event) => {
+        const button = event.target.closest('button');
+        if (!button) return;
+        if (button.dataset.goto) {
+          const index = slides.findIndex((slide) => slide.id === button.dataset.goto);
+          if (index >= 0) show(index);
+          return;
+        }
+        if (button.dataset.pageState) {
+          const article = button.closest('.after');
+          const content = article?.querySelector('[data-page-content]');
+          if (!content) return;
+          button.parentElement.querySelectorAll('[data-page-state]').forEach((item) => {
+            item.classList.toggle('active', item === button);
+            item.setAttribute('aria-pressed', String(item === button));
+          });
+          const title = content.dataset.pageTitle.toLocaleLowerCase('sv');
+          if (button.dataset.pageState === 'content') content.innerHTML = pageContent.get(content);
+          if (button.dataset.pageState === 'empty') content.innerHTML = `<div class="preview-title"><h3>${content.dataset.pageTitle}</h3></div><div class="preview-panel preview-state"><b>Inget att visa ännu</b><p>Skapa eller välj innehåll för ${title}.</p><button type="button" class="primary" data-demo-action="Skapa första posten">Skapa första posten</button></div>`;
+          if (button.dataset.pageState === 'loading') content.innerHTML = `<div class="preview-title"><h3>${content.dataset.pageTitle}</h3></div><div class="preview-panel" role="status"><b>Laddar ${title}…</b><p>Sidans struktur är kvar medan innehållet hämtas.</p><div class="preview-skeleton wide"></div><div class="preview-skeleton"></div><div class="preview-skeleton wide"></div></div>`;
+          if (button.dataset.pageState === 'error') content.innerHTML = `<div class="preview-title"><h3>${content.dataset.pageTitle}</h3></div><div class="preview-panel notice error" role="alert"><b>Det gick inte att hämta innehållet</b><p>Kontrollera anslutningen och försök igen.</p><button type="button" data-page-retry>Försök igen</button></div>`;
+          return;
+        }
+        if (button.hasAttribute('data-page-retry')) {
+          const article = button.closest('.after');
+          article.querySelector('[data-page-state="content"]').click();
+          showToast('Demo: innehållet är tillgängligt igen.');
+          return;
+        }
+        if (button.hasAttribute('data-page-tab')) {
+          button.parentElement.querySelectorAll('[data-page-tab]').forEach((item) => { item.classList.toggle('active', item === button); item.setAttribute('aria-selected', String(item === button)); });
+          const main = button.closest('[data-page-content]');
+          let status = main.querySelector('[data-page-tab-status]');
+          if (!status) { status = document.createElement('p'); status.dataset.pageTabStatus = ''; status.className = 'preview-muted'; button.parentElement.after(status); }
+          status.textContent = `Vald flik: ${button.textContent}. Innehållet nedan är oförändrat i denna designskiss.`;
+          return;
+        }
+        if (button.hasAttribute('data-page-segment')) {
+          button.parentElement.querySelectorAll('[data-page-segment]').forEach((item) => item.classList.toggle('active', item === button));
+          showToast(`Demo: ${button.textContent} är valt.`);
+          return;
+        }
+        if (button.dataset.demoAction) {
+          showToast(`Demo: ${button.dataset.demoAction}. Ingen data ändrades.`);
+        }
+      });
+      document.addEventListener('input', (event) => {
+        if (!event.target.hasAttribute('data-page-search')) return;
+        const main = event.target.closest('[data-page-content]');
+        const query = event.target.value.trim().toLocaleLowerCase('sv');
+        const rows = [...main.querySelectorAll('[data-page-item]')];
+        rows.forEach((row) => { row.hidden = !row.textContent.toLocaleLowerCase('sv').includes(query); });
+        let feedback = main.querySelector('[data-page-search-feedback]');
+        if (!feedback) { feedback = document.createElement('p'); feedback.dataset.pageSearchFeedback = ''; feedback.className = 'preview-muted'; event.target.closest('.preview-toolbar').after(feedback); }
+        feedback.textContent = query ? `${rows.filter((row) => !row.hidden).length} träffar i sidexemplet` : '';
+      });
       document.getElementById('rail-search').addEventListener('input', (event) => {
         const query = event.target.value.trim().toLocaleLowerCase('sv');
         nav.querySelectorAll('button').forEach((button) => { button.hidden = !button.dataset.search.includes(query); });
@@ -307,6 +709,14 @@
       document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
           document.querySelectorAll('.popover').forEach((panel) => { panel.hidden = true; });
+          return;
+        }
+        if (event.target.matches('[data-page-tab]') && ['ArrowRight','ArrowLeft'].includes(event.key)) {
+          event.preventDefault();
+          const siblings = [...event.target.parentElement.querySelectorAll('[data-page-tab]')];
+          const delta = event.key === 'ArrowRight' ? 1 : -1;
+          const next = siblings[(siblings.indexOf(event.target) + delta + siblings.length) % siblings.length];
+          next.focus(); next.click();
           return;
         }
         if (event.target.matches('input,textarea,select,[contenteditable]')) return;
@@ -435,6 +845,7 @@
       });
       const initial = slides.findIndex((slide) => '#' + slide.id === location.hash);
       show(initial < 0 ? 0 : initial);
+      window.addEventListener('load', () => { if (location.hash) setTimeout(() => window.scrollTo(0, 0), 0); }, { once: true });
     })();
   </script>
 </body>
