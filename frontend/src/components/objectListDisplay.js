@@ -31,8 +31,9 @@ export const listDetail = (instance, definition, key) => {
     const value = instance.data?.[fieldKey] ?? instance.data?.[camelKey]
     if (value === null || value === undefined || value === '' || typeof value === 'object') return null
     const field = definition?.schema?.properties?.[fieldKey] || definition?.schema?.properties?.[camelKey] || {}
-    const component = field.componentType || field.field_type || field.type
+    const listField = definition?.browserListFields?.find(option => option.key === key)
+    const component = field.componentType || field.field_type || field.type || listField?.kind
     const formatted = typeof value === 'boolean' ? (value ? 'Yes' : 'No')
         : ['date', 'datetime', 'datetime-local'].includes(component) ? displayDate(value) : String(value)
-    return { key, label: field.title || fieldKey, value: formatted }
+    return { key, label: field.title || listField?.label || fieldKey, value: formatted }
 }

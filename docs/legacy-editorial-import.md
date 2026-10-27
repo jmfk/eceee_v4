@@ -20,6 +20,8 @@ de alltid kopplas till rätt tenant och tillåten objekttyp.
 
 `library_item` behålls utan importanpassade förval. Sök- och filterinställningarna kan
 ändras i webben utan att importprofilen eller källtermkartan ändras.
+En exporterad definitionsbundle tar med valda listfält och använder klassificeringens
+stabila nyckel för taggfilter; målmiljön löser nyckeln till sitt eget termtyps-ID.
 
 ## Granskad termkarta
 

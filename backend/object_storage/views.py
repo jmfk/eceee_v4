@@ -1360,7 +1360,9 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         field = (definition.schema or {}).get("properties", {})[filter_key[6:]]
         if option["kind"] == "reference":
             allowed = field.get("allowed_object_types") or field.get("allowedObjectTypes") or []
-            values = ObjectInstance.objects.filter(tenant=request.tenant, object_type__name__in=allowed)
+            values = ObjectInstance.objects.filter(tenant=request.tenant)
+            if allowed:
+                values = values.filter(object_type__name__in=allowed)
             if query:
                 values = values.filter(title__icontains=query)
             values = list(values.order_by("title", "pk")[:51])

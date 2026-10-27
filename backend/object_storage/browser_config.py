@@ -1,6 +1,7 @@
 """Validated, tenant-scoped configuration for searching and filtering Objects."""
 
 import json
+from datetime import timedelta
 from uuid import UUID
 
 from django.db.models import Q
@@ -212,7 +213,11 @@ def apply_browser_filters(request, queryset, definition):
                 raise serializers.ValidationError({"browser_filters": f"{key} needs a from and to date."})
             from django.utils.dateparse import parse_date
 
-            if any(value and not parse_date(value) for value in values):
+            try:
+                dates = [parse_date(value) if value else None for value in values]
+            except ValueError:
+                raise serializers.ValidationError({"browser_filters": f"{key} needs ISO dates."}) from None
+            if any(value and not parsed for value, parsed in zip(values, dates)):
                 raise serializers.ValidationError({"browser_filters": f"{key} needs ISO dates."})
             path = {
                 "created_at": "created_at__date",
@@ -222,7 +227,17 @@ def apply_browser_filters(request, queryset, definition):
             if values[0]:
                 queryset = queryset.filter(**{f"{path}__gte": values[0]})
             if values[1]:
-                queryset = queryset.filter(**{f"{path}__lte": values[1]})
+                if key.startswith("field:"):
+                    # JSON date fields may contain timestamps; include every time on the To date.
+                    if dates[1].year == 9999 and dates[1].month == 12 and dates[1].day == 31:
+                        queryset = queryset.filter(
+                            Q(**{f"{path}__lt": values[1]}) | Q(**{f"{path}__startswith": values[1]})
+                        )
+                    else:
+                        next_day = (dates[1] + timedelta(days=1)).isoformat()
+                        queryset = queryset.filter(**{f"{path}__lt": next_day})
+                else:
+                    queryset = queryset.filter(**{f"{path}__lte": values[1]})
             continue
         if kind == "tag":
             try:

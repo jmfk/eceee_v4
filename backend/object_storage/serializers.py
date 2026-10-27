@@ -16,7 +16,7 @@ from content.models import Namespace
 from file_manager.imgproxy import imgproxy_service
 from utils.schema_system import validate_schema
 
-from .browser_config import browser_config, validate_browser_config
+from .browser_config import DEFAULT_LIST_FIELDS, available_list_fields, browser_config, validate_browser_config
 from .models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
 
 
@@ -660,6 +660,7 @@ class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
     icon_image = serializers.SerializerMethodField()
     browser_group = serializers.SerializerMethodField()
     browser_config = serializers.SerializerMethodField()
+    browser_list_fields = serializers.SerializerMethodField()
 
     class Meta:
         model = ObjectTypeDefinition
@@ -679,11 +680,16 @@ class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
             "allowed_child_types",
             "browser_group",
             "browser_config",
+            "browser_list_fields",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def get_browser_config(self, obj):
         return browser_config(obj)
+
+    def get_browser_list_fields(self, obj):
+        fields = available_list_fields(obj)
+        return [fields[key] for key in browser_config(obj).get("list_fields", DEFAULT_LIST_FIELDS) if key in fields]
 
     def get_instance_count(self, obj):
         """Return count of object instances of this type"""
@@ -1057,6 +1063,15 @@ class ObjectInstanceListSerializer(serializers.ModelSerializer):
     """Simplified serializer for object instance lists"""
 
     classification_ids = serializers.SerializerMethodField()
+    data = serializers.SerializerMethodField()
+
+    def get_data(self, obj):
+        # The browser only needs fields selected for its rows, not the full version payload.
+        selected = [
+            key[6:] for key in browser_config(obj.object_type).get("list_fields", []) if key.startswith("field:")
+        ]
+        values = obj.data or {}
+        return {key: values[key] for key in selected if key in values}
 
     def get_classification_ids(self, obj):
         from taxonomy.assignments import classification_ids
@@ -1074,6 +1089,7 @@ class ObjectInstanceListSerializer(serializers.ModelSerializer):
         model = ObjectInstance
         fields = [
             "classification_ids",
+            "data",
             "id",
             "object_type_name",
             "object_type_label",

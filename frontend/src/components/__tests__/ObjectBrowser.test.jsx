@@ -148,6 +148,13 @@ describe('Object list details', () => {
         expect(listDetail(instance, definition, 'field:is_international')).toEqual({ key: 'field:is_international', label: 'International', value: 'No' })
         expect(listDetail(instance, definition, 'field:event_start_date')).toEqual({ key: 'field:event_start_date', label: 'Start date', value: '01/03/2026' })
     })
+
+    it('uses configured list labels when the type list omits its full schema', () => {
+        const definition = { browserListFields: [{ key: 'field:summary', label: 'Ingress', kind: 'choice' }] }
+        expect(listDetail({ data: { summary: 'Short lead' } }, definition, 'field:summary')).toEqual({
+            key: 'field:summary', label: 'Ingress', value: 'Short lead',
+        })
+    })
 })
 
 describe('ObjectBrowser grouped type list', () => {
