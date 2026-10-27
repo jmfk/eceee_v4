@@ -82,9 +82,9 @@ class DefinitionDiffTests(unittest.TestCase):
 
     def test_exported_browser_fields_and_tag_filters_apply_with_target_type_ids(self):
         self.api.objects[1]["metadata"]["browser"]["list_fields"] = ["status", "field:summary"]
-        self.api.objects[1]["metadata"]["browser"]["filters"].append({
-            "key": "tag:1", "label": "Innehållsslag", "overview": True, "control": "searchable_multi"
-        })
+        self.api.objects[1]["metadata"]["browser"]["filters"].append(
+            {"key": "tag:1", "label": "Innehållsslag", "overview": True, "control": "searchable_multi"}
+        )
         exported = module.export_bundle(self.api, {"id": 2})
         article = next(item for item in exported["definitions"] if item["name"] == "article")
         self.assertEqual(article["metadata"]["browser"]["list_fields"], ["status", "field:summary"])
