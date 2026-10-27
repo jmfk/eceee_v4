@@ -4,10 +4,10 @@ import { Dialog, DialogBackdrop, DialogPanel, DialogTitle, Popover, PopoverButto
 import { ActionsMenu, CardActions, ColumnActions } from '../components/kanban/KanbanActions'
 import { coverColors } from '../components/kanban/cardPresentation'
 import useBoardDrag from '../components/kanban/useBoardDrag'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDropzone } from 'react-dropzone'
-import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
+import { Link, useBlocker, useNavigate, useParams, useLocation } from 'react-router-dom'
 import UserToolsNav from '../components/UserToolsNav'
 import StatusBar from '../components/StatusBar'
 import { Columns3, Plus, MoreHorizontal, SlidersHorizontal, ArrowLeft, X, Tag, Clock, ListChecks, Paperclip, AlignLeft, MessageSquare, Users, Pencil, Archive } from 'lucide-react'
@@ -399,80 +399,121 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                 </div>
                             )}
                             <form onSubmit={save} className="kb-detail-form">
-                                <label className="kb-detail-title">
-                                    <span className="sr-only">Rubrik</span>
-                                    <textarea
-                                        rows={1}
-                                        aria-label="Rubrik"
-                                        required
-                                        maxLength={250}
-                                        value={draft.title}
-                                        onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-                                    />
-                                </label>
-                                <div className="kb-detail-tools">
-                                    <Popover className="kb-detail-add">
-                                        <PopoverButton>
-                                            <Plus size={15} />
-                                            Lägg till
-                                        </PopoverButton>
-                                        <PopoverPanel anchor="bottom start" className="kb-action-popup">
-                                            {({ close }) => (
-                                                <>
-                                                    {[
-                                                        ['members', 'Medlemmar'],
-                                                        ['labels', 'Etiketter'],
-                                                        ['dates', 'Datum'],
-                                                        ['checklist', 'Checklista'],
-                                                        ['references', 'Extern koppling'],
-                                                    ].map(([name, title]) => (
-                                                        <button
-                                                            key={name}
-                                                            type="button"
-                                                            onClick={() => {
-                                                                if (name === 'members') memberButtonRef.current?.click()
-                                                                else reveal(name)
-                                                                close()
-                                                            }}
-                                                        >
-                                                            {title}
-                                                        </button>
-                                                    ))}
-                                                </>
-                                            )}
-                                        </PopoverPanel>
-                                    </Popover>
-                                    <button
-                                        type="button"
-                                        aria-expanded={section === 'labels'}
-                                        onClick={() => reveal('labels')}
-                                    >
-                                        <Tag size={15} />
-                                        Etiketter
-                                    </button>
-                                    <button
-                                        type="button"
-                                        aria-expanded={section === 'dates'}
-                                        onClick={() => reveal('dates')}
-                                    >
-                                        <Clock size={15} />
-                                        Datum
-                                    </button>
-                                    <button
-                                        type="button"
-                                        aria-expanded={section === 'checklist'}
-                                        onClick={() => reveal('checklist')}
-                                    >
-                                        <ListChecks size={15} />
-                                        Checklista
-                                    </button>
-                                    <button type="button" disabled={uploading} onClick={open}>
-                                        <Paperclip size={15} />
-                                        {uploading ? 'Laddar upp…' : 'Bilaga'}
-                                    </button>
+                                <div className="kb-detail-heading">
+                                    <label className="kb-detail-title">
+                                        <span className="sr-only">Rubrik</span>
+                                        <textarea
+                                            rows={1}
+                                            aria-label="Rubrik"
+                                            required
+                                            maxLength={250}
+                                            value={draft.title}
+                                            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+                                        />
+                                    </label>
+                                    <div className="kb-detail-tools">
+                                        <Popover className="kb-member-anchor">
+                                            <PopoverButton ref={memberButtonRef} type="button" aria-label="Ändra medlemmar"
+                                                onClick={() => setMemberSearch('')}>
+                                                <Users size={15} />
+                                                Medlemmar
+                                            </PopoverButton>
+                                            <PopoverPanel anchor="bottom start" className="kb-member-picker">
+                                                {({ close }) => {
+                                                    const query = memberSearch.trim().toLocaleLowerCase()
+                                                    const matches = (member) => `${member.name} ${member.username || ''}`.toLocaleLowerCase().includes(query)
+                                                    const selected = workspace.members.filter((member) => draft.assignees.includes(member.id) && matches(member))
+                                                    const available = workspace.members.filter((member) =>
+                                                        (!boardMemberIds || boardMemberIds.includes(member.id)) &&
+                                                        !draft.assignees.includes(member.id) && matches(member))
+                                                    return <>
+                                                        <div className="kb-member-picker-header">
+                                                            <strong>Ändra medlemmar</strong>
+                                                            <button type="button" aria-label="Stäng medlemsväljaren" onClick={() => close()}><X size={15} /></button>
+                                                        </div>
+                                                        <input autoFocus type="search" aria-label="Sök medlem" placeholder="Sök medlem"
+                                                            value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} />
+                                                        <div className="kb-member-picker-list">
+                                                            <h4>Kortmedlemmar</h4>
+                                                            {selected.length ? selected.map((member) => <button type="button" key={member.id}
+                                                                aria-label={`Ta bort ${member.name} från kortet`} onClick={() => toggle('assignees', member.id)}>
+                                                                <Avatar userId={member.id} name={member.name} size={28} />
+                                                                <span>{member.name}</span><X size={15} aria-hidden="true" />
+                                                            </button>) : <p>Inga kortmedlemmar</p>}
+                                                            <h4>Tavlemedlemmar</h4>
+                                                            {available.length ? available.map((member) => <button type="button" key={member.id}
+                                                                aria-label={`Lägg till ${member.name} på kortet`} onClick={() => toggle('assignees', member.id)}>
+                                                                <Avatar userId={member.id} name={member.name} size={28} />
+                                                                <span>{member.name}</span>
+                                                            </button>) : <p>Inga fler medlemmar</p>}
+                                                        </div>
+                                                    </>
+                                                }}
+                                            </PopoverPanel>
+                                        </Popover>
+                                        <Popover className="kb-detail-add">
+                                            <PopoverButton>
+                                                <Plus size={15} />
+                                                Lägg till
+                                            </PopoverButton>
+                                            <PopoverPanel anchor="bottom start" className="kb-action-popup">
+                                                {({ close }) => (
+                                                    <>
+                                                        {[
+                                                            ['members', 'Medlemmar'],
+                                                            ['labels', 'Etiketter'],
+                                                            ['dates', 'Datum'],
+                                                            ['checklist', 'Checklista'],
+                                                            ['references', 'Extern koppling'],
+                                                        ].map(([name, title]) => (
+                                                            <button
+                                                                key={name}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    if (name === 'members') memberButtonRef.current?.click()
+                                                                    else reveal(name)
+                                                                    close()
+                                                                }}
+                                                            >
+                                                                {title}
+                                                            </button>
+                                                        ))}
+                                                    </>
+                                                )}
+                                            </PopoverPanel>
+                                        </Popover>
+                                        <button
+                                            type="button"
+                                            aria-expanded={section === 'labels'}
+                                            onClick={() => reveal('labels')}
+                                        >
+                                            <Tag size={15} />
+                                            Etiketter
+                                        </button>
+                                        <button
+                                            type="button"
+                                            aria-expanded={section === 'dates'}
+                                            onClick={() => reveal('dates')}
+                                        >
+                                            <Clock size={15} />
+                                            Datum
+                                        </button>
+                                        <button
+                                            type="button"
+                                            aria-expanded={section === 'checklist'}
+                                            onClick={() => reveal('checklist')}
+                                        >
+                                            <ListChecks size={15} />
+                                            Checklista
+                                        </button>
+                                        <button type="button" disabled={uploading} onClick={open}>
+                                            <Paperclip size={15} />
+                                            {uploading ? 'Laddar upp…' : 'Bilaga'}
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="kb-detail-metadata">
-                                    <div>
+                                {(draft.assignees.length > 0 || draft.labels.length > 0 || draft.deadline) && <div className="kb-detail-metadata">
+                                    {draft.assignees.length > 0 && <div>
                                         <h3>Medlemmar</h3>
                                         <div className="kb-detail-members">
                                             {workspace.members
@@ -480,46 +521,8 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                                 .map((member) => (
                                                     <Avatar key={member.id} userId={member.id} name={member.name} />
                                                 ))}
-                                            <Popover className="kb-member-anchor">
-                                                <PopoverButton ref={memberButtonRef} type="button" aria-label="Ändra medlemmar"
-                                                    onClick={() => setMemberSearch('')}>
-                                                    <Plus size={16} />
-                                                </PopoverButton>
-                                                <PopoverPanel anchor="bottom start" className="kb-member-picker">
-                                                    {({ close }) => {
-                                                        const query = memberSearch.trim().toLocaleLowerCase()
-                                                        const matches = (member) => `${member.name} ${member.username || ''}`.toLocaleLowerCase().includes(query)
-                                                        const selected = workspace.members.filter((member) => draft.assignees.includes(member.id) && matches(member))
-                                                        const available = workspace.members.filter((member) =>
-                                                            (!boardMemberIds || boardMemberIds.includes(member.id)) &&
-                                                            !draft.assignees.includes(member.id) && matches(member))
-                                                        return <>
-                                                            <div className="kb-member-picker-header">
-                                                                <strong>Ändra medlemmar</strong>
-                                                                <button type="button" aria-label="Stäng medlemsväljaren" onClick={() => close()}><X size={15} /></button>
-                                                            </div>
-                                                            <input autoFocus type="search" aria-label="Sök medlem" placeholder="Sök medlem"
-                                                                value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} />
-                                                            <div className="kb-member-picker-list">
-                                                                <h4>Kortmedlemmar</h4>
-                                                                {selected.length ? selected.map((member) => <button type="button" key={member.id}
-                                                                    aria-label={`Ta bort ${member.name} från kortet`} onClick={() => toggle('assignees', member.id)}>
-                                                                    <Avatar userId={member.id} name={member.name} size={28} />
-                                                                    <span>{member.name}</span><X size={15} aria-hidden="true" />
-                                                                </button>) : <p>Inga kortmedlemmar</p>}
-                                                                <h4>Tavlemedlemmar</h4>
-                                                                {available.length ? available.map((member) => <button type="button" key={member.id}
-                                                                    aria-label={`Lägg till ${member.name} på kortet`} onClick={() => toggle('assignees', member.id)}>
-                                                                    <Avatar userId={member.id} name={member.name} size={28} />
-                                                                    <span>{member.name}</span>
-                                                                </button>) : <p>Inga fler medlemmar</p>}
-                                                            </div>
-                                                        </>
-                                                    }}
-                                                </PopoverPanel>
-                                            </Popover>
                                         </div>
-                                    </div>
+                                    </div>}
                                     {!!draft.labels.length && (
                                         <div>
                                             <h3>Etiketter</h3>
@@ -540,7 +543,7 @@ function CardDetail({ card, workspace, run, busy, reload, error }) {
                                             </button>
                                         </div>
                                     )}
-                                </div>
+                                </div>}
                                 {section === 'dates' && (
                                     <div className="kb-detail-field-group">
                                         <label className="block">
@@ -995,6 +998,8 @@ export default function KanbanPage() {
     const [backgroundPrompt, setBackgroundPrompt] = useState('')
     const [generatingBackground, setGeneratingBackground] = useState(false)
     const generationAbortRef = useRef(null)
+    const handledNavigationRef = useRef(false)
+    const navigationBlocker = useBlocker(generatingBackground)
     const [memberSearch, setMemberSearch] = useState('')
     const [boardBackground, setBoardBackground] = useState('')
     const searchRef = useRef(null)
@@ -1079,21 +1084,31 @@ export default function KanbanPage() {
             setBusy(false)
         }
     }
-    const cancelBackgroundGeneration = () => {
+    const cancelBackgroundGeneration = useCallback(() => {
         generationAbortRef.current?.abort()
         generationAbortRef.current = null
         setGeneratingBackground(false)
         setBusy(false)
-    }
-    const confirmLeaveGeneration = () => {
+    }, [])
+    const confirmLeaveGeneration = useCallback(() => {
         if (!generatingBackground) return true
         if (!window.confirm('En bakgrundsbild genereras. Om du lämnar nu avbryts väntan på resultatet. Servern kan ändå slutföra bilden. Vill du lämna?')) return false
         cancelBackgroundGeneration()
         return true
-    }
+    }, [generatingBackground, cancelBackgroundGeneration])
     const closeBoardDialog = () => {
         if (confirmLeaveGeneration()) setBoardDialog('')
     }
+    useEffect(() => {
+        if (navigationBlocker.state !== 'blocked') {
+            handledNavigationRef.current = false
+            return
+        }
+        if (handledNavigationRef.current) return
+        handledNavigationRef.current = true
+        if (confirmLeaveGeneration()) navigationBlocker.proceed()
+        else navigationBlocker.reset()
+    }, [navigationBlocker, confirmLeaveGeneration])
     const generateBackground = async (data) => {
         if (busy || generatingBackground) return
         const controller = new AbortController()
@@ -1280,13 +1295,10 @@ export default function KanbanPage() {
     return (
         <KanbanAccessContext.Provider value={ticket}>
             <div className={`user-tools-shell ${boardBackground && board ? 'kb-board-background' : ''}`}
-                onClickCapture={(e) => {
-                    if (!generatingBackground) return
-                    const target = e.target.closest('a[href], .user-tools-logout')
-                    if (!target || target.target === '_blank') return
-                    if (!confirmLeaveGeneration()) {
-                        e.preventDefault()
-                        e.stopPropagation()
+                onClickCapture={(event) => {
+                    if (generatingBackground && event.target.closest('.user-tools-logout') && !confirmLeaveGeneration()) {
+                        event.preventDefault()
+                        event.stopPropagation()
                     }
                 }}
                 style={boardBackground && board ? { backgroundImage: `linear-gradient(rgb(15 23 42 / 0.1), rgb(15 23 42 / 0.1)), url("${boardBackground}")` } : undefined}>
