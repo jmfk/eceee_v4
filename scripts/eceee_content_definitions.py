@@ -97,6 +97,30 @@ def digest(bundle):
     ).hexdigest()
 
 
+def reject_conflicting_terms(api, ns, bundle):
+    """Fail before definition writes if a portable term collides with existing taxonomy."""
+
+    existing_types = {str(t["id"]): t["key"] for t in api.list("taxonomy/types/?namespace=" + str(ns["id"]))}
+    rows = api.list("taxonomy/terms/?namespace=" + str(ns["id"]))
+    by_id = {str(row["id"]): row for row in rows}
+    by_ref = {(existing_types.get(str(row["classification_type"])), row["slug"]): row for row in rows}
+    for desired in bundle["terms"]:
+        current = by_ref.get((desired["type"], desired["slug"]))
+        if not current:
+            continue
+        parent = by_id.get(str(current["parent"])) if current.get("parent") else None
+        if (
+            current["name"] != desired["name"]
+            or current["status"] != "approved"
+            or (parent["slug"] if parent else None) != desired.get("parent")
+            or (
+                "alternative_names" in desired
+                and sorted(current.get("alternative_names") or []) != sorted(desired["alternative_names"])
+            )
+        ):
+            raise ValueError("bundle_term=conflict")
+
+
 def namespace(api, slug, apply=False):
     found = [n for n in api.list("content/namespaces/") if n["slug"] == slug]
     if found:
@@ -148,8 +172,7 @@ def export_bundle(api, ns):
     by_id = {t["id"]: t for t in terms}
     core_parents = {t["slug"]: t["parent"] for t in profile.initial_bundle()["terms"]}
     core_terms = [
-        t for t in terms
-        if type_ids.get(t["classification_type"]) == "article_kind" and t["slug"] in core_parents
+        t for t in terms if type_ids.get(t["classification_type"]) == "article_kind" and t["slug"] in core_parents
     ]
     if {t["slug"] for t in core_terms if t["status"] == "approved"} != set(core_parents):
         raise ValueError("definition_export=incomplete_core_terms")
@@ -194,6 +217,8 @@ def apply_bundle(api, ns, bundle, apply=False):
         raise ValueError("bundle=unsupported")
     if {d["name"] for d in bundle["definitions"]} != set(profile.OBJECT_TYPES):
         raise ValueError("bundle=wrong_object_types")
+    if apply:
+        reject_conflicting_terms(api, ns, bundle)
     current = {
         r["name"]: api.request(f'objects/object-types/{r["id"]}/')
         for r in api.list("objects/object-types/")
@@ -261,6 +286,10 @@ def apply_bundle(api, ns, bundle, apply=False):
             or old["name"] != term["name"]
             or old["status"] != "approved"
             or (parent["slug"] if parent else None) != term.get("parent")
+            or (
+                "alternative_names" in term
+                and sorted(old.get("alternative_names") or []) != sorted(term["alternative_names"])
+            )
         ):
             changes.append({"term": term["type"] + ":" + term["slug"], "fields": ["configuration"]})
     if not apply:
@@ -314,6 +343,10 @@ def apply_bundle(api, ns, bundle, apply=False):
                     old["name"] != term["name"]
                     or old.get("parent") != (parent["id"] if parent else None)
                     or old["status"] != "approved"
+                    or (
+                        "alternative_names" in term
+                        and sorted(old.get("alternative_names") or []) != sorted(term["alternative_names"])
+                    )
                 ):
                     raise ValueError("bundle_term=conflict")
             else:
@@ -326,6 +359,7 @@ def apply_bundle(api, ns, bundle, apply=False):
                             "name": term["name"],
                             "slug": term["slug"],
                             "parent_id": parent["id"] if parent else None,
+                            "alternative_names": term.get("alternative_names", []),
                         },
                     },
                 )["term"]

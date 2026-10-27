@@ -88,7 +88,7 @@ CLASSIFICATIONS = {
     "news_category": ("Nyhetskategori", ["article"]),
     "news_source": ("Källa", ["article"]),
     "news_topic": ("Ämne", ["article", "event", "library_item"]),
-    "news_keyword": ("Nyckelord", ["article"]),
+    "news_keyword": ("Nyckelord", ["article", "columnist", "event", "organization"]),
     "general": ("Allmänt", list(OBJECT_TYPES)),
     "event_type": ("Evenemangstyp", ["event"]),
     "event_category": ("Evenemangskategori", ["event"]),

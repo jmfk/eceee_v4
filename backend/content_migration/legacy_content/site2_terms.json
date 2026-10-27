@@ -1,0 +1,7084 @@
+{
+  "format": "eceee-legacy-term-inventory",
+  "version": 1,
+  "sourceSite": 2,
+  "counts": {
+    "news": 18096,
+    "columns": 279,
+    "columnists": 79,
+    "events": 1224,
+    "organizations": 40
+  },
+  "terms": [
+    {
+      "dimension": "affiliations",
+      "model": "eceeememberforum.memberaffiliation",
+      "id": "2",
+      "name": "Energy Consulting Company",
+      "parent": null,
+      "uses": {
+        "organizations": 7
+      }
+    },
+    {
+      "dimension": "affiliations",
+      "model": "eceeememberforum.memberaffiliation",
+      "id": "3",
+      "name": "Environmental NGO",
+      "parent": null,
+      "uses": {
+        "organizations": 12
+      }
+    },
+    {
+      "dimension": "affiliations",
+      "model": "eceeememberforum.memberaffiliation",
+      "id": "4",
+      "name": "National Energy Agency/Authority",
+      "parent": null,
+      "uses": {
+        "organizations": 7
+      }
+    },
+    {
+      "dimension": "affiliations",
+      "model": "eceeememberforum.memberaffiliation",
+      "id": "5",
+      "name": "Other",
+      "parent": null,
+      "uses": {
+        "organizations": 4
+      }
+    },
+    {
+      "dimension": "affiliations",
+      "model": "eceeememberforum.memberaffiliation",
+      "id": "6",
+      "name": "Research/educational facility",
+      "parent": null,
+      "uses": {
+        "organizations": 7
+      }
+    },
+    {
+      "dimension": "affiliations",
+      "model": "eceeememberforum.memberaffiliation",
+      "id": "8",
+      "name": "Trade association",
+      "parent": null,
+      "uses": {
+        "organizations": 4
+      }
+    },
+    {
+      "dimension": "affiliations",
+      "model": "eceeememberforum.memberaffiliation",
+      "id": "9",
+      "name": "Equipment producer",
+      "parent": null,
+      "uses": {
+        "organizations": 2
+      }
+    },
+    {
+      "dimension": "affiliations",
+      "model": "eceeememberforum.memberaffiliation",
+      "id": "12",
+      "name": "Consulting",
+      "parent": null,
+      "uses": {
+        "organizations": 3
+      }
+    },
+    {
+      "dimension": "affiliations",
+      "model": "eceeememberforum.memberaffiliation",
+      "id": "13",
+      "name": "Consulting Engineering",
+      "parent": null,
+      "uses": {
+        "organizations": 2
+      }
+    },
+    {
+      "dimension": "affiliations",
+      "model": "eceeememberforum.memberaffiliation",
+      "id": "14",
+      "name": "Research Institute",
+      "parent": null,
+      "uses": {
+        "organizations": 2
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "1",
+      "name": "climate_ets",
+      "parent": null,
+      "uses": {
+        "news": 3735
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "2",
+      "name": "environment",
+      "parent": null,
+      "uses": {
+        "news": 3785
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "3",
+      "name": "transportation_traffic",
+      "parent": null,
+      "uses": {
+        "news": 491
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "4",
+      "name": "Eco-design/MEPS",
+      "parent": null,
+      "uses": {
+        "news": 89
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "5",
+      "name": "eu_energu_poiyc_general",
+      "parent": null,
+      "uses": {
+        "news": 156
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "6",
+      "name": "buildings",
+      "parent": null,
+      "uses": {
+        "news": 246
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "7",
+      "name": "appliances",
+      "parent": null,
+      "uses": {
+        "news": 96
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "8",
+      "name": "labelling",
+      "parent": null,
+      "uses": {
+        "news": 62
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "9",
+      "name": "energy_security",
+      "parent": null,
+      "uses": {
+        "news": 194
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "10",
+      "name": "energy_supply",
+      "parent": null,
+      "uses": {
+        "news": 162
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "11",
+      "name": "eees_directive",
+      "parent": null,
+      "uses": {
+        "news": 81
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "12",
+      "name": "eco_design_meps",
+      "parent": null,
+      "uses": {
+        "news": 78
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "13",
+      "name": "national_policy_eu",
+      "parent": null,
+      "uses": {
+        "news": 53
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "14",
+      "name": "internationa_cooperation",
+      "parent": null,
+      "uses": {
+        "news": 19
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "15",
+      "name": "taxation",
+      "parent": null,
+      "uses": {
+        "news": 49
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "16",
+      "name": "Energy Supply",
+      "parent": null,
+      "uses": {
+        "news": 57
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "17",
+      "name": "us_policy",
+      "parent": null,
+      "uses": {
+        "news": 54
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "18",
+      "name": "Energy services/ESCOs",
+      "parent": null,
+      "uses": {
+        "news": 7
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "19",
+      "name": "eeurope_new_ms",
+      "parent": null,
+      "uses": {
+        "news": 8
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "20",
+      "name": "International issues",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "21",
+      "name": "energy_services_escos",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "categories",
+      "model": "eceeenews.eceeenewscategory",
+      "id": "22",
+      "name": "Eco-design",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "eceeeCategories",
+      "model": "eceeebase.eceeecategory",
+      "id": "4",
+      "name": "Inherit Parent Category",
+      "parent": null,
+      "uses": {
+        "columns": 31,
+        "columnists": 9,
+        "events": 103
+      }
+    },
+    {
+      "dimension": "eceeeCategories",
+      "model": "eceeebase.eceeecategory",
+      "id": "6",
+      "name": "Inherits: Columnists",
+      "parent": null,
+      "uses": {
+        "columns": 116,
+        "columnists": 28,
+        "events": 555
+      }
+    },
+    {
+      "dimension": "eceeeCategories",
+      "model": "eceeebase.eceeecategory",
+      "id": "7",
+      "name": "Inherits: Error",
+      "parent": null,
+      "uses": {
+        "events": 1
+      }
+    },
+    {
+      "dimension": "eceeeCategories",
+      "model": "eceeebase.eceeecategory",
+      "id": "11",
+      "name": "Columnists",
+      "parent": null,
+      "uses": {
+        "columns": 1
+      }
+    },
+    {
+      "dimension": "eceeeCategories",
+      "model": "eceeebase.eceeecategory",
+      "id": "12",
+      "name": "Inherits: Summer Study",
+      "parent": null,
+      "uses": {
+        "events": 2
+      }
+    },
+    {
+      "dimension": "eventCategories",
+      "model": "choice",
+      "id": "Climate",
+      "name": "Climate",
+      "parent": null,
+      "uses": {
+        "events": 270
+      }
+    },
+    {
+      "dimension": "eventCategories",
+      "model": "choice",
+      "id": "Energy efficiency",
+      "name": "Energy efficiency",
+      "parent": null,
+      "uses": {
+        "events": 815
+      }
+    },
+    {
+      "dimension": "eventCategories",
+      "model": "choice",
+      "id": "Policy",
+      "name": "Policy",
+      "parent": null,
+      "uses": {
+        "events": 364
+      }
+    },
+    {
+      "dimension": "eventCategories",
+      "model": "choice",
+      "id": "Renewables",
+      "name": "Renewables",
+      "parent": null,
+      "uses": {
+        "events": 217
+      }
+    },
+    {
+      "dimension": "eventCategories",
+      "model": "choice",
+      "id": "Technology",
+      "name": "Technology",
+      "parent": null,
+      "uses": {
+        "events": 279
+      }
+    },
+    {
+      "dimension": "eventType",
+      "model": "choice",
+      "id": "Calls",
+      "name": "Calls",
+      "parent": null,
+      "uses": {
+        "events": 24
+      }
+    },
+    {
+      "dimension": "eventType",
+      "model": "choice",
+      "id": "Closed meeting",
+      "name": "Closed meeting",
+      "parent": null,
+      "uses": {
+        "events": 1
+      }
+    },
+    {
+      "dimension": "eventType",
+      "model": "choice",
+      "id": "Conference",
+      "name": "Conference",
+      "parent": null,
+      "uses": {
+        "events": 956
+      }
+    },
+    {
+      "dimension": "eventType",
+      "model": "choice",
+      "id": "Course",
+      "name": "Course",
+      "parent": null,
+      "uses": {
+        "events": 1
+      }
+    },
+    {
+      "dimension": "eventType",
+      "model": "choice",
+      "id": "Seminar",
+      "name": "Seminar",
+      "parent": null,
+      "uses": {
+        "events": 11
+      }
+    },
+    {
+      "dimension": "eventType",
+      "model": "choice",
+      "id": "Webinar",
+      "name": "Webinar",
+      "parent": null,
+      "uses": {
+        "events": 201
+      }
+    },
+    {
+      "dimension": "eventType",
+      "model": "choice",
+      "id": "Workshop",
+      "name": "Workshop",
+      "parent": null,
+      "uses": {
+        "events": 30
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "836",
+      "name": "Climate change",
+      "parent": null,
+      "uses": {
+        "news": 1526,
+        "columns": 1,
+        "events": 2
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "841",
+      "name": "oil production",
+      "parent": null,
+      "uses": {
+        "news": 44
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "847",
+      "name": "product policy",
+      "parent": null,
+      "uses": {
+        "news": 67,
+        "columns": 1,
+        "events": 3
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "851",
+      "name": "utilities",
+      "parent": null,
+      "uses": {
+        "news": 5
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "857",
+      "name": "energy consumption",
+      "parent": null,
+      "uses": {
+        "news": 10,
+        "events": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "869",
+      "name": "air pollution",
+      "parent": null,
+      "uses": {
+        "news": 221
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "872",
+      "name": "electric vehicles",
+      "parent": null,
+      "uses": {
+        "news": 227
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "874",
+      "name": "renewable energy",
+      "parent": null,
+      "uses": {
+        "news": 822,
+        "columns": 1,
+        "events": 3,
+        "organizations": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "878",
+      "name": "nuclear energy",
+      "parent": null,
+      "uses": {
+        "news": 132,
+        "columns": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "883",
+      "name": "buildings",
+      "parent": null,
+      "uses": {
+        "news": 351,
+        "columns": 5,
+        "columnists": 3,
+        "events": 11
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "884",
+      "name": "municipalities",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "886",
+      "name": "greenhouse gas emissions",
+      "parent": null,
+      "uses": {
+        "news": 21
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "888",
+      "name": "Electricity Directive",
+      "parent": null,
+      "uses": {
+        "news": 19
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "892",
+      "name": "energy demand",
+      "parent": null,
+      "uses": {
+        "news": 101,
+        "columns": 1,
+        "columnists": 1,
+        "events": 2
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "895",
+      "name": "city planning",
+      "parent": null,
+      "uses": {
+        "news": 38
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "899",
+      "name": "energy efficiency policies",
+      "parent": null,
+      "uses": {
+        "news": 54,
+        "columns": 2,
+        "events": 2
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "900",
+      "name": "energy efficient technologies",
+      "parent": null,
+      "uses": {
+        "news": 23,
+        "columnists": 2
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "901",
+      "name": "EU emissions trading system ETS",
+      "parent": null,
+      "uses": {
+        "news": 202
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "904",
+      "name": "Energy Efficiency Directive EED",
+      "parent": null,
+      "uses": {
+        "news": 36,
+        "columns": 2,
+        "events": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "906",
+      "name": "EU Energy Policy",
+      "parent": null,
+      "uses": {
+        "news": 295,
+        "columns": 4,
+        "columnists": 2,
+        "events": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "907",
+      "name": "transport",
+      "parent": null,
+      "uses": {
+        "news": 867,
+        "events": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "916",
+      "name": "financing",
+      "parent": null,
+      "uses": {
+        "news": 335,
+        "columns": 5
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "920",
+      "name": "Energy Union",
+      "parent": null,
+      "uses": {
+        "news": 35,
+        "columns": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "923",
+      "name": "discount rates",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "925",
+      "name": "behaviour",
+      "parent": null,
+      "uses": {
+        "news": 3,
+        "columns": 1,
+        "columnists": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "930",
+      "name": "lighting",
+      "parent": null,
+      "uses": {
+        "news": 26
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "934",
+      "name": "capacity mechanisms",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "965",
+      "name": "Carbon capture and storage (CCS)",
+      "parent": null,
+      "uses": {
+        "news": 111
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "966",
+      "name": "resilience",
+      "parent": null,
+      "uses": {
+        "news": 79
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "989",
+      "name": "energy sufficiency",
+      "parent": null,
+      "uses": {
+        "news": 16,
+        "events": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "990",
+      "name": "multiple benefits",
+      "parent": null,
+      "uses": {
+        "news": 53,
+        "columns": 2,
+        "events": 9
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "991",
+      "name": "climate policy",
+      "parent": null,
+      "uses": {
+        "news": 1270,
+        "columns": 1,
+        "events": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1004",
+      "name": "batteries",
+      "parent": null,
+      "uses": {
+        "news": 134,
+        "columns": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1005",
+      "name": "energy services",
+      "parent": null,
+      "uses": {
+        "news": 3,
+        "events": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1009",
+      "name": "gender",
+      "parent": null,
+      "uses": {
+        "news": 20
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1013",
+      "name": "energy labelling",
+      "parent": null,
+      "uses": {
+        "news": 3,
+        "columns": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1017",
+      "name": "heating",
+      "parent": null,
+      "uses": {
+        "news": 221
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1018",
+      "name": "windows",
+      "parent": null,
+      "uses": {
+        "news": 5
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1019",
+      "name": "cooling",
+      "parent": null,
+      "uses": {
+        "news": 87
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1021",
+      "name": "industry",
+      "parent": null,
+      "uses": {
+        "news": 176,
+        "events": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1022",
+      "name": "electricity",
+      "parent": null,
+      "uses": {
+        "news": 124
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1023",
+      "name": "fossil fuels",
+      "parent": null,
+      "uses": {
+        "news": 487,
+        "columns": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1024",
+      "name": "gas",
+      "parent": null,
+      "uses": {
+        "news": 60
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1025",
+      "name": "IEA",
+      "parent": null,
+      "uses": {
+        "news": 43,
+        "columns": 1,
+        "columnists": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1026",
+      "name": "shipping",
+      "parent": null,
+      "uses": {
+        "news": 92
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1027",
+      "name": "Carbon and energy taxes",
+      "parent": null,
+      "uses": {
+        "news": 46
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1028",
+      "name": "data centres",
+      "parent": null,
+      "uses": {
+        "news": 77
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1029",
+      "name": "Carbon removal technology",
+      "parent": null,
+      "uses": {
+        "news": 18
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1030",
+      "name": "behavioural",
+      "parent": null,
+      "uses": {
+        "news": 5
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1032",
+      "name": "carbon dioxide emissions",
+      "parent": null,
+      "uses": {
+        "news": 82,
+        "columns": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1033",
+      "name": "energy transition",
+      "parent": null,
+      "uses": {
+        "news": 104,
+        "columns": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1034",
+      "name": "clean energy transition",
+      "parent": null,
+      "uses": {
+        "news": 266
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1035",
+      "name": "energy storage",
+      "parent": null,
+      "uses": {
+        "news": 26,
+        "columns": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1036",
+      "name": "electrification",
+      "parent": null,
+      "uses": {
+        "news": 83,
+        "columns": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1037",
+      "name": "justice",
+      "parent": null,
+      "uses": {
+        "news": 45
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1038",
+      "name": "economic recovery",
+      "parent": null,
+      "uses": {
+        "news": 5
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1039",
+      "name": "off-grid electricity",
+      "parent": null,
+      "uses": {
+        "news": 7
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1040",
+      "name": "biofuel",
+      "parent": null,
+      "uses": {
+        "news": 52
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1041",
+      "name": "energy poverty",
+      "parent": null,
+      "uses": {
+        "news": 50,
+        "events": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1042",
+      "name": "green recovery",
+      "parent": null,
+      "uses": {
+        "news": 175,
+        "columns": 3,
+        "organizations": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1043",
+      "name": "renovation",
+      "parent": null,
+      "uses": {
+        "news": 54
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1044",
+      "name": "circular economy",
+      "parent": null,
+      "uses": {
+        "news": 72,
+        "organizations": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1045",
+      "name": "sector coupling",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1046",
+      "name": "energy efficiency services",
+      "parent": null,
+      "uses": {
+        "news": 1,
+        "events": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1047",
+      "name": "hydrogen",
+      "parent": null,
+      "uses": {
+        "news": 137,
+        "columns": 2
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1048",
+      "name": "EASME",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1049",
+      "name": "EU-funding",
+      "parent": null,
+      "uses": {
+        "news": 9
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1050",
+      "name": "Innovation",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1051",
+      "name": "decoupling",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1052",
+      "name": "Circular Economy Action Plan CEAP",
+      "parent": null,
+      "uses": {
+        "news": 26
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1053",
+      "name": "AI",
+      "parent": null,
+      "uses": {
+        "news": 12
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1054",
+      "name": "methane emissions",
+      "parent": null,
+      "uses": {
+        "news": 54
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1055",
+      "name": "ecodesign",
+      "parent": null,
+      "uses": {
+        "news": 15,
+        "columns": 1,
+        "organizations": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1058",
+      "name": "webinar",
+      "parent": null,
+      "uses": {
+        "events": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1059",
+      "name": "Coocking",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1062",
+      "name": "low-carbon energy networks",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1063",
+      "name": "carbon market",
+      "parent": null,
+      "uses": {
+        "news": 80
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1064",
+      "name": "smart technologies",
+      "parent": null,
+      "uses": {
+        "news": 6
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1065",
+      "name": "public purchasing",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1066",
+      "name": "monitoring",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1067",
+      "name": "decarbonisation",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1068",
+      "name": "biodiversity",
+      "parent": null,
+      "uses": {
+        "news": 9
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1069",
+      "name": "Rohs Directive",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1071",
+      "name": "Energy Charter Treaty",
+      "parent": null,
+      "uses": {
+        "news": 46
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1073",
+      "name": "building renovation",
+      "parent": null,
+      "uses": {
+        "news": 200,
+        "columns": 2,
+        "columnists": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1074",
+      "name": "EU Green Deal",
+      "parent": null,
+      "uses": {
+        "news": 76,
+        "columns": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1075",
+      "name": "Euro 7 regulaton",
+      "parent": null,
+      "uses": {
+        "news": 10
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1076",
+      "name": "bioenergy",
+      "parent": null,
+      "uses": {
+        "news": 36
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1077",
+      "name": "sufficiency",
+      "parent": null,
+      "uses": {
+        "news": 9,
+        "organizations": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1078",
+      "name": "embodied emissions",
+      "parent": null,
+      "uses": {
+        "organizations": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1079",
+      "name": "EPBD",
+      "parent": null,
+      "uses": {
+        "news": 73,
+        "columnists": 1,
+        "organizations": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1080",
+      "name": "Energy Label",
+      "parent": null,
+      "uses": {
+        "news": 1,
+        "organizations": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1081",
+      "name": "Ecolabel",
+      "parent": null,
+      "uses": {
+        "organizations": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1082",
+      "name": "energy grids",
+      "parent": null,
+      "uses": {
+        "news": 51,
+        "organizations": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1083",
+      "name": "Paris Agreement",
+      "parent": null,
+      "uses": {
+        "news": 85,
+        "organizations": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1084",
+      "name": "EU Budget",
+      "parent": null,
+      "uses": {
+        "organizations": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1085",
+      "name": "EU",
+      "parent": null,
+      "uses": {
+        "news": 3,
+        "organizations": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1086",
+      "name": "Funds",
+      "parent": null,
+      "uses": {
+        "news": 1,
+        "organizations": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1087",
+      "name": "Next Generation EU",
+      "parent": null,
+      "uses": {
+        "news": 2,
+        "organizations": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1088",
+      "name": "energy efficiency",
+      "parent": null,
+      "uses": {
+        "news": 14,
+        "events": 4,
+        "organizations": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1089",
+      "name": "energy modelling",
+      "parent": null,
+      "uses": {
+        "organizations": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1090",
+      "name": "NECPs",
+      "parent": null,
+      "uses": {
+        "news": 35,
+        "organizations": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1091",
+      "name": "governance",
+      "parent": null,
+      "uses": {
+        "news": 3,
+        "organizations": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1092",
+      "name": "effort sharing",
+      "parent": null,
+      "uses": {
+        "news": 7,
+        "organizations": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1093",
+      "name": "Summer Study",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1094",
+      "name": "EU carbon border adjustment mechanism CBAM",
+      "parent": null,
+      "uses": {
+        "news": 50
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1095",
+      "name": "policy",
+      "parent": null,
+      "uses": {
+        "news": 1,
+        "events": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1097",
+      "name": "technology",
+      "parent": null,
+      "uses": {
+        "events": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1098",
+      "name": "Fuel poverty",
+      "parent": null,
+      "uses": {
+        "news": 18
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1100",
+      "name": "Energy price",
+      "parent": null,
+      "uses": {
+        "news": 141
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1101",
+      "name": "Geothermal energy",
+      "parent": null,
+      "uses": {
+        "news": 9
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1102",
+      "name": "taxation",
+      "parent": null,
+      "uses": {
+        "news": 26
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1103",
+      "name": "just transition",
+      "parent": null,
+      "uses": {
+        "news": 95
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1104",
+      "name": "climate crisis",
+      "parent": null,
+      "uses": {
+        "news": 1000
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1105",
+      "name": "digital technology",
+      "parent": null,
+      "uses": {
+        "news": 6
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1106",
+      "name": "EU’s Sustainable Finance Taxonomy",
+      "parent": null,
+      "uses": {
+        "news": 46
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1107",
+      "name": "Energy Security",
+      "parent": null,
+      "uses": {
+        "news": 320,
+        "columns": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1108",
+      "name": "eco",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1109",
+      "name": "energy crisis",
+      "parent": null,
+      "uses": {
+        "news": 114
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1110",
+      "name": "ignition",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1116",
+      "name": "Carbon capture and storage CCS",
+      "parent": null,
+      "uses": {
+        "news": 14
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1117",
+      "name": "DA",
+      "parent": null,
+      "uses": {
+        "events": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1118",
+      "name": "DGA",
+      "parent": null,
+      "uses": {
+        "events": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1119",
+      "name": "Energy",
+      "parent": null,
+      "uses": {
+        "events": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1120",
+      "name": "Digitalization",
+      "parent": null,
+      "uses": {
+        "news": 1,
+        "events": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1121",
+      "name": "data",
+      "parent": null,
+      "uses": {
+        "events": 1
+      }
+    },
+    {
+      "dimension": "keywords",
+      "model": "generic.keyword",
+      "id": "1122",
+      "name": "competitiveness",
+      "parent": null,
+      "uses": {
+        "events": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "1",
+      "name": "planet-ark",
+      "parent": null,
+      "uses": {
+        "news": 823
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "2",
+      "name": "Reuters",
+      "parent": null,
+      "uses": {
+        "news": 996
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "3",
+      "name": "The Guardian",
+      "parent": null,
+      "uses": {
+        "news": 3319
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "4",
+      "name": "",
+      "parent": null,
+      "uses": {
+        "news": 644
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "5",
+      "name": "the-guardian-blog",
+      "parent": null,
+      "uses": {
+        "news": 77
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "6",
+      "name": "guardian-",
+      "parent": null,
+      "uses": {
+        "news": 623
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "7",
+      "name": "europeanvoice",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "8",
+      "name": "EurActiv",
+      "parent": null,
+      "uses": {
+        "news": 4226
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "9",
+      "name": "clean-energy-ministerial-news",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "10",
+      "name": "Eco Business",
+      "parent": null,
+      "uses": {
+        "news": 1075
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "11",
+      "name": "eceee news",
+      "parent": null,
+      "uses": {
+        "news": 339
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "12",
+      "name": "The Washington Post",
+      "parent": null,
+      "uses": {
+        "news": 76
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "13",
+      "name": "guardian---commentary_blog",
+      "parent": null,
+      "uses": {
+        "news": 113
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "14",
+      "name": "new-york-times",
+      "parent": null,
+      "uses": {
+        "news": 18
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "15",
+      "name": "BBC News",
+      "parent": null,
+      "uses": {
+        "news": 51
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "16",
+      "name": "0-nothing",
+      "parent": null,
+      "uses": {
+        "news": 34
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "17",
+      "name": "external-resource",
+      "parent": null,
+      "uses": {
+        "news": 268
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "18",
+      "name": "The Independent",
+      "parent": null,
+      "uses": {
+        "news": 377
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "19",
+      "name": "proud-green-building",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "20",
+      "name": "blogactive",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "21",
+      "name": "The Guardian Blog",
+      "parent": null,
+      "uses": {
+        "news": 27
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "22",
+      "name": "businessgreen",
+      "parent": null,
+      "uses": {
+        "news": 9
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "23",
+      "name": "the-telegraph",
+      "parent": null,
+      "uses": {
+        "news": 9
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "24",
+      "name": "Greentech Media",
+      "parent": null,
+      "uses": {
+        "news": 61
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "25",
+      "name": "WEN-Planet-Ark",
+      "parent": null,
+      "uses": {
+        "news": 44
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "26",
+      "name": "News Center LBL",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "27",
+      "name": "european-energy-review---interview-you-may-need-to-register-to-access-this-article",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "28",
+      "name": "european-energy-review",
+      "parent": null,
+      "uses": {
+        "news": 6
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "29",
+      "name": "International Energy Agency",
+      "parent": null,
+      "uses": {
+        "news": 22
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "30",
+      "name": "edie.net",
+      "parent": null,
+      "uses": {
+        "news": 18
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "31",
+      "name": "europamedia.blogactiv",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "32",
+      "name": "external-report",
+      "parent": null,
+      "uses": {
+        "news": 36
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "33",
+      "name": "news.yahoo.com",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "34",
+      "name": "ACEEE blog",
+      "parent": null,
+      "uses": {
+        "news": 301
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "35",
+      "name": "energy-efficiency-news",
+      "parent": null,
+      "uses": {
+        "news": 6
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "36",
+      "name": "energy-live-news",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "37",
+      "name": "bloombergs",
+      "parent": null,
+      "uses": {
+        "news": 16
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "38",
+      "name": "european-environment-agency",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "39",
+      "name": "remi-network",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "40",
+      "name": "berkeley-news",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "41",
+      "name": "consumer-corner",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "42",
+      "name": "planet-ark-",
+      "parent": null,
+      "uses": {
+        "news": 12
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "43",
+      "name": "helsingin-sanomat",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "44",
+      "name": "poughkeepsie-journal",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "45",
+      "name": "New York Times",
+      "parent": null,
+      "uses": {
+        "news": 84
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "46",
+      "name": "financial-times",
+      "parent": null,
+      "uses": {
+        "news": 5
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "47",
+      "name": "associated-press",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "48",
+      "name": "businesswest",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "49",
+      "name": "energy-effiiency-news",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "50",
+      "name": "startups",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "51",
+      "name": "utilitydive",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "52",
+      "name": "pvtech",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "53",
+      "name": "european-energy-review-you-may-need-to-register-to-access-this-article",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "54",
+      "name": "greenbiz.com",
+      "parent": null,
+      "uses": {
+        "news": 10
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "55",
+      "name": "european-voice-column-by-george-soros",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "56",
+      "name": "reneweconomy",
+      "parent": null,
+      "uses": {
+        "news": 6
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "57",
+      "name": "the-atlantic",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "58",
+      "name": "blogactive.eu",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "59",
+      "name": "the-press-enterprise",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "60",
+      "name": "sustainable-energy-for-all",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "61",
+      "name": "green-wise-business",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "62",
+      "name": "yahoo-contributor-network",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "63",
+      "name": "eu-neighbourhood-info-centre",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "64",
+      "name": "business-standard",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "65",
+      "name": "fraser-institute",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "66",
+      "name": "asian-development-bank",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "67",
+      "name": "renews",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "68",
+      "name": "european-commission",
+      "parent": null,
+      "uses": {
+        "news": 5
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "69",
+      "name": "wwf-europe",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "70",
+      "name": "energy-manager-today",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "71",
+      "name": "belfast-telegraph",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "72",
+      "name": "lightning.co.uk",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "73",
+      "name": "scientific-american",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "74",
+      "name": "forbes",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "75",
+      "name": "the-globe-and-mail",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "76",
+      "name": "balkan-green-energy-news",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "77",
+      "name": "est-energy-saving-trust-uk",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "78",
+      "name": "european-energy-review---blog-you-may-need-to-register-to-access-this-article",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "79",
+      "name": "decentralized-energy",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "80",
+      "name": "finnish-forest-association",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "81",
+      "name": "wall-street-journal",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "82",
+      "name": "renewable-energy-focus",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "83",
+      "name": "bulletin-of-the-atomic-scientists",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "84",
+      "name": "cbcnews-nova-scotia",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "85",
+      "name": "responding-to-climate-change-rtcc",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "86",
+      "name": "European Energy Review",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "87",
+      "name": "CleanTechnica",
+      "parent": null,
+      "uses": {
+        "news": 12
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "88",
+      "name": "The Climate Group",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "89",
+      "name": "VOX Energy Environment",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "90",
+      "name": "Huffington Post",
+      "parent": null,
+      "uses": {
+        "news": 6
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "91",
+      "name": "Rocky Mountain Institute Outlet",
+      "parent": null,
+      "uses": {
+        "news": 11
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "92",
+      "name": "UKAce",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "93",
+      "name": "SeeNews Renewables",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "94",
+      "name": "Eurekalert",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "95",
+      "name": "California Watch",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "96",
+      "name": "European Voice",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "97",
+      "name": "International Institute for Sustainable Development",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "98",
+      "name": "NextCity",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "99",
+      "name": "Build Up",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "100",
+      "name": "Oregon State University",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "101",
+      "name": "UN News Centre",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "102",
+      "name": "The Hindu",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "103",
+      "name": "The Green Perspective",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "104",
+      "name": "Climate Home",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "105",
+      "name": "European Policy Office",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "106",
+      "name": "Daily Planet",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "107",
+      "name": "Energy Transition",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "108",
+      "name": "Clean Energy News",
+      "parent": null,
+      "uses": {
+        "news": 9
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "109",
+      "name": "Zondits",
+      "parent": null,
+      "uses": {
+        "news": 17
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "110",
+      "name": "Taipei Times",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "111",
+      "name": "New Atlas",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "112",
+      "name": "South China Morning Post",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "113",
+      "name": "Efficient Energy",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "114",
+      "name": "Science Daily",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "115",
+      "name": "Renewable Energy World",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "116",
+      "name": "Newstatesman",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "117",
+      "name": "CBC News",
+      "parent": null,
+      "uses": {
+        "news": 7
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "118",
+      "name": "Ecogeneration",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "119",
+      "name": "IRENA Newsroom",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "120",
+      "name": "Noodls",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "121",
+      "name": "ACR News",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "122",
+      "name": "Evening Standard",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "123",
+      "name": "The Economist",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "124",
+      "name": "Finland Times",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "126",
+      "name": "Digital Trends",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "127",
+      "name": "Environment Yale",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "128",
+      "name": "BPIE news",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "129",
+      "name": "Inside Climate News",
+      "parent": null,
+      "uses": {
+        "news": 348
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "130",
+      "name": "LUX Review",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "131",
+      "name": "Energy Post",
+      "parent": null,
+      "uses": {
+        "news": 42
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "132",
+      "name": "New Power",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "133",
+      "name": "CNN Money",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "134",
+      "name": "New Republic",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "135",
+      "name": "abc.net",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "136",
+      "name": "Metering & Smart Energy International",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "137",
+      "name": "The Conversation",
+      "parent": null,
+      "uses": {
+        "news": 187
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "138",
+      "name": "NRDC",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "139",
+      "name": "The Ecologist",
+      "parent": null,
+      "uses": {
+        "news": 8
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "140",
+      "name": "Indy100",
+      "parent": null,
+      "uses": {
+        "news": 5
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "141",
+      "name": "CarbonBrief",
+      "parent": null,
+      "uses": {
+        "news": 162
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "142",
+      "name": "Newsweek",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "143",
+      "name": "IPEEC Newsroom",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "144",
+      "name": "The Telegraph",
+      "parent": null,
+      "uses": {
+        "news": 5
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "145",
+      "name": "Climate Change News",
+      "parent": null,
+      "uses": {
+        "news": 199
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "146",
+      "name": "eceee Press Release",
+      "parent": null,
+      "uses": {
+        "news": 25
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "147",
+      "name": "Energy Efficiency in Industrial Processes news",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "148",
+      "name": "WWF Europe",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "149",
+      "name": "Egyptian Independent",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "150",
+      "name": "EU Science Hub",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "151",
+      "name": "Utility Dive",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "152",
+      "name": "SDG Knorledge Hub",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "153",
+      "name": "Transport and Environment",
+      "parent": null,
+      "uses": {
+        "news": 366
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "154",
+      "name": "SDG Knowledge Hub",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "155",
+      "name": "Blog Felix Dodds",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "156",
+      "name": "Energy in Demand",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "157",
+      "name": "Power Today Magazine India",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "158",
+      "name": "PV Magazine India",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "159",
+      "name": "euobserver",
+      "parent": null,
+      "uses": {
+        "news": 7
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "160",
+      "name": "Climate Action",
+      "parent": null,
+      "uses": {
+        "news": 148
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "161",
+      "name": "Climate News Network",
+      "parent": null,
+      "uses": {
+        "news": 156
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "162",
+      "name": "ACEEE press",
+      "parent": null,
+      "uses": {
+        "news": 17
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "164",
+      "name": "Global LEAP",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "165",
+      "name": "Responsible business",
+      "parent": null,
+      "uses": {
+        "news": 5
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "166",
+      "name": "EU Observer",
+      "parent": null,
+      "uses": {
+        "news": 12
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "167",
+      "name": "Business Green",
+      "parent": null,
+      "uses": {
+        "news": 24
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "169",
+      "name": "RapOnline",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "170",
+      "name": "UN Environment",
+      "parent": null,
+      "uses": {
+        "news": 17
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "171",
+      "name": "Entrepreneur",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "172",
+      "name": "YouTube",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "173",
+      "name": "Mongabay News",
+      "parent": null,
+      "uses": {
+        "news": 7
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "174",
+      "name": "Reuters News",
+      "parent": null,
+      "uses": {
+        "news": 268
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "175",
+      "name": "Independent",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "176",
+      "name": "UN News",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "177",
+      "name": "News Cision",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "178",
+      "name": "Nexus Media News",
+      "parent": null,
+      "uses": {
+        "news": 11
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "179",
+      "name": "The Salt",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "180",
+      "name": "Responsible investor",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "181",
+      "name": "Energy News Network",
+      "parent": null,
+      "uses": {
+        "news": 5
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "182",
+      "name": "The Third Pole",
+      "parent": null,
+      "uses": {
+        "news": 24
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "184",
+      "name": "Communicationsworks",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "185",
+      "name": "Times of India",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "186",
+      "name": "World Economic Forum",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "187",
+      "name": "Clean Energy Wire",
+      "parent": null,
+      "uses": {
+        "news": 505
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "188",
+      "name": "Irish Times",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "189",
+      "name": "NRDC News",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "190",
+      "name": "Climate Home News",
+      "parent": null,
+      "uses": {
+        "news": 469
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "191",
+      "name": "IEA Newsroom",
+      "parent": null,
+      "uses": {
+        "news": 36
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "192",
+      "name": "The Times",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "193",
+      "name": "Agora Energiewende",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "194",
+      "name": "Canada's National Observer",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "195",
+      "name": "CAN Europe",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "196",
+      "name": "World Resources Institute",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "197",
+      "name": "The Atlantic",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "198",
+      "name": "Bloomberg",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "199",
+      "name": "EDF + Business",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "200",
+      "name": "Foresight Climate & Energy",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "201",
+      "name": "The Third Pole.net",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "202",
+      "name": "National Observer",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "203",
+      "name": "Smarter House",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "204",
+      "name": "The Daily Star",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "205",
+      "name": "Ecosperity",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "206",
+      "name": "Positive Money",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "207",
+      "name": "MotherJones",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "208",
+      "name": "UCL European Institute",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "209",
+      "name": "International Energy Agency Newsroom",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "210",
+      "name": "Politico",
+      "parent": null,
+      "uses": {
+        "news": 252
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "211",
+      "name": "CLASP",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "212",
+      "name": "European Commission",
+      "parent": null,
+      "uses": {
+        "news": 29
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "213",
+      "name": "Scientific American",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "214",
+      "name": "META News Channel EEB",
+      "parent": null,
+      "uses": {
+        "news": 5
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "216",
+      "name": "Climate Action Network",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "217",
+      "name": "CNN",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "218",
+      "name": "Energycities",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "219",
+      "name": "China Dialogue",
+      "parent": null,
+      "uses": {
+        "news": 79
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "220",
+      "name": "Netzpolitik",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "221",
+      "name": "Energy Monitor",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "222",
+      "name": "Eos",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "223",
+      "name": "The Energy Mix",
+      "parent": null,
+      "uses": {
+        "news": 17
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "224",
+      "name": "scidev.net",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "225",
+      "name": "Coolproducts",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "227",
+      "name": "Context",
+      "parent": null,
+      "uses": {
+        "news": 268
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "228",
+      "name": "eceee open letter",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "230",
+      "name": "Test",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "231",
+      "name": "Autonomy",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "232",
+      "name": "The Guardianx",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "233",
+      "name": "eceee factbox",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "234",
+      "name": "EuroACE",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "235",
+      "name": "Dialogue Earth",
+      "parent": null,
+      "uses": {
+        "news": 118
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "236",
+      "name": "Linköping University News",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "237",
+      "name": "Le Monde",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "240",
+      "name": "Rinnovabili Europe",
+      "parent": null,
+      "uses": {
+        "news": 16
+      }
+    },
+    {
+      "dimension": "sources",
+      "model": "eceeenews.eceeenewssource",
+      "id": "241",
+      "name": "Canary Media",
+      "parent": null,
+      "uses": {
+        "news": 33
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "3",
+      "name": "Clean Energy Package",
+      "parent": null,
+      "uses": {
+        "news": 16
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "6",
+      "name": "Green mortgages",
+      "parent": null,
+      "uses": {
+        "news": 5
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "12",
+      "name": "BRISKEE",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "13",
+      "name": "CHEETAH",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "14",
+      "name": "discount rates",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "16",
+      "name": "Trucks performance standards",
+      "parent": null,
+      "uses": {
+        "news": 44
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "18",
+      "name": "capacity mechanisms",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "19",
+      "name": "Future of Ecodesign",
+      "parent": null,
+      "uses": {
+        "news": 7
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "21",
+      "name": "IPCC report",
+      "parent": null,
+      "uses": {
+        "news": 32,
+        "columns": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "22",
+      "name": "energy sufficiency",
+      "parent": null,
+      "uses": {
+        "news": 18
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "23",
+      "name": "multiple benefits",
+      "parent": null,
+      "uses": {
+        "news": 58,
+        "columns": 3
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "27",
+      "name": "energy efficiency investments",
+      "parent": null,
+      "uses": {
+        "news": 5,
+        "columns": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "29",
+      "name": "car emissions",
+      "parent": null,
+      "uses": {
+        "news": 102
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "31",
+      "name": "fossil fuel subsidies",
+      "parent": null,
+      "uses": {
+        "news": 35
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "32",
+      "name": "Carbon market",
+      "parent": null,
+      "uses": {
+        "news": 100
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "33",
+      "name": "digital tax",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "34",
+      "name": "Coal exit",
+      "parent": null,
+      "uses": {
+        "news": 255
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "35",
+      "name": "National Energy and Climate Plans (NECP)",
+      "parent": null,
+      "uses": {
+        "news": 47
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "37",
+      "name": "palm oil exit",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "40",
+      "name": "lighting standards",
+      "parent": null,
+      "uses": {
+        "news": 17
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "41",
+      "name": "Climate crisis",
+      "parent": null,
+      "uses": {
+        "news": 620
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "42",
+      "name": "Amazon fires",
+      "parent": null,
+      "uses": {
+        "news": 7
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "44",
+      "name": "IEA 3 percent club & high-level EE commission",
+      "parent": null,
+      "uses": {
+        "news": 7
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "46",
+      "name": "European Green Deal",
+      "parent": null,
+      "uses": {
+        "news": 176,
+        "columns": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "47",
+      "name": "Net Zero Carbon Buildings Commitment",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "48",
+      "name": "Cop25",
+      "parent": null,
+      "uses": {
+        "news": 16
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "49",
+      "name": "Cop24",
+      "parent": null,
+      "uses": {
+        "news": 10
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "50",
+      "name": "Paris Agreement",
+      "parent": null,
+      "uses": {
+        "news": 241
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "52",
+      "name": "CO2 standards",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "53",
+      "name": "Australian fires",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "54",
+      "name": "Smart cities",
+      "parent": null,
+      "uses": {
+        "news": 19
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "57",
+      "name": "Davos 2020",
+      "parent": null,
+      "uses": {
+        "news": 6
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "58",
+      "name": "Brexit",
+      "parent": null,
+      "uses": {
+        "news": 7
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "60",
+      "name": "Airline emissions",
+      "parent": null,
+      "uses": {
+        "news": 178
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "61",
+      "name": "behaviour science",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "62",
+      "name": "Cop26",
+      "parent": null,
+      "uses": {
+        "news": 185
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "63",
+      "name": "Sector coupling",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "64",
+      "name": "Carbon capture and storage (CCS)",
+      "parent": null,
+      "uses": {
+        "news": 135
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "65",
+      "name": "EU Climate law",
+      "parent": null,
+      "uses": {
+        "news": 32
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "66",
+      "name": "CSR",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "68",
+      "name": "School strikes",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "69",
+      "name": "climate and environmental litigation",
+      "parent": null,
+      "uses": {
+        "news": 231
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "70",
+      "name": "Climate activism",
+      "parent": null,
+      "uses": {
+        "news": 69
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "71",
+      "name": "Resilience",
+      "parent": null,
+      "uses": {
+        "news": 82
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "73",
+      "name": "circular economy",
+      "parent": null,
+      "uses": {
+        "news": 72
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "74",
+      "name": "Dieselgate",
+      "parent": null,
+      "uses": {
+        "news": 12
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "75",
+      "name": "EU Green Recovery",
+      "parent": null,
+      "uses": {
+        "news": 85,
+        "columns": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "76",
+      "name": "Renovation wave",
+      "parent": null,
+      "uses": {
+        "news": 77,
+        "columns": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "77",
+      "name": "Energy Charter Treaty",
+      "parent": null,
+      "uses": {
+        "news": 59
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "78",
+      "name": "Energy and poverty",
+      "parent": null,
+      "uses": {
+        "news": 77
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "79",
+      "name": "Airline bailouts",
+      "parent": null,
+      "uses": {
+        "news": 9
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "80",
+      "name": "Green recovery",
+      "parent": null,
+      "uses": {
+        "news": 101,
+        "columns": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "81",
+      "name": "US fuel efficiency standards",
+      "parent": null,
+      "uses": {
+        "news": 36
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "83",
+      "name": "EU Just Transition Fund",
+      "parent": null,
+      "uses": {
+        "news": 9
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "84",
+      "name": "Energy Efficiency First principle",
+      "parent": null,
+      "uses": {
+        "news": 6
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "86",
+      "name": "US election",
+      "parent": null,
+      "uses": {
+        "news": 35
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "87",
+      "name": "EU climate targets",
+      "parent": null,
+      "uses": {
+        "news": 148
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "88",
+      "name": "EU’s Sustainable Finance Taxonomy",
+      "parent": null,
+      "uses": {
+        "news": 84,
+        "columns": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "89",
+      "name": "Sustainable finance",
+      "parent": null,
+      "uses": {
+        "news": 149
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "90",
+      "name": "Energy and equity",
+      "parent": null,
+      "uses": {
+        "news": 43
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "91",
+      "name": "Circular Economy Action Plan (CEAP)",
+      "parent": null,
+      "uses": {
+        "news": 30
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "92",
+      "name": "EU-Mercosur treaty",
+      "parent": null,
+      "uses": {
+        "news": 5
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "93",
+      "name": "New Consumer Agenda",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "95",
+      "name": "Low Traffic Neighbourhood Schemes (LTN)",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "96",
+      "name": "Mercury and lighting",
+      "parent": null,
+      "uses": {
+        "news": 15
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "98",
+      "name": "Asean Comprehensive Recovery Framework",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "99",
+      "name": "EU hydrogen strategy",
+      "parent": null,
+      "uses": {
+        "news": 70,
+        "columns": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "100",
+      "name": "EU offshore renewable energy strategy",
+      "parent": null,
+      "uses": {
+        "news": 24
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "101",
+      "name": "hydrogen",
+      "parent": null,
+      "uses": {
+        "news": 118
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "102",
+      "name": "Eu batteries regulation",
+      "parent": null,
+      "uses": {
+        "news": 14
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "103",
+      "name": "EU emissions trading system ETS",
+      "parent": null,
+      "uses": {
+        "news": 177
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "104",
+      "name": "Zebra Partnership",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "105",
+      "name": "European Climate Pact",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "106",
+      "name": "Climate literacy",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "107",
+      "name": "EU Trans-European Energy Networks rules (TEN-E)",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "108",
+      "name": "Sustainable Aviation Fuels (SAF)",
+      "parent": null,
+      "uses": {
+        "news": 30
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "109",
+      "name": "The Commission’s biodiversity strategy",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "110",
+      "name": "The Commission’s strategy for sustainable and smart mobility",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "111",
+      "name": "Biodiversity",
+      "parent": null,
+      "uses": {
+        "news": 8
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "112",
+      "name": "Monitoring",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "113",
+      "name": "Shipping",
+      "parent": null,
+      "uses": {
+        "news": 93
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "114",
+      "name": "Carbon border taxes",
+      "parent": null,
+      "uses": {
+        "news": 31
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "115",
+      "name": "Just transition",
+      "parent": null,
+      "uses": {
+        "news": 108
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "116",
+      "name": "Fit for 55 package",
+      "parent": null,
+      "uses": {
+        "news": 49
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "117",
+      "name": "Mercosur trade deal",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "118",
+      "name": "Trans-European Networks for Energy",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "119",
+      "name": "sustainable and smart mobility strategy.",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "120",
+      "name": "Science-based targets (SBTs)",
+      "parent": null,
+      "uses": {
+        "news": 8
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "122",
+      "name": "EU industrial strategy",
+      "parent": null,
+      "uses": {
+        "news": 72
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "123",
+      "name": "Texas freeze",
+      "parent": null,
+      "uses": {
+        "news": 6
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "124",
+      "name": "social cost of carbon (SCC)",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "125",
+      "name": "EU climate change adaptation strategy",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "126",
+      "name": "Euro 7 regulation",
+      "parent": null,
+      "uses": {
+        "news": 11
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "127",
+      "name": "US product efficiency standards",
+      "parent": null,
+      "uses": {
+        "news": 14
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "128",
+      "name": "Climate and gender",
+      "parent": null,
+      "uses": {
+        "news": 18
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "129",
+      "name": "Renovation",
+      "parent": null,
+      "uses": {
+        "news": 99,
+        "columns": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "130",
+      "name": "The Corsia deal",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "131",
+      "name": "National Emission Ceilings Regulations",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "132",
+      "name": "Taxation",
+      "parent": null,
+      "uses": {
+        "news": 73
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "133",
+      "name": "Earth Day virtual global summit on climate",
+      "parent": null,
+      "uses": {
+        "news": 11
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "134",
+      "name": "EU Energy System Integration Strategy",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "135",
+      "name": "Climate Change Action Plan",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "136",
+      "name": "Renewable Energy Directive",
+      "parent": null,
+      "uses": {
+        "news": 59
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "137",
+      "name": "Nationally Determined Contributions (NDCs) to reduce carbon emissions",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "138",
+      "name": "The Powering Past Coal Alliance",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "139",
+      "name": "Energy Performance of Buildings Directive (EPBD)",
+      "parent": null,
+      "uses": {
+        "news": 80,
+        "columns": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "141",
+      "name": "Solar power",
+      "parent": null,
+      "uses": {
+        "news": 241
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "142",
+      "name": "End-of-Life Vehicles (ELV)",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "143",
+      "name": "G7 Summit",
+      "parent": null,
+      "uses": {
+        "news": 21
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "144",
+      "name": "Transatlantic Green Technology Alliance",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "145",
+      "name": "EU-OACPS Partnership Agreement",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "146",
+      "name": "FuelEU Maritime",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "147",
+      "name": "EU carbon border adjustment mechanism (CBAM)",
+      "parent": null,
+      "uses": {
+        "news": 55
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "148",
+      "name": "EU Ecodesign Directive",
+      "parent": null,
+      "uses": {
+        "news": 10
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "149",
+      "name": "Climate change and GDP",
+      "parent": null,
+      "uses": {
+        "news": 10
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "150",
+      "name": "internal combustion engines",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "151",
+      "name": "EU certification scheme for carbon dioxide removals",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "152",
+      "name": "Product standards",
+      "parent": null,
+      "uses": {
+        "news": 6
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "153",
+      "name": "Fuel poverty",
+      "parent": null,
+      "uses": {
+        "news": 12
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "156",
+      "name": "Energy Efficiency Directive EED",
+      "parent": null,
+      "uses": {
+        "news": 26
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "157",
+      "name": "Energy price",
+      "parent": null,
+      "uses": {
+        "news": 142
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "158",
+      "name": "Narratives for energy transition",
+      "parent": null,
+      "uses": {
+        "news": 11
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "159",
+      "name": "Cement",
+      "parent": null,
+      "uses": {
+        "news": 12
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "160",
+      "name": "methane emissions",
+      "parent": null,
+      "uses": {
+        "news": 44
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "161",
+      "name": "gas boiler phase out",
+      "parent": null,
+      "uses": {
+        "news": 77,
+        "columns": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "162",
+      "name": "energy security",
+      "parent": null,
+      "uses": {
+        "news": 343
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "163",
+      "name": "EU Fiscal Reform",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "165",
+      "name": "batteries",
+      "parent": null,
+      "uses": {
+        "news": 105,
+        "columns": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "166",
+      "name": "G20 Summit",
+      "parent": null,
+      "uses": {
+        "news": 13
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "167",
+      "name": "Sustainability Standards Board (ISSB)",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "168",
+      "name": "digital technology",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "169",
+      "name": "Climate justice",
+      "parent": null,
+      "uses": {
+        "news": 23
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "170",
+      "name": "climate emergency",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "171",
+      "name": "Cop27",
+      "parent": null,
+      "uses": {
+        "news": 61
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "172",
+      "name": "Bitcoin",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "173",
+      "name": "Ten-Year Network Development Plan (TYNDP)",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "174",
+      "name": "Whole Life Carbon (WLC)",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "175",
+      "name": "EU gas market legislation",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "176",
+      "name": "climate and economic growth",
+      "parent": null,
+      "uses": {
+        "news": 9
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "178",
+      "name": "EU regulatory framework for the certification of carbon removals",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "179",
+      "name": "EU regulation on CO2 emission standards",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "180",
+      "name": "The Declaration on China-Africa Cooperation on Combatting Climate Change",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "181",
+      "name": "Substantiating Green Claims Initiative",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "183",
+      "name": "EU social climate fund",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "184",
+      "name": "Global Gateway programme",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "185",
+      "name": "European Energy and Climate Security Strategy",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "186",
+      "name": "Energy storage",
+      "parent": null,
+      "uses": {
+        "news": 29
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "187",
+      "name": "EU-SysFlex",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "188",
+      "name": "Power Purchase Agreements (PPAs)",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "189",
+      "name": "Africa-EU summit",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "190",
+      "name": "Africa-EU Energy Partnership (AEEP)",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "191",
+      "name": "U Energy Crisis Solidarity Facility",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "192",
+      "name": "Citizen Energy Communities (CECs)",
+      "parent": null,
+      "uses": {
+        "news": 6
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "193",
+      "name": "district heating",
+      "parent": null,
+      "uses": {
+        "news": 6
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "194",
+      "name": "consumption-based emissions",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "195",
+      "name": "energy rationing",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "196",
+      "name": "heating",
+      "parent": null,
+      "uses": {
+        "news": 184
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "197",
+      "name": "EU green aviation law",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "198",
+      "name": "RePowerEU",
+      "parent": null,
+      "uses": {
+        "news": 19
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "199",
+      "name": "EU electricity market",
+      "parent": null,
+      "uses": {
+        "news": 61
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "200",
+      "name": "EU sustainability reporting standards",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "201",
+      "name": "Next Generation EU",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "202",
+      "name": "Stockholm+50",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "203",
+      "name": "cities",
+      "parent": null,
+      "uses": {
+        "news": 58
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "204",
+      "name": "energy crisis",
+      "parent": null,
+      "uses": {
+        "news": 118
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "205",
+      "name": "ReFuelEU",
+      "parent": null,
+      "uses": {
+        "news": 10
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "206",
+      "name": "cryptomining",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "207",
+      "name": "bioenergy",
+      "parent": null,
+      "uses": {
+        "news": 34
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "208",
+      "name": "Public procurement",
+      "parent": null,
+      "uses": {
+        "news": 9
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "209",
+      "name": "Regulation on Ecodesign for Sustainable Products (ESPR)",
+      "parent": null,
+      "uses": {
+        "news": 8
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "211",
+      "name": "energy saving measures",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "212",
+      "name": "Bioeconomy",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "213",
+      "name": "electrification",
+      "parent": null,
+      "uses": {
+        "news": 73
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "215",
+      "name": "Carbon handprint",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "216",
+      "name": "Cop28",
+      "parent": null,
+      "uses": {
+        "news": 114
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "217",
+      "name": "EU Critical Raw Materials Act",
+      "parent": null,
+      "uses": {
+        "news": 27
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "218",
+      "name": "EU Gas Price Cap",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "219",
+      "name": "EU sustainability reporting standards (ESRS)",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "220",
+      "name": "EU Sovereignty Fund",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "221",
+      "name": "nuclear fusion",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "222",
+      "name": "smart technologies",
+      "parent": null,
+      "uses": {
+        "news": 5
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "224",
+      "name": "Green Deal Industrial Plan",
+      "parent": null,
+      "uses": {
+        "news": 26
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "225",
+      "name": "EU windfall tax",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "226",
+      "name": "Cooling",
+      "parent": null,
+      "uses": {
+        "news": 62
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "227",
+      "name": "EU car performance standards",
+      "parent": null,
+      "uses": {
+        "news": 116
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "228",
+      "name": "heat recovery",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "229",
+      "name": "combustion engine phaseout",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "231",
+      "name": "EU energy support package",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "232",
+      "name": "Green Claims Directive",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "233",
+      "name": "carbon offsetting",
+      "parent": null,
+      "uses": {
+        "news": 18
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "234",
+      "name": "EU standards for heavy-duty vehicles",
+      "parent": null,
+      "uses": {
+        "news": 38
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "235",
+      "name": "Green Alliance",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "236",
+      "name": "Energy sharing",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "237",
+      "name": "clean energy transition",
+      "parent": null,
+      "uses": {
+        "news": 243
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "238",
+      "name": "building performance standards (BPS)",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "239",
+      "name": "EU Energy Taxation Directive",
+      "parent": null,
+      "uses": {
+        "news": 8
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "240",
+      "name": "Industrial Emissions Directive (IED)",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "241",
+      "name": "data centres",
+      "parent": null,
+      "uses": {
+        "news": 78
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "242",
+      "name": "Climate and insurance",
+      "parent": null,
+      "uses": {
+        "news": 34
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "243",
+      "name": "EU Net-Zero Industry Act (NZIA)",
+      "parent": null,
+      "uses": {
+        "news": 28
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "244",
+      "name": "nuclear energy",
+      "parent": null,
+      "uses": {
+        "news": 60
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "245",
+      "name": "Geoengineering",
+      "parent": null,
+      "uses": {
+        "news": 7
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "246",
+      "name": "Paris Summit for a New Global Financing Pact",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "247",
+      "name": "Ukraine energy transition",
+      "parent": null,
+      "uses": {
+        "news": 13
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "248",
+      "name": "EU’s Zero Pollution Action Plan",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "249",
+      "name": "Inflation Reduction Act (IRA)",
+      "parent": null,
+      "uses": {
+        "news": 11
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "250",
+      "name": "Artificial Intelligence (AI)",
+      "parent": null,
+      "uses": {
+        "news": 48
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "251",
+      "name": "climate washing",
+      "parent": null,
+      "uses": {
+        "news": 6
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "252",
+      "name": "effort sharing regulation (ESR)",
+      "parent": null,
+      "uses": {
+        "news": 7
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "253",
+      "name": "F-gases",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "254",
+      "name": "Africa Climate Summit (ACS)",
+      "parent": null,
+      "uses": {
+        "news": 9
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "255",
+      "name": "Positive Energy Neighbourhoods (PENs)",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "256",
+      "name": "South Africa’s Just Energy Transition Partnership (JETP)",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "257",
+      "name": "Climate Ambition Summit",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "258",
+      "name": "International Climate and Energy Summit",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "259",
+      "name": "E-fuels",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "260",
+      "name": "cooking",
+      "parent": null,
+      "uses": {
+        "news": 9
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "261",
+      "name": "EU Wind Power Package",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "262",
+      "name": "HFC-23",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "263",
+      "name": "EU Action Plan for Grids",
+      "parent": null,
+      "uses": {
+        "news": 18
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "264",
+      "name": "biofuels",
+      "parent": null,
+      "uses": {
+        "news": 15
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "265",
+      "name": "COP29",
+      "parent": null,
+      "uses": {
+        "news": 68
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "266",
+      "name": "Geothermal energy",
+      "parent": null,
+      "uses": {
+        "news": 7
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "267",
+      "name": "green steel",
+      "parent": null,
+      "uses": {
+        "news": 20
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "269",
+      "name": "right-to-repair (or R2R) directive",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "270",
+      "name": "International Energy Conservation Code (IECC)",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "273",
+      "name": "industrial carbon management (ICM) strategy",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "274",
+      "name": "Energy Efficiency Scoreboard",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "275",
+      "name": "EU parliament election",
+      "parent": null,
+      "uses": {
+        "news": 25
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "276",
+      "name": "demand flexibility",
+      "parent": null,
+      "uses": {
+        "news": 16
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "277",
+      "name": "energy demand",
+      "parent": null,
+      "uses": {
+        "news": 31
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "278",
+      "name": "carbon dioxide emissions",
+      "parent": null,
+      "uses": {
+        "news": 9
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "279",
+      "name": "Antwerp Declaration for an Industrial Deal",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "280",
+      "name": "Energy Efficiency Academy",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "281",
+      "name": "US election 2024",
+      "parent": null,
+      "uses": {
+        "news": 43
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "282",
+      "name": "European Court of Human Rights",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "283",
+      "name": "Electric vehicles",
+      "parent": null,
+      "uses": {
+        "news": 110
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "284",
+      "name": "Greenwashing",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "285",
+      "name": "Heat Pump Action Plan",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "286",
+      "name": "Consumption-based CO₂ emissions (CBEs)",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "287",
+      "name": "Railways",
+      "parent": null,
+      "uses": {
+        "news": 28
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "288",
+      "name": "biochar",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "289",
+      "name": "Global Renewables Summit",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "290",
+      "name": "COP30",
+      "parent": null,
+      "uses": {
+        "news": 91
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "291",
+      "name": "Energy demand response",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "292",
+      "name": "grid capacity",
+      "parent": null,
+      "uses": {
+        "news": 27
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "293",
+      "name": "EU Flight Emissions Label",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "294",
+      "name": "Windows",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "295",
+      "name": "solar geoengineering",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "296",
+      "name": "earthen buildings",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "297",
+      "name": "Cop31",
+      "parent": null,
+      "uses": {
+        "news": 16
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "298",
+      "name": "Environmental and social governance (ESG)",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "299",
+      "name": "Automotive Industry Action Plan",
+      "parent": null,
+      "uses": {
+        "news": 7
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "300",
+      "name": "EU Clean Industrial Deal",
+      "parent": null,
+      "uses": {
+        "news": 33,
+        "columns": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "303",
+      "name": "Fossil Fuel Non-Proliferation Treaty",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "304",
+      "name": "Innovation",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "305",
+      "name": "The Summit on the Future of Energy Security",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "306",
+      "name": "European Steel and Metals Action Plan",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "307",
+      "name": "carbon pricing",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "308",
+      "name": "US climate policy",
+      "parent": null,
+      "uses": {
+        "news": 99
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "309",
+      "name": "The Sustainable Transport Investment Plan (STIP)",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "310",
+      "name": "Corporate Sustainability Due Diligence Directive",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "311",
+      "name": "osmotic power",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "312",
+      "name": "fashion industry",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "313",
+      "name": "Omnibus simplification package",
+      "parent": null,
+      "uses": {
+        "news": 2
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "314",
+      "name": "Green aluminium",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "315",
+      "name": "EU Air services regulation",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "316",
+      "name": "EU Affordable Housing Plan",
+      "parent": null,
+      "uses": {
+        "news": 5
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "317",
+      "name": "Trans-European Transport Network (TEN-T)",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "318",
+      "name": "off-grid electricity",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "319",
+      "name": "Clean Vehicles Directive",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "320",
+      "name": "Clean Corporate Vehicles Regulation",
+      "parent": null,
+      "uses": {
+        "news": 3
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "321",
+      "name": "waste-to-energy",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "322",
+      "name": "Industrial Accelerator Act (IAA)",
+      "parent": null,
+      "uses": {
+        "news": 4
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "323",
+      "name": "Governance Regulation",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "324",
+      "name": "digitalisation",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "325",
+      "name": "Energy",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "326",
+      "name": "EU Passenger Package",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "327",
+      "name": "EU standards for light-duty vehicles",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "328",
+      "name": "electrification action plan",
+      "parent": null,
+      "uses": {
+        "news": 7
+      }
+    },
+    {
+      "dimension": "topics",
+      "model": "eceeenews.relatednews",
+      "id": "329",
+      "name": "T-MED Investment Platform",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    },
+    {
+      "dimension": "types",
+      "model": "eceeenews.eceeenewstype",
+      "id": "1",
+      "name": "External News via Page",
+      "parent": null,
+      "uses": {
+        "news": 16776
+      }
+    },
+    {
+      "dimension": "types",
+      "model": "eceeenews.eceeenewstype",
+      "id": "2",
+      "name": "News ENDS",
+      "parent": null,
+      "uses": {
+        "news": 569
+      }
+    },
+    {
+      "dimension": "types",
+      "model": "eceeenews.eceeenewstype",
+      "id": "4",
+      "name": "Press Release",
+      "parent": null,
+      "uses": {
+        "news": 53
+      }
+    },
+    {
+      "dimension": "types",
+      "model": "eceeenews.eceeenewstype",
+      "id": "6",
+      "name": "Community News",
+      "parent": null,
+      "uses": {
+        "news": 13
+      }
+    },
+    {
+      "dimension": "types",
+      "model": "eceeenews.eceeenewstype",
+      "id": "8",
+      "name": "External Report",
+      "parent": null,
+      "uses": {
+        "news": 18
+      }
+    },
+    {
+      "dimension": "types",
+      "model": "eceeenews.eceeenewstype",
+      "id": "10",
+      "name": "eceee News",
+      "parent": null,
+      "uses": {
+        "news": 143
+      }
+    },
+    {
+      "dimension": "types",
+      "model": "eceeenews.eceeenewstype",
+      "id": "11",
+      "name": "eceee",
+      "parent": null,
+      "uses": {
+        "news": 9
+      }
+    },
+    {
+      "dimension": "types",
+      "model": "eceeenews.eceeenewstype",
+      "id": "12",
+      "name": "External column",
+      "parent": null,
+      "uses": {
+        "news": 18
+      }
+    },
+    {
+      "dimension": "types",
+      "model": "eceeenews.eceeenewstype",
+      "id": "13",
+      "name": "Open letter",
+      "parent": null,
+      "uses": {
+        "news": 1
+      }
+    }
+  ]
+}

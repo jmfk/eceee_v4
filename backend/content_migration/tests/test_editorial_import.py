@@ -16,6 +16,7 @@ from content.models import Namespace
 from content_migration.legacy_content.profile import CLASSIFICATIONS, initial_bundle
 from content_migration.legacy_content.service import apply_item, apply_run, preflight, stage
 from content_migration.legacy_content.source import validate_record
+from content_migration.legacy_content.term_plan import identity
 from content_migration.legacy_content.transform import BlockedRecord, normalize
 from content_migration.models import EditorialImportBinding
 from core.models import Tenant
@@ -139,6 +140,210 @@ class EditorialImportTests(TestCase):
         return Tag.objects.create(
             tenant=self.tenant, namespace=self.namespace, classification_type=definition, name=name, slug=name.lower()
         )
+
+    def _reviewed_source_plan(self):
+        source_key = identity(2, "sources", "eceeenews.eceeenewssource", 4)
+        term = {
+            "type": "news_source",
+            "slug": "group-okand-kalla",
+            "name": "Okänd källa",
+            "parent": None,
+            "alternative_names": [],
+        }
+        mapping = {
+            "format": "eceee-reviewed-legacy-term-map",
+            "version": 2,
+            "sourceSite": 2,
+            "inventoryDigest": "inventory",
+            "decisionsDigest": "decisions",
+            "termRefs": {source_key: {"type": "news_source", "slug": term["slug"]}},
+            "pressReleaseSourceTerms": ["4"],
+        }
+        return {"bundle": {"terms": [term]}, "mapping": mapping}
+
+    def test_reviewed_blank_source_is_mapped_and_new_source_is_rejected(self):
+        from taxonomy.assignments import classification_ids
+        from taxonomy.models import Tag
+
+        plan = self._reviewed_source_plan()
+        operation = mutate(
+            self.user,
+            self.facets["news_source"],
+            "create",
+            payload={"name": "Okänd källa", "slug": "group-okand-kalla"},
+        )
+        target = Tag.objects.get(pk=next(iter(operation.after)))
+        source = {"model": "eceeenews.eceeenewssource", "id": 4, "name": "", "parentId": None}
+        with patch("content_migration.legacy_content.service.compile_plan", return_value=plan):
+            run = self.stage([("news", record(taxonomy={"sources": [source]}))], plan["mapping"])
+            self.assertEqual(apply_run(run, self.user), {"imported": 1})
+            obj = EditorialImportBinding.objects.get().object_instance
+            self.assertIn(str(target.pk), classification_ids(obj.current_version))
+            unknown = {**source, "id": 9999, "name": "New source"}
+            with self.assertRaisesRegex(BlockedRecord, "new_or_unmapped_source_term"):
+                self.stage([("news", record(pk=2, taxonomy={"sources": [unknown]}))], plan["mapping"])
+
+    def test_changed_reviewed_target_blocks_apply(self):
+        from taxonomy.models import Tag
+
+        plan = self._reviewed_source_plan()
+        operation = mutate(
+            self.user,
+            self.facets["news_source"],
+            "create",
+            payload={"name": "Okänd källa", "slug": "group-okand-kalla"},
+        )
+        target = Tag.objects.get(pk=next(iter(operation.after)))
+        source = {"model": "eceeenews.eceeenewssource", "id": 4, "name": "", "parentId": None}
+        with patch("content_migration.legacy_content.service.compile_plan", return_value=plan):
+            run = self.stage([("news", record(taxonomy={"sources": [source]}))], plan["mapping"])
+            target.name = "Changed"
+            target.save(update_fields=["name"])
+            with self.assertRaisesRegex(BlockedRecord, "unprepared_or_changed_reviewed_term"):
+                apply_run(run, self.user)
+
+    def test_reviewed_event_choice_and_keyword_across_four_target_types(self):
+        from taxonomy.assignments import classification_ids
+        from taxonomy.models import Tag
+
+        keyword = {"model": "generic.keyword", "id": 836, "name": "Climate change", "parentId": None}
+        keyword_key = identity(2, "keywords", "generic.keyword", 836)
+        choice_key = identity(2, "eventType", "choice", "Conference")
+        terms = [
+            {
+                "type": "news_keyword",
+                "slug": "climate-change-reviewed",
+                "name": "Climate change",
+                "parent": None,
+                "alternative_names": [],
+            },
+            {
+                "type": "event_type",
+                "slug": "conference-reviewed",
+                "name": "Conference",
+                "parent": None,
+                "alternative_names": [],
+            },
+        ]
+        plan = {
+            "bundle": {"terms": terms},
+            "mapping": {
+                "format": "eceee-reviewed-legacy-term-map",
+                "version": 2,
+                "sourceSite": 2,
+                "inventoryDigest": "inventory",
+                "decisionsDigest": "decisions",
+                "termRefs": {
+                    keyword_key: {"type": "news_keyword", "slug": "climate-change-reviewed"},
+                    choice_key: {"type": "event_type", "slug": "conference-reviewed"},
+                },
+            },
+        }
+        for term in terms:
+            mutate(
+                self.user,
+                self.facets[term["type"]],
+                "create",
+                payload={
+                    "name": term["name"],
+                    "slug": term["slug"],
+                },
+            )
+        rows = [
+            ("news", record(taxonomy={"keywords": [keyword]})),
+            ("columnists", record("columnists", pk=2, taxonomy={"keywords": [keyword]})),
+            (
+                "events",
+                record(
+                    "events",
+                    pk=3,
+                    data={"eventStartDate": "2020-05-10", "eventType": "Conference"},
+                    taxonomy={"keywords": [keyword]},
+                ),
+            ),
+            (
+                "organizations",
+                record(
+                    "organizations", pk=4, data={"fullName": "Example organization"}, taxonomy={"keywords": [keyword]}
+                ),
+            ),
+        ]
+        with patch("content_migration.legacy_content.service.compile_plan", return_value=plan):
+            run = self.stage(rows, plan["mapping"])
+            self.assertEqual(apply_run(run, self.user), {"imported": 4})
+            keyword_tag = Tag.objects.get(
+                classification_type=self.facets["news_keyword"], slug="climate-change-reviewed"
+            )
+            for binding in EditorialImportBinding.objects.all():
+                self.assertIn(str(keyword_tag.pk), classification_ids(binding.object_instance.current_version))
+            changed_choice = {**rows[2][1], "data": {"eventStartDate": "2020-05-10", "eventType": "conference"}}
+            with self.assertRaisesRegex(BlockedRecord, "new_or_unmapped_source_term"):
+                self.stage([("events", changed_choice)], plan["mapping"])
+
+    def test_press_release_requires_reviewed_newstype_identity(self):
+        from taxonomy.assignments import classification_ids
+        from taxonomy.models import Tag
+
+        news = Tag.objects.get(classification_type=self.facets["article_kind"], slug="news")
+        mutate(
+            self.user,
+            self.facets["article_kind"],
+            "create",
+            payload={
+                "name": "Pressmeddelande",
+                "slug": "press-release",
+                "parent_id": str(news.pk),
+            },
+        )
+        mutate(
+            self.user,
+            self.facets["news_type"],
+            "create",
+            payload={
+                "name": "Press Release",
+                "slug": "press-release-source",
+            },
+        )
+        source = {"model": "eceeenews.eceeenewstype", "id": 4, "name": "Press Release", "parentId": None}
+        key = identity(2, "types", source["model"], source["id"])
+        plan = {
+            "bundle": {
+                "terms": [
+                    {"type": "article_kind", "slug": "news", "name": "Nyhet", "parent": None, "alternative_names": []},
+                    {
+                        "type": "article_kind",
+                        "slug": "press-release",
+                        "name": "Pressmeddelande",
+                        "parent": "news",
+                        "alternative_names": [],
+                    },
+                    {
+                        "type": "news_type",
+                        "slug": "press-release-source",
+                        "name": "Press Release",
+                        "parent": None,
+                        "alternative_names": [],
+                    },
+                ]
+            },
+            "mapping": {
+                "format": "eceee-reviewed-legacy-term-map",
+                "version": 2,
+                "sourceSite": 2,
+                "inventoryDigest": "inventory",
+                "decisionsDigest": "decisions",
+                "termRefs": {key: {"type": "news_type", "slug": "press-release-source"}},
+            },
+        }
+        with patch("content_migration.legacy_content.service.compile_plan", return_value=plan):
+            run = self.stage([("news", record(taxonomy={"types": [source]}))], plan["mapping"])
+            self.assertEqual(apply_run(run, self.user), {"imported": 1})
+            assigned = classification_ids(EditorialImportBinding.objects.get().object_instance.current_version)
+            press = Tag.objects.get(classification_type=self.facets["article_kind"], slug="press-release")
+            self.assertIn(str(press.pk), assigned)
+            other_model = {**source, "model": "other.eceeenewstype"}
+            with self.assertRaisesRegex(BlockedRecord, "new_or_unmapped_source_term"):
+                self.stage([("news", record(pk=2, taxonomy={"types": [other_model]}))], plan["mapping"])
 
     def _media_run(self, row, configuration):
         return stage(
@@ -570,7 +775,7 @@ class EditorialImportTests(TestCase):
     @patch("content_migration.management.commands.migrate_legacy_editorial.NewsCommand._legacy_api_config")
     @patch("content_migration.legacy_content.source.EditorialSource._request")
     def test_preflight_inventory_is_read_only_and_reports_each_source_resource(self, request, config):
-        from content_migration.legacy_content.source import RESOURCES
+        from content_migration.legacy_content.source import DEFAULT_RESOURCES, RESOURCES
 
         config.return_value = {"base_url": "https://legacy.example/api/migration/v1/", "token": "test-only"}
         request.side_effect = lambda path: (
@@ -592,9 +797,9 @@ class EditorialImportTests(TestCase):
             stdout=output,
         )
         result = json.loads(output.getvalue())
-        self.assertEqual(set(result["inventory"]), set(RESOURCES))
+        self.assertEqual(set(result["inventory"]), set(DEFAULT_RESOURCES))
         self.assertEqual(result["inventory"]["columns"]["excludedUnpublished"], 3)
-        self.assertEqual(request.call_count, 7)
+        self.assertEqual(request.call_count, 6)
         self.assertFalse(EditorialImportBinding.objects.exists())
         self.assertFalse(ObjectInstance.objects.exists())
 
@@ -619,37 +824,70 @@ class EditorialImportTests(TestCase):
             )
 
     def test_full_import_requires_a_current_completed_reviewed_sample(self):
-        config = {"resources": ["news"], "mappingHash": "reviewed-mapping"}
-        sample = stage(
-            tenant=self.tenant,
-            namespace=self.namespace,
-            user=self.user,
-            source_scope="legacy.example:site:2",
-            records=[("news", record())],
-            configuration=config,
-        )
-        apply_run(sample, self.user)
-        sample.refresh_from_db()
-        sample.reviewed_at = timezone.now()
-        sample.reviewed_by = self.user
-        sample.save()
+        plan = {
+            "bundle": {
+                "terms": [
+                    {"type": "article_kind", "slug": slug, "name": name, "parent": parent, "alternative_names": []}
+                    for slug, name, parent in [
+                        ("news", "Nyhet", None),
+                        ("column", "Krönika", None),
+                        ("press-release", "Pressmeddelande", "news"),
+                    ]
+                ]
+            },
+            "mapping": {
+                "format": "eceee-reviewed-legacy-term-map",
+                "version": 2,
+                "sourceSite": 2,
+                "inventoryDigest": "inventory",
+                "decisionsDigest": "decisions",
+                "termRefs": {},
+            },
+        }
+        from taxonomy.models import Tag
 
-        def full_run():
-            return stage(
+        mutate(
+            self.user,
+            self.facets["article_kind"],
+            "create",
+            payload={
+                "name": "Pressmeddelande",
+                "slug": "press-release",
+                "parent_id": str(Tag.objects.get(classification_type=self.facets["article_kind"], slug="news").pk),
+            },
+        )
+        config = {**plan["mapping"], "resources": ["news"], "mappingHash": "reviewed-mapping"}
+        with patch("content_migration.legacy_content.service.compile_plan", return_value=plan):
+            sample = stage(
                 tenant=self.tenant,
                 namespace=self.namespace,
                 user=self.user,
                 source_scope="legacy.example:site:2",
                 records=[("news", record())],
-                preset="all",
-                configuration={**config, "acceptedSampleRun": str(sample.pk)},
+                configuration=config,
             )
+            apply_run(sample, self.user)
+            sample.refresh_from_db()
+            sample.reviewed_at = timezone.now()
+            sample.reviewed_by = self.user
+            sample.save()
 
-        self.assertEqual(apply_run(full_run(), self.user), {"unchanged": 1})
-        sample.status = "partial"
-        sample.save()
-        with self.assertRaisesRegex(BlockedRecord, "reviewed_sample_required"):
-            apply_run(full_run(), self.user)
+            def full_run():
+                return stage(
+                    tenant=self.tenant,
+                    namespace=self.namespace,
+                    user=self.user,
+                    source_scope="legacy.example:site:2",
+                    records=[("news", record())],
+                    preset="all",
+                    configuration={**config, "acceptedSampleRun": str(sample.pk)},
+                )
+
+            self.assertEqual(apply_run(full_run(), self.user), {"unchanged": 1})
+            sample.status = "partial"
+            sample.save()
+            with self.assertRaisesRegex(BlockedRecord, "reviewed_sample_required"):
+                apply_run(full_run(), self.user)
 
     def test_changed_frozen_manifest_fails_before_writing(self):
         run = self.stage([("news", record())])

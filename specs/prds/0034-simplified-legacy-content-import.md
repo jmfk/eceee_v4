@@ -5,6 +5,7 @@ status: in-progress
 locked: true
 created: 2026-10-22
 related_adrs:
+  - ADR-0056
   - ADR-0049
   - ADR-0047
   - ADR-0046
@@ -106,19 +107,26 @@ ECEEE behöver föra över sitt redaktionella innehåll utan att återskapa alla
 
 ## Linked ADRs
 
+- [ADR-0056](../adrs/active/0056-exclude-legacy-publications-from-editorial-import.md)
 - [ADR-0046](../adrs/active/0046-unified-articles-and-bounded-legacy-import.md)
 - [ADR-0043](../adrs/active/0043-classification-governance.md)
 - [ADR-0025](../adrs/active/0025-authenticated-legacy-migration-api.md)
 
 ## Completion Evidence
 
-- Planering och dokumentation finns. Inga nya importverktyg eller datakörningar har genomförts för denna PRD.
+- Site-2-inventeringen omfattar 698 termidentiteter. Den versionsstyrda beslutskartan kompilerar 703 måltermer och importen kräver godkända måltermer före stage/apply.
+- Den äldre lokala site-0-testimporten säkerhetskopierades och rensades avgränsat. Ett verkligt blandat site-2-prov med två poster per kvarvarande källresurs gav 10 utkast utan blockerade poster; omkörning skapade inga nya versioner. Se [importguiden](../../docs/legacy-editorial-import.md).
+- Redaktionell provacceptans, större källavstämning, full import och produktionsövergång återstår; PRD:n är fortsatt `in-progress`.
+
+## Scope note — 2026-10-27
+
+Ägaren har valt att ignorera `EceeeLibraryItem`, dess filposter och `ReportPage` i den aktuella importen efter att källresursen `publications` gav noll poster för site 2. Den befintliga tekniska måltypen `library_item` behålls. Se ADR-0056 och PLAN-0005. Detta är ett urvalsbeslut för importen, inte ett påstående att alla framtida publikationer saknas.
 
 ## Implementation notes — 2026-10-22
 
 Implementation started in the isolated `codex/legacy-import-dev` workspace. The five definitions are installed in tenant `legacy-import-dev`; 100 real public legacy News records are imported as draft Articles. Definition export/diff is repeatable, and per-item import checkpoints protect manual destination edits. See [operator guide](../../docs/legacy-editorial-import.md) and [ADR-0047](../adrs/active/0047-portable-editorial-definitions-and-draft-import.md).
 
-Status remains in-progress: the deployed source exposes only the old News API. The six-resource source extension is implemented and tested in the separate legacy repository but not deployed. Real mixed News/Column samples, remaining object types, inventory reconciliation, proceedings exclusions, staging rehearsal, public rendering/URL cutover and production execution are not accepted by this dev exercise.
+Historical status at 2026-10-22: the deployed source then exposed only the old News API. The extended source contract is now available for the five selected resources and a small real mixed draft sample has run. Public rendering, URL cutover and production execution remain outside the accepted scope.
 
 ### Source-contract preparation
 

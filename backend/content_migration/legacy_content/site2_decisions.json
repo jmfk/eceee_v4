@@ -1,0 +1,643 @@
+{
+  "format": "eceee-legacy-term-decisions",
+  "version": 1,
+  "sourceSite": 2,
+  "targetTypes": {
+    "types": "news_type",
+    "categories": "news_category",
+    "sources": "news_source",
+    "topics": "news_topic",
+    "keywords": "news_keyword",
+    "eceeeCategories": "general",
+    "eventType": "event_type",
+    "eventCategories": "event_category",
+    "affiliations": "organization_affiliation"
+  },
+  "groups": {
+    "types": {
+      "ECEEE": [
+        10,
+        11
+      ],
+      "External": [
+        1,
+        2,
+        8,
+        12
+      ],
+      "Submitted": [
+        4,
+        6,
+        13
+      ]
+    },
+    "categories": {
+      "Climate & environment": [
+        1,
+        2
+      ],
+      "Energy": [
+        9,
+        10,
+        16,
+        18,
+        21
+      ],
+      "Buildings & products": [
+        4,
+        6,
+        7,
+        8,
+        12,
+        22
+      ],
+      "Policy & cooperation": [
+        5,
+        11,
+        13,
+        14,
+        15,
+        17,
+        19,
+        20
+      ],
+      "Transport": [
+        3
+      ]
+    },
+    "topics": {
+      "Climate & environment": [
+        21,
+        37,
+        41,
+        42,
+        48,
+        49,
+        50,
+        53,
+        62,
+        65,
+        68,
+        69,
+        70,
+        71,
+        87,
+        103,
+        105,
+        106,
+        109,
+        111,
+        120,
+        124,
+        125,
+        128,
+        131,
+        133,
+        135,
+        137,
+        149,
+        151,
+        160,
+        169,
+        170,
+        171,
+        176,
+        178,
+        180,
+        194,
+        202,
+        215,
+        216,
+        233,
+        242,
+        245,
+        248,
+        251,
+        252,
+        253,
+        254,
+        257,
+        258,
+        262,
+        265,
+        278,
+        284,
+        286,
+        288,
+        290,
+        295,
+        297,
+        303
+      ],
+      "Energy": [
+        3,
+        18,
+        22,
+        27,
+        31,
+        34,
+        35,
+        44,
+        63,
+        77,
+        84,
+        99,
+        100,
+        101,
+        107,
+        118,
+        123,
+        134,
+        136,
+        138,
+        141,
+        153,
+        156,
+        157,
+        158,
+        162,
+        165,
+        173,
+        175,
+        185,
+        186,
+        187,
+        188,
+        190,
+        191,
+        192,
+        195,
+        198,
+        199,
+        204,
+        207,
+        211,
+        213,
+        218,
+        221,
+        231,
+        236,
+        237,
+        244,
+        247,
+        261,
+        263,
+        264,
+        266,
+        274,
+        276,
+        277,
+        280,
+        289,
+        291,
+        292,
+        305,
+        311,
+        318,
+        321,
+        325,
+        328
+      ],
+      "Buildings": [
+        19,
+        40,
+        47,
+        54,
+        76,
+        96,
+        127,
+        129,
+        139,
+        148,
+        152,
+        161,
+        174,
+        193,
+        196,
+        203,
+        209,
+        226,
+        228,
+        238,
+        255,
+        260,
+        269,
+        270,
+        285,
+        294,
+        296,
+        316
+      ],
+      "Transport": [
+        16,
+        29,
+        60,
+        74,
+        79,
+        81,
+        95,
+        108,
+        110,
+        113,
+        119,
+        126,
+        130,
+        142,
+        146,
+        150,
+        179,
+        197,
+        205,
+        227,
+        229,
+        234,
+        259,
+        283,
+        287,
+        293,
+        299,
+        309,
+        315,
+        317,
+        319,
+        320,
+        326,
+        327
+      ],
+      "Policy & society": [
+        6,
+        14,
+        23,
+        32,
+        33,
+        46,
+        57,
+        58,
+        61,
+        66,
+        75,
+        78,
+        80,
+        83,
+        86,
+        88,
+        89,
+        90,
+        92,
+        93,
+        98,
+        114,
+        115,
+        116,
+        117,
+        132,
+        143,
+        145,
+        163,
+        166,
+        167,
+        181,
+        183,
+        184,
+        189,
+        200,
+        201,
+        208,
+        219,
+        220,
+        225,
+        232,
+        235,
+        239,
+        246,
+        249,
+        256,
+        275,
+        281,
+        282,
+        298,
+        307,
+        308,
+        310,
+        313,
+        323,
+        329
+      ],
+      "Industry & technology": [
+        64,
+        73,
+        91,
+        102,
+        122,
+        144,
+        147,
+        159,
+        168,
+        172,
+        206,
+        212,
+        217,
+        222,
+        224,
+        240,
+        241,
+        243,
+        250,
+        267,
+        273,
+        279,
+        300,
+        304,
+        306,
+        312,
+        314,
+        322,
+        324
+      ]
+    },
+    "eventType": {
+      "Events": [
+        "Conference",
+        "Webinar",
+        "Workshop",
+        "Seminar",
+        "Course",
+        "Closed meeting"
+      ]
+    },
+    "eventCategories": {
+      "Energy & technology": [
+        "Energy efficiency",
+        "Technology",
+        "Renewables"
+      ],
+      "Policy & climate": [
+        "Policy",
+        "Climate"
+      ]
+    },
+    "affiliations": {
+      "Public sector": [
+        4
+      ],
+      "Research & education": [
+        6,
+        14
+      ],
+      "Consulting & business": [
+        2,
+        9,
+        12,
+        13
+      ],
+      "Civil society": [
+        3,
+        8
+      ]
+    },
+    "eceeeCategories": {
+      "Legacy navigation": [
+        4,
+        6,
+        7,
+        11,
+        12
+      ]
+    }
+  },
+  "root": {
+    "topics": [
+      12,
+      13,
+      52,
+      104,
+      112
+    ],
+    "eventType": [
+      "Calls"
+    ],
+    "affiliations": [
+      5
+    ]
+  },
+  "synthetic": {
+    "topics": [
+      {
+        "name": "UN climate conferences",
+        "parent": "Climate & environment"
+      }
+    ],
+    "sources": [
+      {
+        "name": "Okänd källa",
+        "parent": null
+      }
+    ]
+  },
+  "children": {
+    "categories": {
+      "4": "22",
+      "12": "22"
+    },
+    "topics": {
+      "48": "UN climate conferences",
+      "49": "UN climate conferences",
+      "62": "UN climate conferences",
+      "75": "80",
+      "76": "129",
+      "88": "89",
+      "91": "73",
+      "99": "101",
+      "161": "196",
+      "165": "186",
+      "171": "UN climate conferences",
+      "193": "196",
+      "216": "UN climate conferences",
+      "265": "UN climate conferences",
+      "290": "UN climate conferences",
+      "295": "245",
+      "297": "UN climate conferences"
+    }
+  },
+  "merges": {
+    "sources": [
+      {
+        "ids": [
+          1,
+          42
+        ],
+        "canonical": 1
+      },
+      {
+        "ids": [
+          14,
+          45
+        ],
+        "canonical": 45
+      },
+      {
+        "ids": [
+          23,
+          144
+        ],
+        "canonical": 144
+      },
+      {
+        "ids": [
+          69,
+          148
+        ],
+        "canonical": 148
+      },
+      {
+        "ids": [
+          51,
+          151
+        ],
+        "canonical": 151
+      },
+      {
+        "ids": [
+          159,
+          166
+        ],
+        "canonical": 166
+      },
+      {
+        "ids": [
+          22,
+          167
+        ],
+        "canonical": 167
+      },
+      {
+        "ids": [
+          57,
+          197
+        ],
+        "canonical": 197
+      },
+      {
+        "ids": [
+          5,
+          21
+        ],
+        "canonical": 21
+      },
+      {
+        "ids": [
+          68,
+          212
+        ],
+        "canonical": 212
+      },
+      {
+        "ids": [
+          73,
+          213
+        ],
+        "canonical": 213
+      },
+      {
+        "ids": [
+          28,
+          86
+        ],
+        "canonical": 86
+      },
+      {
+        "ids": [
+          7,
+          96
+        ],
+        "canonical": 96
+      },
+      {
+        "ids": [
+          4,
+          17
+        ],
+        "target": "Okänd källa"
+      }
+    ],
+    "categories": [
+      {
+        "ids": [
+          10,
+          16
+        ],
+        "canonical": 16
+      },
+      {
+        "ids": [
+          4,
+          12
+        ],
+        "canonical": 4
+      },
+      {
+        "ids": [
+          18,
+          21
+        ],
+        "canonical": 18
+      }
+    ],
+    "keywords": [
+      {
+        "ids": [
+          965,
+          1116
+        ],
+        "canonical": 965
+      }
+    ],
+    "topics": [
+      {
+        "ids": [
+          107,
+          118
+        ],
+        "canonical": 107
+      },
+      {
+        "ids": [
+          110,
+          119
+        ],
+        "canonical": 110
+      },
+      {
+        "ids": [
+          200,
+          219
+        ],
+        "canonical": 219
+      }
+    ]
+  },
+  "names": {
+    "categories": {
+      "1": "Climate ETS",
+      "2": "Environment",
+      "3": "Transportation/traffic",
+      "5": "EU energy policy (general)",
+      "6": "Buildings",
+      "7": "Appliances",
+      "9": "Energy security",
+      "10": "Energy Supply",
+      "13": "National policy (EU)",
+      "14": "International cooperation",
+      "15": "Taxation",
+      "17": "US policy",
+      "18": "Energy services/ESCOs",
+      "19": "eeurope_new_ms",
+      "22": "Eco-design"
+    },
+    "topics": {
+      "107": "TEN-E",
+      "110": "EU sustainable and smart mobility strategy",
+      "219": "EU sustainability reporting standards (ESRS)"
+    }
+  }
+}
