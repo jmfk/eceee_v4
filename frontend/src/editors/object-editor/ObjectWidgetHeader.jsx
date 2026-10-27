@@ -12,7 +12,6 @@ import {
     ChevronDown,
     MoreHorizontal,
     AlertTriangle,
-    Info,
     Check,
     Clipboard,
     Scissors,
@@ -33,7 +32,6 @@ const ObjectWidgetHeader = ({
     canMoveDown = false,
     showControls = true,
     // ObjectEditor-specific props
-    slotConfig,
     isRequired = false,
     maxWidgets = null,
     currentIndex = 0,
@@ -139,14 +137,6 @@ const ObjectWidgetHeader = ({
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-orange-100 text-orange-800">
                             <AlertTriangle className="h-3 w-3 mr-1" />
                             Required
-                        </span>
-                    )}
-
-                    {/* Slot info */}
-                    {slotConfig && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-800">
-                            <Info className="h-3 w-3 mr-1" />
-                            {slotConfig.label || slotConfig.name}
                         </span>
                     )}
 
