@@ -40,9 +40,7 @@ def record(resource="news", pk=1, **updates):
     data = (
         {"firstName": "Test", "lastName": "Writer"}
         if resource == "columnists"
-        else {"authorIds": [1]}
-        if resource == "columns"
-        else {}
+        else {"authorIds": [1]} if resource == "columns" else {}
     )
     return {
         "legacyId": pk,
