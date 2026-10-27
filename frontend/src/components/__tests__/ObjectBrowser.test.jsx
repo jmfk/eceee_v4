@@ -105,8 +105,7 @@ const event = {
     browserGroup: null,
 }
 
-const renderBrowser = (initialEntry = '/objects', routePath = '/objects') => {
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+const renderBrowser = (initialEntry = '/objects', routePath = '/objects', queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })) => {
     return render(
         <MemoryRouter initialEntries={[initialEntry]}>
             <QueryClientProvider client={queryClient}>
@@ -357,6 +356,18 @@ describe('ObjectBrowser grouped type list', () => {
             browser_filters: JSON.stringify([{ key: 'effective_date', values: [format(first), format(last)] }]),
         }))
         expect(screen.queryByRole('dialog', { name: 'Filter Publication date' })).not.toBeInTheDocument()
+    })
+
+    it('shows date filters saved in the shared Object type configuration cache', async () => {
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
+        queryClient.setQueryData(['objectTypeBrowserConfiguration', news.id], {
+            config: { searchFields: [], filters: ['created_at', 'effective_date', 'expiry_date'].map(key => ({ key, label: key, overview: true, control: 'date_range', quick: true })) },
+            availableFilters: ['created_at', 'effective_date', 'expiry_date'].map(key => ({ key, label: key, kind: 'date' })),
+        })
+        renderBrowser('/objects/news', '/objects/:typeName', queryClient)
+        for (const key of ['created_at', 'effective_date', 'expiry_date']) {
+            expect(await screen.findByRole('button', { name: `Filter by ${key}` })).toBeInTheDocument()
+        }
     })
 
     it('opens the only available filter directly without an intermediate menu', async () => {
