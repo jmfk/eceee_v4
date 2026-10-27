@@ -170,6 +170,49 @@ describe('Kanban application navigation', () => {
         expect(screen.queryByRole('textbox', { name: 'Tavelnamn' })).not.toBeInTheDocument()
     })
 
+    it('shows the uploaded background as a scaled board tile cover', async () => {
+        const createObjectURL = URL.createObjectURL
+        const revokeObjectURL = URL.revokeObjectURL
+        const revoke = vi.fn()
+        URL.createObjectURL = vi.fn(() => 'blob:board-tile')
+        URL.revokeObjectURL = revoke
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? {
+            ...workspace, boards: [{ ...workspace.boards[0], hasBackground: true, revision: 1 }],
+        } : {})
+        kanbanApi.background.mockResolvedValue(new Blob(['image'], { type: 'image/png' }))
+        const view = renderKanban()
+        try {
+            const tile = (await screen.findByRole('link', { name: 'Redaktionen' })).closest('.kb-board-tile')
+            await waitFor(() => expect(tile.querySelector('img')).toHaveAttribute('src', 'blob:board-tile'))
+            expect(kanbanApi.background).toHaveBeenCalledWith('board-1')
+        } finally {
+            view.unmount()
+            URL.createObjectURL = createObjectURL
+            URL.revokeObjectURL = revokeObjectURL
+        }
+        expect(revoke).toHaveBeenCalledWith('blob:board-tile')
+    })
+
+    it('renames a board on its tile and opens board properties from the tile menu', async () => {
+        kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? {
+            ...workspace, boards: [{ ...workspace.boards[0], revision: 1 }],
+        } : {})
+        kanbanApi.patch.mockResolvedValue({ ...workspace.boards[0], title: 'Nytt namn' })
+        renderKanban()
+        const tile = (await screen.findByRole('link', { name: 'Redaktionen' })).closest('.kb-board-tile')
+        expect(tile.querySelector('.kb-board-tile-preview')).toBeInTheDocument()
+        fireEvent.click(within(tile).getByRole('button', { name: 'Byt namn på Redaktionen' }))
+        const input = within(tile).getByRole('textbox', { name: 'Tavelnamn för Redaktionen' })
+        expect(input).toHaveFocus()
+        fireEvent.change(input, { target: { value: '  Nytt namn  ' } })
+        fireEvent.click(within(tile).getByRole('button', { name: 'Spara tavelnamn' }))
+        await waitFor(() => expect(kanbanApi.patch).toHaveBeenCalledWith('boards/board-1/', { revision: 1, title: 'Nytt namn' }))
+        await waitFor(() => expect(within(tile).queryByRole('textbox', { name: 'Tavelnamn för Redaktionen' })).not.toBeInTheDocument())
+        fireEvent.click(within(tile).getByRole('button', { name: 'Tavelåtgärder för Redaktionen' }))
+        fireEvent.click(await screen.findByRole('button', { name: 'Redigera tavlan' }))
+        expect(await screen.findByRole('dialog', { name: 'Redigera tavlan' })).toBeVisible()
+    })
+
     it('opens filters and creates a list from the board actions menu', async () => {
         kanbanApi.post.mockResolvedValue({})
         renderKanban('/kanban/boards/board-1')
