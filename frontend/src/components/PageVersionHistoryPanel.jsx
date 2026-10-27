@@ -10,7 +10,7 @@ const statusStyles = {
     draft: 'bg-amber-50 text-amber-700 border-amber-200',
 }
 
-const PageVersionHistoryPanel = ({ pageId, workflow, onRestored, onRestoreError, confirmRestore }) => {
+const PageVersionHistoryPanel = ({ pageId, workflow, onRestored, onRestoreError, confirmRestore, onViewVersion }) => {
     const [versions, setVersions] = useState([])
     const [loading, setLoading] = useState(true)
     const [restoringId, setRestoringId] = useState(null)
@@ -128,6 +128,10 @@ const PageVersionHistoryPanel = ({ pageId, workflow, onRestored, onRestoreError,
                                 </span>
                             </label>
                             <div className="flex items-center gap-2">
+                                <button type="button" onClick={() => onViewVersion?.(version.id)}
+                                    className="flex items-center gap-1 rounded border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                                    <Eye className="h-3.5 w-3.5" /> View
+                                </button>
                                 <button
                                     type="button"
                                     onClick={() => openVersionPreview(version.id)}

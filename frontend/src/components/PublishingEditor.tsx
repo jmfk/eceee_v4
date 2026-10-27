@@ -44,6 +44,7 @@ type PublishingEditorProps = {
     onSave?: () => Promise<WorkflowVersion | undefined>
     onWorkflowChange?: () => Promise<unknown>
     onVersionRestored?: (version: WorkflowVersion) => Promise<unknown>
+    onViewVersion?: (versionId: number | string) => void
 }
 
 const PublishingEditor = ({
@@ -52,6 +53,7 @@ const PublishingEditor = ({
     onSave,
     onWorkflowChange,
     onVersionRestored,
+    onViewVersion,
 }: PublishingEditorProps) => {
     const [scheduleDate, setScheduleDate] = useState('')
     const [busyAction, setBusyAction] = useState<string | null>(null)
@@ -255,6 +257,7 @@ const PublishingEditor = ({
                 confirmRestore={confirmRestore}
                 onRestored={versionRestored}
                 onRestoreError={restoreFailed}
+                onViewVersion={onViewVersion}
             />
 
         </div>

@@ -23,6 +23,7 @@ import ObjectEditorPanel from '../components/objectEdit/ObjectEditorPanel'
 import ObjectNavigation from '../components/objectEdit/ObjectNavigation'
 import InlineObjectTitle from '../components/objectEdit/InlineObjectTitle'
 import ObjectSubObjectsView from '../components/objectEdit/ObjectSubObjectsView'
+import { HistoricalObjectView } from '../components/HistoricalVersionView'
 
 const ObjectInstanceEditPage = () => {
     // --- 1. ALL HOOKS AT THE TOP ---
@@ -60,6 +61,7 @@ const ObjectInstanceEditPage = () => {
 
     const urlParams = new URLSearchParams(location.search)
     const parentIdFromUrl = urlParams.get('parent')
+    const historyVersionId = urlParams.get('historyVersion')
     const isNewInstance = !instanceId && objectTypeId
     const isEditingInstance = !!instanceId
     const publishingPath = (showHistory = false) => {
@@ -415,6 +417,13 @@ const ObjectInstanceEditPage = () => {
         </div>
     )
 
+    if (historyVersionId && instanceId) {
+        return <div className="h-screen bg-gray-50">
+            <HistoricalObjectView versionId={historyVersionId} objectType={objectType}
+                onClose={() => navigate(`/objects/${instanceId}/edit/publishing?panel=history`)} />
+        </div>
+    }
+
     // --- 3. LOGIC FOR TABS ---
     const tabs = [
         { id: 'content', label: 'Content', icon: Layout },
@@ -529,6 +538,7 @@ const ObjectInstanceEditPage = () => {
                 {tab === 'content' && <ObjectContentView key={instanceId || objectTypeId} ref={contentTabRef} {...commonTabProps} />}
                 {tab === 'settings' && <ObjectSettingsView {...commonTabProps} />}
                 {tab === 'publishing' && <ObjectPublishingView {...commonTabProps} isDirty={hasUnsavedChanges} showHistory={urlParams.get('panel') === 'history'} onWorkflowChange={refreshObject} onRestored={handleRestored}
+                    onViewVersion={versionId => navigate(`/objects/${instanceId}/edit/content?historyVersion=${encodeURIComponent(versionId)}`)}
                     isFeatured={isFeatured} onFeaturedChange={value => {
                         setIsFeatured(value)
                         setIsDirty(true)

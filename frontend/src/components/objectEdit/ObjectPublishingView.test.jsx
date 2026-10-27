@@ -28,6 +28,14 @@ beforeEach(() => {
     mocks.confirm.mockResolvedValue(true)
 })
 describe('Object publishing workflow', () => {
+    it('opens a historical version in the editor without restoring it', async () => {
+        const onViewVersion = vi.fn()
+        mount({ onViewVersion })
+        fireEvent.click((await screen.findAllByRole('button', { name: 'View' }))[1])
+        expect(onViewVersion).toHaveBeenCalledWith(2)
+        expect(mocks.get).not.toHaveBeenCalled()
+        expect(mocks.restore).not.toHaveBeenCalled()
+    })
     it('shows aggregate state and history together', async () => {
         mount()
         expect(await screen.findByText('Live · unpublished changes')).toBeInTheDocument()
