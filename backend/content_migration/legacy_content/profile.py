@@ -125,7 +125,7 @@ def initial_bundle():
                     ]
                 },
                 "metadata": {"content_profile": {"id": PROFILE, "version": 1}},
-                "browser_group_name": "article" if key == "columnist" else None,
+                "browser_group_name": None,
             }
         )
     return {

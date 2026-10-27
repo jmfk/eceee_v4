@@ -2,6 +2,8 @@
 
 Detta är en fristående målbeskrivning att ge ett annat projekt. Skapa **fyra objekttyper** för den aktuella importen: `article`, `columnist`, `event` och `organization`. De fem källresurserna är `news`, `columns`, `columnists`, `events` och `organizations`. Både nyheter och krönikor blir `article`. Den befintliga typen `library_item` får finnas kvar i ECEEE v4, men ingen publikation eller `ReportPage` ska skapas/importeras inom detta uppdrag.
 
+Visa alla fyra importerade objekttyper på huvudnivån i objektöversikten. `columnist` är en egen huvudtyp även om artiklar refererar till krönikörer som författare.
+
 | Källresurs | Måltyp | Redaktionell benämning |
 | --- | --- | --- |
 | `news` | `article` | Nyhet eller Pressmeddelande |

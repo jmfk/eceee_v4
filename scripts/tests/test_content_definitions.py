@@ -89,8 +89,10 @@ class DefinitionDiffTests(unittest.TestCase):
         self.assertTrue(any("term" in change for change in changes))
 
     def test_reports_group_clear_without_writing(self):
-        self.api.objects[1]["browser_group"] = 2
-        self.assertTrue(any(change.get("fields") == ["browser_group"] for change in self.diff()))
+        columnist = next(item for item in self.bundle["definitions"] if item["name"] == "columnist")
+        self.assertIsNone(columnist["browser_group_name"])
+        self.api.objects[2]["browser_group"] = 1
+        self.assertIn({"type": "columnist", "fields": ["browser_group"]}, self.diff())
 
     def test_rejects_definition_owned_by_another_namespace(self):
         self.api.objects[1]["namespace"] = {"id": 99}
