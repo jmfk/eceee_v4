@@ -5,6 +5,7 @@ from urllib.parse import urlsplit
 from content_migration.legacy_news.api import LegacyMigrationApiError, LegacyNewsApi
 
 RESOURCES = ("columnists", "organizations", "news", "columns", "events", "publications")
+DEFAULT_RESOURCES = ("columnists", "organizations", "news", "columns", "events")
 TARGETS = {
     "news": "article",
     "columns": "article",

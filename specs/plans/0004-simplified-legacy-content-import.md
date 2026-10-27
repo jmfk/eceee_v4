@@ -18,7 +18,7 @@ related_adrs:
 
 ## Mål och kunskapsläge
 
-För över ECEEE:s publicerade redaktionella innehåll till fem tekniska objekttyper och ett gemensamt hierarkiskt klassificeringssystem. Nyheter och krönikor blir Artikel och kan visas tillsammans. Proceedings och medlems-/externanvändarfunktioner ligger helt utanför arbetet.
+För över det inkluderade publicerade ECEEE-innehållet till Artikel, Krönikör, Evenemang och Organisation i ett gemensamt hierarkiskt klassificeringssystem. Den femte befintliga objekttypen Publikation behålls i profilen men används inte av denna legacyimport enligt ADR-0056. Nyheter och krönikor blir Artikel och kan visas tillsammans. Proceedings och medlems-/externanvändarfunktioner ligger helt utanför arbetet.
 
 Ägaren har valt gemensam Artikel samt publicerat innehåll inklusive arkiv. Utkast och avpublicerat material inventeras men importeras inte automatiskt. Genomförandet har startat; avsnittet nedan skiljer verifierad devimport från återstående arbete.
 
@@ -31,7 +31,7 @@ Mappningskandidaterna nedan bygger på dokumentkraven och modellfilerna i `extra
 | Nyhet, krönika, pressmeddelande | `article` | Rubrik, slug, ingress, brödtext, visningsdatum, valfri källa/länk och källdatum, huvudbild, krönikörer och klassificering |
 | Krönikör | `columnist` | Publikt namn, biografi, porträtt, organisationstillhörighet som text och webblänk |
 | Evenemang | `event` | Start/slut, tidstext, arrangör som text, plats, fokusområde, typ/kategori, beskrivning och länk |
-| Publikation | `library_item` | Titel, beskrivning, klassificering och ordnade bilagor med beskrivning, mediareferens och/eller extern länk |
+| Publikation | `library_item` | Befintlig objekttyp; ingen legacykälla importeras till den i denna omgång |
 | Organisation | `organization` | Publikt namn, eventuellt publikt kortnamn, presentation, logotyp, webblänk, land och granskad klassificering |
 
 Definiera och granska schemafälten före implementation av importerare. Använd befintliga objektversioner, innehållswidgetar, objektreferenser och media. Bevara Python-namn i `snake_case` och frontend-/schemafält enligt det befintliga explicita `camelCase`-kontraktet. Skapa ingen ny generell innehållsplattform.
@@ -70,10 +70,10 @@ Visningsdatum mappas från `presentational_publishing_date` där det finns. För
 | `eceeecolumnists.EceeeColumn` | Artikel / Krönika | Rubrik, content, visningsdatum, priority, columnists-relationer, ämnen/kategorier och bilder | Saknad/opublicerad skribent, ej återfunna relationer och avvikande innehåll blockerar godkännande |
 | `eceeecolumnists.EceeeColumnist` | Krönikör | first_name, last_name, prefix, affiliation som text, home_page, biografi och porträtt | Dubbletter och oklara namn bedöms manuellt; ingen automatisk organisationskoppling från affiliation |
 | `eceeecalendar.EceeeCalenderEvent` | Evenemang | Publicerad content, event_date/event_end_date när entydiga, event_time som text, organiser, venue, focus_areas, url, typ/kategori, priority | Ofullständiga/flexibla datum, oklar tidszon och motsägande datum går till åtgärdslistan; draft/draft_title används aldrig som publicerad text |
-| `eceeelibrary.EceeeLibraryItem` | Publikation | Rubrik, content, bibliotekskategorier, filrelationer | Oklara specialfält och dubbletter mot rapportsidor bedöms; nummer/titelfält bevaras i proveniens tills betydelsen bekräftats |
-| `eceeelibrary.EceeeLibraryFileItem` och bilagor till inkluderade objekt | Bilagor/media på ägarobjekt | Fil, extern URL, titel, beskrivning och ursprunglig ordning; bibliotekskällans fil har företräde i visning om både fil och URL finns, men URL bevaras | Saknade filer, skyddad nedladdning, oklara rättigheter och felaktig filtyp kräver åtgärd |
+| `eceeelibrary.EceeeLibraryItem` | Ingår inte i denna import | Källresursen gav 0 poster för site 2; ägaren valde 2026-10-27 att ignorera den i denna import | Den befintliga måltypen `library_item` ändras inte |
+| Bilagor till inkluderade objekt | Bilagor/media på ägarobjekt | Fil, extern URL, titel, beskrivning och ursprunglig ordning | Saknade filer, skyddad nedladdning, oklara rättigheter och felaktig filtyp kräver åtgärd; `EceeeLibraryFileItem` ingår inte |
 | `eceeememberforum.EceeeMemberOrganization` | Organisation | organizations_full_name eller verifierat offentligt visningsnamn, text, homepage, logo, country, is_international och relevanta publika kategorier | Fältet organization är märkt internt i modellen och importeras inte som publikt kortnamn utan kontroll; aktuellt medlemskap härleds inte från gammal post |
-| `eceeebase.ReportPage` | Kandidat till Publikation | Endast inventering av rubrik, innehåll och report_url | Manuellt beslut om import och eventuell sammanfogning med bibliotekspost; sidlayout och sidträd importeras inte |
+| `eceeebase.ReportPage` | Ingår inte i denna import | Ingen inventering eller automatisk import | Sidlayout och sidträd importeras inte |
 
 För krönikörsportätt används legacy-valets ordning: kvadratiskt, annars horisontellt, annars vertikalt porträtt. Bevara övriga befintliga porträtt som media, utan att skapa fler obligatoriska profilfält. Uppgifter som senaste krönikedatum beräknas från importerade artiklar, inte som en separat redaktionell sanning.
 
@@ -101,7 +101,7 @@ Partnerlogotyper i sidinnehåll får kopieras som media där innehållet ingår,
 | RelatedNews | Ämnen för relaterat innehåll, inte en automatisk artikel-till-artikel-relation |
 | Keywords/keywords_sub och generella kategorier | Mappas enligt ursprung och granskad betydelse, med bevarade källidentiteter |
 | Event type/event categories | Evenemangstyp och evenemangskategori i samma klassificeringssystem |
-| LibraryCategory | Publikationsklassificering; bevara faktiskt verifierad föräldrahierarki |
+| LibraryCategory | Ingår inte i den aktuella importens termmappning |
 | Organisationskategorier/tillhörigheter | Endast publika kategorier, med rätt källrelation verifierad; inte kontobehörigheter |
 
 För varje använd källterm behövs en mappningsrad med källscope, modell och ID, ursprunglig förälder, måltyp/term-ID, åtgärd och motivering. Åtgärder är bevara, slå ihop genom uttrycklig mappning, manuell eller utelämna med orsak. Termer som inte används av urvalet, och inte behövs som föräldrar, behöver inte importeras.
@@ -131,7 +131,7 @@ Orden exkludera och utelämna betyder att uppgiften inte förs in i v4:s aktiva 
 
 ### A Inventering utan skrivning
 
-Utöka den befintliga avgränsade legacy-API-integrationen med fasta läsresurser för krönikor, krönikörer, evenemang, bibliotek inklusive bilagor, organisationer och tillhörande klassificering. Källans manifest innehåller stabil identitet, faktiskt publik/utgången/skyddad status, relationer, filer och genererade original-URL:er. Sammanställ counts även för exkluderat material utan att exportera onödiga personuppgifter.
+Använd det befintliga avgränsade legacy-API:t för nyheter, krönikor, krönikörer, evenemang och organisationer med tillhörande klassificering. API:t kan exponera biblioteksresursen av kompatibilitetsskäl, men denna import väljer den inte. Källans manifest innehåller stabil identitet, faktiskt publik/utgången/skyddad status, relationer, filer och genererade original-URL:er. Sammanställ counts även för exkluderat material inom det valda urvalet utan att exportera onödiga personuppgifter.
 
 Ingen direkt SQL, databasport eller ny SSH-tunnel införs. Befintlig API-version/News-kontrakt behålls för befintliga anrop; nya resurser annonseras uttryckligt i health/capabilities och valideras per resurs. Gamla klienter ska fortsatt fungera. Källändringar som inte är additiva kräver ett nytt versionskontrakt.
 
@@ -145,9 +145,9 @@ Inventera även tidigare importerade v4-objekt. Återanvänd målidentitet när 
 
 ### C Provimport i lokal granskningsmiljö
 
-Välj högst 20 verkliga poster totalt, med alla fem måltyper och minst följande täckning: vanlig nyhet, krönika med flera skribenter, pressmeddelande om det finns, delad slug mellan två modeller, publicerat evenemang med väntande ändring, ofullständigt datum, publikation med flera filer/extern referens, organisationsnamn som skiljer sig internt/publikt och ett faktiskt filfel om det finns. Saknade verkliga kantfall kompletteras med tydligt syntetiska testfixturer.
+Välj högst 20 verkliga poster totalt från de inkluderade källorna, med minst följande täckning där verkliga exempel finns: vanlig nyhet, krönika med flera skribenter, pressmeddelande, delad slug mellan två modeller, publicerat evenemang med väntande ändring, ofullständigt datum, organisationsnamn som skiljer sig internt/publikt och ett faktiskt filfel. Saknade kantfall kompletteras med tydligt syntetiska testfixturer. Publikationer och rapportsidor ingår inte i detta importprov enligt [ADR-0056](../adrs/active/0056-exclude-legacy-publications-from-editorial-import.md).
 
-Importera godkända termer och medieresurser som beroenden, därefter krönikörer/organisationer och slutligen artiklar, evenemang och publikationer. Relationskopplingar och interna länkar avstäms efter att målidentiteterna är kända.
+Importera godkända termer och medieresurser som beroenden, därefter krönikörer/organisationer och slutligen artiklar och evenemang. Relationskopplingar och interna länkar avstäms efter att målidentiteterna är kända.
 
 Granska innehåll, blandad lista, profilrelationer, datum, filer och detaljer i stödda renderingsytor. Använd befintlig provgranskningsmekanism från nyhetsimporten. Godkännande knyts till det faktiska målkontraktet och mappningsversionen; en ändring i dessa ogiltigförklarar tidigare importacceptans.
 
@@ -186,7 +186,7 @@ Produktion kräver egna godkännanden för käll-API/driftsättning, import och 
 | --- | --- | --- |
 | 1 Inventering och kontrakt | Källresurser, counts, slutlig fält-/term-/undantagsmatris och verifierat urval | Kontraktstester för tillåtna resurser, scope, status/åtkomst, paginering, relationer och bilagor |
 | 2 Gemensam Artikel och måltyper | Gemensam redigering, innehållsslag, blandad listning, detalj och klassificeringsvalidering | Fokuserade API-/widget-/renderingstester för sortering före paginering, Nyhet med underordnad Pressmeddelande, författare och datum |
-| 3 Import av alla måltyper | Dry-run, källidentiteter, provimport, media, relationer och konfliktrapport | Fältmappning, publicerad text trots eventutkast, porträtt, publik/intern organisation, filer och ofullständiga datum |
+| 3 Import av inkluderade måltyper | Dry-run, källidentiteter, provimport, media, relationer och konfliktrapport | Fältmappning, publicerad text trots eventutkast, porträtt, publik/intern organisation, filer och ofullständiga datum |
 | 4 Avstämning och övergång | Resume, URL-mappning, gammal v4-import och stagingrepetition | Avbrott efter DB-/mediegränser, dubbla körningar, ändrat underlag, skyddade manuella ändringar, slugkollision och återhämtning |
 
 Klassificeringens PRD-0031 färdigställs och verifieras för nödvändiga delar innan batch 2–3 godkänns. Batcherna är arbetsenheter; de innebär inte en PR per deländring. Kör fokuserade tester under utveckling och en sammanhållen migrations-/integrationsgranskning före staging/produktionsförberedelse.

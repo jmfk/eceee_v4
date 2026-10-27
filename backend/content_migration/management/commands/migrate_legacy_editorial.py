@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from content.models import Namespace
 from content_migration.legacy_content.service import apply_run, preflight, stage
-from content_migration.legacy_content.source import DEV_LIMITS, RESOURCES, EditorialSource
+from content_migration.legacy_content.source import DEFAULT_RESOURCES, DEV_LIMITS, RESOURCES, EditorialSource
 from content_migration.legacy_content.transform import checksum
 from content_migration.legacy_news.api import LegacyMigrationApiError, LegacyNewsApi
 from content_migration.management.commands.migrate_legacy_news import Command as NewsCommand
@@ -28,7 +28,7 @@ class Command(BaseCommand):
         parser.add_argument("--namespace", default="default")
         parser.add_argument("--user", default="codex-content-import")
         parser.add_argument("--source-env", type=Path, default=Path(".env.legacy"))
-        parser.add_argument("--resources", default=",".join(RESOURCES))
+        parser.add_argument("--resources", default=",".join(DEFAULT_RESOURCES))
         parser.add_argument("--preset", choices=["dev", "all"], default="dev")
         parser.add_argument("--limit", type=int, help="Bound each resource for a smaller dev sample")
         parser.add_argument("--run")
@@ -96,7 +96,7 @@ class Command(BaseCommand):
         available = source.available(health)
         if o["action"] == "preflight":
             inventory = (
-                {resource: source.content_summary(resource) for resource in sorted(available)}
+                {resource: source.content_summary(resource) for resource in sorted(available & set(DEFAULT_RESOURCES))}
                 if o["inventory"]
                 else None
             )
@@ -108,7 +108,7 @@ class Command(BaseCommand):
                         "definitions": "ready",
                         "definitionHash": fingerprint,
                         "availableResources": sorted(available),
-                        "missingResources": sorted(set(RESOURCES) - available),
+                        "missingResources": sorted(set(DEFAULT_RESOURCES) - available),
                         "legacyNewsAvailable": "news" in health.get("resources", []),
                         **({"inventory": inventory} if inventory is not None else {}),
                     }
@@ -125,6 +125,8 @@ class Command(BaseCommand):
         mapping = json.loads(o["mapping"].read_text()) if o["mapping"] else {}
         if o["preset"] == "all" and (not o["accepted_sample_run"] or not o["mapping"]):
             raise CommandError("Full import requires a reviewed sample run and explicit reviewed mapping file")
+        if o["preset"] == "all" and mapping.get("format") != "eceee-reviewed-legacy-term-map":
+            raise CommandError("Full import requires the reviewed site-2 term plan")
         records = []
         if o["legacy_news_compatible"]:
             if not settings.DEBUG or o["preset"] != "dev" or resources != ["news"]:

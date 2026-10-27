@@ -19,9 +19,10 @@ from taxonomy.services import require
 
 from .profile import OBJECT_TYPES, PROFILE
 from .source import validate_record
+from .term_plan import compile_plan, identity as term_identity, source_names
 from .transform import BlockedRecord, checksum, normalize
 
-PIPELINE_VERSION = "1"
+PIPELINE_VERSION = "2"
 TAXONOMY = {
     "types": "news_type",
     "categories": "news_category",
@@ -33,6 +34,63 @@ TAXONOMY = {
     "organizationCategories": "organization_category",
     "affiliations": "organization_affiliation",
 }
+
+
+def _reviewed_term_state(config, facets):
+    """Resolve the portable map and reject changed or unprepared target terms."""
+
+    expected = compile_plan()
+    for key in ("format", "version", "sourceSite", "inventoryDigest", "decisionsDigest", "termRefs"):
+        if config.get(key) != expected["mapping"][key]:
+            raise BlockedRecord("reviewed_term_map_mismatch")
+    terms = {
+        (term.classification_type.key, term.slug): term
+        for term in Tag.objects.filter(
+            namespace=facets["article_kind"].namespace,
+            tenant=facets["article_kind"].tenant,
+            classification_type__key__in={item["type"] for item in expected["bundle"]["terms"]},
+        ).select_related("classification_type", "parent")
+    }
+    resolved = {}
+    for term in expected["bundle"]["terms"]:
+        key = (term["type"], term["slug"])
+        actual = terms.get(key)
+        parent = actual.parent.slug if actual and actual.parent else None
+        if (
+            not actual
+            or actual.status != "approved"
+            or actual.name != term["name"]
+            or parent != term["parent"]
+            or (actual.parent and actual.parent.classification_type_id != actual.classification_type_id)
+            or sorted(actual.alternative_names or []) != sorted(term.get("alternative_names") or [])
+        ):
+            raise BlockedRecord("unprepared_or_changed_reviewed_term")
+    for source_key, ref in expected["mapping"]["termRefs"].items():
+        resolved[source_key] = str(terms[(ref["type"], ref["slug"])].pk)
+    fingerprint = checksum(
+        [
+            (item["type"], item["slug"], resolved_key, terms[(item["type"], item["slug"])].revision)
+            for resolved_key, item in sorted(expected["mapping"]["termRefs"].items())
+        ]
+    )
+    return resolved, fingerprint
+
+
+def _reviewed_keys(row, resource):
+    site = row["sourceSite"]
+    for source_key, values in row.get("taxonomy", {}).items():
+        if source_key not in TAXONOMY or (resource != "publications" and source_key == "publicationCategories"):
+            raise BlockedRecord("unmapped_taxonomy_dimension")
+        for value in values:
+            if not isinstance(value, dict) or not value.get("model") or not value.get("id"):
+                raise BlockedRecord("taxonomy_source_identity_missing")
+            yield term_identity(site, source_key, value["model"], value["id"])
+    if resource == "events":
+        event_type = row["data"].get("eventType")
+        if event_type:
+            yield term_identity(site, "eventType", "choice", event_type)
+        for value in row["data"].get("eventCategories", []):
+            yield term_identity(site, "eventCategories", "choice", value)
 
 
 def preflight(tenant, namespace, user):
@@ -65,16 +123,36 @@ def preflight(tenant, namespace, user):
 
 def stage(*, tenant, namespace, user, source_scope, records, preset="dev", configuration=None):
     types, facets, definition_hash = preflight(tenant, namespace, user)
+    config = {**(configuration or {}), "pipeline": PIPELINE_VERSION, "definitionHash": definition_hash}
+    if config.get("format") == "eceee-reviewed-legacy-term-map":
+        resolved, fingerprint = _reviewed_term_state(config, facets)
+        config["resolvedTermMap"] = resolved
+        config["termPlanFingerprint"] = fingerprint
+        reviewed_names = source_names()
+    elif preset == "all":
+        raise BlockedRecord("reviewed_term_map_required")
     prepared = []
     identities = set()
     for resource, row in records:
         validate_record(row, resource)
+        if "resolvedTermMap" in config:
+            if resource == "publications":
+                raise BlockedRecord("resource_not_in_reviewed_import")
+            if row["sourceSite"] != config["sourceSite"]:
+                raise BlockedRecord("reviewed_term_map_wrong_site")
+            for key in _reviewed_keys(row, resource):
+                if key not in config["resolvedTermMap"]:
+                    raise BlockedRecord("new_or_unmapped_source_term")
+            for source_key, values in row.get("taxonomy", {}).items():
+                for value in values:
+                    key = term_identity(row["sourceSite"], source_key, value["model"], value["id"])
+                    if value.get("name") != reviewed_names[key]:
+                        raise BlockedRecord("source_term_name_changed")
         identity = (resource, str(row["legacyId"]))
         if identity in identities:
             raise BlockedRecord("duplicate_source_identity")
         identities.add(identity)
         prepared.append((resource, deepcopy(row)))
-    config = {**(configuration or {}), "pipeline": PIPELINE_VERSION, "definitionHash": definition_hash}
     manifest_hash = checksum({"scope": source_scope, "configuration": config, "records": prepared})
     with transaction.atomic():
         run = EditorialImportRun.objects.create(
@@ -154,11 +232,48 @@ def terms_for(row, resource, facets, user, config):
     result = []
     if resource in {"news", "columns"}:
         kind = "column" if resource == "columns" else "news"
-        if resource == "news" and set(config.get("pressReleaseSourceTerms", [])) & {
-            str(t.get("id")) for t in row.get("taxonomy", {}).get("types", []) if isinstance(t, dict)
-        }:
+        if (
+            resource == "news"
+            and any(
+                isinstance(term, dict)
+                and term_identity(row["sourceSite"], "types", term.get("model"), term.get("id"))
+                == term_identity(2, "types", "eceeenews.eceeenewstype", "4")
+                for term in row.get("taxonomy", {}).get("types", [])
+            )
+            and config.get("format") == "eceee-reviewed-legacy-term-map"
+        ):
+            kind = "press-release"
+        elif (
+            resource == "news"
+            and config.get("format") != "eceee-reviewed-legacy-term-map"
+            and set(config.get("pressReleaseSourceTerms", []))
+            & {str(t.get("id")) for t in row.get("taxonomy", {}).get("types", []) if isinstance(t, dict)}
+        ):
             kind = "press-release"
         result.append(Tag.objects.get(classification_type=facets["article_kind"], slug=kind, status="approved"))
+    if config.get("format") == "eceee-reviewed-legacy-term-map":
+        resolved = config["resolvedTermMap"]
+        for source_key in _reviewed_keys(row, resource):
+            pk = resolved.get(source_key)
+            if not pk:
+                raise BlockedRecord("new_or_unmapped_source_term")
+            dimension = source_key.split(":", 2)[1]
+            facet_key = TAXONOMY.get(dimension) or {"eventType": "event_type", "eventCategories": "event_category"}.get(
+                dimension
+            )
+            if not facet_key:
+                raise BlockedRecord("unmapped_taxonomy_dimension")
+            term = Tag.objects.filter(
+                pk=pk,
+                classification_type=facets[facet_key],
+                namespace=facets[facet_key].namespace,
+                tenant=facets[facet_key].tenant,
+                status="approved",
+            ).first()
+            if term is None:
+                raise BlockedRecord("taxonomy_mapping_wrong_facet_or_unavailable")
+            result.append(term)
+        return list(dict.fromkeys(str(t.pk) for t in result))
     approved = config.get("approvedTermMap", {})
     for source_key, values in row.get("taxonomy", {}).items():
         key = TAXONOMY.get(source_key)
@@ -335,6 +450,9 @@ def apply_item(run, item, user, types, facets):
     # Raw source equality is insufficient when a reviewed mapping or profile changes.
     mapping_keys = (
         "approvedTermMap",
+        "decisionsDigest",
+        "inventoryDigest",
+        "termPlanFingerprint",
         "pressReleaseSourceTerms",
         "mediaClassificationIds",
         "pipeline",
@@ -458,6 +576,12 @@ def apply_run(run, user):
     types, facets, definition_hash = preflight(run.tenant, run.namespace, user)
     if definition_hash != run.configuration["definitionHash"]:
         raise BlockedRecord("definitions_changed_since_staging")
+    if run.configuration.get("format") == "eceee-reviewed-legacy-term-map":
+        resolved, fingerprint = _reviewed_term_state(run.configuration, facets)
+        if resolved != run.configuration.get("resolvedTermMap") or fingerprint != run.configuration.get(
+            "termPlanFingerprint"
+        ):
+            raise BlockedRecord("reviewed_terms_changed_since_staging")
     records = [(i.resource, i.record) for i in run.items.order_by("pk")]
     if (
         checksum({"scope": run.source_scope, "configuration": run.configuration, "records": records})
@@ -481,6 +605,9 @@ def apply_run(run, user):
             or sample.configuration.get("definitionHash") != definition_hash
             or sample.configuration.get("pipeline") != PIPELINE_VERSION
             or sample.configuration.get("mappingHash") != run.configuration.get("mappingHash")
+            or sample.configuration.get("inventoryDigest") != run.configuration.get("inventoryDigest")
+            or sample.configuration.get("decisionsDigest") != run.configuration.get("decisionsDigest")
+            or sample.configuration.get("termPlanFingerprint") != run.configuration.get("termPlanFingerprint")
             or set(sample.configuration.get("resources", [])) != set(run.configuration.get("resources", []))
         ):
             raise BlockedRecord("reviewed_sample_required_before_full_import")

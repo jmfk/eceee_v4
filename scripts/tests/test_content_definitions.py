@@ -84,6 +84,11 @@ class DefinitionDiffTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "definition_namespace=conflict"):
             self.diff()
 
+    def test_apply_rejects_conflicting_term_before_mutation(self):
+        self.api.terms[0]["name"] = "Conflicting name"
+        with self.assertRaisesRegex(ValueError, "bundle_term=conflict"):
+            module.apply_bundle(self.api, {"id": 2}, self.bundle, apply=True)
+
 
 if __name__ == "__main__":
     unittest.main()
