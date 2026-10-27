@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ECEEE v4 · Komponentatlas</title>
+  <style>
+    :root{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#172033;background:#f7f8fa;font-size:14px}
+    *{box-sizing:border-box}
+    body{margin:0}
+    button,input,select,textarea{font:inherit}
+    button{cursor:pointer}
+    button:disabled{cursor:not-allowed;opacity:.48}
+    :focus-visible{outline:2px solid #2563eb;outline-offset:2px}
+    a{color:#1d4ed8}
+    .app{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100dvh}
+    .rail{position:sticky;top:0;height:100dvh;overflow:auto;background:#fff;border-right:1px solid #e0e5eb;padding:23px 14px}
+    .brand{display:flex;align-items:center;gap:10px;padding:0 10px 20px;border-bottom:1px solid #edf0f3;font-weight:750;letter-spacing:-.02em}
+    .brandmark{display:grid;place-items:center;width:29px;height:29px;background:#2563eb;color:white;border-radius:4px;font-size:17px}
+    .rail p{margin:18px 10px 7px;color:#667085;font-size:11px;text-transform:uppercase;letter-spacing:.07em;font-weight:700}
+    .rail button{display:block;width:100%;border:0;border-radius:4px;background:transparent;color:#344054;text-align:left;padding:9px 10px;font-size:12px;line-height:1.35}
+    .rail button:hover{background:#f4f6f9}
+    .rail button[aria-current="page"]{background:#eff6ff;color:#1d4ed8;font-weight:650}
+    .rail-search{width:calc(100% - 20px);margin:18px 10px 0;padding:8px 10px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px}
+    .workspace{min-width:0}
+    .topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;min-height:58px;padding:9px clamp(20px,4vw,54px);border-bottom:1px solid #e0e5eb;background:rgba(255,255,255,.94);backdrop-filter:blur(10px)}
+    .topbar strong{font-size:13px}
+    .topbar .progress-label{margin-left:auto;color:#667085;font-size:12px;white-space:nowrap}
+    .pager{display:inline-flex;border:1px solid #cbd5e1;border-radius:4px;overflow:hidden}
+    .pager button{min-width:32px;min-height:30px;background:white;border:0;color:#344054}
+    .pager button+button{border-left:1px solid #d8dee6}
+    .pager button:hover{background:#f1f5f9}
+    .main{max-width:1480px;margin:auto;padding:34px clamp(20px,4vw,54px) 90px}
+    .slide{display:none}
+    .slide.active{display:block}
+    .eyebrow{color:#2563eb;font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:750}
+    h1{font-size:clamp(29px,3vw,44px);line-height:1.12;letter-spacing:-.045em;margin:9px 0 12px}
+    .intro{max-width:770px;color:#536070;font-size:15px;line-height:1.6;margin:0 0 25px}
+    .meta{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 28px}
+    .meta span{border:1px solid #dce3eb;border-radius:3px;padding:5px 8px;color:#475569;background:white;font-size:11px}
+    .compare-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}
+    .compare{min-width:0;background:#fff;border:1px solid #dde3e9;border-radius:5px;box-shadow:0 1px 3px rgba(18,37,61,.04);overflow:hidden}
+    .compare-head{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid #e5e9ee;color:#475569;font-size:11px;text-transform:uppercase;letter-spacing:.055em;font-weight:750}
+    .compare.after .compare-head{color:#1d4ed8}
+    .compare-body{min-height:275px;padding:22px;overflow:hidden}
+    .compare.before .compare-body{pointer-events:none}
+    .caption{min-height:78px;margin:0;padding:15px 18px;border-top:1px solid #e9edf1;color:#475569;font-size:12px;line-height:1.55}
+    .caption b{color:#1f2937}
+    .source{margin-top:17px;color:#64748b;font-size:11px}
+    .source code{color:#334155}
+    .source a{margin-left:8px}
+    .principle{margin-top:24px;padding:13px 16px;border-left:3px solid #2563eb;background:#eff6ff;color:#334155;font-size:12px;line-height:1.5}
+    .demo{font-size:12px;color:#202c3d}
+    .demo h3{font-size:15px;line-height:1.3;margin:0 0 12px}
+    .demo p{margin:8px 0;color:#5b6777;line-height:1.5}
+    .demo .subtle{color:#718096;font-size:11px}
+    .demo .surface{padding:15px;background:#fff;border:1px solid #e2e7ed;border-radius:4px}
+    .demo .quiet{padding:12px;background:#f7f8fa;border-radius:4px}
+    .demo .old-card{padding:18px;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 2px 6px #0000000d}
+    .demo .row{display:flex;align-items:center;gap:9px;min-width:0}
+    .demo .between{justify-content:space-between}
+    .demo .stack{display:grid;gap:9px}
+    .demo .divider{height:1px;background:#e6ebf0;margin:12px 0}
+    .demo button,.demo select{min-height:30px;padding:5px 10px;border:1px solid #cbd5e1;border-radius:3px;background:white;color:#344054;font-size:12px}
+    .demo button:hover:not(:disabled){background:#f3f6f9}
+    .demo button.primary{border-color:#2563eb;background:#2563eb;color:white;font-weight:600}
+    .demo button.primary:hover{background:#1d4ed8}
+    .demo button.quiet-button{border:0;background:transparent}
+    .demo button.danger{color:#b42318}
+    .demo button.small{min-height:26px;padding:3px 7px}
+    .demo input,.demo textarea{min-width:0;padding:7px 9px;border:1px solid #cbd5e1;border-radius:3px;background:white;color:#1f2937;font-size:12px}
+    .demo input::placeholder{color:#8993a1}
+    .demo .segmented{display:inline-flex;max-width:100%;border:1px solid #cbd5e1;border-radius:4px;overflow:hidden}
+    .demo .segmented button{min-height:30px;border:0;border-radius:0}
+    .demo .segmented button+button{border-left:1px solid #d9e0e8}
+    .demo .segmented button.active,.demo .segmented button[aria-pressed="true"]{background:#eff6ff;color:#1d4ed8;font-weight:650}
+    .demo .pill{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;background:#eff6ff;color:#1d4ed8;border-radius:3px;font-size:11px}
+    .demo .count{font-variant-numeric:tabular-nums;font-weight:650;color:#475569}
+    .demo .tabline{display:flex;gap:2px;border-bottom:1px solid #cbd5e1}
+    .demo .tabline button{min-height:29px;border:1px solid transparent;border-bottom:0;border-radius:3px 3px 0 0;background:transparent}
+    .demo .tabline button.active{border-color:#cbd5e1;background:white;color:#1d4ed8;font-weight:600;margin-bottom:-1px}
+    .demo .list{display:grid;gap:0}
+    .demo .list > div,.demo .list > button{display:flex;align-items:center;justify-content:space-between;min-height:33px;padding:6px 9px;border:0;border-bottom:1px solid #edf0f3;border-radius:0;background:transparent;text-align:left}
+    .demo .list > :last-child{border-bottom:0}
+    .demo .list > button:hover{background:#f5f7fa}
+    .demo .avatar{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#dce7ff;color:#1d4ed8;font-weight:700}
+    .demo .avatar.orange{background:#ffe2cd;color:#9a3900}
+    .demo .avatar.gray{background:#e5e7eb;color:#374151}
+    .demo .notice{padding:9px 11px;border:1px solid #cbd5e1;border-radius:4px;background:#f8fafc;color:#475569}
+    .demo .notice.success{border-color:#a8dec1;background:#ecfdf3;color:#166534}
+    .demo .notice.warning{border-color:#f2d4a7;background:#fffbeb;color:#92400e}
+    .demo .notice.error{border-color:#f1b8b1;background:#fff4f2;color:#9f2a20}
+    .demo .popover{position:relative;display:grid;gap:8px;max-width:260px;margin-top:8px;padding:12px;border:1px solid #d1d9e2;border-radius:4px;background:white;box-shadow:0 10px 22px #2030401a}
+    .demo .fake-image{display:grid;place-items:center;width:100%;height:130px;background:linear-gradient(135deg,#b7c9d9,#e8edf1 58%,#d0dce5);border-radius:3px;color:#456075;font-size:11px}
+    .demo .fake-image.selected{outline:2px solid #2563eb;outline-offset:2px}
+    .demo .meter{height:5px;background:#dbe7f7;border-radius:3px;overflow:hidden}
+    .demo .meter span{display:block;height:100%;width:35%;background:#2563eb;transition:width .25s ease}
+    .demo .thumb{width:44px;height:36px;border-radius:3px;background:linear-gradient(135deg,#8da5ba,#dce7f0)}
+    .demo .old-button{border:1px solid #cbd5e1;border-radius:3px;padding:5px 9px;color:#344054;background:white}
+    .demo .side-layout{display:grid;grid-template-columns:105px minmax(0,1fr);border:1px solid #dce3ea;border-radius:4px;overflow:hidden;min-height:180px}
+    .demo .side-layout nav{padding:10px;background:#f7f8fa;border-right:1px solid #e4e8ec}
+    .demo .side-layout main{padding:14px}
+    .demo .side-layout nav div,.demo .side-layout nav button{display:block;width:100%;margin:0 0 3px;padding:7px 6px;border:0;background:transparent;text-align:left;font-size:11px}
+    .demo .side-layout nav .active{background:#eaf2ff;color:#1d4ed8;font-weight:650}
+    .demo .board{display:flex;gap:9px;align-items:start;overflow:auto}
+    .demo .column{flex:0 0 47%;padding:9px;border-radius:5px;background:#eff0f2}
+    .demo .column .card{padding:10px;margin:7px 0;border-radius:4px;background:white;box-shadow:0 1px 2px #0002}
+    .demo .old-column{border:1px solid #aeb8c7;background:#e2e5e9}
+    .demo .checkrow{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #edf0f3}
+    .demo .checkrow input{min-width:auto}
+    .demo details{border-bottom:1px solid #edf0f3;padding:7px 0}
+    .demo summary{cursor:pointer}
+    .demo .float-field{position:relative;display:block;margin-top:10px}
+    .demo .float-field input{width:100%;min-height:34px;padding:9px 11px 5px}
+    .demo .float-field span{position:absolute;left:9px;top:10px;padding:0 3px;background:white;color:#667085;pointer-events:none;transition:top .14s,font-size .14s}
+    .demo .float-field:focus-within span,.demo .float-field:has(input:not(:placeholder-shown)) span{top:-5px;font-size:10px;color:#2563eb}
+    .demo .float-field:focus-within input{border-color:#2563eb;outline:none}
+    .toast{position:fixed;right:22px;bottom:22px;z-index:30;max-width:min(340px,calc(100vw - 44px));padding:11px 14px;border-radius:4px;background:#1f2937;color:white;box-shadow:0 8px 25px #0003;font-size:12px}
+    .index-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:25px}
+    .index-card{padding:15px;border:1px solid #dce3ea;border-radius:4px;background:white;text-align:left}
+    .index-card:hover{border-color:#93b4f4;background:#f8fbff}
+    .index-card small{display:block;color:#667085;margin-bottom:7px}
+    .index-card strong{font-size:14px}
+    .index-card p{font-size:11px;color:#667085;line-height:1.5;margin:7px 0 0}
+    [hidden]{display:none!important}
+    @media(max-width:900px){.app{grid-template-columns:1fr}.rail{position:static;height:auto;max-height:185px;border-right:0;border-bottom:1px solid #e0e5eb}.rail nav{display:flex;gap:5px;overflow:auto}.rail p{display:none}.rail button{flex:0 0 auto;width:auto;white-space:nowrap}.rail-search{display:none}.compare-grid{grid-template-columns:1fr}.main{padding-top:24px}}
+    @media(max-width:520px){.topbar{gap:7px;padding:8px 16px}.topbar strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.main{padding-inline:16px}.compare-body{padding:16px}.intro{font-size:14px}}
+    @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="rail" aria-label="Presentationens innehåll">
+      <div class="brand"><span class="brandmark">E</span><span>ECEEE · UI atlas</span></div>
+      <input class="rail-search" id="rail-search" type="search" aria-label="Sök komponenter" placeholder="Sök komponent…">
+      <nav id="slide-nav" aria-label="Komponenter"></nav>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">
+        <strong id="top-title">Komponentatlas</strong>
+        <span class="progress-label" id="progress-label">1 / 16</span>
+        <div class="pager" aria-label="Bläddra">
+          <button type="button" id="previous" aria-label="Föregående">←</button>
+          <button type="button" id="next" aria-label="Nästa">→</button>
+        </div>
+      </header>
+      <main class="main" id="slides">
+        <section class="slide active" id="start" data-category="Översikt" data-title="Start">
+          <div class="eyebrow">Designstudie · oktober 2026</div>
+          <h1>ECEEE v4<br>komponentatlas</h1>
+          <p class="intro">En klickbar genomgång av vanliga och mer specifika komponenter i CMS:et. Varje uppslag visar ett representativt nuläge, ett konkret förbättringsförslag och en liten demo som går att prova.</p>
+          <div class="meta"><span>15 komponenter och layouter</span><span>Före / förslag</span><span>Fristående HTML</span><span>Ingen backend krävs</span></div>
+          <div class="principle">Riktning: behåll ECEEE:s ljusa skal, Inter, neutral chrome och blå aktiv färg. Minska upprepade ramar, ge innehåll tydligare hierarki och låt verktyg visas nära uppgiften. Förslagen är prototyper, inte beslut om en generell redesign.</div>
+          <div class="index-grid" id="index-grid"></div>
+          <p class="source">Referenser: <a href="https://component.gallery/" target="_blank" rel="noreferrer">The Component Gallery</a> · <a href="https://m3.material.io/components" target="_blank" rel="noreferrer">Material 3 components</a>. Inspirationen gäller beteende och struktur; ECEEE:s egna mönster styr utseendet.</p>
+        </section>
+        <section class="slide" id="app-shell" data-category="Struktur" data-title="Appskal och navigation">
+          <div class="eyebrow">01 · Struktur</div><h1>Appskal och navigation</h1>
+          <p class="intro">Samma orientering när användaren byter mellan sidor, objekt, media och personliga verktyg.</p>
+          <div class="compare-grid">
+            <article class="compare before"><div class="compare-head">Före · representativt nuläge</div><div class="compare-body demo"><div class="surface"><div class="row between"><b>ECEEE</b><span>Sidor &nbsp; Media &nbsp; Inställningar &nbsp; Profil</span></div></div><div class="old-card" style="margin-top:12px"><h3>Settings Dashboard</h3><p>System overview and quick management</p><div class="row"><span class="old-button">Pages</span><span class="old-button">Themes</span></div></div></div><p class="caption"><b>Utmaning:</b> skiftande rubriker, täta rader av länkar och flera konkurrerande ytor gör hierarkin svag.</p></article>
+            <article class="compare after"><div class="compare-head">Förslag · prova navigationen</div><div class="compare-body demo"><div class="side-layout"><nav><button class="active" data-side>Översikt</button><button data-side>Sidor</button><button data-side>Media</button><button data-side>Inställningar</button></nav><main><div class="subtle">ECEEE / Arbetsyta</div><h3 data-side-title>Översikt</h3><p>En tydlig plats för sidans primära uppgift.</p><div class="segmented"><button class="active" data-segment>Alla</button><button data-segment>Mina</button></div></main></div></div><p class="caption"><b>Förbättring:</b> stabil vänsternavigation i stora arbetsytor, en sidrubrik och en tydlig uppgiftsyta. Sekundära val ligger nära innehållet.</p></article>
+          </div><p class="source">I koden: <code>Navbar.jsx</code>, <code>StatusBar.jsx</code>, <code>SettingsDashboard.jsx</code></p>
+        </section>
+
+        <section class="slide" id="overview" data-category="Struktur" data-title="Översikt och statistik">
+          <div class="eyebrow">02 · Struktur</div><h1>Översikt och statistik</h1><p class="intro">Siffror ska hjälpa användaren välja nästa åtgärd, inte bara fylla ytan.</p>
+          <div class="compare-grid"><article class="compare before"><div class="compare-head">Före</div><div class="compare-body demo"><div class="row"><div class="old-card" style="flex:1"><span class="subtle">Pages</span><h1 style="font-size:30px;margin:6px 0">128</h1><p>Total managed web pages</p><span style="color:#2563eb">Manage Pages →</span></div><div class="old-card" style="flex:1"><span class="subtle">Themes</span><h1 style="font-size:30px;margin:6px 0">8</h1><p>Visual style configurations</p><span style="color:#2563eb">Manage Themes →</span></div></div></div><p class="caption"><b>Utmaning:</b> stora kort, ikonfärg och upprepad metadata förlänger vägen till handling.</p></article><article class="compare after"><div class="compare-head">Förslag · välj period</div><div class="compare-body demo"><div class="row between"><h3>Arbetsöversikt</h3><div class="segmented"><button class="active" data-period>7 dagar</button><button data-period>30 dagar</button></div></div><div class="list"><div><span>Sidor att granska</span><b class="count" data-metric>12</b></div><div><span>Väntande publiceringar</span><b class="count">4</b></div><div><span>Utkast</span><b class="count">23</b></div></div><p class="subtle">Välj en rad för att öppna motsvarande arbetslista.</p></div><p class="caption"><b>Förbättring:</b> kompakta rader, tabulära siffror och en periodväljare. Status och handling får samma läsriktning.</p></article></div><p class="source">I koden: <code>SettingsDashboard.jsx</code></p>
+        </section>
+
+        <section class="slide" id="search" data-category="Hitta och välja" data-title="Sök och filter">
+          <div class="eyebrow">03 · Hitta och välja</div><h1>Sök och filter</h1><p class="intro">En sökrad som bär både fritext och valda filter, utan en permanent remsa av dropdowns.</p>
+          <div class="compare-grid"><article class="compare before"><div class="compare-head">Före · äldre verktygsrad</div><div class="compare-body demo"><div class="surface stack"><input placeholder="Search card · ⌘K / Ctrl+K"><div class="row"><span class="old-button">Sök</span><span class="old-button">All assignees ⌄</span><span class="old-button">All labels ⌄</span></div><div class="row"><span class="old-button">All deadlines ⌄</span><span class="old-button">Active ⌄</span></div></div></div><p class="caption"><b>Utmaning:</b> många likvärdiga kontroller tar plats även när inget filter används.</p></article><article class="compare after"><div class="compare-head">Förslag · skriv och lägg till filter</div><div class="compare-body demo"><div class="surface"><div class="row"><input data-filter-input aria-label="Sök kort" placeholder="Sök kort…" style="flex:1"><button data-toggle="filter-menu" aria-expanded="false" aria-controls="filter-menu">＋ Filter</button></div><div class="row" style="margin-top:8px"><span class="pill" data-filter-pill hidden>Ansvarig: jag <button class="small quiet-button" data-clear-filter aria-label="Ta bort filter">×</button></span></div><div id="filter-menu" class="popover" hidden><b>Filtrera</b><button data-apply-filter>Mina kort</button><button data-apply-filter>Förfallna</button></div><div class="list" style="margin-top:12px"><div class="filter-row">Uppdatera startsida <span class="subtle">TASK-24</span></div><div class="filter-row">Granska nyhet <span class="subtle">TASK-19</span></div><div class="filter-row">Publicera tema <span class="subtle">TASK-12</span></div></div></div></div><p class="caption"><b>Förbättring:</b> sökning först, filter vid behov och aktiva val som borttagbara piller.</p></article></div><p class="source">I koden: <code>ClassificationManager.jsx</code>, <code>KanbanPage.jsx</code></p>
+        </section>
+
+        <section class="slide" id="tabs" data-category="Hitta och välja" data-title="Flikar och segment">
+          <div class="eyebrow">04 · Hitta och välja</div><h1>Flikar och segment</h1><p class="intro">Två liknande kontroller med olika jobb: flikar byter innehållsyta, segment ändrar ett lokalt visningsval.</p>
+          <div class="compare-grid"><article class="compare before"><div class="compare-head">Före</div><div class="compare-body demo"><div class="row"><span class="old-button">Definitioner</span><span class="old-button">Termer</span><span class="old-button">Historik</span></div><div class="divider"></div><div class="row"><span class="old-button">Failing</span><span class="old-button">Uptime</span></div></div><p class="caption"><b>Utmaning:</b> fristående knappar gör informationshierarkin oklar.</p></article><article class="compare after"><div class="compare-head">Förslag · växla båda typerna</div><div class="compare-body demo"><div class="tabline"><button class="active" data-tab="Definitioner">Definitioner</button><button data-tab="Termer">Termer</button><button data-tab="Historik">Historik</button></div><div class="surface" style="border-top:0"><h3 data-tab-content>Definitioner</h3><p>Innehållet hör ihop med fliken ovan.</p></div><div class="row" style="margin-top:19px"><span class="subtle">Visa</span><div class="segmented"><button class="active" data-segment>Aktiva</button><button data-segment>Arkiverade</button></div></div></div><p class="caption"><b>Förbättring:</b> flikar sitter på baslinjen; segmenterade kontroller är en sammanhållen enhet med jämn padding.</p></article></div><p class="source">I koden: <code>ClassificationManager.jsx</code>, <code>ObjectVersionViewer.jsx</code></p>
+        </section>
+
+        <section class="slide" id="fields" data-category="Hitta och välja" data-title="Fält och val">
+          <div class="eyebrow">05 · Hitta och välja</div><h1>Fält och val</h1><p class="intro">Kompakta fält utan dubbla etiketter och med tillräcklig plats för värde och pil.</p>
+          <div class="compare-grid"><article class="compare before"><div class="compare-head">Före</div><div class="compare-body demo"><label>Board name</label><input style="display:block;width:100%;margin:7px 0 16px" value="eceee 2026" readonly><label>Background image</label><input style="display:block;margin:7px 0" value="Choose file  No file chosen" readonly></div><p class="caption"><b>Utmaning:</b> permanenta etiketter och ojämna native-kontroller gör täta formulär ryckiga.</p></article><article class="compare after"><div class="compare-head">Förslag · fokusera och fyll</div><div class="compare-body demo"><label class="float-field"><span>Tavlans namn</span><input aria-label="Tavlans namn" placeholder=" " value="eceee 2026"></label><label class="float-field"><span>Beskrivning</span><input aria-label="Beskrivning" placeholder=" "></label><div class="row" style="margin-top:17px"><button data-toast="Filväljaren skulle öppnas här.">Ladda upp bild</button><span class="subtle">JPG, PNG eller WebP</span></div><p>En enda etikett per fält. Den flyttar upp när fältet fokuseras eller har ett värde.</p></div><p class="caption"><b>Förbättring:</b> 12 px text, 30–34 px kontroller, tydlig fokuskant och konsekventa inre marginaler.</p></article></div><p class="source">I koden: <code>CompactSelect.jsx</code>, <code>ClassificationManager.jsx</code>, <code>KanbanPage.jsx</code></p>
+        </section>
+
+        <section class="slide" id="object-tree" data-category="Struktur" data-title="Objektträd och relationer">
+          <div class="eyebrow">06 · Struktur</div><h1>Objektträd och relationer</h1><p class="intro">En ovanlig men central CMS-komponent: hierarki, aktuell nod och relaterat innehåll i samma arbetsyta.</p>
+          <div class="compare-grid"><article class="compare before"><div class="compare-head">Före</div><div class="compare-body demo"><div class="surface"><div class="stack"><div>Startsida <span class="subtle">Page</span></div><div style="padding-left:18px">Nyheter <span class="subtle">Section</span></div><div style="padding-left:36px;background:#dbeafe;padding-top:7px;padding-bottom:7px">Artikel 42 <span class="subtle">Article</span></div></div><h3 style="margin-top:17px">RELATED OBJECTS</h3><div>Författare <span class="subtle">Person</span></div></div></div><p class="caption"><b>Utmaning:</b> indrag utan tydlig grenstruktur och metadata på varje rad gör trädet svårt att skanna.</p></article><article class="compare after"><div class="compare-head">Förslag · öppna och välj nod</div><div class="compare-body demo"><div class="side-layout"><nav style="width:auto"><details open><summary>▾ Startsida</summary><details open style="padding-left:8px"><summary>▾ Nyheter</summary><button class="active" data-tree-item>Artikel 42</button><button data-tree-item>Artikel 43</button></details></details><div class="subtle" style="margin-top:14px">RELATERAT</div><button data-tree-item>Författare</button></nav><main><span class="subtle">Startsida / Nyheter</span><h3 data-tree-title>Artikel 42</h3><p>Vald post visas i huvudytan. Trädet behåller plats och expansion.</p></main></div></div><p class="caption"><b>Förbättring:</b> explicit expansion, en tydlig aktuell rad och typinformation bara där den behövs.</p></article></div><p class="source">I koden: <code>ObjectNavigation.jsx</code>, <code>TreePageManager.jsx</code></p>
+        </section>
+
+        <section class="slide" id="kanban" data-category="Arbetsflöde" data-title="Kanban-lista och kort">
+          <div class="eyebrow">07 · Arbetsflöde</div><h1>Kanban-lista och kort</h1><p class="intro">Tavlan ska vara lätt att överblicka även när kort får etiketter, ansvariga och bilagor.</p>
+          <div class="compare-grid"><article class="compare before"><div class="compare-head">Före · äldre liststil</div><div class="compare-body demo"><div class="board"><div class="column old-column"><div class="row between"><b>To do <span class="subtle">0</span></b><span class="old-button">···</span></div><p>＋ Add card</p></div><div class="column old-column"><div class="row between"><b>Done <span class="subtle">1</span></b><span class="old-button">···</span></div><div class="card">TASK-2<br>New card</div><p>＋ Add card</p></div></div></div><p class="caption"><b>Utmaning:</b> mörkare listyta, inramad meny och svag räknare konkurrerar med kortets innehåll.</p></article><article class="compare after"><div class="compare-head">Förslag · skapa ett kort</div><div class="compare-body demo"><div class="board"><div class="column"><div class="row between"><b>Att göra</b><span class="count" data-board-count>1</span><button class="quiet-button small" data-toggle="board-menu">···</button></div><div class="popover" id="board-menu" hidden><button data-toast="Listmenyn öppnades.">Flytta lista</button><button data-toast="Listan skulle arkiveras.">Arkivera lista</button></div><div class="card">Granska startsida <span class="subtle">TASK-24</span></div><div data-card-list></div><button class="quiet-button" data-toggle="card-compose">＋ Lägg till kort</button><div id="card-compose" class="stack" hidden><input data-card-input aria-label="Kortrubrik" placeholder="Ange en titel…"><div class="row"><button class="primary" data-create-card>Skapa kort</button><button class="quiet-button" data-toggle="card-compose">Avbryt</button></div></div></div><div class="column"><div class="row between"><b>Pågår</b><span class="count">2</span></div><div class="card">Uppdatera tema</div><div class="card">Skriv nyhet</div></div></div></div><p class="caption"><b>Förbättring:</b> neutral listyta, starkare antal och inline-komposition utan extra dialog.</p></article></div><p class="source">I koden: <code>KanbanPage.jsx</code>, <code>kanban.css</code></p>
+        </section>
+
+        <section class="slide" id="detail-layout" data-category="Struktur" data-title="Detaljvy med stödyta">
+          <div class="eyebrow">08 · Struktur</div><h1>Detaljvy med stödyta</h1><p class="intro">Kortets innehåll och aktivitet har olika läsrytm men måste höra ihop.</p>
+          <div class="compare-grid"><article class="compare before"><div class="compare-head">Före</div><div class="compare-body demo"><div class="surface"><div class="row"><span class="old-button">eceee / Done ⌄</span><span class="subtle">TASK-1</span></div><div class="divider"></div><h3>Beskrivning</h3><p>Text och bilder</p><h3>Attachments</h3><div class="fake-image"></div><div class="divider"></div><span>Kommentarer och aktivitet ↓</span></div></div><p class="caption"><b>Utmaning:</b> långa kort blandar innehåll, metadata, filer och händelser i en enda vertikal sekvens.</p></article><article class="compare after"><div class="compare-head">Förslag · välj stödyta</div><div class="compare-body demo"><div style="display:grid;grid-template-columns:1.25fr .85fr;border:1px solid #dce3ea;border-radius:4px;min-height:208px"><div style="padding:15px"><span class="subtle">TASK-1 · Pågår</span><h3 style="margin-top:8px">Uppdatera redaktionens startsida</h3><p>Beskrivning och innehåll får största ytan.</p><button class="quiet-button" data-toast="Redigeringsytan skulle öppnas.">Redigera beskrivning</button></div><div style="padding:15px;background:#f5f7fa;border-left:1px solid #dce3ea"><div class="segmented"><button class="active" data-segment>Aktivitet</button><button data-segment>Filer</button></div><p>Johan ändrade status · 14:32</p><p>Sara kommenterade · i går</p></div></div></div><p class="caption"><b>Förbättring:</b> huvuduppgift i stor yta och stödjande aktivitet eller filer i en lugn sekundär panel.</p></article></div><p class="source">I koden: <code>KanbanPage.jsx</code> · strukturprincip: <a href="https://m3.material.io/foundations/layout/canonical-examples/overview" target="_blank" rel="noreferrer">M3 supporting pane</a></p>
+        </section>
+
+        <section class="slide" id="image-actions" data-category="Redigera" data-title="Bildverktyg i rich text">
+          <div class="eyebrow">09 · Redigera</div><h1>Bildverktyg i rich text</h1><p class="intro">Bilden markeras i texten och får verktyg på samma plats. Justering och textflöde är olika val.</p>
+          <div class="compare-grid"><article class="compare before"><div class="compare-head">Före · första utkastet</div><div class="compare-body demo"><div class="fake-image selected"></div><div class="surface stack" style="margin-top:12px"><div class="row"><span>Storlek 100 %</span><span class="old-button">Minska</span><span class="old-button">Öka</span></div><div class="row"><span>Textflöde</span><span class="old-button">Inget ⌄</span></div><div class="row"><span>Justering</span><span class="old-button">Ingen ⌄</span></div><div class="row"><span class="old-button">Ta bort ur texten</span><span class="old-button">Ta bort bilaga</span></div></div></div><p class="caption"><b>Utmaning:</b> många separata ramar och selekter ger en tung meny för ett lokalt val.</p></article><article class="compare after"><div class="compare-head">Förslag · ändra bilden</div><div class="compare-body demo"><div class="fake-image selected" data-sample-image>Vald bild</div><div class="surface stack" style="max-width:310px;margin-top:12px;padding:11px"><div class="row between"><b>Storlek</b><div class="segmented"><button data-image-size="-25">−</button><button class="active" data-image-width>100 %</button><button data-image-size="25">＋</button></div></div><div class="row between"><b>Textflöde</b><div class="segmented"><button class="active" data-image-flow>Av</button><button data-image-flow>Vänster</button><button data-image-flow>Höger</button></div></div><div class="row between"><b>Justering</b><div class="segmented"><button class="active" data-image-align>Auto</button><button data-image-align>Mitt</button><button data-image-align>Höger</button></div></div><div class="divider" style="margin:0"></div><div class="row"><button class="quiet-button" data-image-unlink>Ta bort ur texten</button><button class="quiet-button danger" data-toast="Bilagan skulle tas bort efter bekräftelse.">Ta bort bilaga</button></div></div></div><p class="caption"><b>Förbättring:</b> segmenterade toolbarval med gemensam ram, jämn padding och tydlig destruktiv åtgärd.</p></article></div><p class="source">I koden: <code>MarkdownEditor.jsx</code>, <code>markdown.js</code></p>
+        </section>
+
+        <section class="slide" id="attachments" data-category="Redigera" data-title="Bilagor och filåtgärder">
+          <div class="eyebrow">10 · Redigera</div><h1>Bilagor och filåtgärder</h1><p class="intro">Filens namn, förhandsvisning och åtgärder ska bilda en sammanhängande rad utan att själva bilden ramas in i onödan.</p>
+          <div class="compare-grid"><article class="compare before"><div class="compare-head">Före</div><div class="compare-body demo"><a href="#" onclick="return false">Headshot – 2025 jan – Johan.jpg</a><span class="subtle"> &nbsp;1,1 MB</span><div class="fake-image" style="margin:9px 0 0"></div><div class="row"><span class="old-button">Copy Markdown image</span><span class="old-button" style="color:#b42318">Remove attachment</span></div></div><p class="caption"><b>Utmaning:</b> knapparna ligger tätt mot bilden och ser ut som två orelaterade formulärkontroller.</p></article><article class="compare after"><div class="compare-head">Förslag · små bilagekort</div><div class="compare-body demo"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px"><div class="surface" style="padding:0;overflow:hidden"><div class="row" style="padding:10px"><span class="thumb" style="width:52px;height:52px;flex:none"></span><div style="min-width:0"><a href="#" onclick="return false" style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Headshot – 2025 jan – Johan.jpg</a><span class="subtle">1,1 MB</span></div></div><div class="segmented" style="display:flex;width:100%;border:0;border-top:1px solid #dce3ea;border-radius:0"><button style="flex:1" data-toast="Markdown-länken kopierades.">Kopiera bildlänk</button><button style="flex:1" class="danger" data-toggle="attachment-warning">Ta bort</button></div></div><div class="surface" style="padding:0;overflow:hidden"><div class="row" style="padding:10px"><span class="thumb" style="width:52px;height:52px;flex:none;background:#eef2f6"></span><div style="min-width:0"><a href="#" onclick="return false">guide.pdf</a><div class="subtle">0,5 MB</div></div></div><div class="segmented" style="display:flex;width:100%;border:0;border-top:1px solid #dce3ea;border-radius:0"><button class="danger" style="flex:1" data-toggle="attachment-warning">Ta bort</button></div></div></div><div id="attachment-warning" class="notice warning" style="margin-top:10px" hidden>Filen kan användas i kortets text. <div class="row" style="margin-top:7px"><button class="small danger" data-toast="Demo: bilagan skulle tas bort.">Ta bort ändå</button><button class="small" data-toggle="attachment-warning">Avbryt</button></div></div></div><p class="caption"><b>Förbättring:</b> små kort med miniatyr, namn, storlek och gemensam åtgärdsrad. Borttagning förklarar konsekvensen.</p></article></div><p class="source">I koden: <code>KanbanPage.jsx</code>, <code>kanban.css</code></p>
+        </section>
+        <section class="slide" id="members" data-category="Samarbete" data-title="Medlemmar och profil">
+          <div class="eyebrow">11 · Samarbete</div><h1>Medlemmar och profil</h1><p class="intro">Kortets tilldelning samlas i en sökbar popup. Avatarer gör det lätt att känna igen både valda kortmedlemmar och andra på tavlan.</p>
+          <div class="compare-grid">
+            <article class="compare before"><div class="compare-head">Före · separat fält</div><div class="compare-body demo"><div class="row"><b>Members</b><span class="old-button">＋</span></div><div class="divider"></div><b>Ansvariga</b><div class="row" style="margin-top:12px"><label><input type="checkbox"> codex-local</label><label><input type="checkbox"> Dev User</label></div></div><p class="caption"><b>Utmaning:</b> plusknappen och en separat checkboxrad uttrycker samma val på två olika platser.</p></article>
+            <article class="compare after"><div class="compare-head">Förslag · välj kortmedlemmar</div><div class="compare-body demo">
+              <div class="row between" style="align-items:center;flex-wrap:wrap;gap:10px"><b style="font-size:20px">Beskriv mig</b><div class="row" style="flex-wrap:wrap;gap:5px"><button data-toast="Demo: fler kortåtgärder öppnas.">＋ Lägg till</button><button data-toggle="card-member-popover" aria-expanded="false" aria-label="Ändra kortmedlemmar">＋ Medlemmar</button><button data-toast="Demo: etiketter öppnas.">Etiketter</button><button data-toast="Demo: datum öppnas.">Datum</button><button data-toast="Demo: checklista öppnas.">Checklista</button><button data-toast="Demo: bilagor öppnas.">Bilaga</button></div></div>
+              <div class="popover" id="card-member-popover" style="max-width:300px;padding:12px" hidden>
+                <div class="row between"><b>Ändra medlemmar</b><button class="quiet-button small" data-toggle="card-member-popover" aria-label="Stäng medlemsväljaren">×</button></div>
+                <input type="search" data-card-member-search aria-label="Sök medlem" placeholder="Sök medlem" style="width:100%">
+                <b class="subtle">Kortmedlemmar</b><div data-card-member-selected class="list"><button data-card-member="Ylva Blume" data-selected="true" aria-label="Ta bort Ylva Blume från kortet"><span class="row"><span class="avatar orange">YB</span>Ylva Blume</span><span>×</span></button></div>
+                <b class="subtle">Tavlemedlemmar</b><div data-card-member-available class="list"><button data-card-member="Johan Berg" data-selected="false" aria-label="Lägg till Johan Berg på kortet"><span class="row"><span class="avatar gray">JB</span>Johan Berg</span><span></span></button><button data-card-member="Kim" data-selected="false" aria-label="Lägg till Kim på kortet"><span class="row"><span class="avatar gray">K</span>Kim</span><span></span></button></div>
+              </div>
+              <div class="divider"></div><div class="row"><span class="subtle">Tavelprofil:</span><button class="avatar orange" data-member="Ylva Blume" style="padding:0;border:0" aria-label="Visa Ylva Blumes profil">YB</button></div>
+              <div class="popover" id="member-popover" hidden><div class="row"><span class="avatar orange" id="member-avatar">YB</span><div><b id="member-name">Ylva Blume</b><div class="subtle">Medlem på tavlan</div></div></div><div class="divider"></div><button data-toast="Demo: profilvyn skulle öppnas.">Visa profil</button><button data-toast="Demo: medlemsaktivitet skulle öppnas.">Visa aktivitet på tavlan</button></div>
+            </div><p class="caption"><b>Förbättring:</b> titel och åtgärder delar övre raden. Medlemsknappen öppnar en kompakt panel med sök, valda kortmedlemmar och tavlemedlemmar.</p></article>
+          </div><p class="source">I koden: <code>KanbanPage.jsx</code>, <code>kanban.css</code></p>
+        </section>
+        <section class="slide" id="media" data-category="Innehåll" data-title="Media och urval">
+          <div class="eyebrow">12 · Innehåll</div><h1>Media och urval</h1><p class="intro">Bildbiblioteket behöver visa vad som är valt, var bilden används och vilken åtgärd som följer.</p>
+          <div class="compare-grid"><article class="compare before"><div class="compare-head">Före</div><div class="compare-body demo"><div class="row"><div class="thumb"></div><div><b>coast.jpg</b><div class="subtle">2026-10-20</div></div><span class="old-button">Välj</span></div><div class="divider"></div><div class="row"><div class="thumb"></div><div><b>coast-copy.jpg</b><div class="subtle">2026-10-20</div></div><span class="old-button">Välj</span></div></div><p class="caption"><b>Utmaning:</b> upprepade kontroller döljer vilket objekt som är aktivt och vilka filer som kan vara dubbletter.</p></article><article class="compare after"><div class="compare-head">Förslag · välj och granska</div><div class="compare-body demo"><div class="list" role="listbox" aria-label="Media"><button data-media="coast.jpg" class="active"><span class="row"><span class="thumb"></span><span>coast.jpg</span></span><span class="pill">Vald</span></button><button data-media="portrait.jpg"><span class="row"><span class="thumb"></span><span>portrait.jpg</span></span><span class="subtle">1,1 MB</span></button></div><div class="notice" style="margin-top:13px">Vald: <b data-media-name>coast.jpg</b><br><span class="subtle">Används i 2 kort · kontrollera filen före borttagning</span></div><div class="row" style="margin-top:12px"><button class="primary" data-toast="Demo: vald bild skulle infogas.">Infoga vald bild</button><button data-toast="Demo: filväljaren skulle öppnas.">Ladda upp ny</button></div></div><p class="caption"><b>Förbättring:</b> en markerad rad, kontext för återanvändning och åtgärder nära det aktuella valet.</p></article></div><p class="source">I koden: <code>MediaBrowser.jsx</code></p>
+        </section>
+        <section class="slide" id="bulk" data-category="Arbetsflöde" data-title="Massåtgärder">
+          <div class="eyebrow">13 · Arbetsflöde</div><h1>Massåtgärder</h1><p class="intro">När flera poster markeras ska verktygsfältet visa antal och säkra nästa steg utan att störa listans läsbarhet.</p>
+          <div class="compare-grid"><article class="compare before"><div class="compare-head">Före</div><div class="compare-body demo"><div class="row" style="flex-wrap:wrap"><span class="old-button">Cut</span><span class="old-button">Copy</span><span class="old-button">Duplicate</span><span class="old-button">Publish</span><span class="old-button">Unpublish</span><span class="old-button">Delete</span></div><p>Tre poster är valda.</p></div><p class="caption"><b>Utmaning:</b> en rad av likvärdiga knappar gör det svårt att skilja den vanliga åtgärden från den destruktiva.</p></article><article class="compare after"><div class="compare-head">Förslag · markera och utför</div><div class="compare-body demo"><div class="surface"><div class="checkrow"><input type="checkbox" data-bulk-check checked aria-label="Välj artikel A">Artikel A</div><div class="checkrow"><input type="checkbox" data-bulk-check checked aria-label="Välj artikel B">Artikel B</div><div class="checkrow"><input type="checkbox" data-bulk-check aria-label="Välj artikel C">Artikel C</div></div><div class="row" style="margin-top:12px;flex-wrap:wrap"><b><span data-bulk-count>2</span> valda</b><div class="segmented"><button data-toast="Demo: valda poster skulle kopieras.">Kopiera</button><button data-toast="Demo: valda poster skulle publiceras.">Publicera</button><button data-toggle="bulk-more">Mer ▾</button></div></div><div id="bulk-more" class="popover" hidden><button data-toast="Demo: valda poster skulle dupliceras.">Duplicera</button><button class="danger" data-toggle="bulk-warning">Ta bort…</button><div class="notice warning" id="bulk-warning" hidden>Ta bort markerade poster? <button class="danger small" data-toast="Demo: borttagning bekräftad.">Bekräfta</button></div></div></div><p class="caption"><b>Förbättring:</b> antal följer urvalet, vanliga åtgärder står först och borttagning kräver ett tydligt beslut.</p></article></div><p class="source">I koden: <code>BulkActionsToolbar.jsx</code></p>
+        </section>
+        <section class="slide" id="versions" data-category="Arbetsflöde" data-title="Versioner och jämförelse">
+          <div class="eyebrow">14 · Arbetsflöde</div><h1>Versioner och jämförelse</h1><p class="intro">Versionshistorik bör besvara tre frågor snabbt: vilken version visas, vad ändrades och vem gjorde ändringen?</p>
+          <div class="compare-grid"><article class="compare before"><div class="compare-head">Före</div><div class="compare-body demo"><div class="list"><div>Version 18 <span>2026-10-27</span></div><div>Version 17 <span>2026-10-26</span></div><div>Version 16 <span>2026-10-25</span></div></div></div><p class="caption"><b>Utmaning:</b> datum och versionsnummer ger lite stöd för att avgöra vilken ändring som är relevant.</p></article><article class="compare after"><div class="compare-head">Förslag · välj och jämför</div><div class="compare-body demo"><div class="list"><button data-version="18"><span><b>v18</b> · Idag 10:42<br><small class="subtle">Johan · rubrik och bild</small></span><span class="pill">Aktuell</span></button><button data-version="17"><span><b>v17</b> · Igår 16:05<br><small class="subtle">Ylva · textändring</small></span><span>Välj</span></button><button data-version="16"><span><b>v16</b> · 25 okt<br><small class="subtle">Kim · ny sida</small></span><span>Välj</span></button></div><div class="notice" style="margin-top:12px">Jämför <b>v18</b> med <b data-version-choice>v17</b></div><button class="primary" style="margin-top:10px" data-toast="Demo: skillnadsvyn skulle öppnas.">Visa ändringar</button></div><p class="caption"><b>Förbättring:</b> ändringssammanfattning i varje rad och ett synligt jämförelsepar före nästa steg.</p></article></div><p class="source">I koden: <code>ObjectVersionViewer.jsx</code></p>
+        </section>
+        <section class="slide" id="states" data-category="Återkoppling" data-title="Förlopp och status">
+          <div class="eyebrow">15 · Återkoppling</div><h1>Förlopp och status</h1><p class="intro">Långa uppgifter behöver ett synligt förlopp, status med ord och ett begripligt besked om man lämnar vyn.</p>
+          <div class="compare-grid"><article class="compare before"><div class="compare-head">Före</div><div class="compare-body demo"><button disabled>Generera från beskrivning</button><p>Uppgiften pågår utan statusindikator.</p></div><p class="caption"><b>Utmaning:</b> en inaktiverad knapp berättar inte om processen arbetar, fastnat eller kan avbrytas.</p></article><article class="compare after"><div class="compare-head">Förslag · starta och prova att stänga</div><div class="compare-body demo"><div class="surface stack"><div class="row between"><b data-task-label>Redo att generera</b><span class="subtle" data-task-percent>0 %</span></div><div class="meter"><span data-task-meter style="width:0"></span></div><p data-task-help>Skapa en ny bakgrund från tavlans innehåll.</p><div class="row"><button class="primary" data-start-task>Generera bild</button><button data-leave-task>Stäng panel</button></div><div class="notice warning" id="task-warning" hidden>Bildgenereringen avbryts om du lämnar den här vyn. <div class="row" style="margin-top:8px"><button class="small" data-continue-task>Fortsätt vänta</button><button class="small danger" data-cancel-task>Avbryt</button></div></div></div></div><p class="caption"><b>Förbättring:</b> fas och progress syns under väntan. Försök att lämna uppgiften ger en konkret varning.</p></article></div><p class="source">I koden: <code>KanbanPage.jsx</code></p>
+        </section>
+
+      </main>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <script>
+    (() => {
+      const slides = [...document.querySelectorAll('.slide')];
+      const nav = document.getElementById('slide-nav');
+      const index = document.getElementById('index-grid');
+      const toast = document.getElementById('toast');
+      let current = 0;
+      let toastTimer;
+      let taskTimer;
+      let taskProgress = 0;
+      let taskRunning = false;
+      const showToast = (message) => {
+        toast.textContent = message;
+        toast.hidden = false;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { toast.hidden = true; }, 3000);
+      };
+      const show = (next) => {
+        current = Math.max(0, Math.min(slides.length - 1, next));
+        slides.forEach((slide, i) => { slide.classList.toggle('active', i === current); });
+        [...nav.querySelectorAll('button')].forEach((button, i) => {
+          if (i === current) button.setAttribute('aria-current', 'page');
+          else button.removeAttribute('aria-current');
+        });
+        document.getElementById('top-title').textContent = slides[current].dataset.title;
+        document.getElementById('progress-label').textContent = (current + 1) + ' / ' + slides.length;
+        document.getElementById('previous').disabled = current === 0;
+        document.getElementById('next').disabled = current === slides.length - 1;
+        history.replaceState(null, '', '#' + slides[current].id);
+        scrollTo({ top: 0, behavior: 'instant' });
+      };
+      slides.forEach((slide, i) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = String(i).padStart(2, '0') + '  ' + slide.dataset.title;
+        button.dataset.search = (slide.dataset.title + ' ' + slide.dataset.category).toLocaleLowerCase('sv');
+        button.addEventListener('click', () => show(i));
+        nav.append(button);
+        if (i > 0) {
+          const card = document.createElement('button');
+          card.className = 'index-card';
+          card.type = 'button';
+          const category = document.createElement('small');
+          category.textContent = String(i).padStart(2, '0') + ' · ' + slide.dataset.category;
+          const title = document.createElement('strong');
+          title.textContent = slide.dataset.title;
+          const note = document.createElement('p');
+          note.textContent = slide.querySelector('.intro')?.textContent || '';
+          card.append(category, title, note);
+          card.addEventListener('click', () => show(i));
+          index.append(card);
+        }
+      });
+      document.getElementById('previous').addEventListener('click', () => show(current - 1));
+      document.getElementById('next').addEventListener('click', () => show(current + 1));
+      document.getElementById('rail-search').addEventListener('input', (event) => {
+        const query = event.target.value.trim().toLocaleLowerCase('sv');
+        nav.querySelectorAll('button').forEach((button) => { button.hidden = !button.dataset.search.includes(query); });
+      });
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          document.querySelectorAll('.popover').forEach((panel) => { panel.hidden = true; });
+          return;
+        }
+        if (event.target.matches('input,textarea,select,[contenteditable]')) return;
+        if (event.key === 'ArrowRight') show(current + 1);
+        if (event.key === 'ArrowLeft') show(current - 1);
+      });
+      document.querySelectorAll('[data-filter-input]').forEach((input) => {
+        input.addEventListener('input', () => {
+          input.closest('.after').querySelectorAll('.filter-row').forEach((row) => {
+            row.hidden = !row.textContent.toLocaleLowerCase('sv').includes(input.value.toLocaleLowerCase('sv'));
+          });
+        });
+      });
+      document.querySelector('[data-card-member-search]').addEventListener('input', (event) => {
+        document.querySelectorAll('[data-card-member]').forEach((button) => {
+          button.hidden = !button.dataset.cardMember.toLocaleLowerCase('sv').includes(event.target.value.toLocaleLowerCase('sv'));
+        });
+      });
+      document.querySelectorAll('[data-bulk-check]').forEach((checkbox) => {
+        checkbox.addEventListener('change', () => {
+          document.querySelector('[data-bulk-count]').textContent = document.querySelectorAll('[data-bulk-check]:checked').length;
+        });
+      });
+      document.addEventListener('click', (event) => {
+        const button = event.target.closest('button');
+        if (!button || !button.closest('.after')) return;
+        if (button.dataset.toast) showToast(button.dataset.toast);
+        if (button.dataset.toggle) {
+          const panel = document.getElementById(button.dataset.toggle);
+          if (panel) { panel.hidden = !panel.hidden; button.setAttribute('aria-expanded', String(!panel.hidden)); }
+          if (button.dataset.toggle === 'card-member-popover' && !panel.hidden) panel.querySelector('input').focus();
+        }
+        if (button.hasAttribute('data-card-member')) {
+          const selected = button.dataset.selected !== 'true';
+          button.dataset.selected = String(selected);
+          button.setAttribute('aria-label', `${selected ? 'Ta bort' : 'Lägg till'} ${button.dataset.cardMember} ${selected ? 'från' : 'på'} kortet`);
+          button.lastElementChild.textContent = selected ? '×' : '';
+          document.querySelector(selected ? '[data-card-member-selected]' : '[data-card-member-available]').append(button);
+        }
+        if (button.matches('[data-segment],[data-period],[data-image-flow],[data-image-align]')) {
+          button.parentElement.querySelectorAll('button').forEach((item) => { item.classList.toggle('active', item === button); });
+          if (button.hasAttribute('data-period')) document.querySelector('[data-period-label]').textContent = button.textContent;
+          if (button.hasAttribute('data-image-flow')) document.querySelector('[data-sample-image]').style.float = button.textContent === 'Vänster' ? 'left' : button.textContent === 'Höger' ? 'right' : 'none';
+          if (button.hasAttribute('data-image-align')) document.querySelector('[data-sample-image]').style.marginInline = button.textContent === 'Mitt' ? 'auto' : button.textContent === 'Höger' ? '0 0' : '0';
+        }
+        if (button.hasAttribute('data-tab')) {
+          button.parentElement.querySelectorAll('button').forEach((item) => { item.classList.toggle('active', item === button); });
+          document.querySelector('[data-tab-content]').textContent = button.dataset.tab;
+        }
+        if (button.hasAttribute('data-side')) {
+          button.parentElement.querySelectorAll('button').forEach((item) => { item.classList.toggle('active', item === button); });
+          document.querySelector('[data-side-title]').textContent = button.textContent;
+        }
+        if (button.hasAttribute('data-tree-item')) {
+          document.querySelectorAll('[data-tree-item]').forEach((item) => { item.classList.toggle('active', item === button); });
+          document.querySelector('[data-tree-title]').textContent = button.textContent;
+        }
+        if (button.hasAttribute('data-apply-filter')) {
+          const pill = document.querySelector('[data-filter-pill]');
+          pill.firstChild.textContent = button.textContent + ' ';
+          pill.hidden = false;
+          document.getElementById('filter-menu').hidden = true;
+        }
+        if (button.hasAttribute('data-clear-filter')) document.querySelector('[data-filter-pill]').hidden = true;
+        if (button.hasAttribute('data-create-card')) {
+          const input = button.closest('.after').querySelector('[data-card-input]');
+          if (input.value.trim()) {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.textContent = input.value.trim();
+            button.closest('.after').querySelector('[data-card-list]').append(card);
+            const count = document.querySelector('[data-board-count]');
+            count.textContent = Number(count.textContent) + 1;
+            input.value = '';
+            document.getElementById('card-compose').hidden = true;
+          } else input.focus();
+        }
+        if (button.hasAttribute('data-image-size')) {
+          const label = document.querySelector('[data-image-width]');
+          const size = Math.max(25, Math.min(150, parseInt(label.textContent, 10) + Number(button.dataset.imageSize)));
+          label.textContent = size + ' %';
+          document.querySelector('[data-sample-image]').style.width = Math.min(100, size) + '%';
+        }
+        if (button.hasAttribute('data-image-unlink')) { document.querySelector('[data-sample-image]').hidden = true; showToast('Bilden togs bort ur texten; bilagan finns kvar.'); }
+        if (button.hasAttribute('data-member')) {
+          document.getElementById('member-name').textContent = button.dataset.member;
+          document.getElementById('member-avatar').textContent = button.textContent;
+          document.getElementById('member-popover').hidden = false;
+        }
+        if (button.hasAttribute('data-media')) {
+          document.querySelectorAll('[data-media]').forEach((item) => { item.style.background = item === button ? '#eff6ff' : ''; });
+          document.querySelector('[data-media-name]').textContent = button.dataset.media;
+        }
+        if (button.hasAttribute('data-version')) document.querySelector('[data-version-choice]').textContent = 'v' + button.dataset.version;
+        if (button.hasAttribute('data-start-task')) {
+          clearInterval(taskTimer); taskProgress = 0; taskRunning = true;
+          document.querySelector('[data-task-label]').textContent = 'Genererar bild…';
+          document.querySelector('[data-task-help]').textContent = 'Stanna i vyn medan bilden skapas.';
+          button.disabled = true;
+          taskTimer = setInterval(() => {
+            taskProgress = Math.min(100, taskProgress + 10);
+            document.querySelector('[data-task-meter]').style.width = taskProgress + '%';
+            document.querySelector('[data-task-percent]').textContent = taskProgress + ' %';
+            if (taskProgress === 100) {
+              clearInterval(taskTimer);
+              taskRunning = false;
+              document.querySelector('[data-task-label]').textContent = 'Bild klar';
+              document.querySelector('[data-task-help]').textContent = 'Den nya bakgrunden är redo att användas.';
+              button.disabled = false;
+            }
+          }, 350);
+        }
+        if (button.hasAttribute('data-leave-task')) {
+          if (taskRunning) document.getElementById('task-warning').hidden = false;
+          else showToast('Demo: panelen skulle stängas.');
+        }
+        if (button.hasAttribute('data-continue-task')) document.getElementById('task-warning').hidden = true;
+        if (button.hasAttribute('data-cancel-task')) {
+          clearInterval(taskTimer);
+          taskRunning = false;
+          document.getElementById('task-warning').hidden = true;
+          document.querySelector('[data-task-label]').textContent = 'Generering avbruten';
+          document.querySelector('[data-start-task]').disabled = false;
+          showToast('Bildgenereringen avbröts.');
+        }
+      });
+      const initial = slides.findIndex((slide) => '#' + slide.id === location.hash);
+      show(initial < 0 ? 0 : initial);
+    })();
+  </script>
+</body>
+</html>
