@@ -84,16 +84,21 @@ describe('classification picker', () => {
             { id: 'keyword', name: 'Nyckelord', allowedUses: ['pages'] },
         ] })
         renderPicker({ namespace: 'editorial' })
-        fireEvent.click(await screen.findByRole('combobox', { name: 'Filter tag type' }))
-        fireEvent.click(await screen.findByRole('option', { name: 'Ämne' }))
+        fireEvent.click(await screen.findByRole('button', { name: 'Add filter' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Ämne' }))
+        expect(screen.getByRole('button', { name: 'Remove type filter: Ämne' })).toBeInTheDocument()
         fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'climate' } })
         await waitFor(() => expect(taxonomyApi.terms).toHaveBeenCalledWith(expect.objectContaining({
             namespace: 'editorial', classification_type: 'topic', search: 'climate', page: 1,
         })))
-        fireEvent.click(screen.getByRole('combobox', { name: 'Filter tag type' }))
-        fireEvent.click(await screen.findByRole('option', { name: 'Nyckelord' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Add filter' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Nyckelord' }))
         await waitFor(() => expect(taxonomyApi.terms).toHaveBeenCalledWith(expect.objectContaining({
             namespace: 'editorial', classification_type: 'keyword', search: 'climate', page: 1,
+        })))
+        fireEvent.click(screen.getByRole('button', { name: 'Remove type filter: Nyckelord' }))
+        await waitFor(() => expect(taxonomyApi.terms).toHaveBeenCalledWith(expect.objectContaining({
+            namespace: 'editorial', classification_type: undefined, search: 'climate', page: 1,
         })))
     })
 })
