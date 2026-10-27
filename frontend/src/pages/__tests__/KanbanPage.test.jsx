@@ -192,7 +192,15 @@ describe('Kanban application navigation', () => {
     it('shows the uploaded background as a scaled board tile cover', async () => {
         const createObjectURL = URL.createObjectURL
         const revokeObjectURL = URL.revokeObjectURL
+        const originalObserver = globalThis.IntersectionObserver
         const revoke = vi.fn()
+        let enterViewport
+        const observe = vi.fn()
+        globalThis.IntersectionObserver = class {
+            constructor(callback) { enterViewport = callback }
+            observe = observe
+            disconnect = vi.fn()
+        }
         URL.createObjectURL = vi.fn(() => 'blob:board-tile')
         URL.revokeObjectURL = revoke
         kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? {
@@ -202,12 +210,16 @@ describe('Kanban application navigation', () => {
         const view = renderKanban()
         try {
             const tile = (await screen.findByRole('link', { name: 'Redaktionen' })).closest('.kb-board-tile')
+            expect(observe).toHaveBeenCalledWith(tile)
+            expect(kanbanApi.background).not.toHaveBeenCalled()
+            act(() => enterViewport([{ isIntersecting: true }]))
             await waitFor(() => expect(tile.querySelector('img')).toHaveAttribute('src', 'blob:board-tile'))
             expect(kanbanApi.background).toHaveBeenCalledWith('board-1')
         } finally {
             view.unmount()
             URL.createObjectURL = createObjectURL
             URL.revokeObjectURL = revokeObjectURL
+            globalThis.IntersectionObserver = originalObserver
         }
         expect(revoke).toHaveBeenCalledWith('blob:board-tile')
     })
@@ -375,7 +387,7 @@ describe('Kanban card attachments', () => {
         const members = [
             { id: 42, name: 'Johan Berg', username: 'johan' },
             { id: 43, name: 'Ylva Blume', username: 'ylva' },
-            { id: 44, name: 'Outside Member', username: 'outside' },
+            { id: 44, name: 'New Workspace Member', username: 'new-member' },
         ]
         kanbanApi.get.mockImplementation(async (path) => path === 'workspace/' ? {
             ...workspace, boards: [{ ...workspace.boards[0], members: [42, 43] }], members,
@@ -384,17 +396,18 @@ describe('Kanban card attachments', () => {
         renderKanban('/kanban/cards/card-1')
         fireEvent.click(await screen.findByRole('button', { name: 'Ändra medlemmar' }))
         expect(screen.getByRole('heading', { name: 'Kortmedlemmar' })).toBeInTheDocument()
-        expect(screen.getByRole('heading', { name: 'Tavlemedlemmar' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Övriga medlemmar' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Ta bort Johan Berg från kortet' })).toBeInTheDocument()
-        expect(screen.queryByRole('button', { name: 'Lägg till Outside Member på kortet' })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Lägg till New Workspace Member på kortet' })).toBeInTheDocument()
         fireEvent.change(screen.getByRole('searchbox', { name: 'Sök medlem' }), { target: { value: 'ylva' } })
         expect(screen.queryByRole('button', { name: 'Ta bort Johan Berg från kortet' })).not.toBeInTheDocument()
         fireEvent.click(screen.getByRole('button', { name: 'Lägg till Ylva Blume på kortet' }))
         expect(screen.getByRole('button', { name: 'Ta bort Ylva Blume från kortet' })).toBeInTheDocument()
         fireEvent.change(screen.getByRole('searchbox', { name: 'Sök medlem' }), { target: { value: '' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Lägg till New Workspace Member på kortet' }))
         fireEvent.click(screen.getByRole('button', { name: 'Ta bort Johan Berg från kortet' }))
         fireEvent.click(screen.getByRole('button', { name: 'Spara kort' }))
-        await waitFor(() => expect(kanbanApi.patch).toHaveBeenCalledWith('cards/card-1/', expect.objectContaining({ assignees: [43] })))
+        await waitFor(() => expect(kanbanApi.patch).toHaveBeenCalledWith('cards/card-1/', expect.objectContaining({ assignees: [43, 44] })))
     })
 
     it('opens the member popup from the card add menu', async () => {
