@@ -12,6 +12,7 @@ import type { RenderPageModel } from './types'
 export interface DirectRenderLocation {
     siteId: number
     slugPath: string
+    queryString?: string
 }
 
 export interface ResolvedRenderLocation extends DirectRenderLocation {
@@ -21,10 +22,19 @@ export interface ResolvedRenderLocation extends DirectRenderLocation {
     pathPatternPath?: string
 }
 
+const queryParamsFromSearch = (search = ''): Record<string, string | string[]> => {
+    const params = new URLSearchParams(search)
+    return Object.fromEntries([...new Set(params.keys())].map((key) => {
+        const values = params.getAll(key)
+        return [key, values.length > 1 ? values : values[0]]
+    }))
+}
+
 export interface VersionRenderLocation {
     pageId: number
     versionId: number
     tenantIdentifier?: string
+    queryString?: string
 }
 
 export const parseDirectRenderPath = (pathname: string): DirectRenderLocation | null => {
@@ -43,8 +53,11 @@ export const parseDirectRenderPath = (pathname: string): DirectRenderLocation | 
 export const parseVersionRenderPath = (pathname: string, search = ''): VersionRenderLocation | null => {
     const match = pathname.match(/^\/_render-version\/(\d+)\/(\d+)\/?$/)
     if (!match) return null
-    const tenantIdentifier = new URLSearchParams(search).get('workspace') || undefined
-    return { pageId: Number(match[1]), versionId: Number(match[2]), ...(tenantIdentifier ? { tenantIdentifier } : {}) }
+    const params = new URLSearchParams(search)
+    const tenantIdentifier = params.get('workspace') || undefined
+    params.delete('workspace')
+    const queryString = params.toString()
+    return { pageId: Number(match[1]), versionId: Number(match[2]), ...(tenantIdentifier ? { tenantIdentifier } : {}), ...(queryString ? { queryString: `?${queryString}` } : {}) }
 }
 
 export const buildResolvedRenderModel = async ({
@@ -88,6 +101,8 @@ export const buildResolvedRenderModel = async ({
             pageId: resolved.pageId,
             versionId: resolved.versionId,
             pathVariables,
+            currentPath: simulatedPath,
+            queryParams: queryParamsFromSearch(resolved.queryString),
             simulatedPath,
             renderRoutePrefix: `/_render/${resolved.siteId}`,
             themeWidgetTypes: theme?.widgetTypes || theme?.widget_types,
@@ -117,7 +132,7 @@ export const loadResolvedRenderModel = async (resolved: ResolvedRenderLocation):
     })
 }
 
-export const loadDirectRenderModel = async ({ siteId, slugPath }: DirectRenderLocation): Promise<RenderPageModel> => {
+export const loadDirectRenderModel = async ({ siteId, slugPath, queryString }: DirectRenderLocation): Promise<RenderPageModel> => {
     try {
         const response: any = await api.get(
             `${endpoints.pages.resolveRenderPath}${buildQueryParams({ site_id: siteId, path: slugPath })}`,
@@ -126,13 +141,13 @@ export const loadDirectRenderModel = async ({ siteId, slugPath }: DirectRenderLo
                 skipTenantHeader: true,
             },
         )
-        return loadResolvedRenderModel(response?.data || response)
+        return loadResolvedRenderModel({ ...(response?.data || response), queryString })
     } catch (error: any) {
         throw new Error(error?.response?.data?.detail || 'Could not resolve this page.')
     }
 }
 
-export const loadVersionRenderModel = async ({ pageId, versionId, tenantIdentifier }: VersionRenderLocation): Promise<RenderPageModel> => {
+export const loadVersionRenderModel = async ({ pageId, versionId, tenantIdentifier, queryString }: VersionRenderLocation): Promise<RenderPageModel> => {
     const tenantId = tenantIdentifier || getCurrentTenantId()
     const requestConfig = tenantId ? { headers: { 'X-Tenant-ID': tenantId } } : undefined
     const [pageResponse, versionResponse, inheritanceResponse]: any[] = await Promise.all([
@@ -169,6 +184,7 @@ export const loadVersionRenderModel = async ({ pageId, versionId, tenantIdentifi
             slugPath,
             pageId,
             versionId,
+            queryString,
         },
         page,
         version: renderVersion,

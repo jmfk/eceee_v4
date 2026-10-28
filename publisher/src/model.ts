@@ -107,6 +107,7 @@ export interface PublishedObjectQuery {
   limit: number;
   sortOrder: string;
   featuredFirst?: boolean;
+  featuredOnly?: boolean;
   pinnedFirst?: boolean;
   includeHierarchy?: boolean;
   status?: 'draft' | 'archived';
@@ -174,6 +175,8 @@ export interface PublishedPageModel {
     versionId: DbId;
     pathVariables: Record<string, string>;
     simulatedPath: string;
+    currentPath?: string;
+    queryParams?: Record<string, string | string[]>;
     themeWidgetTypes?: import("../../frontend/src/rendering/themeWidgets").ThemeWidgetDocument;
     componentStyles: Record<string, Record<string, unknown>>;
     publicForms: {
@@ -713,14 +716,7 @@ function positiveLimit(input: unknown, fallback: number): number {
 }
 
 function topNewsLimit(layout: unknown): number {
-  const limits: Record<string, number> = {
-    '1x3': 3,
-    '1x2': 2,
-    '2x3_2': 5,
-    '2x1': 2,
-    '2x2': 4,
-  };
-  return limits[String(layout ?? '1x3')] ?? 3;
+  return layout === '1x3' ? 3 : 2;
 }
 
 function objectPath(basePath: string, slug: string): string {
@@ -791,15 +787,17 @@ async function resolvePublishedData(
       }
     } else if (widget.type === 'easy_widgets.TopNewsPlugWidget' || widget.type === 'easy_widgets.SidebarTopNewsWidget') {
       const configuredTypes = config.objectTypes !== undefined ? config.objectTypes : config.object_types;
+      const selectedTypes = stringList(configuredTypes === undefined ? ['news'] : configuredTypes);
       items = await reader.publishedObjects({
-        objectTypeNames: stringList(configuredTypes === undefined ? ['news'] : configuredTypes),
+        objectTypeIds: selectedTypes.filter(type => /^\d+$/.test(type)),
+        objectTypeNames: selectedTypes.filter(type => !/^\d+$/.test(type)),
         limit: widget.type === 'easy_widgets.TopNewsPlugWidget'
           ? topNewsLimit(config.layout)
           : positiveLimit(config.limit ?? config.maxItems ?? config.max_items, 5),
-        sortOrder: String(config.sortOrder ?? config.sort_order ?? '-publish_date'),
+        sortOrder: '-publish_date',
         classificationIds: stringList(config.classificationIds ?? config.classification_ids),
         includeDescendants: (config.includeDescendants ?? config.include_descendants) !== false,
-        pinnedFirst: true,
+        featuredOnly: widget.type === 'easy_widgets.TopNewsPlugWidget',
         activeTypeOnly: true,
       }, tenantId, at);
     } else if (widget.type === 'easy_widgets.NewsDetailWidget') {
@@ -844,10 +842,13 @@ async function resolvePublishedData(
     if (items) {
       const usesObjectTypePath = widget.type === 'easy_widgets.TopNewsPlugWidget'
         || widget.type === 'easy_widgets.SidebarTopNewsWidget';
+      const configuredBase = String(config.newsPagePath ?? config.news_page_path ?? '/news/');
+      const newsBase = configuredBase.startsWith('/') && !configuredBase.startsWith('//')
+        ? configuredBase.split(/[?#]/)[0].replace(/\/$/, '') : '/news';
       return { ...prepared, data: { status: items.length ? 'ready' : 'empty', items: items.map(value => ({
         ...value,
         path: usesObjectTypePath
-          ? `/${encodeURIComponent(value.objectType.name)}/${encodeURIComponent(value.slug)}/`
+          ? `${newsBase}/${encodeURIComponent(value.slug)}/`
           : objectPath(pagePath, value.slug),
       })) } };
     }

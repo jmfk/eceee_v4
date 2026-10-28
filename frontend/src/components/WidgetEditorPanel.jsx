@@ -10,6 +10,7 @@ import { SpecialEditorRenderer, hasSpecialEditor } from './special-editors'
 import IsolatedFormRenderer from './IsolatedFormRenderer.jsx'
 import WidgetPublishingInheritanceFields from './WidgetPublishingInheritanceFields.jsx'
 import WidgetQuickReference from './widget-help/WidgetQuickReference'
+import { newsHomeEditorSchema } from '../widgets/easy-widgets/newsHomeSchema'
 
 
 /**
@@ -380,7 +381,7 @@ const WidgetEditorPanel = forwardRef(({
         && widgetData?.config?.componentStyle !== 'default' && Boolean(componentStyle)
         && componentStyle.template?.trim() !== '{{passthru}}'
     const formSchema = useMemo(() => {
-        if (!needsBannerContentFields) return sourceSchema
+        if (!needsBannerContentFields) return newsHomeEditorSchema(selectedType, sourceSchema)
         // Replacing the default markup removes the inline editor, so keep one text editing path.
         const definition = sourceSchema?.schema || sourceSchema
         if (!definition?.properties) return sourceSchema
@@ -391,7 +392,7 @@ const WidgetEditorPanel = forwardRef(({
         return sourceSchema.schema
             ? { ...sourceSchema, schema: { ...definition, properties } }
             : { ...sourceSchema, properties }
-    }, [sourceSchema, needsBannerContentFields])
+    }, [sourceSchema, needsBannerContentFields, selectedType])
 
     if (!isOpen) return null
     return (

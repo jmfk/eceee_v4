@@ -301,6 +301,7 @@ function reader(client: PoolClient): PageReader {
             OR $11::boolean)
           AND ($5::text IS NULL OR object.slug = $5)
           AND ($9::text IS NULL OR object.status = $9)
+          AND (NOT $14::boolean OR published.is_featured = true)
           AND (NOT ($10::boolean OR $11::boolean) OR (
             type.is_active = true
             AND (type.namespace_id IS NULL OR type_namespace.tenant_id = $1)
@@ -324,6 +325,7 @@ function reader(client: PoolClient): PageReader {
           Boolean(query.allActiveTypes),
           classificationIds,
           query.includeDescendants !== false,
+          Boolean(query.featuredOnly),
         ]);
       return result.rows;
     },

@@ -1,8 +1,8 @@
 import type { RenderWidgetModel } from './types'
 
 const news = [
-    { id: 'news-1', title: 'A representative news story', path: '#news-1', data: { summary: 'A short summary that makes typography and spacing visible.' } },
-    { id: 'news-2', title: 'A second example story', path: '#news-2', data: { summary: 'Another predictable item for list and grid previews.' } },
+    { id: 'news-1', slug: 'representative-story', title: 'A representative news story', isFeatured: true, data: { summary: 'A short summary that makes typography and spacing visible.', featuredImage: { url: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="220"%3E%3Crect width="100%25" height="100%25" fill="%2367c3e8"/%3E%3C/svg%3E' } } },
+    { id: 'news-2', slug: 'second-story', title: 'A second example story', isFeatured: true, data: { summary: 'Another predictable item for list and grid previews.', featuredImage: { url: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="220"%3E%3Crect width="100%25" height="100%25" fill="%23d8a13a"/%3E%3C/svg%3E' } } },
 ]
 
 const widget = (type: string, config: Record<string, any>, data?: Record<string, any>): RenderWidgetModel => ({
@@ -32,8 +32,8 @@ export const RENDER_WIDGET_FIXTURES: Record<string, RenderWidgetModel> = {
     'easy_widgets.PathDebugWidget': widget('easy_widgets.PathDebugWidget', {}),
     'easy_widgets.NewsListWidget': widget('easy_widgets.NewsListWidget', { objectTypes: ['news'] }, { status: 'ready', items: news }),
     'easy_widgets.NewsDetailWidget': widget('easy_widgets.NewsDetailWidget', {}, { status: 'ready', item: { title: 'Example article', data: { summary: 'The article lead is distinct from its body.', presentationalPublishingDate: '2026-09-30', externalUrl: 'https://example.org/source' }, widgets: { main: [widget('easy_widgets.ContentWidget', { content: '<p>Detailed article content for the preview.</p><div data-media-insert="true" data-width="full" data-align="center"><img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22800%22 height=%22450%22%3E%3Crect width=%22100%25%22 height=%22100%25%22 fill=%22%23cbd5e1%22/%3E%3C/svg%3E" alt="Imported article illustration"></div>' })] } } }),
-    'easy_widgets.TopNewsPlugWidget': widget('easy_widgets.TopNewsPlugWidget', { layout: '1x2' }, { status: 'ready', items: news }),
-    'easy_widgets.SidebarTopNewsWidget': widget('easy_widgets.SidebarTopNewsWidget', { widget_title: 'Top news', showExcerpts: true }, { status: 'ready', items: news }),
+    'easy_widgets.TopNewsPlugWidget': widget('easy_widgets.TopNewsPlugWidget', { layout: '1x2', newsPagePath: '/news/' }, { status: 'ready', items: news }),
+    'easy_widgets.SidebarTopNewsWidget': widget('easy_widgets.SidebarTopNewsWidget', { widgetTitle: 'Latest news', displayVariant: 'content', newsPagePath: '/news/' }, { status: 'ready', items: news }),
     'easy_widgets.SectionWidget': widget('easy_widgets.SectionWidget', { enableCollapse: true, startExpanded: true, contractText: 'Show less', slots: { content: [widget('easy_widgets.HeadlineWidget', { content: 'Collapsible section', headerLevel: 'h3' }), widget('easy_widgets.ContentWidget', { content: '<p>Nested section content remains visually consistent while the control uses native button semantics.</p>' })] } }),
 }
 

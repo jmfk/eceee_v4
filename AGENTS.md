@@ -12,6 +12,12 @@ ECEEE v4 is a Docker-based CMS stack with:
 
 The system centers on page management, publishing workflows, code-based layouts/themes, multi-tenancy, and a code-based widget system.
 
+## Development Direction
+
+- Build new features in TypeScript and React, with PostgreSQL for persistent data. This includes widgets, public rendering, APIs, and business logic where the existing TypeScript stack can support them.
+- Do not expand the Python/Django implementation for new functionality by default. Prefer using or extending the TypeScript publisher and frontend, and keep data access tenant-scoped.
+- Maintain existing Python code when needed for correctness, security, or compatibility. If a requested feature cannot reasonably be implemented without new Python code, explain the specific dependency and tradeoff before proceeding with that part.
+
 ## Repository Map
 
 - `backend/`: Django project, API, templates, static assets, management commands, migrations.

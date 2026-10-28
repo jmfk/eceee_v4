@@ -39,6 +39,8 @@ export interface RenderContext {
     objectData?: Record<string, any>
     objectType?: Record<string, any>
     pathVariables?: Record<string, string>
+    currentPath?: string
+    queryParams?: Record<string, string | string[]>
     simulatedPath?: string
     renderRoutePrefix?: string
     componentStyles?: Record<string, Record<string, any>>

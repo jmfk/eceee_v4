@@ -29,12 +29,15 @@ export default async function Page(props: Props) {
   const result: { widgetId: string; status: 'success' | 'error' } | undefined = (formStatus === 'success' || formStatus === 'error') && typeof formWidget === 'string'
     ? { widgetId: formWidget, status: formStatus }
     : undefined;
-  const renderModel = result ? {
+  const queryParams = Object.fromEntries(Object.entries(query).filter((entry): entry is [string, string | string[]] => entry[1] !== undefined));
+  const renderModel = {
     ...model,
     context: {
       ...model.context,
-      publicForms: { ...model.context.publicForms, result },
+      currentPath: path,
+      queryParams,
+      publicForms: { ...model.context.publicForms, ...(result ? { result } : {}) },
     },
-  } : model;
+  };
   return <>{model.fontUrl && <link data-eceee-render-font rel="stylesheet" href={model.fontUrl} />}<style data-eceee-render-css>{model.themeCss}</style><PublishedPage model={renderModel} /></>;
 }

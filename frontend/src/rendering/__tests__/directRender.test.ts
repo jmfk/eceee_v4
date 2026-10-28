@@ -47,6 +47,9 @@ describe('direct render URL', () => {
             versionId: 9,
             tenantIdentifier: 'theme-tenant',
         })
+        expect(parseVersionRenderPath('/_render-version/42/9/', '?workspace=theme-tenant&q=policy')).toEqual({
+            pageId: 42, versionId: 9, tenantIdentifier: 'theme-tenant', queryString: '?q=policy',
+        })
         expect(parseVersionRenderPath('/_render-version/42/not-a-version/')).toBeNull()
     })
 
@@ -114,7 +117,7 @@ describe('direct render URL', () => {
             .mockResolvedValueOnce({ data: { id: 125, codeLayout: 'main_layout', widgets: {} } })
             .mockResolvedValueOnce({ data: { slots: {} } })
 
-        const model = await loadDirectRenderModel({ siteId: 85, slugPath: 'for-authors/review-process' })
+        const model = await loadDirectRenderModel({ siteId: 85, slugPath: 'for-authors/review-process', queryString: '?q=policy&topic=industry&topic=climate' })
 
         expect(clientApi.get).toHaveBeenNthCalledWith(
             1,
@@ -132,6 +135,8 @@ describe('direct render URL', () => {
             pageId: 92,
             versionId: 125,
             renderRoutePrefix: '/_render/85',
+            currentPath: '/for-authors/review-process',
+            queryParams: { q: 'policy', topic: ['industry', 'climate'] },
         })
         expect(previewResolver.resolve).toHaveBeenCalledOnce()
     })
