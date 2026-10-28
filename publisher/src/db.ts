@@ -49,6 +49,7 @@ function reader(client: PoolClient): PageReader {
             OR hostnames && $2::varchar[]
             OR ($3::boolean AND hostnames @> ARRAY['*']::varchar[])
             OR ($4::boolean AND hostnames @> ARRAY['default']::varchar[]))
+          AND EXISTS (SELECT 1 FROM core_tenant AS tenant WHERE tenant.id = tenant_id AND tenant.is_active = true)
         ORDER BY CASE WHEN hostnames @> ARRAY[$1]::varchar[] THEN 0
                       WHEN hostnames && $2::varchar[] THEN 1 ELSE 2 END,
           (SELECT MIN(array_position($2::varchar[], candidate))

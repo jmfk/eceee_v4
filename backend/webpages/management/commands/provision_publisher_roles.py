@@ -268,6 +268,9 @@ class Command(BaseCommand):
                 )
             )
             cursor.execute(
+                sql.SQL("GRANT SELECT (id, is_active) ON core_tenant TO {}").format(sql.Identifier(READ_ROLE))
+            )
+            cursor.execute(
                 sql.SQL(
                     "GRANT SELECT (id, tenant_id, file_url, file_path, file_type, title, description, "
                     "metadata, width, height, "

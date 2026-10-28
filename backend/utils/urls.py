@@ -7,6 +7,7 @@ from rest_framework.routers import DefaultRouter
 
 from core.profile_views import ProfilePhotoView
 from core.role_views import RolesView, WorkspaceMemberView
+from core.tenant_views import TenantListView, TenantDetailView
 
 from . import views
 
@@ -60,6 +61,8 @@ urlpatterns = [
     # User Management
     path("current-user/", views.CurrentUserView.as_view(), name="current_user"),
     path("current-workspace/", views.CurrentWorkspaceView.as_view(), name="current_workspace"),
+    path("tenants/", TenantListView.as_view(), name="tenant_list"),
+    path("tenants/<uuid:pk>/", TenantDetailView.as_view(), name="tenant_detail"),
     path("change-password/", views.ChangePasswordView.as_view(), name="change_password"),
     path("users/", views.UserListView.as_view(), name="user_list"),
     path("users/<int:user_id>/", views.UserDetailView.as_view(), name="user_detail"),

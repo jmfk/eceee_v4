@@ -22,6 +22,18 @@ from .theme import PageThemeSerializer
 class WebPageSimpleSerializer(serializers.ModelSerializer):
     """Page serializer with version management support"""
 
+    def validate_hostnames(self, value):
+        from core.hostname_policy import validate_hostnames
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        tenant = self.instance.tenant if self.instance else getattr(self.context["request"], "tenant", None)
+        if tenant:
+            try:
+                validate_hostnames(tenant, value)
+            except DjangoValidationError as error:
+                raise serializers.ValidationError(str(error)) from error
+        return value
+
     VERSION_CONTROLLED_FIELDS = {
         "title",
         "description",
