@@ -2306,7 +2306,8 @@ export default defineConfig({
       },
       '/api': {
         target: process.env.VITE_BACKEND_URL || 'http://backend:8000',
-        changeOrigin: true,
+        // Preserve the browser host so Django's CSRF origin check accepts tenant .localhost sites.
+        changeOrigin: false,
         secure: false,
         timeout: 300000, // 5 minutes for large uploads
         proxyTimeout: 300000,
