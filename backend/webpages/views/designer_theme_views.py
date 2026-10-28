@@ -871,24 +871,35 @@ class DesignerThemeImageVersionsView(APIView):
         prefix = f"theme_images/{theme.id}/designer_drafts/"
         if prefix not in url:
             return theme, draft, None
-        path = url[url.index(prefix):].split("?", 1)[0].split("#", 1)[0]
-        version = DesignerImageVersion.objects.filter(series__theme=theme, file_path=path).select_related("series").first()
+        path = url[url.index(prefix) :].split("?", 1)[0].split("#", 1)[0]
+        version = (
+            DesignerImageVersion.objects.filter(series__theme=theme, file_path=path).select_related("series").first()
+        )
         return theme, draft, version.series if version else None
 
     def get(self, request, theme_id):
         theme, draft, series = self._series(request, theme_id, request.query_params.get("asset_key"))
         if not series:
             return Response({"versions": [], "protected_from_cleanup": False})
-        versions = [{
-            "id": str(version.id), "version_number": version.version_number,
-            "file_size": version.file_size, "content_type": version.content_type,
-            "width": version.width, "height": version.height,
-            "uploaded_at": version.uploaded_at, "uploaded_by": version.uploaded_by_id,
-            "superseded_at": version.superseded_at,
-            "preview_url": system_storage.url(version.file_path),
-            "is_current": version.superseded_at is None,
-        } for version in series.versions.all()]
-        return Response({"series_id": str(series.id), "protected_from_cleanup": series.protected_from_cleanup, "versions": versions})
+        versions = [
+            {
+                "id": str(version.id),
+                "version_number": version.version_number,
+                "file_size": version.file_size,
+                "content_type": version.content_type,
+                "width": version.width,
+                "height": version.height,
+                "uploaded_at": version.uploaded_at,
+                "uploaded_by": version.uploaded_by_id,
+                "superseded_at": version.superseded_at,
+                "preview_url": system_storage.url(version.file_path),
+                "is_current": version.superseded_at is None,
+            }
+            for version in series.versions.all()
+        ]
+        return Response(
+            {"series_id": str(series.id), "protected_from_cleanup": series.protected_from_cleanup, "versions": versions}
+        )
 
     def post(self, request, theme_id):
         theme, draft, series = self._series(request, theme_id, request.data.get("asset_key"))
@@ -898,7 +909,9 @@ class DesignerThemeImageVersionsView(APIView):
         if action_name == "protect":
             protected = request.data.get("protected_from_cleanup")
             if not isinstance(protected, bool):
-                return Response({"error": "protected_from_cleanup must be a boolean"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"error": "protected_from_cleanup must be a boolean"}, status=status.HTTP_400_BAD_REQUEST
+                )
             from core.models import Tenant
 
             with transaction.atomic():
@@ -922,11 +935,23 @@ class DesignerThemeImageVersionsView(APIView):
                 if not version:
                     return Response({"error": "Image version no longer exists"}, status=status.HTTP_404_NOT_FOUND)
                 with system_storage.open(version.file_path, "rb") as source:
-                    extension = {"image/jpeg": ".jpg", "image/png": ".png", "image/gif": ".gif", "image/webp": ".webp", "image/svg+xml": ".svg"}.get(version.content_type, ".png")
-                    upload = SimpleUploadedFile(f"restored-image{extension}", source.read(), content_type=version.content_type)
+                    extension = {
+                        "image/jpeg": ".jpg",
+                        "image/png": ".png",
+                        "image/gif": ".gif",
+                        "image/webp": ".webp",
+                        "image/svg+xml": ".svg",
+                    }.get(version.content_type, ".png")
+                    upload = SimpleUploadedFile(
+                        f"restored-image{extension}", source.read(), content_type=version.content_type
+                    )
                 theme, draft = replace_designer_asset(
-                    theme.id, request.tenant, request.user, request.data.get("asset_key"),
-                    upload, request.data.get("draft_version"),
+                    theme.id,
+                    request.tenant,
+                    request.user,
+                    request.data.get("asset_key"),
+                    upload,
+                    request.data.get("draft_version"),
                 )
         except DesignerDraftConflict as exc:
             return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)

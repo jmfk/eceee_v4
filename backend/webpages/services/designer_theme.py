@@ -978,8 +978,12 @@ def register_designer_image_version(theme, old_source, new_path, content, conten
     prefix = f"theme_images/{theme.id}/designer_drafts/"
     old_path = None
     if isinstance(old_source, str) and prefix in old_source:
-        old_path = old_source[old_source.index(prefix):].split("?", 1)[0].split("#", 1)[0]
-    previous = DesignerImageVersion.objects.filter(series__theme=theme, file_path=old_path).select_related("series").first() if old_path else None
+        old_path = old_source[old_source.index(prefix) :].split("?", 1)[0].split("#", 1)[0]
+    previous = (
+        DesignerImageVersion.objects.filter(series__theme=theme, file_path=old_path).select_related("series").first()
+        if old_path
+        else None
+    )
     if previous:
         series = previous.series
         next_number = series.versions.order_by("-version_number").values_list("version_number", flat=True).first() + 1
@@ -989,15 +993,24 @@ def register_designer_image_version(theme, old_source, new_path, content, conten
         next_number = 1
         if old_path and system_storage.exists(old_path):
             DesignerImageVersion.objects.create(
-                series=series, version_number=1, file_path=old_path,
-                file_size=0, content_type=mimetypes.guess_type(old_path)[0] or "application/octet-stream",
-                uploaded_by=user, superseded_at=timezone.now(),
+                series=series,
+                version_number=1,
+                file_path=old_path,
+                file_size=0,
+                content_type=mimetypes.guess_type(old_path)[0] or "application/octet-stream",
+                uploaded_by=user,
+                superseded_at=timezone.now(),
             )
             next_number = 2
     return DesignerImageVersion.objects.create(
-        series=series, version_number=next_number, file_path=new_path,
-        file_size=len(content), content_type=content_type,
-        width=width, height=height, uploaded_by=user,
+        series=series,
+        version_number=next_number,
+        file_path=new_path,
+        file_size=len(content),
+        content_type=content_type,
+        width=width,
+        height=height,
+        uploaded_by=user,
     )
 
 
@@ -2463,7 +2476,14 @@ def replace_designer_asset(
             path = f"theme_images/{theme.id}/designer_drafts/{draft.id}/{filename}"
             saved_path = system_storage.save(path, ContentFile(content))
             register_designer_image_version(
-                theme, previous_source, saved_path, content, upload.content_type, width, height, user,
+                theme,
+                previous_source,
+                saved_path,
+                content,
+                upload.content_type,
+                width,
+                height,
+                user,
             )
 
             if asset_key == "preview":

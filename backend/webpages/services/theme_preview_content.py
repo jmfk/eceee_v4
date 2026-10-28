@@ -829,8 +829,7 @@ def _copy_preview_images(theme, value):
                 for key in media_reference_keys
             )
             points_to_library = any(
-                isinstance(rewritten.get(key), str)
-                and rewritten[key].startswith("/api/v1/media/file/")
+                isinstance(rewritten.get(key), str) and rewritten[key].startswith("/api/v1/media/file/")
                 for key in media_reference_keys
             )
             if copied_media_reference and not points_to_library:

@@ -428,7 +428,9 @@ class ImageWidget(BaseWidget):
                     except (TypeError, ValueError):
                         media_id = None
                     if media_id:
-                        media_file = MediaFile.objects.filter(id=media_id, tenant=theme.tenant, file_type="image").first()
+                        media_file = MediaFile.objects.filter(
+                            id=media_id, tenant=theme.tenant, file_type="image"
+                        ).first()
                 current_url = media_file.get_uuid_url() if media_file else _media_url(image)
                 # Convert camelCase to snake_case for template
                 media_item = {
@@ -443,7 +445,11 @@ class ImageWidget(BaseWidget):
                     "source": image.get("source", ""),
                     "width": media_file.width if media_file else image.get("width"),
                     "height": media_file.height if media_file else image.get("height"),
-                    "thumbnail_url": media_file.get_imgproxy_thumbnail_url() if media_file else image.get("thumbnailUrl") or image.get("thumbnail_url") or current_url,
+                    "thumbnail_url": (
+                        media_file.get_imgproxy_thumbnail_url()
+                        if media_file
+                        else image.get("thumbnailUrl") or image.get("thumbnail_url") or current_url
+                    ),
                 }
                 template_config["media_items"] = [media_item]
 
@@ -468,7 +474,12 @@ class ImageWidget(BaseWidget):
                                 media_id = uuid.UUID(str(item["id"]))
                             except (TypeError, ValueError):
                                 media_id = None
-                            if media_id and MediaFile.objects.filter(id=media_id, tenant=theme.tenant, file_type="image").exists():
+                            if (
+                                media_id
+                                and MediaFile.objects.filter(
+                                    id=media_id, tenant=theme.tenant, file_type="image"
+                                ).exists()
+                            ):
                                 item_url = f"/api/v1/media/file/{media_id}/"
                         snake_case_item = {
                             "id": item.get("id"),

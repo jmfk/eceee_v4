@@ -243,17 +243,17 @@ class AtomicFileHashHandlingTests(TestCase):
 
         # Try to create another file with same hash
         duplicate = MediaFile.create_with_hash_cleanup(
-                file_hash=self.test_hash,
-                title="Duplicate File",
-                original_filename="duplicate.jpg",
-                file_path="test/duplicate.jpg",
-                file_size=1000,
-                content_type="image/jpeg",
-                file_type="image",
-                namespace=self.namespace,
-                tenant=self.tenant,
-                created_by=self.user,
-                last_modified_by=self.user,
+            file_hash=self.test_hash,
+            title="Duplicate File",
+            original_filename="duplicate.jpg",
+            file_path="test/duplicate.jpg",
+            file_size=1000,
+            content_type="image/jpeg",
+            file_type="image",
+            namespace=self.namespace,
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
         )
         self.assertEqual(duplicate.file_hash, self.test_hash)
         self.assertEqual(MediaFile.objects.filter(file_hash=self.test_hash).count(), 2)

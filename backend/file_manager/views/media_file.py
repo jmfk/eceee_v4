@@ -132,34 +132,40 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         media_file = self.get_object()
         if media_file.file_type != "image":
             return Response({"error": "Only images have versions"}, status=status.HTTP_400_BAD_REQUEST)
-        versions = [{
-            "id": str(version.id),
-            "version_number": version.version_number,
-            "original_filename": version.original_filename,
-            "file_size": version.file_size,
-            "content_type": version.content_type,
-            "width": version.width,
-            "height": version.height,
-            "uploaded_at": version.uploaded_at,
-            "uploaded_by": version.uploaded_by_id,
-            "superseded_at": version.superseded_at,
-            "preview_url": storage.generate_signed_url(version.file_path),
-            "is_current": False,
-        } for version in media_file.image_versions.select_related("uploaded_by")]
-        versions.insert(0, {
-            "id": None,
-            "version_number": media_file.version_number,
-            "original_filename": media_file.original_filename,
-            "file_size": media_file.file_size,
-            "content_type": media_file.content_type,
-            "width": media_file.width,
-            "height": media_file.height,
-            "uploaded_at": media_file.version_uploaded_at or media_file.created_at,
-            "uploaded_by": media_file.uploaded_by_id or media_file.created_by_id,
-            "superseded_at": None,
-            "preview_url": storage.generate_signed_url(media_file.file_path),
-            "is_current": True,
-        })
+        versions = [
+            {
+                "id": str(version.id),
+                "version_number": version.version_number,
+                "original_filename": version.original_filename,
+                "file_size": version.file_size,
+                "content_type": version.content_type,
+                "width": version.width,
+                "height": version.height,
+                "uploaded_at": version.uploaded_at,
+                "uploaded_by": version.uploaded_by_id,
+                "superseded_at": version.superseded_at,
+                "preview_url": storage.generate_signed_url(version.file_path),
+                "is_current": False,
+            }
+            for version in media_file.image_versions.select_related("uploaded_by")
+        ]
+        versions.insert(
+            0,
+            {
+                "id": None,
+                "version_number": media_file.version_number,
+                "original_filename": media_file.original_filename,
+                "file_size": media_file.file_size,
+                "content_type": media_file.content_type,
+                "width": media_file.width,
+                "height": media_file.height,
+                "uploaded_at": media_file.version_uploaded_at or media_file.created_at,
+                "uploaded_by": media_file.uploaded_by_id or media_file.created_by_id,
+                "superseded_at": None,
+                "preview_url": storage.generate_signed_url(media_file.file_path),
+                "is_current": True,
+            },
+        )
         return Response({"protected_from_cleanup": media_file.protected_from_cleanup, "versions": versions})
 
     @action(detail=True, methods=["post"])

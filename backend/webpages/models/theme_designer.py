@@ -135,6 +135,8 @@ class DesignerImageVersion(models.Model):
     superseded_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["series", "version_number"], name="unique_designer_image_version")]
+        constraints = [
+            models.UniqueConstraint(fields=["series", "version_number"], name="unique_designer_image_version")
+        ]
         ordering = ["-version_number"]
         indexes = [models.Index(fields=["superseded_at"], name="designer_image_superseded_idx")]
