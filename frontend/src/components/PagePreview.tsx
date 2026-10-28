@@ -140,7 +140,9 @@ const PagePreview: React.FC<PagePreviewProps> = ({
         context: {
             pageId: webpageData?.id,
             siteId: webpageData?.cachedRootId || webpageData?.cached_root_id || (!webpageData?.parentId && !webpageData?.parent_id ? webpageData?.id : undefined),
-            siteHostnames: webpageData?.hostnames || webpageData?.cachedRootHostnames || webpageData?.cached_root_hostnames || [],
+            siteHostnames: webpageData?.hostnames?.length
+                ? webpageData.hostnames
+                : webpageData?.cachedRootHostnames || webpageData?.cached_root_hostnames || [],
             versionId: pageVersionData?.id || pageVersionData?.versionId,
             pathVariables: pathVariables || {},
             simulatedPath,
