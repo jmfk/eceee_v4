@@ -531,9 +531,9 @@ def pending_upload(namespace, user, file_hash):
     )
 
 
-@pytest.mark.parametrize("duplicate", [False, True])
+@pytest.mark.parametrize("matching_hash", [False, True])
 @pytest.mark.parametrize("collection_case", ["allowed", "disallowed", "missing"])
-def test_approval_and_requested_collection_are_atomic(scope, resources, duplicate, collection_case):
+def test_approval_and_requested_collection_are_atomic(scope, resources, matching_hash, collection_case):
     from unittest.mock import patch
 
     from file_manager.models import MediaCollection, MediaFile
@@ -545,7 +545,7 @@ def test_approval_and_requested_collection_are_atomic(scope, resources, duplicat
     term = create(owner, definition, "Approval")
     original = create(owner, definition, "Original")
     replace_assignments(resources[2], [str(original.pk)], owner)
-    pending = pending_upload(definition.namespace, owner, resources[2].file_hash if duplicate else "e" * 64)
+    pending = pending_upload(definition.namespace, owner, resources[2].file_hash if matching_hash else "e" * 64)
     client = APIClient()
     client.force_authenticate(owner)
     collection_payload = (
@@ -569,9 +569,11 @@ def test_approval_and_requested_collection_are_atomic(scope, resources, duplicat
             approve.assert_not_called()
     pending.refresh_from_db()
     if collection_case == "allowed":
-        assert response.status_code == (200 if duplicate else 201), response.data
+        assert response.status_code == 201, response.data
         assert pending.status == "approved"
         approved = MediaFile.objects.get(pk=response.data["media_file"]["id"])
+        assert approved.pk != resources[2].pk
+        assert classification_ids(resources[2]) == [str(original.pk)]
         collection = approved.collections.get(title="Requested collection")
         assert str(term.pk) in classification_ids(collection)
     else:
@@ -583,7 +585,8 @@ def test_approval_and_requested_collection_are_atomic(scope, resources, duplicat
 
 
 @pytest.mark.parametrize("case", ["owner", "member", "private", "archived"])
-def test_duplicate_approval_merges_classifications_with_access_gate(scope, resources, case):
+def test_identical_content_approval_keeps_classifications_separate(scope, resources, case):
+    from file_manager.models import MediaFile
     from taxonomy.services import mutate
 
     owner, member, _, definition = scope
@@ -601,19 +604,17 @@ def test_duplicate_approval_merges_classifications_with_access_gate(scope, resou
     client.force_authenticate(actor)
     response = client.post(
         f"/api/v1/media/pending-files/{pending.pk}/approve/",
-        {"classification_ids": [str(second.pk)]},
+        {"title": "Independent copy", "classification_ids": [str(second.pk)]},
         format="json",
         HTTP_X_TENANT_ID=str(definition.tenant_id),
     )
     pending.refresh_from_db()
-    if case == "private":
-        assert response.status_code == 403, response.data
-        assert pending.status == "pending"
-        assert classification_ids(existing) == [str(first.pk)]
-    else:
-        assert response.status_code == 200, response.data
-        assert pending.status == "approved"
-        assert classification_ids(existing) == [str(first.pk), str(second.pk)]
+    assert response.status_code == 201, response.data
+    assert pending.status == "approved"
+    assert classification_ids(existing) == [str(first.pk)]
+    approved = MediaFile.objects.get(pk=response.data["media_file"]["id"])
+    assert approved.pk != existing.pk
+    assert classification_ids(approved) == [str(second.pk)]
 
 
 def test_legacy_removal_follows_merge_redirect_and_retains_required_tag(scope, resources):
