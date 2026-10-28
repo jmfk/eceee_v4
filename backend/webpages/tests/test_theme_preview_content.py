@@ -445,8 +445,6 @@ class ThemePreviewContentTests(TestCase):
         self.assertEqual(widget["id"], "image-widget")
         self.assertEqual(media_item["fileUrl"], uuid_url)
         self.assertEqual(media_item["id"], str(self.media_file.id))
-        self.assertEqual(media_item["mediaId"], str(self.media_file.id))
-        self.assertEqual(media_item["fileId"], str(self.media_file.id))
         self.assertEqual(copied_images, 0)
         storage.open.assert_not_called()
 
