@@ -54,6 +54,7 @@ describe('StandaloneRenderRuntime', () => {
         expect(directRender.load).toHaveBeenCalledWith({
             siteId: 85,
             slugPath: 'for-authors/review-process',
+            queryString: '',
         })
         await waitFor(() => expect(renderReady).toHaveBeenCalledOnce())
         expect((renderReady.mock.calls[0][0] as CustomEvent).detail.model.context.pageId).toBe(92)
@@ -81,6 +82,7 @@ describe('StandaloneRenderRuntime', () => {
         expect(directRender.load).toHaveBeenLastCalledWith({
             siteId: 85,
             slugPath: 'for-authors/publication-ethics',
+            queryString: '',
         })
     })
 

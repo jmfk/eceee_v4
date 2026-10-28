@@ -41,6 +41,33 @@ describe('page preview model resolution', () => {
         expect(objectApi.getNewsList).not.toHaveBeenCalled()
     })
 
+    it('previews configured news types and bounds concurrent version requests', async () => {
+        objectApi.getPublished.mockResolvedValue({ data: [
+            ...Array.from({ length: 10 }, (_item, index) => ({ id: index + 1, slug: `story-${index + 1}`, object_type: { id: 9, name: 'article' } })),
+            { id: 99, slug: 'unselected', object_type: { id: 7, name: 'news' } },
+        ] })
+        let inFlight = 0
+        let maxInFlight = 0
+        objectApi.getCurrentPublishedVersion.mockImplementation(async (id: number) => {
+            inFlight += 1
+            maxInFlight = Math.max(maxInFlight, inFlight)
+            await new Promise(resolve => setTimeout(resolve, 0))
+            inFlight -= 1
+            return { data: { data: { title: `Story ${id}`, data: {}, is_featured: true, effective_date: `2026-10-${String(id).padStart(2, '0')}T00:00:00Z` } } }
+        })
+        const model = createPageRenderModel({ widgets: { main: [
+            { id: 'featured', type: 'easy_widgets.TopNewsPlugWidget', config: { objectTypes: [9], layout: '1x3' } },
+            { id: 'latest', type: 'easy_widgets.SidebarTopNewsWidget', config: { objectTypes: ['article'], limit: 5 } },
+        ] } })
+
+        const resolved = await resolvePagePreviewModel(model)
+
+        expect(resolved.slots.main[0].data?.items?.map((item: any) => item.slug)).toEqual(['story-10', 'story-9', 'story-8'])
+        expect(resolved.slots.main[1].data?.items?.map((item: any) => item.slug)).toEqual(['story-10', 'story-9', 'story-8', 'story-7', 'story-6'])
+        expect(objectApi.getCurrentPublishedVersion).toHaveBeenCalledTimes(10)
+        expect(maxInFlight).toBeLessThanOrEqual(8)
+    })
+
     it('resolves Designer ImageWidget sources without rendering the original URL', async () => {
         const model = createDesignerRenderModel({
             workspace: {
