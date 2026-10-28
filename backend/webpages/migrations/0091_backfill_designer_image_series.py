@@ -22,6 +22,7 @@ def backfill(apps, schema_editor):
     Theme = apps.get_model("webpages", "PageTheme")
     Draft = apps.get_model("webpages", "ThemeDesignerDraft")
     Revision = apps.get_model("webpages", "ThemeDesignerRevision")
+    ThemeVersion = apps.get_model("webpages", "ThemeVersion")
     ExportJob = apps.get_model("webpages", "ThemeDesignerExportJob")
     Series = apps.get_model("webpages", "DesignerImageSeries")
     Version = apps.get_model("webpages", "DesignerImageVersion")
@@ -37,7 +38,7 @@ def backfill(apps, schema_editor):
         for snapshot in Draft.objects.using(db).filter(theme_id=theme.pk).values_list("snapshot", flat=True):
             draft_paths.update(_paths(snapshot, prefix))
         historical_paths = set()
-        for model in (Revision, ExportJob):
+        for model in (Revision, ThemeVersion, ExportJob):
             for snapshot in model.objects.using(db).filter(theme_id=theme.pk).values_list("snapshot", flat=True):
                 historical_paths.update(_paths(snapshot, prefix))
         for path in live_paths | draft_paths | historical_paths:

@@ -16,6 +16,7 @@ from webpages.models import (
     ThemeDesignerDraft,
     ThemeDesignerExportJob,
     ThemeDesignerRevision,
+    ThemeVersion,
     WebPage,
 )
 
@@ -41,6 +42,7 @@ def _content_sources(tenant):
         PageTheme.objects.filter(tenant=tenant),
         ThemeDesignerDraft.objects.filter(theme__tenant=tenant),
         ThemeDesignerRevision.objects.filter(theme__tenant=tenant),
+        ThemeVersion.objects.filter(theme__tenant=tenant),
         ThemeDesignerExportJob.objects.filter(theme__tenant=tenant),
     )
 
