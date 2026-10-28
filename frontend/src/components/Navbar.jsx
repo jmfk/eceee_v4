@@ -3,11 +3,12 @@ import { useSupportContext } from './support/useSupportContext'
 import { safeReportLocation } from '../api/support'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Menu, X, Settings, Grid3X3, FolderOpen, Database, Hash, User as UserIcon, BarChart2, Palette, Flag } from 'lucide-react'
+import { Menu, X, Settings, Grid3X3, FolderOpen, Database, Hash, User as UserIcon, BarChart2, Palette, Flag, Building2 } from 'lucide-react'
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { cmsText } from '../utils/cmsCopy'
 import { switchCurrentWorkspace } from '../api/users'
 import { setCurrentTenantId } from '../utils/tenant'
+import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
 
 const navigation = [
   { name: 'Pages', href: '/pages', icon: Grid3X3 },
@@ -24,6 +25,8 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isSwitchingWorkspace, setIsSwitchingWorkspace] = useState(false)
+  const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false)
+  const [selectedWorkspace, setSelectedWorkspace] = useState('')
   const [workspaceError, setWorkspaceError] = useState('')
   const location = useLocation()
   const support = useSupportContext()
@@ -61,19 +64,27 @@ const Navbar = () => {
     return location.pathname === path || location.pathname.startsWith(path + '/')
   }
 
-  const handleWorkspaceChange = async (event) => {
-    const identifier = event.target.value
-    if (!identifier || identifier === currentWorkspace) return
+  const openWorkspaceDialog = () => {
+    setSelectedWorkspace(currentWorkspace)
+    setWorkspaceError('')
+    setWorkspaceDialogOpen(true)
+  }
+
+  const handleWorkspaceChange = async () => {
+    if (!selectedWorkspace || selectedWorkspace === currentWorkspace) {
+      setWorkspaceDialogOpen(false)
+      return
+    }
     setIsSwitchingWorkspace(true)
     setWorkspaceError('')
     try {
-      const response = await switchCurrentWorkspace(identifier)
+      const response = await switchCurrentWorkspace(selectedWorkspace)
       setCurrentTenantId(response.data.currentWorkspace.identifier)
       window.location.assign('/pages')
-    } catch {
-      setWorkspaceError(t('Failed to switch workspace'))
+    } catch (error) {
+      const reason = error.response?.data?.detail || error.response?.data?.error
+      setWorkspaceError(typeof reason === 'string' ? reason : t('Failed to switch workspace'))
       setIsSwitchingWorkspace(false)
-      event.target.value = currentWorkspace
     }
   }
 
@@ -165,23 +176,11 @@ const Navbar = () => {
           </div>
         </div>
         {workspaces.length > 1 && (
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="hidden text-xs text-gray-500 sm:inline">{t('Workspace')}</span>
-            <label htmlFor="cms-workspace-switcher" className="sr-only">{t('Current workspace')}</label>
-            <select
-              id="cms-workspace-switcher"
-              aria-label={t('Current workspace')}
-              value={currentWorkspace}
-              onChange={handleWorkspaceChange}
-              disabled={isSwitchingWorkspace}
-              className="cms-native-select max-w-52 rounded border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 focus:border-blue-600 focus:outline-none"
-            >
-              {workspaces.map((workspace) => (
-                <option key={workspace.id} value={workspace.identifier}>{workspace.name}</option>
-              ))}
-            </select>
-            {workspaceError && <span role="alert" className="ml-2 text-xs text-red-600">{workspaceError}</span>}
-          </div>
+          <button type="button" onClick={openWorkspaceDialog} aria-label={t('Switch workspace')}
+            title={`${t('Current workspace')}: ${user.currentWorkspace?.name || currentWorkspace}`}
+            className="shrink-0 rounded p-2 text-gray-600 hover:bg-gray-100 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <Building2 className="h-5 w-5" aria-hidden="true" />
+          </button>
         )}
         </div>
 
@@ -212,6 +211,32 @@ const Navbar = () => {
           </div>
         )}
       </div>
+      <Dialog open={workspaceDialogOpen} onClose={() => { if (!isSwitchingWorkspace) setWorkspaceDialogOpen(false) }} className="relative z-50">
+        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <DialogPanel className="w-full max-w-sm rounded border border-gray-200 bg-white p-5 shadow-lg">
+            <DialogTitle className="text-lg font-semibold text-gray-900">{t('Switch workspace')}</DialogTitle>
+            <p className="mt-1 text-xs text-gray-600">{t('Choose which workspace to use in this browser session.')}</p>
+            <label htmlFor="cms-workspace-switcher" className="mt-4 block text-xs font-medium text-gray-700">{t('Current workspace')}</label>
+            <select id="cms-workspace-switcher" value={selectedWorkspace} onChange={event => setSelectedWorkspace(event.target.value)}
+              disabled={isSwitchingWorkspace}
+              className="cms-native-select mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-600 focus:outline-none">
+              {workspaces.map((workspace) => (
+                <option key={workspace.id} value={workspace.identifier}>{workspace.name}</option>
+              ))}
+            </select>
+            {workspaceError && <p role="alert" className="mt-3 text-xs text-red-700">{workspaceError}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setWorkspaceDialogOpen(false)} disabled={isSwitchingWorkspace}
+                className="rounded border border-gray-300 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50">Cancel</button>
+              <button type="button" onClick={handleWorkspaceChange} disabled={isSwitchingWorkspace || !selectedWorkspace || selectedWorkspace === currentWorkspace}
+                className="rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                {isSwitchingWorkspace ? t('Switching…') : t('Switch workspace')}
+              </button>
+            </div>
+          </DialogPanel>
+        </div>
+      </Dialog>
     </nav>
   )
 }

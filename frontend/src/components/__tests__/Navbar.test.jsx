@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -99,7 +99,7 @@ describe('Navbar', () => {
     expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/profile')
   })
 
-  it('lets a superuser select another workspace from the main menu', async () => {
+  it('lets a superuser open a compact workspace dialog and request a switch', async () => {
     useAuth.mockReturnValue({ user: {
       isSuperuser: true,
       currentWorkspace: { identifier: 'production-copy' },
@@ -111,9 +111,12 @@ describe('Navbar', () => {
     switchCurrentWorkspace.mockReturnValue(new Promise(() => {}))
     renderNavbar()
 
+    expect(screen.queryByRole('combobox', { name: 'Current workspace' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Switch workspace' }))
     const selector = screen.getByRole('combobox', { name: 'Current workspace' })
     expect(selector).toHaveValue('production-copy')
     fireEvent.change(selector, { target: { value: 'debug-preview' } })
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Switch workspace' }))
     expect(switchCurrentWorkspace).toHaveBeenCalledWith('debug-preview')
     expect(selector).toBeDisabled()
   })
