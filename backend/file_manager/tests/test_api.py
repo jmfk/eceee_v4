@@ -294,7 +294,7 @@ class MediaFileAPITest(APITestCase):
         self.assertFalse(theme_media.is_deleted)
         self.assertTrue(any("Replacement target not found" in item["error"] for item in response.data["errors"]))
 
-    def test_duplicate_hash_cannot_move_media_between_namespaces(self):
+    def test_duplicate_hash_in_other_namespace_keeps_independent_identity(self):
         theme_namespace = Namespace.get_or_create_theme_media(self.tenant, created_by=self.user)
         duplicate_content = b"shared-image-content"
         theme_media = MediaFile.objects.create(
@@ -317,9 +317,8 @@ class MediaFileAPITest(APITestCase):
         result = DuplicateFileHandler().check_duplicates(upload, self.namespace, self.user)
 
         theme_media.refresh_from_db()
-        self.assertTrue(result.has_duplicates)
-        self.assertEqual(result.errors[0]["reason"], "duplicate_other_namespace")
-        self.assertNotIn("existing_file", result.errors[0])
+        self.assertFalse(result.has_duplicates)
+        self.assertEqual(result.errors, [])
         self.assertEqual(theme_media.namespace, theme_namespace)
         self.assertFalse(PendingMediaFile.objects.filter(namespace=self.namespace).exists())
 

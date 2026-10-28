@@ -3,7 +3,7 @@
 import mimetypes
 import uuid
 
-from django.db import migrations
+from django.db import migrations, transaction
 from django.utils import timezone
 
 
@@ -43,19 +43,21 @@ def backfill(apps, schema_editor):
         for path in live_paths | draft_paths | historical_paths:
             if Version.objects.using(db).filter(file_path=path).exists():
                 continue
-            series = Series.objects.using(db).create(id=uuid.uuid4(), theme_id=theme.pk)
-            Version.objects.using(db).create(
-                id=uuid.uuid4(),
-                series_id=series.pk,
-                version_number=1,
-                file_path=path,
-                file_size=0,
-                content_type=mimetypes.guess_type(path)[0] or "application/octet-stream",
-                uploaded_by_id=theme.created_by_id,
-                superseded_at=None if path in live_paths | draft_paths else now,
-            )
+            with transaction.atomic(using=db):
+                series = Series.objects.using(db).create(id=uuid.uuid4(), theme_id=theme.pk)
+                Version.objects.using(db).create(
+                    id=uuid.uuid4(),
+                    series_id=series.pk,
+                    version_number=1,
+                    file_path=path,
+                    file_size=0,
+                    content_type=mimetypes.guess_type(path)[0] or "application/octet-stream",
+                    uploaded_by_id=theme.created_by_id,
+                    superseded_at=None if path in live_paths | draft_paths else now,
+                )
 
 
 class Migration(migrations.Migration):
+    atomic = False  # Existing-path checks make a partial backfill safe to resume.
     dependencies = [("webpages", "0090_designer_image_versions")]
     operations = [migrations.RunPython(backfill, migrations.RunPython.noop)]
