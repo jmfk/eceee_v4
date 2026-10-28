@@ -160,7 +160,7 @@ const ObjectReferenceInput = ({
                                 onDragOver={(e) => handleDragOver(e, index)}
                                 onDragEnd={handleDragEnd}
                                 className={`
-                                    inline-flex items-center gap-1 px-2 py-1 
+                                    object-reference-selected inline-flex items-center gap-1 px-2 py-1
                                     bg-blue-100 text-blue-800 rounded-md text-sm
                                     ${!disabled ? 'cursor-move' : 'cursor-default'}
                                     ${draggedIndex === index ? 'opacity-50' : ''}
@@ -201,7 +201,7 @@ const ObjectReferenceInput = ({
                         <button
                             type="button"
                             onClick={clearAll}
-                            className="text-xs text-red-600 hover:text-red-800 px-2"
+                            className="object-reference-clear text-xs text-red-600 hover:text-red-800 px-2"
                         >
                             Clear All
                         </button>
@@ -211,7 +211,7 @@ const ObjectReferenceInput = ({
 
             {/* Single Selected Item */}
             {!multiple && selectedIds.length > 0 && (
-                <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-md border border-gray-200">
+                <div className="object-reference-selected flex items-center gap-2 p-2 bg-gray-50 rounded-md border border-gray-200">
                     <span className="flex-1 text-sm">
                         {isLoadingSelected ? (
                             `ID: ${selectedIds[0]}`
@@ -254,7 +254,7 @@ const ObjectReferenceInput = ({
                             onFocus={() => !isDropdownOpen && toggleDropdown()}
                             placeholder={placeholder}
                             className={`
-                                w-full pl-10 pr-10 py-2 border rounded-md focus:outline-none focus:ring-2
+                                object-reference-search w-full pl-10 pr-10 py-2 border rounded-md focus:outline-none focus:ring-2
                                 ${validation?.isValid === false ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}
                             `}
                             disabled={disabled}
@@ -297,7 +297,7 @@ const ObjectReferenceInput = ({
                                                 type="button"
                                                 onClick={() => handleSelectObject(obj.id)}
                                                 className={`
-                                                    w-full text-left px-4 py-2 hover:bg-gray-100 
+                                                    object-reference-result w-full text-left px-4 py-2 hover:bg-gray-100
                                                     flex items-center justify-between
                                                     ${isSelected ? 'bg-blue-50' : ''}
                                                 `}

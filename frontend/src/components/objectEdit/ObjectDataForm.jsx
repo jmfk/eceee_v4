@@ -412,7 +412,7 @@ const ObjectDataForm = forwardRef(({
 
             {/* Dynamic Schema Fields */}
             {objectType && propertiesFields.length > 0 && (
-                <div className="border-t pt-4">
+                <div className="object-property-fields border-t pt-4">
                     <ObjectSchemaForm
                         schema={{ fields: propertiesFields }}
                         data={formData.data || {}}
@@ -426,8 +426,10 @@ const ObjectDataForm = forwardRef(({
             {editorGroups.map(group => {
                 const fields = schemaFields.filter(field => group.fields.includes(field.name))
                 return fields.length > 0 && <EditorAccordion key={group.id} title={group.label}>
-                    <ObjectSchemaForm schema={{ fields }} data={formData.data || {}}
-                        onChange={handleDataFieldChange} namespace={namespace} />
+                    <div className="object-property-fields">
+                        <ObjectSchemaForm schema={{ fields }} data={formData.data || {}}
+                            onChange={handleDataFieldChange} namespace={namespace} />
+                    </div>
                 </EditorAccordion>
             })}
         </>
