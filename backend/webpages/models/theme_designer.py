@@ -115,7 +115,10 @@ class DesignerImageSeries(models.Model):
     """Stable identity for a Designer-owned image across draft replacements."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    theme = models.ForeignKey("webpages.PageTheme", on_delete=models.CASCADE, related_name="designer_image_series")
+    tenant = models.ForeignKey("core.Tenant", on_delete=models.CASCADE, related_name="designer_image_series")
+    theme = models.ForeignKey(
+        "webpages.PageTheme", on_delete=models.SET_NULL, null=True, related_name="designer_image_series"
+    )
     protected_from_cleanup = models.BooleanField(default=False)
 
 

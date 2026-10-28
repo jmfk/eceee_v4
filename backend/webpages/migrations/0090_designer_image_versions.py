@@ -18,9 +18,18 @@ class Migration(migrations.Migration):
                 ("id", models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
                 ("protected_from_cleanup", models.BooleanField(default=False)),
                 (
-                    "theme",
+                    "tenant",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
+                        related_name="designer_image_series",
+                        to="core.tenant",
+                    ),
+                ),
+                (
+                    "theme",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
                         related_name="designer_image_series",
                         to="webpages.pagetheme",
                     ),

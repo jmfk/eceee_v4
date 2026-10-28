@@ -2697,6 +2697,7 @@ class PageTheme(models.Model):
         return updated_groups
 
     @transaction.atomic
+    @transaction.atomic
     def delete(self, *args, **kwargs):
         """Delete theme and cleanup design group images from object storage."""
         import logging
@@ -2710,6 +2711,15 @@ class PageTheme(models.Model):
         if any(item.get("releases") for item in persisted.widget_types.get("items", [])):
             raise ValidationError("Themes with published widget types cannot be deleted. Archive the types instead.")
 
+        from django.utils import timezone
+
+        from webpages.models.theme_designer import DesignerImageSeries, DesignerImageVersion
+
+        series_ids = list(DesignerImageSeries.objects.filter(theme=self).values_list("pk", flat=True))
+        registered_paths = set(
+            DesignerImageVersion.objects.filter(series_id__in=series_ids).values_list("file_path", flat=True)
+        )
+
         from file_manager.storage import system_storage
 
         logger = logging.getLogger(__name__)
@@ -2721,11 +2731,20 @@ class PageTheme(models.Model):
             for url, metadata in design_group_images:
                 try:
                     path = self._extract_path_from_url(url)
+                    if path in registered_paths:
+                        continue
                     if path and storage.exists(path):
                         storage.delete(path)
                         logger.info(f"Deleted design group image: {path}")
                 except Exception as e:
                     logger.warning(f"Failed to delete design group image {url}: {str(e)}")
+
+        # Keep registered versions so protected objects survive theme deletion,
+        # and unprotected ones can later pass through the normal cleanup checks.
+        DesignerImageVersion.objects.filter(series_id__in=series_ids, superseded_at__isnull=True).update(
+            superseded_at=timezone.now()
+        )
+        DesignerImageSeries.objects.filter(pk__in=series_ids).update(theme=None)
 
         # Call parent delete
         super().delete(*args, **kwargs)

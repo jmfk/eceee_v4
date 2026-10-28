@@ -77,10 +77,10 @@ def cleanup_candidates(tenant, years):
     )
     designer = list(
         DesignerImageVersion.objects.filter(
-            series__theme__tenant=tenant,
+            series__tenant=tenant,
             series__protected_from_cleanup=False,
             superseded_at__lt=cutoff,
-        ).select_related("series__theme")
+        ).select_related("series", "series__theme")
     )
     paths = {version.file_path for version in [*media, *designer]}
     referenced = _referenced_paths(tenant, paths)
@@ -93,7 +93,7 @@ def _eligible(tenant, version, cutoff, referenced=None):
     if isinstance(version, MediaFileVersion):
         if version.media_file.tenant_id != tenant.pk or version.media_file.protected_from_cleanup:
             return False
-    elif version.series.theme.tenant_id != tenant.pk or version.series.protected_from_cleanup:
+    elif version.series.tenant_id != tenant.pk or version.series.protected_from_cleanup:
         return False
     path = version.file_path
     if path in (referenced if referenced is not None else _referenced_paths(tenant, {path})):
@@ -126,7 +126,11 @@ def preview_cleanup(tenant, years):
                 "version_number": item.version_number,
                 "file_size": item.file_size,
                 "superseded_at": item.superseded_at,
-                "image": item.media_file.title if isinstance(item, MediaFileVersion) else item.series.theme.name,
+                "image": (
+                    item.media_file.title
+                    if isinstance(item, MediaFileVersion)
+                    else (item.series.theme.name if item.series.theme else "Deleted theme")
+                ),
             }
             for item in candidates
         ],
