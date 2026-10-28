@@ -305,7 +305,9 @@ class SitePackageServiceTests(TestCase):
         buffer.seek(0)
         with zipfile.ZipFile(buffer, "r") as package:
             SitePackageImporter(second_import_job, storage=storage).import_package(package)
-        self.assertEqual(MediaFile.objects.filter(tenant=destination_tenant).count(), 1)
+        imported_files = MediaFile.objects.filter(tenant=destination_tenant)
+        self.assertEqual(imported_files.count(), 2)
+        self.assertEqual(imported_files.values_list("file_path", flat=True).distinct().count(), 2)
 
     def test_v1_package_remains_importable(self):
         package_buffer = io.BytesIO()
