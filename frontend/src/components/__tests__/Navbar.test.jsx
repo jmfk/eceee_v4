@@ -6,6 +6,7 @@ import Navbar from '../Navbar'
 import UserToolsNav from '../UserToolsNav'
 import { useAuth } from '../../contexts/AuthContext'
 import { useSupportContext } from '../support/useSupportContext'
+import { switchCurrentWorkspace } from '../../api/users'
 
 vi.mock('../support/useSupportContext', () => ({ useSupportContext: vi.fn(), useSupportTenant: () => 'a' }))
 vi.mock('react-router-dom', async () => vi.importActual('react-router-dom'))
@@ -13,6 +14,7 @@ vi.mock('react-router-dom', async () => vi.importActual('react-router-dom'))
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: vi.fn(() => ({ logout: vi.fn(), user: { username: 'editor' } })),
 }))
+vi.mock('../../api/users', () => ({ switchCurrentWorkspace: vi.fn() }))
 
 describe('Navbar', () => {
   let availableWidth
@@ -95,6 +97,25 @@ describe('Navbar', () => {
     useAuth.mockReturnValue({ logout: vi.fn(), user: { isKanbanBoardGuest: true, permissions: ['kanban.read'] } })
     renderNavbar()
     expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/profile')
+  })
+
+  it('lets a superuser select another workspace from the main menu', async () => {
+    useAuth.mockReturnValue({ user: {
+      isSuperuser: true,
+      currentWorkspace: { identifier: 'production-copy' },
+      designerTenants: [
+        { id: '1', identifier: 'production-copy', name: 'ECEEE Production Copy' },
+        { id: '2', identifier: 'debug-preview', name: 'Debug Preview Tenant' },
+      ],
+    } })
+    switchCurrentWorkspace.mockReturnValue(new Promise(() => {}))
+    renderNavbar()
+
+    const selector = screen.getByRole('combobox', { name: 'Current workspace' })
+    expect(selector).toHaveValue('production-copy')
+    fireEvent.change(selector, { target: { value: 'debug-preview' } })
+    expect(switchCurrentWorkspace).toHaveBeenCalledWith('debug-preview')
+    expect(selector).toBeDisabled()
   })
 
   it('keeps personal tools but hides denied CMS navigation for an empty role', () => {

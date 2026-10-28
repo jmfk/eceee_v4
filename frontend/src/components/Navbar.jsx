@@ -6,6 +6,8 @@ import { useAuth } from '../contexts/AuthContext'
 import { Menu, X, Settings, Grid3X3, FolderOpen, Database, Hash, User as UserIcon, BarChart2, Palette, Flag } from 'lucide-react'
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { cmsText } from '../utils/cmsCopy'
+import { switchCurrentWorkspace } from '../api/users'
+import { setCurrentTenantId } from '../utils/tenant'
 
 const navigation = [
   { name: 'Pages', href: '/pages', icon: Grid3X3 },
@@ -21,6 +23,8 @@ const navigation = [
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isSwitchingWorkspace, setIsSwitchingWorkspace] = useState(false)
+  const [workspaceError, setWorkspaceError] = useState('')
   const location = useLocation()
   const support = useSupportContext()
   const inboxCount = support.data?.unreadCount || 0
@@ -40,6 +44,8 @@ const Navbar = () => {
     if (item.href === '/settings') return supportSettingsOnly ? supportSettingsHref : settingsHref
     return item.href
   }
+  const workspaces = user?.isSuperuser ? user.designerTenants || [] : []
+  const currentWorkspace = user?.currentWorkspace?.identifier || ''
   const navRef = useRef(null)
   const navContainerRef = useRef(null)
   const desktopNavRef = useRef(null)
@@ -53,6 +59,22 @@ const Navbar = () => {
         location.pathname === section || location.pathname.startsWith(section + '/'))
     }
     return location.pathname === path || location.pathname.startsWith(path + '/')
+  }
+
+  const handleWorkspaceChange = async (event) => {
+    const identifier = event.target.value
+    if (!identifier || identifier === currentWorkspace) return
+    setIsSwitchingWorkspace(true)
+    setWorkspaceError('')
+    try {
+      const response = await switchCurrentWorkspace(identifier)
+      setCurrentTenantId(response.data.currentWorkspace.identifier)
+      window.location.assign('/pages')
+    } catch {
+      setWorkspaceError(t('Failed to switch workspace'))
+      setIsSwitchingWorkspace(false)
+      event.target.value = currentWorkspace
+    }
   }
 
   useLayoutEffect(() => {
@@ -94,7 +116,8 @@ const Navbar = () => {
   return (
     <nav ref={navRef} className={`bg-white shadow-sm border-b border-gray-200 ${isCollapsed ? 'nav-collapsed' : ''}`}>
       <div className="container mx-auto px-4">
-        <div ref={navContainerRef} className="relative flex justify-start h-16 overflow-hidden">
+        <div className="flex h-16 items-center gap-3">
+        <div ref={navContainerRef} className="relative flex min-w-0 flex-1 justify-start h-16 overflow-hidden">
           {/* Desktop navigation */}
           {/* Keep the collapsed menu measurable without exposing its links. */}
           <div
@@ -140,6 +163,26 @@ const Navbar = () => {
               )}
             </button>
           </div>
+        </div>
+        {workspaces.length > 1 && (
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="hidden text-xs text-gray-500 sm:inline">{t('Workspace')}</span>
+            <label htmlFor="cms-workspace-switcher" className="sr-only">{t('Current workspace')}</label>
+            <select
+              id="cms-workspace-switcher"
+              aria-label={t('Current workspace')}
+              value={currentWorkspace}
+              onChange={handleWorkspaceChange}
+              disabled={isSwitchingWorkspace}
+              className="cms-native-select max-w-52 rounded border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 focus:border-blue-600 focus:outline-none"
+            >
+              {workspaces.map((workspace) => (
+                <option key={workspace.id} value={workspace.identifier}>{workspace.name}</option>
+              ))}
+            </select>
+            {workspaceError && <span role="alert" className="ml-2 text-xs text-red-600">{workspaceError}</span>}
+          </div>
+        )}
         </div>
 
         {/* Mobile/Collapsed navigation */}
