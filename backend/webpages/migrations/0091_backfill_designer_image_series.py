@@ -1,6 +1,7 @@
 """Register surviving Designer draft objects without changing theme snapshots."""
 
 import mimetypes
+import re
 import uuid
 
 from django.db import migrations, transaction
@@ -15,7 +16,10 @@ def _paths(value, prefix):
         for child in value:
             yield from _paths(child, prefix)
     elif isinstance(value, str) and prefix in value:
-        yield value[value.index(prefix) :].split("?", 1)[0].split("#", 1)[0]
+        pattern = re.compile(
+            re.escape(prefix) + r"[A-Za-z0-9/_-]+\.(?:avif|gif|jpe?g|png|svg|webp)", re.IGNORECASE
+        )
+        yield from (match.group(0) for match in pattern.finditer(value))
 
 
 def backfill(apps, schema_editor):
