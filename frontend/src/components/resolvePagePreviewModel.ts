@@ -17,7 +17,17 @@ const dataDrivenNewsTypes = new Set([
 const linkTypes = new Set(['internal', 'external', 'email', 'phone', 'anchor', 'media'])
 const imgproxyBatchSize = 50
 const pageLookupBatchSize = 500
-const newsVersionBatchSize = 8
+
+const newsPreviewOrigin = (hostnames: string[]) => {
+    const hostname = hostnames.find(value => /^[a-z0-9][a-z0-9.-]*$/i.test(value) && !value.includes('..'))
+    if (!hostname) throw new Error('No public site hostname is configured for this preview.')
+    const local = hostname === 'localhost' || hostname.endsWith('.localhost')
+    const adminPort = Number(window.location.port)
+    const fallbackPort = Number.isInteger(adminPort) && adminPort > 0
+        ? Math.floor(adminPort / 100) * 100 + 15 : 10115
+    const port = local ? `:${import.meta.env.VITE_PUBLISHER_PORT || fallbackPort}` : ''
+    return `${local ? 'http:' : 'https:'}//${hostname}${port}`
+}
 
 const collectionFileToMediaItem = (file: any) => {
     const url = file.imgproxyBaseUrl || file.imgproxy_base_url || file.fileUrl || file.file_url || file.url || ''
@@ -120,41 +130,28 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
         return [widget, ...collectWidgets(nested)]
     })
     let allWidgets = collectWidgets(Object.values(next.slots).flat())
-    const selectedNewsTypes = new Set<string>()
-    allWidgets.forEach((widget) => {
-        if (widget.type !== 'easy_widgets.TopNewsPlugWidget' && widget.type !== 'easy_widgets.SidebarTopNewsWidget') return
+    const newsRequests = new Map<string, Promise<any[]>>()
+    const previewNews = (widget: RenderWidgetModel) => {
         const configured = widget.config.objectTypes ?? widget.config.object_types ?? ['news']
-        if (Array.isArray(configured)) configured.forEach((type) => selectedNewsTypes.add(String(type)))
-    })
-    let publishedNewsPromise: Promise<any[]> | undefined
-    const publishedNews = () => {
-        publishedNewsPromise ??= (async () => {
-            const response: any = await objectInstancesApi.getPublished({}, tenantRequestConfig)
-            const published = response?.data || response
-            const candidates = (Array.isArray(published) ? published : []).filter((item: any) => {
-                const type = item.objectType || item.object_type || {}
-                return selectedNewsTypes.has(String(type.id)) || selectedNewsTypes.has(String(type.name))
-            })
-            const versions = []
-            for (let index = 0; index < candidates.length; index += newsVersionBatchSize) {
-                const batch = await Promise.all(candidates.slice(index, index + newsVersionBatchSize).map(async (item: any) => {
-                    const versionResponse: any = await objectInstancesApi.getCurrentPublishedVersion(item.id, tenantRequestConfig)
-                    const version = versionResponse?.data?.data ?? versionResponse?.data ?? versionResponse
-                    if (!version || !version.effective_date) return null
-                    return {
-                        ...item,
-                        title: version.title || item.title,
-                        data: version.data || {},
-                        classificationIds: version.classification_ids || [],
-                        isFeatured: version.is_featured === true,
-                        publishDate: version.effective_date,
-                    }
-                }))
-                versions.push(...batch)
-            }
-            return versions.filter(Boolean)
-        })()
-        return publishedNewsPromise
+        const types = Array.isArray(configured) ? configured.map(String) : []
+        if (!types.length) return Promise.resolve([])
+        const params = new URLSearchParams()
+        params.set('siteId', String(next.context.siteId || ''))
+        types.forEach(type => params.append('type', type))
+        const classifications = widget.config.classificationIds ?? widget.config.classification_ids ?? []
+        if (Array.isArray(classifications)) classifications.forEach(id => params.append('classificationId', String(id)))
+        params.set('includeDescendants', String((widget.config.includeDescendants ?? widget.config.include_descendants) !== false))
+        params.set('featuredOnly', String(widget.type === 'easy_widgets.TopNewsPlugWidget'))
+        params.set('limit', String(widget.type === 'easy_widgets.TopNewsPlugWidget'
+            ? (widget.config.layout === '1x3' ? 3 : 2)
+            : Math.min(Math.max(Number(widget.config.limit) || 5, 1), 50)))
+        const url = `${newsPreviewOrigin(next.context.siteHostnames || [])}/api/news-preview?${params}`
+        if (!newsRequests.has(url)) newsRequests.set(url, fetch(url, { credentials: 'omit' }).then(async response => {
+            if (!response.ok) throw new Error(`News preview failed (${response.status}).`)
+            const result = await response.json()
+            return Array.isArray(result.items) ? result.items : []
+        }))
+        return newsRequests.get(url)!
     }
     const internalPageIds = new Set<string>()
     allWidgets.forEach((widget) => collectInternalPageIds(widget.config, internalPageIds))
@@ -260,24 +257,7 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
         const objectTypes = widget.config.objectTypes || widget.config.object_types || []
         if (widget.type === 'easy_widgets.TopNewsPlugWidget' || widget.type === 'easy_widgets.SidebarTopNewsWidget') {
             try {
-                const published = await publishedNews()
-                const configuredTypes = widget.config.objectTypes !== undefined ? widget.config.objectTypes : widget.config.object_types
-                const selectedTypes = Array.isArray(configuredTypes)
-                    ? configuredTypes.map(String) : configuredTypes === undefined ? ['news'] : []
-                const selected = published.filter((item: any) => {
-                    const type = item.objectType || item.object_type || {}
-                    return selectedTypes.includes(String(type.id)) || selectedTypes.includes(String(type.name))
-                })
-                const configuredClassifications = widget.config.classificationIds || widget.config.classification_ids || []
-                const classificationIds = Array.isArray(configuredClassifications) ? configuredClassifications.map(String) : []
-                const eligible = selected.filter((item: any) => item
-                    && (!classificationIds.length || item.classificationIds.some((id: string) => classificationIds.includes(String(id))))
-                    && (widget.type !== 'easy_widgets.TopNewsPlugWidget' || item.isFeatured))
-                eligible.sort((left: any, right: any) => right.publishDate.localeCompare(left.publishDate) || String(right.id).localeCompare(String(left.id)))
-                const limit = widget.type === 'easy_widgets.TopNewsPlugWidget'
-                    ? (widget.config.layout === '1x3' ? 3 : 2)
-                    : Math.min(Math.max(Number(widget.config.limit) || 5, 1), 50)
-                const items = eligible.slice(0, limit)
+                const items = await previewNews(widget)
                 widget.data = { status: items.length ? 'ready' : 'empty', items }
             } catch (error: any) {
                 widget.data = { status: 'error', error: error?.message || 'Failed to load preview data.', items: [] }

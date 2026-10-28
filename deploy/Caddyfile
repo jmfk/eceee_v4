@@ -33,9 +33,12 @@ summerstudy.{$DOMAIN}, industry.{$DOMAIN} {
         reverse_proxy imgproxy:8080
     }
 
-    # Public forms are validated and stored by the publisher. This must remain
-    # before the broader Django API route below.
+    # Publisher APIs must remain before the broader Django API route below.
     handle /api/forms/* {
+        reverse_proxy publisher:3000
+    }
+
+    handle /api/news-preview {
         reverse_proxy publisher:3000
     }
 

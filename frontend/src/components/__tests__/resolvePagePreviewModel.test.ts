@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDesignerRenderModel, createPageRenderModel } from '../../rendering/adapters'
 import { resolvePagePreviewModel } from '../resolvePagePreviewModel'
 
@@ -18,54 +18,54 @@ describe('page preview model resolution', () => {
             requests.map(request => `/imgproxy/resize:fit:${request.width}:0/${request.sourceUrl}`)
         ))
     })
+    afterEach(() => vi.unstubAllGlobals())
 
     it('requests featured blocks and latest news with distinct selection rules', async () => {
-        objectApi.getPublished.mockResolvedValue({ data: [
-            { id: 1, slug: 'older-featured', object_type: { id: 7, name: 'news' } },
-            { id: 2, slug: 'newer-regular', object_type: { id: 7, name: 'news' } },
-            { id: 3, slug: 'newest-featured', object_type: { id: 7, name: 'news' } },
-        ] })
-        objectApi.getCurrentPublishedVersion.mockImplementation(async (id: number) => ({ data: { data: {
-            title: `Story ${id}`, data: {}, is_featured: id !== 2,
-            effective_date: `2026-10-${String(id).padStart(2, '0')}T00:00:00Z`,
-        } } }))
+        const stories = [
+            { id: 3, slug: 'newest-featured', isFeatured: true, publishDate: '2026-10-03T00:00:00Z' },
+            { id: 2, slug: 'newer-regular', isFeatured: false, publishDate: '2026-10-02T00:00:00Z' },
+            { id: 1, slug: 'older-featured', isFeatured: true, publishDate: '2026-10-01T00:00:00Z' },
+        ]
+        const fetchNews = vi.fn(async (url: string, _options?: RequestInit) => ({
+            ok: true,
+            json: async () => ({ items: new URL(url).searchParams.get('featuredOnly') === 'true'
+                ? stories.filter(story => story.isFeatured) : stories }),
+        }))
+        vi.stubGlobal('fetch', fetchNews)
         const model = createPageRenderModel({ widgets: { main: [
             { id: 'featured', type: 'easy_widgets.TopNewsPlugWidget', config: { object_types: ['news'], layout: '1x3' } },
             { id: 'latest', type: 'easy_widgets.SidebarTopNewsWidget', config: { objectTypes: ['news'], limit: 5, displayVariant: 'header' } },
-        ] } })
+        ] }, context: { siteId: 85, siteHostnames: ['eceee.localhost'] } })
 
         const resolved = await resolvePagePreviewModel(model)
 
         expect(resolved.slots.main[0].data?.items?.map((item: any) => item.slug)).toEqual(['newest-featured', 'older-featured'])
         expect(resolved.slots.main[1].data?.items?.map((item: any) => item.slug)).toEqual(['newest-featured', 'newer-regular', 'older-featured'])
+        expect(fetchNews).toHaveBeenCalledTimes(2)
+        expect(fetchNews.mock.calls.map(([url]) => new URL(url).searchParams.get('limit'))).toEqual(['3', '5'])
+        expect(fetchNews.mock.calls[0][1]).toEqual({ credentials: 'omit' })
+        expect(objectApi.getPublished).not.toHaveBeenCalled()
+        expect(objectApi.getCurrentPublishedVersion).not.toHaveBeenCalled()
         expect(objectApi.getNewsList).not.toHaveBeenCalled()
     })
 
-    it('previews configured news types and bounds concurrent version requests', async () => {
-        objectApi.getPublished.mockResolvedValue({ data: [
-            ...Array.from({ length: 10 }, (_item, index) => ({ id: index + 1, slug: `story-${index + 1}`, object_type: { id: 9, name: 'article' } })),
-            { id: 99, slug: 'unselected', object_type: { id: 7, name: 'news' } },
-        ] })
-        let inFlight = 0
-        let maxInFlight = 0
-        objectApi.getCurrentPublishedVersion.mockImplementation(async (id: number) => {
-            inFlight += 1
-            maxInFlight = Math.max(maxInFlight, inFlight)
-            await new Promise(resolve => setTimeout(resolve, 0))
-            inFlight -= 1
-            return { data: { data: { title: `Story ${id}`, data: {}, is_featured: true, effective_date: `2026-10-${String(id).padStart(2, '0')}T00:00:00Z` } } }
-        })
+    it('passes configured type IDs, names and limits to the bounded publisher query', async () => {
+        const fetchNews = vi.fn(async () => ({ ok: true, json: async () => ({ items: [{ id: 10, slug: 'story-10' }] }) }))
+        vi.stubGlobal('fetch', fetchNews)
         const model = createPageRenderModel({ widgets: { main: [
-            { id: 'featured', type: 'easy_widgets.TopNewsPlugWidget', config: { objectTypes: [9], layout: '1x3' } },
+            { id: 'featured', type: 'easy_widgets.TopNewsPlugWidget', config: { objectTypes: [9, 'article'], layout: '1x3' } },
             { id: 'latest', type: 'easy_widgets.SidebarTopNewsWidget', config: { objectTypes: ['article'], limit: 5 } },
-        ] } })
+        ] }, context: { siteId: 85, siteHostnames: ['eceee.localhost'] } })
 
         const resolved = await resolvePagePreviewModel(model)
 
-        expect(resolved.slots.main[0].data?.items?.map((item: any) => item.slug)).toEqual(['story-10', 'story-9', 'story-8'])
-        expect(resolved.slots.main[1].data?.items?.map((item: any) => item.slug)).toEqual(['story-10', 'story-9', 'story-8', 'story-7', 'story-6'])
-        expect(objectApi.getCurrentPublishedVersion).toHaveBeenCalledTimes(10)
-        expect(maxInFlight).toBeLessThanOrEqual(8)
+        expect(resolved.slots.main[0].data?.items?.map((item: any) => item.slug)).toEqual(['story-10'])
+        const featuredParams = new URL(fetchNews.mock.calls[0][0]).searchParams
+        expect(featuredParams.get('siteId')).toBe('85')
+        expect(featuredParams.getAll('type')).toEqual(['9', 'article'])
+        expect(featuredParams.get('featuredOnly')).toBe('true')
+        expect(featuredParams.get('limit')).toBe('3')
+        expect(new URL(fetchNews.mock.calls[1][0]).searchParams.get('featuredOnly')).toBe('false')
     })
 
     it('resolves Designer ImageWidget sources without rendering the original URL', async () => {
