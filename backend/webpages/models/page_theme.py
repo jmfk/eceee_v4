@@ -2280,13 +2280,14 @@ class PageTheme(models.Model):
         parsed_path = urlparse(str(image_url)).path.strip("/")
         pieces = parsed_path.split("/")
         suffixes = ["/".join(pieces[index:]) for index in range(len(pieces))]
-        previous = (
-            MediaFileVersion.objects.filter(media_file__tenant_id=self.tenant_id, file_path__in=suffixes)
-            .select_related("media_file")
-            .first()
-        )
-        if previous:
-            return previous.media_file.get_file_url()
+        if self.tenant_id and "theme_images/" not in str(image_url):
+            previous = (
+                MediaFileVersion.objects.filter(media_file__tenant_id=self.tenant_id, file_path__in=suffixes)
+                .select_related("media_file")
+                .first()
+            )
+            if previous:
+                return previous.media_file.get_file_url()
 
         if "theme_images/" not in str(image_url):
             return image_url
