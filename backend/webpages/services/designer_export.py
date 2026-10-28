@@ -97,7 +97,10 @@ def _read_asset(theme, asset):
     )
     if media_match:
         media_file = MediaFile.objects.filter(
-            pk=media_match.group(1), tenant=theme.tenant, file_type="image", is_deleted=False,
+            pk=media_match.group(1),
+            tenant=theme.tenant,
+            file_type="image",
+            is_deleted=False,
         ).first()
         if media_file:
             with S3MediaStorage().open(media_file.file_path, "rb") as source:

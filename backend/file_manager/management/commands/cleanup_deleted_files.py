@@ -45,10 +45,16 @@ class Command(BaseCommand):
         # 1. Soft deleted
         # 2. Have no references
         # 3. Were deleted before the cutoff date
-        files_to_delete = MediaFile.objects.with_deleted().filter(
-            is_deleted=True, reference_count=0, deleted_at__lt=cutoff_date,
-            protected_from_cleanup=False,
-        ).filter(image_versions__isnull=True)
+        files_to_delete = (
+            MediaFile.objects.with_deleted()
+            .filter(
+                is_deleted=True,
+                reference_count=0,
+                deleted_at__lt=cutoff_date,
+                protected_from_cleanup=False,
+            )
+            .filter(image_versions__isnull=True)
+        )
 
         total_count = files_to_delete.count()
         if total_count == 0:
@@ -66,7 +72,7 @@ class Command(BaseCommand):
         # Use a list of IDs to avoid issues with queryset changing during deletion
         file_ids = list(files_to_delete.values_list("id", flat=True))
         total_count = len(file_ids)
-        
+
         processed_count = 0
         error_count = 0
 
@@ -81,9 +87,7 @@ class Command(BaseCommand):
                             # Perform hard delete
                             if not file.delete(force=True):
                                 continue
-                        self.stdout.write(
-                            f"Deleted file: {file.original_filename} (ID: {file.id})"
-                        )
+                        self.stdout.write(f"Deleted file: {file.original_filename} (ID: {file.id})")
                     except Exception as e:
                         error_count += 1
                         logger.error(f"Failed to delete file {file.id}: {str(e)}")

@@ -1089,7 +1089,9 @@ class MediaFileVersion(models.Model):
     superseded_at = models.DateTimeField()
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["media_file", "version_number"], name="unique_media_image_version")]
+        constraints = [
+            models.UniqueConstraint(fields=["media_file", "version_number"], name="unique_media_image_version")
+        ]
         ordering = ["-version_number"]
         indexes = [models.Index(fields=["superseded_at"], name="media_version_superseded_idx")]
 

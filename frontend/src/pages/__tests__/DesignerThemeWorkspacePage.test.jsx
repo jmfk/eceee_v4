@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
     replaceAsset: vi.fn(), createPlaceholder: vi.fn(), savePreviewContent: vi.fn(),
     importPreviewSource: vi.fn(), deletePreviewContent: vi.fn(), replacePreviewImage: vi.fn(),
     loadPreviewPage: vi.fn(), loadPreviewObject: vi.fn(), buildResolvedRenderModel: vi.fn(),
-    createExport: vi.fn(), getExport: vi.fn(), getExportDownload: vi.fn(), navigate: vi.fn(),
+    createExport: vi.fn(), getExport: vi.fn(), getExportDownload: vi.fn(), imageVersions: vi.fn(), navigate: vi.fn(),
 }))
 
 // The embedded import panel consumes the authenticated principal just as it does in the app.
@@ -168,6 +168,7 @@ describe('DesignerThemeWorkspacePage', () => {
     })
 
     beforeEach(() => {
+        mocks.imageVersions.mockResolvedValue({ versions: [], protectedFromCleanup: false })
         vi.clearAllMocks()
         mocks.workspace.mockResolvedValue(structuredClone(workspace))
         document.documentElement.lang = 'en'

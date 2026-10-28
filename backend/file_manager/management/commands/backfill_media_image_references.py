@@ -73,7 +73,8 @@ class Command(BaseCommand):
             with transaction.atomic():
                 for queryset in _sources(tenant):
                     fields = [
-                        field.name for field in queryset.model._meta.concrete_fields
+                        field.name
+                        for field in queryset.model._meta.concrete_fields
                         if isinstance(field, (models.JSONField, models.TextField))
                     ]
                     for item in queryset.only("pk", *fields).iterator(chunk_size=100):
