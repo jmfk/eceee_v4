@@ -11,7 +11,7 @@ from content.models import Namespace
 from core.models import Tenant
 from file_manager.image_version_cleanup import execute_cleanup, preview_cleanup
 from file_manager.models import MediaFile, MediaFileVersion
-from webpages.models import PageTheme
+from webpages.models import PageTheme, ThemeVersion
 
 
 class ImageVersionCleanupTests(TestCase):
@@ -62,6 +62,18 @@ class ImageVersionCleanupTests(TestCase):
         theme = PageTheme.objects.create(tenant=self.tenant, created_by=self.user, name="Image theme")
         theme.design_groups = {"header": {"url": "https://storage.test/uploads/old-header.jpg"}}
         theme.save(update_fields=["design_groups"])
+        self.assertEqual(preview_cleanup(self.tenant, 1)["count"], 0)
+
+    def test_theme_version_snapshot_keeps_old_file(self):
+        theme = PageTheme.objects.create(tenant=self.tenant, created_by=self.user, name="Versioned theme")
+        ThemeVersion.objects.create(
+            theme=theme,
+            version_number=1,
+            sync_version=1,
+            snapshot={"design_groups": {"header": {"url": "https://storage.test/uploads/old-header.jpg"}}},
+            content_hash="c" * 64,
+        )
+
         self.assertEqual(preview_cleanup(self.tenant, 1)["count"], 0)
 
     @patch("file_manager.image_version_cleanup.S3MediaStorage")
