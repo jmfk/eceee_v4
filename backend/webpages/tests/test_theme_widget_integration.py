@@ -46,9 +46,76 @@ class ThemeWidgetIntegrationTests(TestCase):
         )
         request.tenant = self.tenant
         force_authenticate(request, self.user)
-        imported = PageThemeViewSet.as_view({"post": "import_theme"})(request)
+        from unittest.mock import patch
+
+        with patch("webpages.views.page_theme_views.imgproxy_service.health_check", return_value=True):
+            imported = PageThemeViewSet.as_view({"post": "import_theme"})(request)
         self.assertEqual(imported.status_code, 201, imported.data)
         self.assertEqual(PageTheme.objects.get(pk=imported.data["theme"]["id"]).widget_types, self.theme.widget_types)
+
+    def test_export_import_copies_icon_and_rewrites_legacy_design_group_image(self):
+        import io
+        import zipfile
+        from unittest.mock import patch
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from rest_framework.test import APIRequestFactory, force_authenticate
+
+        from file_manager.storage import system_storage
+        from webpages.views.page_theme_views import PageThemeViewSet
+
+        old_url = f"https://storage.test/theme_images/{self.theme.id}/design_groups/hero.png"
+        foreign_url = "https://storage.test/theme_images/999/library/foreign.png"
+        self.theme.site_icon.name = "site_icons/favicon.png"
+        self.theme.design_groups = {
+            "groups": [{"layoutProperties": {"hero": {"xs": {"backgroundImage": {"url": old_url}}}}}]
+        }
+        self.theme.designer_preview = {"imageUrl": old_url, "foreignImageUrl": foreign_url}
+        self.theme.save(update_fields=["site_icon", "design_groups", "designer_preview"])
+        files = {
+            "site_icons/favicon.png": b"icon",
+            f"theme_images/{self.theme.id}/design_groups/hero.png": b"hero",
+        }
+
+        def save_file(path, content, **_kwargs):
+            files[path] = content.read()
+            return path
+
+        factory = APIRequestFactory()
+        with (
+            patch.object(PageTheme, "list_library_images", return_value=[]),
+            patch.object(system_storage, "exists", side_effect=lambda path: path in files),
+            patch.object(system_storage, "_open", side_effect=lambda path, mode="rb": io.BytesIO(files[path])),
+            patch.object(system_storage, "save", side_effect=save_file),
+            patch.object(system_storage, "url", side_effect=lambda path: f"https://storage.test/{path}"),
+        ):
+            request = factory.get("/themes/export/")
+            request.tenant = self.tenant
+            force_authenticate(request, self.user)
+            exported = PageThemeViewSet.as_view({"get": "export_theme"})(request, pk=self.theme.id)
+            self.assertEqual(exported.status_code, 200)
+            with zipfile.ZipFile(io.BytesIO(exported.content)) as package:
+                self.assertEqual(package.read("site_icon/favicon.png"), b"icon")
+                self.assertEqual(package.read("library_images/hero.png"), b"hero")
+
+            request = factory.post(
+                "/themes/import/",
+                {"theme_zip": SimpleUploadedFile("theme.zip", exported.content, content_type="application/zip")},
+                format="multipart",
+            )
+            request.tenant = self.tenant
+            force_authenticate(request, self.user)
+            with patch("webpages.views.page_theme_views.imgproxy_service.health_check", return_value=True):
+                imported = PageThemeViewSet.as_view({"post": "import_theme"})(request)
+            self.assertEqual(imported.status_code, 201, imported.data)
+
+        new_theme = PageTheme.objects.get(pk=imported.data["theme"]["id"])
+        new_url = f"https://storage.test/theme_images/{new_theme.id}/library/hero.png"
+        self.assertEqual(new_theme.design_groups["groups"][0]["layoutProperties"]["hero"]["xs"]["backgroundImage"]["url"], new_url)
+        self.assertEqual(new_theme.designer_preview["imageUrl"], new_url)
+        self.assertEqual(new_theme.designer_preview["foreignImageUrl"], foreign_url)
+        self.assertEqual(files[new_theme.site_icon.name], b"icon")
+        self.assertEqual(files[f"theme_images/{new_theme.id}/library/hero.png"], b"hero")
 
     def test_predefined_object_widgets_receive_a_pinned_revision(self):
         self.publish_first()

@@ -198,7 +198,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
             "updated_at",
             "created_by",
         ]
-        read_only_fields = ["id", "stable_key", "widget_types", "created_at", "updated_at", "created_by"]
+        read_only_fields = ["id", "stable_key", "widget_types", "is_default", "created_at", "updated_at", "created_by"]
 
     def validate_breakpoints(self, value):
         """Validate breakpoints configuration"""

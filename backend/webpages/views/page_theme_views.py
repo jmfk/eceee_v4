@@ -28,6 +28,7 @@ from rest_framework.response import Response
 
 from core.models import Tenant
 from core.roles import is_tenant_admin
+from file_manager.imgproxy import imgproxy_service
 from file_manager.storage import system_storage
 from webpages.text_outline_styles import default_text_outline_styles, validate_text_outline_styles
 
@@ -429,7 +430,16 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 theme.save(update_fields=["is_default", "updated_at"])
                 theme.refresh_from_db()
         except ValidationError as exc:
-            return Response({"widgets": exc.messages}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "detail": (
+                        "This theme cannot be the default because existing content is incompatible with it. "
+                        f"{exc.messages[0]} The current default theme was kept."
+                    ),
+                    "widgets": exc.messages,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         serializer = PageThemeSerializer(theme)
         return Response(
@@ -1595,7 +1605,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             # Write metadata
             zip_file.writestr("metadata.json", json.dumps(metadata, indent=2, ensure_ascii=False))
 
-            # Add image if exists
+            # Add the two ImageField assets separately from theme.json.
             if theme.image:
                 try:
                     image_name = theme.image.name.split("/")[-1]
@@ -1603,14 +1613,17 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 except Exception as e:
                     # Log error but continue
                     logger.warning(f"Failed to add image to export: {str(e)}")
+            if theme.site_icon:
+                try:
+                    icon_name = os.path.basename(theme.site_icon.name)
+                    zip_file.writestr(f"site_icon/{icon_name}", theme.site_icon.read())
+                except Exception as e:
+                    logger.warning(f"Failed to add site icon to export: {str(e)}")
 
             # Add library images
             library_images = theme.list_library_images()
+            storage = system_storage
             if library_images:
-                from file_manager.storage import S3MediaStorage
-
-                storage = S3MediaStorage()
-
                 for filename in library_images:
                     try:
                         path = f"theme_images/{theme.id}/library/{filename}"
@@ -1716,6 +1729,19 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 layouts = theme_data.get("layouts") or default_theme_layouts()
                 validate_theme_layouts(layouts)
 
+                # Check the image service before creating a theme or writing assets.
+                # The editor needs it to display imported library images.
+                if not imgproxy_service.health_check():
+                    return Response(
+                        {
+                            "error": (
+                                "Theme import cancelled: the image proxy is unavailable. "
+                                "No theme or images were imported. Start the image proxy and try again."
+                            )
+                        },
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    )
+
                 # Create theme
                 new_theme = PageTheme.objects.create(
                     tenant=request.tenant,
@@ -1740,7 +1766,6 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     breakpoints=theme_data.get("breakpoints", {}),
                     css_variables=theme_data.get("css_variables", {}),
                     html_elements=theme_data.get("html_elements", {}),
-                    site_icon=theme_data.get("site_icon"),
                     custom_css=theme_data.get("custom_css", ""),
                     is_active=theme_data.get("is_active", True),
                     is_default=False,  # Imported themes are never default
@@ -1748,29 +1773,29 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 )
 
                 # Handle image if exists
-                image_files = [f for f in zf.namelist() if f.startswith("image/")]
+                image_files = [f for f in zf.namelist() if f.startswith("image/") and not f.endswith("/")]
                 if image_files:
                     image_file = image_files[0]
                     image_name = image_file.split("/")[-1]
                     image_content = zf.read(image_file)
                     new_theme.image.save(image_name, ContentFile(image_content), save=True)
 
+                icon_files = [f for f in zf.namelist() if f.startswith("site_icon/") and not f.endswith("/")]
+                if icon_files:
+                    icon_file = icon_files[0]
+                    new_theme.site_icon.save(os.path.basename(icon_file), ContentFile(zf.read(icon_file)), save=True)
+
                 # Handle library images (new format)
-                library_images = [f for f in zf.namelist() if f.startswith("library_images/")]
+                library_images = [f for f in zf.namelist() if f.startswith("library_images/") and not f.endswith("/")]
 
                 # Also check for legacy design_group_images
-                legacy_images = [f for f in zf.namelist() if f.startswith("design_group_images/")]
+                legacy_images = [f for f in zf.namelist() if f.startswith("design_group_images/") and not f.endswith("/")]
 
                 # Combine both lists
                 all_images = library_images + legacy_images
 
                 if all_images:
-                    import logging
-
-                    from file_manager.storage import S3MediaStorage
-
-                    logger = logging.getLogger(__name__)
-                    storage = S3MediaStorage()
+                    storage = system_storage
                     url_mapping = {}  # filename -> new_url
 
                     for image_file in all_images:
@@ -1780,8 +1805,8 @@ class PageThemeViewSet(viewsets.ModelViewSet):
 
                             # Upload to new theme's library directory
                             new_path = f"theme_images/{new_theme.id}/library/{image_name}"
-                            storage._save(new_path, ContentFile(image_content))
-                            new_url = storage.url(new_path)
+                            saved_path = storage.save(new_path, ContentFile(image_content))
+                            new_url = storage.url(saved_path)
 
                             # Build mapping of filenames to new URLs
                             url_mapping[image_name] = new_url
@@ -1789,33 +1814,13 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                         except Exception as e:
                             logger.warning(f"Failed to import image {image_file}: {str(e)}")
 
-                    # Update image URLs in design_groups JSON
+                    # Rewrite references to the source theme, including legacy
+                    # design_groups paths and nested image fields.
                     if url_mapping and new_theme.design_groups:
-                        updated_groups = new_theme.design_groups.copy()
-                        if "groups" in updated_groups:
-                            for group in updated_groups["groups"]:
-                                if "layoutProperties" in group:
-                                    for part, breakpoints in group["layoutProperties"].items():
-                                        for bp, props in breakpoints.items():
-                                            if "images" in props and isinstance(props["images"], dict):
-                                                for (
-                                                    image_key,
-                                                    image_data,
-                                                ) in props["images"].items():
-                                                    if isinstance(image_data, dict):
-                                                        # Try to match by filename
-                                                        old_url = image_data.get("url") or image_data.get("fileUrl")
-                                                        if old_url:
-                                                            # Extract filename from old URL
-                                                            old_filename = old_url.split("/")[-1]
-                                                            if old_filename in url_mapping:
-                                                                image_data["url"] = url_mapping[old_filename]
-                                                                # Remove fileUrl if present
-                                                                if "fileUrl" in image_data:
-                                                                    del image_data["fileUrl"]
-
-                        new_theme.design_groups = updated_groups
-                        new_theme.save()
+                        new_theme.design_groups = rewrite_theme_library_image_urls(
+                            new_theme.design_groups, url_mapping, metadata.get("source_theme_id")
+                        )
+                        new_theme.save(update_fields=["design_groups", "updated_at"])
 
                     if url_mapping and new_theme.designer_preview:
                         new_theme.designer_preview = rewrite_theme_library_image_urls(

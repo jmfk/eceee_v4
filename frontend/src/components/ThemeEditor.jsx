@@ -59,6 +59,7 @@ const ThemeEditor = ({ onSave }) => {
     const [pasteDialogOpen, setPasteDialogOpen] = useState(false);
     const [themeToPaste, setThemeToPaste] = useState(null);
     const [isPasting, setIsPasting] = useState(false);
+    const [settingDefaultThemeId, setSettingDefaultThemeId] = useState(null);
 
     // Derive view mode from URL
     const isCreating = themeId === 'new';
@@ -285,6 +286,22 @@ const ThemeEditor = ({ onSave }) => {
 
     const handleEditTheme = (theme) => {
         navigate(`/settings/themes/${theme.id}`);
+    };
+
+    const handleSetDefault = async (theme) => {
+        setSettingDefaultThemeId(theme.id);
+        try {
+            const result = await themesApi.setDefault(theme.id);
+            await queryClient.invalidateQueries({ queryKey: ['themes'] });
+            addNotification({ type: 'success', message: result.message });
+        } catch (error) {
+            addNotification({
+                type: 'error',
+                message: extractErrorMessage(error, 'Could not set the default theme'),
+            });
+        } finally {
+            setSettingDefaultThemeId(null);
+        }
     };
 
     const handleBackToList = () => {
@@ -866,6 +883,17 @@ const ThemeEditor = ({ onSave }) => {
                                                     <Download className="w-4 h-4 mr-1" />
                                                     Export
                                                 </button>
+                                                {!theme.isDefault && (
+                                                    <button
+                                                        onClick={() => handleSetDefault(theme)}
+                                                        disabled={!theme.isActive || settingDefaultThemeId !== null}
+                                                        className="flex-1 inline-flex items-center justify-center whitespace-nowrap px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        title={theme.isActive ? 'Set as default theme' : 'Activate this theme before setting it as default'}
+                                                    >
+                                                        <Star className="w-4 h-4 mr-1" />
+                                                        {settingDefaultThemeId === theme.id ? 'Setting...' : 'Set Default'}
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -945,6 +973,17 @@ const ThemeEditor = ({ onSave }) => {
                                         });
                                     }}
                                 />
+                                {!isCreating && (
+                                    <button
+                                        onClick={() => handleExport(selectedThemeData)}
+                                        disabled={!selectedThemeData}
+                                        className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                                        title="Export saved theme as ZIP"
+                                    >
+                                        <Download className="w-4 h-4 mr-2" />
+                                        Export
+                                    </button>
+                                )}
                                 {/* Clear Cache Button - only show when editing existing theme */}
                                 {!isCreating && (
                                     <button
@@ -1016,18 +1055,6 @@ const ThemeEditor = ({ onSave }) => {
                                     </label>
                                 </div>
 
-                                <div className="flex items-center">
-                                    <input
-                                        type="checkbox"
-                                        id="isDefault"
-                                        checked={themeData?.isDefault ?? false}
-                                        onChange={(e) => updateThemeField('isDefault', e.target.checked)}
-                                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                    />
-                                    <label htmlFor="isDefault" className="ml-2 block text-sm text-gray-900">
-                                        Set as Default Theme
-                                    </label>
-                                </div>
                             </div>
 
                             {/* Restricted Designer access */}

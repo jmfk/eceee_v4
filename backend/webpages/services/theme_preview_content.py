@@ -880,7 +880,7 @@ def rewrite_theme_library_image_urls(value, filename_urls, source_theme_id):
             elif isinstance(current, str):
                 for match in EMBEDDED_IMAGE_PATTERN.finditer(current):
                     path = urlparse(match.group(0)).path.lstrip("/")
-                    library_match = re.search(r"(?:^|/)theme_images/([^/]+)/library/([^/]+)$", path)
+                    library_match = re.search(r"(?:^|/)theme_images/([^/]+)/(?:library|design_groups)/([^/]+)$", path)
                     if library_match and library_match.group(2) in filename_urls:
                         candidate_ids.add(library_match.group(1))
 
@@ -900,7 +900,7 @@ def rewrite_theme_library_image_urls(value, filename_urls, source_theme_id):
         def replace(match):
             reference = match.group(0)
             path = urlparse(reference).path.lstrip("/")
-            library_match = re.search(r"(?:^|/)theme_images/([^/]+)/library/[^/]+$", path)
+            library_match = re.search(r"(?:^|/)theme_images/([^/]+)/(?:library|design_groups)/[^/]+$", path)
             if not library_match or library_match.group(1) != str(source_theme_id):
                 return reference
             filename = os.path.basename(path)

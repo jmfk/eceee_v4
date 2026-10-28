@@ -479,14 +479,14 @@ const ImagesTab = ({ themeId, theme, onThemeUpdate }) => {
         <div className="p-6">
             {/* Header */}
             <div className="mb-6">
-                <div className="flex items-center justify-between mb-4">
-                    <div>
+                <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+                    <div className="min-w-0 flex-1">
                         <div className="text-lg font-semibold text-gray-900">Theme Image Library</div>
                         <div className="text-sm text-gray-600 mt-1">
                             Manage images for this theme. Images are stored in the theme's library and can be used in design groups.
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex shrink-0 items-center gap-2">
                         {/* View mode toggle */}
                         <div className="flex items-center border border-gray-300 rounded-md overflow-hidden">
                             <button
@@ -530,9 +530,9 @@ const ImagesTab = ({ themeId, theme, onThemeUpdate }) => {
                         </button>
                         <button
                             onClick={() => setShowBulkUpload(true)}
-                            className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition flex items-center gap-2"
+                            className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded bg-purple-600 px-3 text-xs font-medium text-white transition hover:bg-purple-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600"
                         >
-                            <Upload className="h-4 w-4" />
+                            <Upload className="h-3.5 w-3.5" />
                             Upload Images
                         </button>
                     </div>
