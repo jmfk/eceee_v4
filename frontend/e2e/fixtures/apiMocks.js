@@ -503,6 +503,12 @@ export async function mockCmsApi(page, {
       return json(route, { count: 0, next: null, previous: null, results: [] })
     }
 
+    if (pageEditor && url.pathname === '/api/v1/taxonomy/types/' && method === 'GET') {
+      return json(route, { count: 1, next: null, previous: null, results: [{
+        id: 'general', name: 'General', allowedUses: ['page'], permissions: [],
+      }] })
+    }
+
     if (pageEditor && url.pathname.startsWith('/api/v1/taxonomy/terms/') && method === 'GET') {
       const term = {
         id: '7d38dd31-d831-43d2-a931-d0a06224f42e', namespace: 1,
