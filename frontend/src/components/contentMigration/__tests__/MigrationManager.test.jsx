@@ -113,6 +113,7 @@ describe('MigrationManager plugin workflow', () => {
         render(<QueryClientProvider client={client}><MigrationManager /></QueryClientProvider>)
 
         const limit = await screen.findByRole('spinbutton', { name: 'Latest published items' })
+        await waitFor(() => expect(limit).toHaveValue(100))
         fireEvent.change(limit, { target: { value: '37' } })
         await act(async () => {
             client.setQueryData(['tenant-importers'], {
