@@ -306,8 +306,9 @@ class ObjectStorageAPITest(APITestCase):
         )
 
         roots_url = reverse("api:object_storage:objectinstance-roots")
-        first = self.client.get(roots_url, {"type": "article", "page_size": 20, "page": 1})
-        second = self.client.get(roots_url, {"type": "article", "page_size": 20, "page": 2})
+        tenant_header = {"HTTP_X_TENANT_ID": self.tenant.identifier}
+        first = self.client.get(roots_url, {"type": "article", "page_size": 20, "page": 1}, **tenant_header)
+        second = self.client.get(roots_url, {"type": "article", "page_size": 20, "page": 2}, **tenant_header)
         self.assertEqual(first.status_code, status.HTTP_200_OK)
         self.assertEqual(first.data["count"], 55)
         self.assertEqual(first.data["total_pages"], 3)
@@ -319,14 +320,16 @@ class ObjectStorageAPITest(APITestCase):
 
         search_url = reverse("api:object_storage:objectinstance-search")
         search = self.client.get(
-            search_url, {"q": "Article", "type": "article", "roots_only": "true", "page_size": 50, "page": 2}
+            search_url,
+            {"q": "Article", "type": "article", "roots_only": "true", "page_size": 50, "page": 2},
+            **tenant_header,
         )
         self.assertEqual(search.status_code, status.HTTP_200_OK)
         self.assertEqual(search.data["count"], 55)
         self.assertEqual(len(search.data["results"]), 5)
         self.assertEqual(search.data["page"], 2)
 
-        invalid = self.client.get(roots_url, {"type": "article", "page_size": 30})
+        invalid = self.client.get(roots_url, {"type": "article", "page_size": 30}, **tenant_header)
         self.assertEqual(invalid.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_browser_rows_include_only_selected_schema_details(self):
