@@ -492,6 +492,7 @@ class WebPage(models.Model):
         # 1. Try exact match in the array field (fast path)
         pages = cls.objects.filter(
             parent__isnull=True,
+            tenant__is_active=True,
             hostnames__contains=[normalized_hostname],
             is_deleted=False,
             is_currently_published=True,
@@ -505,6 +506,7 @@ class WebPage(models.Model):
         # and vice-versa, as the user wants to ignore ports globally.
         for page in cls.objects.filter(
             parent__isnull=True,
+            tenant__is_active=True,
             is_deleted=False,
             is_currently_published=True,
         ).select_related("parent"):
@@ -517,6 +519,7 @@ class WebPage(models.Model):
             pattern = "*." + ".".join(labels[index:])
             page = cls.objects.filter(
                 parent__isnull=True,
+                tenant__is_active=True,
                 hostnames__contains=[pattern],
                 is_deleted=False,
                 is_currently_published=True,
@@ -527,6 +530,7 @@ class WebPage(models.Model):
         # 3. Last fallback: look for wildcard or default patterns
         wildcard_pages = cls.objects.filter(
             parent__isnull=True,
+            tenant__is_active=True,
             hostnames__overlap=["*", "default"],
             is_deleted=False,
             is_currently_published=True,
@@ -543,6 +547,7 @@ class WebPage(models.Model):
         hostnames = set()
         for page in cls.objects.filter(
             parent__isnull=True,
+            tenant__is_active=True,
             hostnames__isnull=False,
             is_deleted=False,
             is_currently_published=True,
@@ -757,6 +762,9 @@ class WebPage(models.Model):
 
         # Validate hostname format
         if self.hostnames:
+            from core.hostname_policy import validate_hostnames
+
+            validate_hostnames(self.tenant, self.hostnames)
             import re
 
             for hostname in self.hostnames:
@@ -2138,6 +2146,9 @@ class WebPage(models.Model):
         # Ensure all hostnames are normalized (strips ports by default)
         if self.hostnames:
             self.hostnames = [self.normalize_hostname(h) for h in self.hostnames if h]
+            from core.hostname_policy import validate_hostnames
+
+            validate_hostnames(self.tenant, self.hostnames)
 
         # Check if the active hostname registration is changing. Draft,
         # unpublished, and soft-deleted roots do not own routing hostnames.

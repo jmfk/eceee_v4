@@ -140,6 +140,7 @@ export default function SettingsSidebar({ onNavigate }) {
                 { id: 'support', label: 'Support', icon: Users, href: '/settings/support' },
                 { id: 'roles', label: 'Användare och behörigheter', icon: Users, href: '/settings/roles' },
                 ...(user?.isSuperuser ? [{ id: 'users', label: 'System accounts', icon: Users, href: '/settings/users' }] : []),
+                ...(user?.isSuperuser ? [{ id: 'tenants', label: 'Workspaces', icon: Globe2, href: '/settings/tenants' }] : []),
                 { id: 'versions', label: 'Versions', icon: Cog, href: '/settings/versions' },
                 { id: 'publishing', label: 'Publishing', icon: Calendar, href: '/settings/publishing' },
                 { id: 'namespaces', label: 'Namespaces', icon: FolderOpen, href: '/settings/namespaces' },

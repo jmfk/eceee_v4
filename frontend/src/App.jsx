@@ -31,6 +31,7 @@ import KanbanPage from './pages/KanbanPage'
 import TagsPage from '@pages/TagsPage'
 import ProfilePage from '@pages/ProfilePage'
 import UserManagementPage from '@pages/UserManagementPage'
+import TenantManagementPage from '@pages/TenantManagementPage'
 import HowToHelpPage from '@pages/HowToHelpPage'
 import ObjectBrowser from '@components/ObjectBrowser'
 import ObjectTypeEditorPage from '@pages/ObjectTypeEditorPage'
@@ -291,6 +292,7 @@ export const AppRoutes = () => {
             </SettingsLayout>
           </PrivateRoute>
         } />
+        <Route path="/settings/tenants" element={<PrivateRoute><SettingsLayout><TenantManagementPage /></SettingsLayout></PrivateRoute>} />
         <Route path="/settings/roles" element={<PrivateRoute><SettingsLayout><RoleSettings /></SettingsLayout></PrivateRoute>} />
         <Route path="/settings/support" element={<PrivateRoute><SettingsLayout><SupportSettingsPage /></SettingsLayout></PrivateRoute>} />
         {/* Settings dashboard */}
