@@ -2646,7 +2646,7 @@ class SitePackageImporter:
         base = slugify(slug or "imported-media") or "imported-media"
         candidate = base
         counter = 1
-        while MediaFile.objects.filter(namespace=namespace, slug=candidate).exists():
+        while MediaFile.objects.with_deleted().filter(namespace=namespace, slug=candidate).exists():
             counter += 1
             candidate = f"{base}-{counter}"
         return candidate
