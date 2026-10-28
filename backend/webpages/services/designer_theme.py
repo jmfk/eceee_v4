@@ -88,7 +88,8 @@ CSS_VALUE_FORBIDDEN = re.compile(r"[;{}<>]|url\s*\(|expression\s*\(|@import", re
 COLOR_VALUE = re.compile(r"^(?:#[0-9a-fA-F]{3,8}|(?:rgb|hsl)a?\([0-9.%+,\-\s/]+\)|[a-zA-Z]+)$")
 PREVIEW_IMAGE_PATTERN = re.compile(
     r"(?:https?://[^\s\"'()<>]+|s3://[^\s\"'()<>]+|/(?:theme_images|uploads|media|files|site-package)/[^\s\"'()<>]+)"
-    r"\.(?:avif|gif|jpe?g|png|svg|webp)(?:\?[^\s\"'()<>]*)?",
+    r"\.(?:avif|gif|jpe?g|png|svg|webp)(?:\?[^\s\"'()<>]*)?"
+    r"|/api/v1/media/file/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/",
     re.IGNORECASE,
 )
 logger = logging.getLogger(__name__)
