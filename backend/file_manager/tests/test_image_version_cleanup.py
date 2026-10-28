@@ -80,9 +80,7 @@ class ImageVersionCleanupTests(TestCase):
     def test_deleting_theme_retains_registered_designer_versions(self, storage):
         theme = PageTheme.objects.create(tenant=self.tenant, created_by=self.user, name="Deleted theme")
         path = f"theme_images/{theme.pk}/designer_drafts/header.png"
-        series = DesignerImageSeries.objects.create(
-            tenant=self.tenant, theme=theme, protected_from_cleanup=True
-        )
+        series = DesignerImageSeries.objects.create(tenant=self.tenant, theme=theme, protected_from_cleanup=True)
         version = DesignerImageVersion.objects.create(
             series=series,
             version_number=1,
