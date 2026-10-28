@@ -15,7 +15,7 @@ class ImageWidgetTests(SimpleTestCase):
         self.assertTrue(schema["properties"]["imageStyle"]["editorPrimary"])
 
     @patch("file_manager.models.MediaCollection.objects.get")
-    def test_collection_prefers_explicit_public_file_url(self, get_collection):
+    def test_collection_uses_stable_media_url(self, get_collection):
         media = SimpleNamespace(
             id="media-1",
             file_type="image",
@@ -25,6 +25,7 @@ class ImageWidgetTests(SimpleTestCase):
             width=800,
             height=450,
             metadata={},
+            get_uuid_url=lambda: "/api/v1/media/file/media-1/",
             get_file_url=lambda: "https://storage.invalid/derived.svg",
             get_imgproxy_url=lambda **kwargs: "https://imgproxy.invalid/thumb.webp",
         )
@@ -33,7 +34,7 @@ class ImageWidgetTests(SimpleTestCase):
 
         result = ImageWidget().resolve_collection_images("collection-1")
 
-        self.assertEqual(result[0]["url"], "data:image/svg+xml,public")
+        self.assertEqual(result[0]["url"], "/api/v1/media/file/media-1/")
 
     @patch("file_manager.imgproxy.imgproxy_service.generate_responsive_urls")
     def test_default_image_uses_one_x_source_and_two_density_srcset(self, generate_responsive_urls):
