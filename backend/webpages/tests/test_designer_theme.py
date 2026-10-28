@@ -1280,8 +1280,7 @@ class DesignerThemeApiTests(TestCase):
         image_content = generate_placeholder_png("Tagged", "Replacement", 32, 32)
         storage.open.return_value.__enter__.return_value.read.return_value = image_content
         storage.save.return_value = f"theme_images/{self.theme.id}/designer_drafts/1/tagged.png"
-        replacement_url = "https://storage.test/theme_images/example/tagged.png"
-        storage.url.return_value = replacement_url
+        replacement_url = media.get_uuid_url()
         self.authenticate(self.designer)
         workspace = self.client.get(self.workspace_url).data
         storage.reset_mock()
@@ -1418,8 +1417,6 @@ class DesignerThemeApiTests(TestCase):
     @patch("webpages.services.designer_theme.system_storage")
     def test_replacing_an_example_image_twice_removes_superseded_metadata(self, storage):
         source_url = "https://storage.test/theme_images/example/original.png"
-        first_url = f"https://storage.test/theme_images/{self.theme.id}/designer_drafts/1/first.png"
-        second_url = f"https://storage.test/theme_images/{self.theme.id}/designer_drafts/1/second.png"
         self.theme.designer_preview = {
             "views": [
                 {
@@ -1432,15 +1429,7 @@ class DesignerThemeApiTests(TestCase):
             ]
         }
         self.theme.save(update_fields=["designer_preview"])
-        storage.save.side_effect = [
-            f"theme_images/{self.theme.id}/designer_drafts/1/first.png",
-            f"theme_images/{self.theme.id}/designer_drafts/1/second.png",
-        ]
-        storage.url.side_effect = lambda path: (
-            second_url
-            if path.endswith("second.png")
-            else first_url if path.endswith("first.png") else f"https://storage.test/{path}"
-        )
+        storage.url.side_effect = lambda path: f"https://storage.test/{path}"
         tag = MediaTag.objects.create(name="Designer", slug="designer", namespace=self.namespace, created_by=self.owner)
         media_files = []
         for index in range(2):
@@ -1484,6 +1473,8 @@ class DesignerThemeApiTests(TestCase):
 
         first = replace(source_url, workspace["draftVersion"], media_files[0])
         self.assertEqual(first.status_code, 200, first.data)
+        first_url = media_files[0].get_uuid_url()
+        second_url = media_files[1].get_uuid_url()
         storage.exists.return_value = True
         with self.captureOnCommitCallbacks(execute=True):
             second = replace(first_url, first.data["draftVersion"], media_files[1])
@@ -1493,7 +1484,7 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(saved_view["content"]["image"]["url"], second_url)
         self.assertNotIn(first_url, saved_view["imageMetadata"])
         self.assertIn(second_url, saved_view["imageMetadata"])
-        storage.delete.assert_called_with(f"theme_images/{self.theme.id}/designer_drafts/1/first.png")
+        storage.delete.assert_not_called()
 
     def test_advanced_theme_editor_preserves_preview_ids_and_metadata(self):
         self.authenticate(self.owner)
