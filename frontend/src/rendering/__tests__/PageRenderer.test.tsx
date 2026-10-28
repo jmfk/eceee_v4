@@ -383,7 +383,7 @@ describe('PageRenderer', () => {
         expect(container).not.toHaveTextContent('<p>')
     })
 
-    it('uses instance metadata rather than version featured state for top-news pinning', () => {
+    it('uses the published version featured state for top-news pinning', () => {
         const versionFeatured = { id: 1, title: 'Version featured', isFeatured: true, metadata: {}, data: {} }
         const metadataPinned = { id: 2, title: 'Metadata pinned', isFeatured: false, metadata: { pinned: true }, data: {} }
         const model = createPageRenderModel({ widgets: { main: [
@@ -395,10 +395,22 @@ describe('PageRenderer', () => {
         const topCards = container.querySelectorAll('.top-news-plug-widget .news-card')
         const sidebarItems = container.querySelectorAll('.sidebar-top-news-widget .news-item')
 
-        expect(topCards[0]).not.toHaveClass('pinned')
-        expect(topCards[1]).toHaveClass('pinned')
+        expect(topCards[0]).toHaveClass('pinned')
+        expect(topCards[1]).not.toHaveClass('pinned')
         expect(sidebarItems[0]).not.toHaveClass('pinned')
-        expect(sidebarItems[1]).toHaveClass('pinned')
+        expect(sidebarItems[1]).not.toHaveClass('pinned')
+    })
+
+    it('uses the configured news detail path in both homepage widgets', () => {
+        const story = { id: 1, slug: 'new-report', title: 'New report', data: {} }
+        const model = createPageRenderModel({ widgets: { main: [
+            { id: 'top', type: 'easy_widgets.TopNewsPlugWidget', config: { newsPagePath: '/policy/news/' }, data: { status: 'ready', items: [story] } },
+            { id: 'latest', type: 'easy_widgets.SidebarTopNewsWidget', config: { news_page_path: '/policy/news/', displayVariant: 'header' }, data: { status: 'ready', items: [story] } },
+        ] } })
+
+        const { container } = render(<PageRenderer model={model} />)
+        expect(container.querySelectorAll('a[href="/policy/news/new-report/"]')).toHaveLength(3)
+        expect(container.querySelector('.sidebar-top-news-widget')).toHaveClass('variant-header')
     })
 
     it('honors news-detail fields and renders object widgets', () => {

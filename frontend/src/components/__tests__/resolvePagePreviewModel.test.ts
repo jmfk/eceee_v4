@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDesignerRenderModel, createPageRenderModel } from '../../rendering/adapters'
 import { resolvePagePreviewModel } from '../resolvePagePreviewModel'
 
-const objectApi = vi.hoisted(() => ({ search: vi.fn(), get: vi.fn(), getNewsList: vi.fn() }))
+const objectApi = vi.hoisted(() => ({ search: vi.fn(), get: vi.fn(), getNewsList: vi.fn(), getPublished: vi.fn(), getCurrentPublishedVersion: vi.fn() }))
 const clientApi = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }))
 const imgproxyApi = vi.hoisted(() => ({ getBatch: vi.fn() }))
 const mediaApi = vi.hoisted(() => ({ getFiles: vi.fn() }))
@@ -17,6 +17,28 @@ describe('page preview model resolution', () => {
         imgproxyApi.getBatch.mockImplementation(requests => Promise.resolve(
             requests.map(request => `/imgproxy/resize:fit:${request.width}:0/${request.sourceUrl}`)
         ))
+    })
+
+    it('requests featured blocks and latest news with distinct selection rules', async () => {
+        objectApi.getPublished.mockResolvedValue({ data: [
+            { id: 1, slug: 'older-featured', object_type: { id: 7, name: 'news' } },
+            { id: 2, slug: 'newer-regular', object_type: { id: 7, name: 'news' } },
+            { id: 3, slug: 'newest-featured', object_type: { id: 7, name: 'news' } },
+        ] })
+        objectApi.getCurrentPublishedVersion.mockImplementation(async (id: number) => ({ data: { data: {
+            title: `Story ${id}`, data: {}, is_featured: id !== 2,
+            effective_date: `2026-10-${String(id).padStart(2, '0')}T00:00:00Z`,
+        } } }))
+        const model = createPageRenderModel({ widgets: { main: [
+            { id: 'featured', type: 'easy_widgets.TopNewsPlugWidget', config: { object_types: ['news'], layout: '1x3' } },
+            { id: 'latest', type: 'easy_widgets.SidebarTopNewsWidget', config: { objectTypes: ['news'], limit: 5, displayVariant: 'header' } },
+        ] } })
+
+        const resolved = await resolvePagePreviewModel(model)
+
+        expect(resolved.slots.main[0].data?.items?.map((item: any) => item.slug)).toEqual(['newest-featured', 'older-featured'])
+        expect(resolved.slots.main[1].data?.items?.map((item: any) => item.slug)).toEqual(['newest-featured', 'newer-regular', 'older-featured'])
+        expect(objectApi.getNewsList).not.toHaveBeenCalled()
     })
 
     it('resolves Designer ImageWidget sources without rendering the original URL', async () => {

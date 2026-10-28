@@ -40,6 +40,14 @@ const DEFAULT_SIZES: Omit<PreviewSize, 'id'>[] = [
     { name: 'Mobile', width: 375, height: 667, sortOrder: 4, isDefault: true },
 ];
 
+const previewQueryParams = (path = ''): Record<string, string | string[]> => {
+    const params = new URLSearchParams(path.split('?')[1]?.split('#')[0] || '')
+    return Object.fromEntries([...new Set(params.keys())].map((key) => {
+        const values = params.getAll(key)
+        return [key, values.length > 1 ? values : values[0]]
+    }))
+}
+
 const PagePreview: React.FC<PagePreviewProps> = ({
     webpageData,
     pageVersionData,
@@ -136,6 +144,8 @@ const PagePreview: React.FC<PagePreviewProps> = ({
             versionId: pageVersionData?.id || pageVersionData?.versionId,
             pathVariables: pathVariables || {},
             simulatedPath,
+            currentPath: (simulatedPath || webpageData?.cachedPath || webpageData?.cached_path || '/').split('?')[0],
+            queryParams: previewQueryParams(simulatedPath),
             componentStyles: pageVersionData?.effectiveTheme?.componentStyles || pageVersionData?.effectiveTheme?.component_styles || {},
         },
     }), [layoutName, layoutDefinition, effectiveTheme?.breakpoints, localWidgets, pageVersionData, inheritedWidgets, slotInheritanceRules, compiledStyles, webpageData, pathVariables, simulatedPath]);

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildPublishedPageModel, buildThemeErrorPageModel, normalizeHostname, type Page, type PageReader, type PublishedObject, type ReadDb, type Theme, type Version, type Widget } from '../src/model';
+import { buildPublishedPageModel, buildThemeErrorPageModel, normalizeHostname, type Page, type PageReader, type PublishedObject, type PublishedObjectQuery, type ReadDb, type Theme, type Version, type Widget } from '../src/model';
 
 const page = (values: Partial<Page> & Pick<Page, 'id' | 'tenant_id' | 'parent_id' | 'slug' | 'title'>): Page => ({
   hostnames: [],
@@ -1005,9 +1005,9 @@ describe('public resolution', () => {
     expect(mutualCycle.publishedObjects).toHaveBeenCalledTimes(3);
   });
 
-  it('uses the Django item count for every TopNews layout', async () => {
-    const queries: Array<{ limit: number; pinnedFirst?: boolean; activeTypeOnly?: boolean }> = [];
-    const publishedObjects = vi.fn(async (query: { limit: number; pinnedFirst?: boolean; activeTypeOnly?: boolean }) => {
+  it('selects two or three featured stories by publication date', async () => {
+    const queries: Array<{ limit: number; featuredOnly?: boolean; activeTypeOnly?: boolean; sortOrder?: string }> = [];
+    const publishedObjects = vi.fn(async (query: { limit: number; featuredOnly?: boolean; activeTypeOnly?: boolean; sortOrder?: string }) => {
       queries.push(query);
       return [];
     });
@@ -1016,7 +1016,7 @@ describe('public resolution', () => {
       version: async (id, at) => {
         const selected = await reader.version(id, at);
         if (id !== child.id || !selected) return selected;
-        return version({ ...selected, widgets: { main: ['1x2', '1x3', '2x3_2', '2x1', '2x2'].map(layout => ({
+        return version({ ...selected, widgets: { main: ['1x2', '1x3'].map(layout => ({
           id: `top-${layout}`,
           type: 'easy_widgets.TopNewsPlugWidget',
           config: { objectTypes: ['news'], layout },
@@ -1032,12 +1032,12 @@ describe('public resolution', () => {
       new Date('2026-06-01'),
     );
 
-    expect(queries.map(query => query.limit)).toEqual([2, 3, 5, 2, 4]);
-    expect(queries.every(query => query.pinnedFirst)).toBe(true);
+    expect(queries.map(query => query.limit)).toEqual([2, 3]);
+    expect(queries.every(query => query.featuredOnly && query.sortOrder === '-publish_date')).toBe(true);
     expect(queries.every(query => query.activeTypeOnly)).toBe(true);
   });
 
-  it('uses object-type routes for top-news links without changing page-relative lists', async () => {
+  it('uses configured news routes for home widgets without changing page-relative lists', async () => {
     const publishedObject: PublishedObject = {
       id: '41', title: 'Breaking', slug: 'breaking',
       objectType: { id: '5', name: 'news', label: 'News', pluralLabel: 'News' },
@@ -1049,8 +1049,8 @@ describe('public resolution', () => {
         const selected = await reader.version(id, at);
         if (id !== root.id || !selected) return selected;
         return version({ ...selected, widgets: { main: [
-          { id: 'top', type: 'easy_widgets.TopNewsPlugWidget', config: {} },
-          { id: 'sidebar', type: 'easy_widgets.SidebarTopNewsWidget', config: {} },
+          { id: 'top', type: 'easy_widgets.TopNewsPlugWidget', config: { newsPagePath: '/updates/' } },
+          { id: 'sidebar', type: 'easy_widgets.SidebarTopNewsWidget', config: { newsPagePath: '/updates/' } },
           { id: 'list', type: 'easy_widgets.NewsListWidget', config: {} },
         ] } });
       },
@@ -1065,9 +1065,29 @@ describe('public resolution', () => {
     );
 
     type LinkedObject = PublishedObject & { path: string };
-    expect((model?.slots.main[0].data?.items as LinkedObject[])[0].path).toBe('/news/breaking/');
-    expect((model?.slots.main[1].data?.items as LinkedObject[])[0].path).toBe('/news/breaking/');
+    expect((model?.slots.main[0].data?.items as LinkedObject[])[0].path).toBe('/updates/breaking/');
+    expect((model?.slots.main[1].data?.items as LinkedObject[])[0].path).toBe('/updates/breaking/');
     expect((model?.slots.main[2].data?.items as LinkedObject[])[0].path).toBe('/breaking/');
+  });
+
+  it('keeps Featured priority out of latest-news queries', async () => {
+    const queries: PublishedObjectQuery[] = [];
+    const newsReader: PageReader = {
+      ...reader,
+      version: async (id, at) => {
+        const selected = await reader.version(id, at);
+        if (id !== root.id || !selected) return selected;
+        return version({ ...selected, widgets: { main: [
+          { id: 'latest', type: 'easy_widgets.SidebarTopNewsWidget', config: { limit: 4 } },
+        ] } });
+      },
+      publishedObjects: async query => { queries.push(query); return []; },
+    };
+    await buildPublishedPageModel({ withSnapshot: async read => read(newsReader) }, 'example.org', '/', new Date('2026-06-01'));
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toMatchObject({ limit: 4, sortOrder: '-publish_date', featuredOnly: false });
+    expect(queries[0].featuredFirst).toBeUndefined();
+    expect(queries[0].pinnedFirst).toBeUndefined();
   });
 
   it('preserves Django object-type defaults for NewsList and top-news widgets', async () => {

@@ -241,8 +241,8 @@ export const objectInstancesApi = {
     /**
      * Get current published version for an object
      */
-    async getCurrentPublishedVersion(id) {
-        const response = await api.get(`${BASE_URL}/objects/${id}/current_published_version/`)
+    async getCurrentPublishedVersion(id, requestConfig = {}) {
+        const response = await api.get(`${BASE_URL}/objects/${id}/current_published_version/`, requestConfig)
         return response
     },
 
@@ -308,8 +308,8 @@ export const objectInstancesApi = {
     /**
      * Get published objects
      */
-    async getPublished(params = {}) {
-        const response = await api.get(`${BASE_URL}/objects/published/`, { params })
+    async getPublished(params = {}, requestConfig = {}) {
+        const response = await api.get(`${BASE_URL}/objects/published/`, { ...requestConfig, params })
         return response
     },
 

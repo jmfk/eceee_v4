@@ -111,6 +111,32 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
     const tenantRequestConfig = model.context.tenantId
         ? { headers: { 'X-Tenant-ID': model.context.tenantId } }
         : undefined
+    let publishedNewsPromise: Promise<any[]> | undefined
+    const publishedNews = () => {
+        publishedNewsPromise ??= (async () => {
+            const response: any = await objectInstancesApi.getPublished({}, tenantRequestConfig)
+            const published = response?.data || response
+            const candidates = (Array.isArray(published) ? published : []).filter((item: any) => {
+                const type = item.objectType || item.object_type || {}
+                return type.name === 'news'
+            })
+            const versions = await Promise.all(candidates.map(async (item: any) => {
+                const versionResponse: any = await objectInstancesApi.getCurrentPublishedVersion(item.id, tenantRequestConfig)
+                const version = versionResponse?.data?.data ?? versionResponse?.data ?? versionResponse
+                if (!version || !version.effective_date) return null
+                return {
+                    ...item,
+                    title: version.title || item.title,
+                    data: version.data || {},
+                    classificationIds: version.classification_ids || [],
+                    isFeatured: version.is_featured === true,
+                    publishDate: version.effective_date,
+                }
+            }))
+            return versions.filter(Boolean)
+        })()
+        return publishedNewsPromise
+    }
     const collectWidgets = (widgets: RenderWidgetModel[]): RenderWidgetModel[] => widgets.flatMap((widget) => {
         const nested = [
             ...(Array.isArray(widget.config.widgets) ? widget.config.widgets : []),
@@ -221,6 +247,32 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
         }
         if (!dataDrivenNewsTypes.has(widget.type)) return
         const objectTypes = widget.config.objectTypes || widget.config.object_types || []
+        if (widget.type === 'easy_widgets.TopNewsPlugWidget' || widget.type === 'easy_widgets.SidebarTopNewsWidget') {
+            try {
+                const published = await publishedNews()
+                const configuredTypes = widget.config.objectTypes !== undefined ? widget.config.objectTypes : widget.config.object_types
+                const selectedTypes = Array.isArray(configuredTypes)
+                    ? configuredTypes.map(String) : configuredTypes === undefined ? ['news'] : []
+                const selected = published.filter((item: any) => {
+                    const type = item.objectType || item.object_type || {}
+                    return selectedTypes.includes(String(type.id)) || selectedTypes.includes(String(type.name))
+                })
+                const configuredClassifications = widget.config.classificationIds || widget.config.classification_ids || []
+                const classificationIds = Array.isArray(configuredClassifications) ? configuredClassifications.map(String) : []
+                const eligible = selected.filter((item: any) => item
+                    && (!classificationIds.length || item.classificationIds.some((id: string) => classificationIds.includes(String(id))))
+                    && (widget.type !== 'easy_widgets.TopNewsPlugWidget' || item.isFeatured))
+                eligible.sort((left: any, right: any) => right.publishDate.localeCompare(left.publishDate) || String(right.id).localeCompare(String(left.id)))
+                const limit = widget.type === 'easy_widgets.TopNewsPlugWidget'
+                    ? (widget.config.layout === '1x3' ? 3 : 2)
+                    : Math.min(Math.max(Number(widget.config.limit) || 5, 1), 50)
+                const items = eligible.slice(0, limit)
+                widget.data = { status: items.length ? 'ready' : 'empty', items }
+            } catch (error: any) {
+                widget.data = { status: 'error', error: error?.message || 'Failed to load preview data.', items: [] }
+            }
+            return
+        }
         if (widget.type === 'easy_widgets.NewsDetailWidget') {
             const variableName = widget.config.slugVariableName || widget.config.slug_variable_name || 'news_slug'
             const camelVariableName = variableName.replace(/_([a-z])/g, (_match: string, letter: string) => letter.toUpperCase())

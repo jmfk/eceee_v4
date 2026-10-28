@@ -4,7 +4,10 @@ import { loadDirectRenderModel, parseDirectRenderPath } from './directRender'
 import type { RenderPageModel } from './types'
 
 export const StandaloneRenderRuntime = () => {
-    const [location, setLocation] = useState(() => parseDirectRenderPath(window.location.pathname))
+    const [location, setLocation] = useState(() => {
+        const parsed = parseDirectRenderPath(window.location.pathname)
+        return parsed && { ...parsed, queryString: window.location.search }
+    })
     const [model, setModel] = useState<RenderPageModel | null>(null)
     const [error, setError] = useState('')
 
@@ -26,7 +29,10 @@ export const StandaloneRenderRuntime = () => {
     }, [location])
 
     useEffect(() => {
-        const handlePopState = () => setLocation(parseDirectRenderPath(window.location.pathname))
+        const handlePopState = () => {
+            const parsed = parseDirectRenderPath(window.location.pathname)
+            setLocation(parsed && { ...parsed, queryString: window.location.search })
+        }
         window.addEventListener('popstate', handlePopState)
         return () => window.removeEventListener('popstate', handlePopState)
     }, [])
@@ -48,7 +54,7 @@ export const StandaloneRenderRuntime = () => {
         const nextLocation = parseDirectRenderPath(destination.pathname)
         if (!nextLocation) return
         window.history.pushState({}, '', `${destination.pathname}${destination.search}${destination.hash}`)
-        setLocation(nextLocation)
+        setLocation({ ...nextLocation, queryString: destination.search })
     }, [])
 
     if (error) {
