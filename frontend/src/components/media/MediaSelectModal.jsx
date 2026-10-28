@@ -18,6 +18,7 @@ import CollectionThumbnailGrid from './CollectionThumbnailGrid';
 import SimplifiedApprovalForm from './SimplifiedApprovalForm';
 import OptimizedImage from './OptimizedImage';
 import { mediaCollectionsApi } from '../../api';
+import { isImageCollectionReference } from '../../utils/imageWidgetMedia';
 
 const MediaSelectModal = ({
     // Core props
@@ -43,6 +44,7 @@ const MediaSelectModal = ({
     const [mediaSelectionType, setMediaSelectionType] = useState('image');
     const [collections, setCollections] = useState([]);
     const [loadingCollections, setLoadingCollections] = useState(false);
+    const [currentCollection, setCurrentCollection] = useState(null);
     const [pendingFiles, setPendingFiles] = useState([]);
 
     // Ensure collections is always an array - memoized to prevent recalculation
@@ -106,6 +108,24 @@ const MediaSelectModal = ({
 
         loadCollections();
     }, [isOpen, namespace, allowCollections]);
+
+    const currentIsCollection = Boolean(currentSelection?.files || isImageCollectionReference(currentSelection));
+
+    useEffect(() => {
+        if (!isOpen || !currentIsCollection || !currentSelection?.id) {
+            setCurrentCollection(null);
+            return;
+        }
+
+        let active = true;
+        setCurrentCollection(null);
+        const params = { namespace: currentSelection.namespace || namespace };
+        if (!params.namespace) delete params.namespace;
+        mediaCollectionsApi.get(currentSelection.id, params)()
+            .then(collection => { if (active) setCurrentCollection(collection); })
+            .catch(() => { if (active) setCurrentCollection(null); });
+        return () => { active = false; };
+    }, [isOpen, currentIsCollection, currentSelection?.id, currentSelection?.namespace, namespace]);
 
     // Handle media selection from browser
     const handleMediaSelect = (item) => {
@@ -209,12 +229,13 @@ const MediaSelectModal = ({
                             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg relative">
                                 <div className="flex items-start gap-4">
                                     <div className="flex-shrink-0">
-                                        {currentSelection.files ? (
+                                        {currentIsCollection ? (
                                             // Collection
                                             <div className="w-24 h-24">
                                                 <CollectionThumbnailGrid
-                                                    collection={currentSelection}
+                                                    collection={currentCollection?.id === currentSelection.id ? currentCollection : currentSelection}
                                                     className="w-full h-full"
+                                                    compact
                                                 />
                                             </div>
                                         ) : (
@@ -237,9 +258,9 @@ const MediaSelectModal = ({
                                         <div className="text-sm text-gray-700 truncate">
                                             {currentSelection.title || currentSelection.original_filename || 'Untitled'}
                                         </div>
-                                        {currentSelection.files && (
+                                        {currentIsCollection && (
                                             <div className="text-xs text-gray-600 mt-1">
-                                                Collection ({currentSelection.files.length} images)
+                                                Collection ({(currentCollection?.id === currentSelection.id ? currentCollection.fileCount ?? currentCollection.file_count : null) ?? currentSelection.fileCount ?? currentSelection.file_count ?? currentSelection.files?.length ?? 0} images)
                                             </div>
                                         )}
                                     </div>

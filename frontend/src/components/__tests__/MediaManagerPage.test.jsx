@@ -22,10 +22,12 @@ vi.mock('../../hooks/useDocumentTitle', () => ({
 }))
 
 vi.mock('../media/MediaManager', () => ({
-    default: ({ namespace, selectionMode, onFileSelect, onFilesLoaded }) => (
+    default: ({ namespace, selectionMode, initialTab, collectionId, onFileSelect, onFilesLoaded }) => (
         <div data-testid="media-manager">
             Media manager for {namespace}
             <div>Selection mode: {selectionMode}</div>
+            <div>Initial tab: {initialTab}</div>
+            <div>Collection: {collectionId}</div>
             <button type="button" onClick={() => onFileSelect({ id: '1', title: 'Selected file' })}>
                 Select file
             </button>
@@ -63,7 +65,18 @@ const renderPage = () => {
 describe('MediaManagerPage', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        window.history.replaceState({}, '', '/media')
         namespacesApi.list.mockResolvedValue({ results: namespaces })
+    })
+
+    it('opens a collection link in its namespace and collections tab', async () => {
+        window.history.replaceState({}, '', '/media?tab=collections&collection=42&namespace=archive')
+        renderPage()
+
+        const manager = await screen.findByTestId('media-manager')
+        expect(manager).toHaveTextContent('Media manager for archive')
+        expect(manager).toHaveTextContent('Initial tab: collections')
+        expect(manager).toHaveTextContent('Collection: 42')
     })
 
     it('shows a loading state while namespaces load', () => {

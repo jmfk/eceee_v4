@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Loader2, FolderOpen } from 'lucide-react';
 import { namespacesApi } from '../api';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
@@ -21,6 +22,9 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const MediaManagerPage = () => {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const collectionId = searchParams.get('collection');
+  const [requestedNamespace] = useState(() => searchParams.get('namespace'));
   // Set document title
   useDocumentTitle('Media Manager');
 
@@ -41,7 +45,8 @@ const MediaManagerPage = () => {
 
         // Auto-select first namespace or default
         if (namespaces.length > 0) {
-          const defaultNamespace = namespaces.find(ns => ns.isDefault) || namespaces[0];
+          const defaultNamespace = namespaces.find(ns => ns.slug === requestedNamespace)
+            || namespaces.find(ns => ns.isDefault) || namespaces[0];
           setSelectedNamespace(defaultNamespace.slug);
         }
       } catch (error) {
@@ -53,7 +58,7 @@ const MediaManagerPage = () => {
     };
 
     loadNamespaces();
-  }, [addNotification]);
+  }, [addNotification, requestedNamespace]);
 
   const handleFileSelect = (file) => {
     // Handle file selection - could open details modal, etc.
@@ -123,6 +128,13 @@ const MediaManagerPage = () => {
         ) : (
           <MediaManager
             namespace={selectedNamespace}
+            initialTab={searchParams.get('tab') === 'collections' || collectionId ? 'collections' : 'library'}
+            collectionId={collectionId}
+            onCollectionClose={() => {
+              const nextParams = new URLSearchParams(searchParams);
+              nextParams.delete('collection');
+              setSearchParams(nextParams, { replace: true });
+            }}
             onFileSelect={handleFileSelect}
             onFilesLoaded={handleFilesLoaded}
             selectionMode="multiple"
