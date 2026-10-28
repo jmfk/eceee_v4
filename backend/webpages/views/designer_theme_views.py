@@ -34,9 +34,8 @@ from webpages.services.designer_export import designer_export_filename, designer
 from webpages.services.designer_theme import (
     MAX_IMAGE_PIXELS,
     DesignerDraftConflict,
-    build_draft_workspace,
     _find_asset,
-    theme_from_designer_draft,
+    build_draft_workspace,
     delete_designer_preview_view,
     designer_preview_layout,
     designer_preview_version,
@@ -52,6 +51,7 @@ from webpages.services.designer_theme import (
     replace_designer_preview_image,
     save_designer_draft,
     save_designer_preview_texts,
+    theme_from_designer_draft,
     undo_designer_publish,
     user_can_design_theme,
 )

@@ -2,27 +2,28 @@
 URL configuration for file manager API endpoints.
 """
 
-from django.urls import path, include
+from django.urls import include, path
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.routers import DefaultRouter
+
 from .views import (
-    MediaFileViewSet,
-    MediaTagViewSet,
-    MediaCollectionViewSet,
-    MediaUploadView,
-    MediaSearchView,
+    BulkMediaOperationsView,
     MediaAISuggestionsView,
+    MediaCollectionViewSet,
     MediaFileBySlugView,
     MediaFileByUUIDView,
     MediaFileDownloadView,
     MediaFileProxyView,
-    PendingMediaFileViewSet,
+    MediaFileViewSet,
+    MediaSearchView,
     MediaSlugValidationView,
-    BulkMediaOperationsView,
+    MediaTagViewSet,
+    MediaUploadView,
+    PendingMediaFileViewSet,
 )
-from django.views.decorators.csrf import csrf_exempt
-from .views.imgproxy_sign import sign_imgproxy_url, batch_sign_imgproxy_urls, generate_responsive_imgproxy_urls
-from .views.table_import import import_table_view
 from .views.image_version_cleanup import ImageVersionCleanupView
+from .views.imgproxy_sign import batch_sign_imgproxy_urls, generate_responsive_imgproxy_urls, sign_imgproxy_url
+from .views.table_import import import_table_view
 
 app_name = "file_manager"
 

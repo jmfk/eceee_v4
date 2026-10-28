@@ -15,7 +15,7 @@ def _paths(value, prefix):
         for child in value:
             yield from _paths(child, prefix)
     elif isinstance(value, str) and prefix in value:
-        yield value[value.index(prefix):].split("?", 1)[0].split("#", 1)[0]
+        yield value[value.index(prefix) :].split("?", 1)[0].split("#", 1)[0]
 
 
 def backfill(apps, schema_editor):
@@ -30,7 +30,9 @@ def backfill(apps, schema_editor):
 
     for theme in Theme.objects.using(db).iterator(chunk_size=100):
         prefix = f"theme_images/{theme.pk}/designer_drafts/"
-        live_paths = set(_paths([theme.design_groups, theme.designer_preview, theme.image.name, theme.site_icon.name], prefix))
+        live_paths = set(
+            _paths([theme.design_groups, theme.designer_preview, theme.image.name, theme.site_icon.name], prefix)
+        )
         draft_paths = set()
         for snapshot in Draft.objects.using(db).filter(theme_id=theme.pk).values_list("snapshot", flat=True):
             draft_paths.update(_paths(snapshot, prefix))
@@ -43,8 +45,11 @@ def backfill(apps, schema_editor):
                 continue
             series = Series.objects.using(db).create(id=uuid.uuid4(), theme_id=theme.pk)
             Version.objects.using(db).create(
-                id=uuid.uuid4(), series_id=series.pk, version_number=1,
-                file_path=path, file_size=0,
+                id=uuid.uuid4(),
+                series_id=series.pk,
+                version_number=1,
+                file_path=path,
+                file_size=0,
                 content_type=mimetypes.guess_type(path)[0] or "application/octet-stream",
                 uploaded_by_id=theme.created_by_id,
                 superseded_at=None if path in live_paths | draft_paths else now,

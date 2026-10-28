@@ -1,8 +1,8 @@
 import uuid
 
+import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
-import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
@@ -51,14 +51,30 @@ class Migration(migrations.Migration):
                 ("height", models.PositiveIntegerField(blank=True, null=True)),
                 ("uploaded_at", models.DateTimeField()),
                 ("superseded_at", models.DateTimeField()),
-                ("media_file", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="image_versions", to="file_manager.mediafile")),
-                ("uploaded_by", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="uploaded_media_versions", to=settings.AUTH_USER_MODEL)),
+                (
+                    "media_file",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="image_versions",
+                        to="file_manager.mediafile",
+                    ),
+                ),
+                (
+                    "uploaded_by",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="uploaded_media_versions",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={"ordering": ["-version_number"]},
         ),
         migrations.AddConstraint(
             model_name="mediafileversion",
-            constraint=models.UniqueConstraint(fields=("media_file", "version_number"), name="unique_media_image_version"),
+            constraint=models.UniqueConstraint(
+                fields=("media_file", "version_number"), name="unique_media_image_version"
+            ),
         ),
         migrations.AddIndex(
             model_name="mediafileversion",

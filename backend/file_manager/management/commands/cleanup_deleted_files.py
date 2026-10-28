@@ -4,9 +4,11 @@ Management command to clean up soft-deleted files with no references.
 
 import logging
 from datetime import timedelta
+
 from django.core.management.base import BaseCommand
-from django.utils import timezone
 from django.db import transaction
+from django.utils import timezone
+
 from file_manager.models import MediaFile
 
 logger = logging.getLogger(__name__)

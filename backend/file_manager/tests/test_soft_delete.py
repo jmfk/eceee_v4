@@ -7,7 +7,6 @@ import uuid
 from unittest.mock import Mock, patch
 
 from django.contrib.auth.models import User
-from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient

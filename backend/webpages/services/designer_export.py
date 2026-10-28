@@ -19,8 +19,8 @@ from django.utils import timezone
 from django.utils.text import slugify
 from PIL import Image
 
-from file_manager.storage import S3MediaStorage, system_storage
 from file_manager.models import MediaFile
+from file_manager.storage import S3MediaStorage, system_storage
 from webpages.services.designer_theme import (
     apply_designer_snapshot,
     build_workspace,
