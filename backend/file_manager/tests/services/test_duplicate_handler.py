@@ -118,9 +118,9 @@ class TestDuplicateFileHandler:
             assert len(result.pending_files) == 1
             assert result.existing_file == existing_media_file
 
-            # Verify file was restored
+            # Duplicate detection must not change another image's lifecycle.
             existing_media_file.refresh_from_db()
-            assert not existing_media_file.is_deleted
+            assert existing_media_file.is_deleted
 
             # Verify pending file was created for re-approval
             pending_file = PendingMediaFile.objects.first()

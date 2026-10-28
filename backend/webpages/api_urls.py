@@ -44,6 +44,7 @@ from .views.designer_theme_views import (
     DesignerRemotePushView,
     DesignerRemoteThemesView,
     DesignerThemeAssetView,
+    DesignerThemeImageVersionsView,
     DesignerThemeCompareView,
     DesignerThemeDiscardView,
     DesignerThemeExportDetailView,
@@ -251,6 +252,11 @@ urlpatterns = [
         "designer/themes/<int:theme_id>/replace-asset/",
         DesignerThemeAssetView.as_view(),
         name="designer-theme-replace-asset",
+    ),
+    path(
+        "designer/themes/<int:theme_id>/image-versions/",
+        DesignerThemeImageVersionsView.as_view(),
+        name="designer-theme-image-versions",
     ),
     path(
         "designer/themes/<int:theme_id>/placeholder/",

@@ -126,7 +126,14 @@ export const mediaFilesApi = {
         return apiClient.post(`${endpoints.media.file(id)}replace_file/`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
-    }),
+    })(),
+    versions: (id) => wrapApiCall(() => apiClient.get(`${endpoints.media.file(id)}versions/`))(),
+    restoreVersion: (id, versionId) => wrapApiCall(() =>
+        apiClient.post(`${endpoints.media.file(id)}restore_version/`, { version_id: versionId })
+    )(),
+    protectVersions: (id, protectedFromCleanup) => wrapApiCall(() =>
+        apiClient.post(`${endpoints.media.file(id)}protect_versions/`, { protected_from_cleanup: protectedFromCleanup })
+    )(),
 
     /**
      * Add tags to a media file (creates tags if they don't exist)
@@ -739,6 +746,10 @@ export const slugValidationApi = {
  */
 export const mediaApi = {
     files: mediaFilesApi,
+    imageCleanup: {
+        preview: (years) => wrapApiCall(() => apiClient.get('/api/v1/media/image-version-cleanup/', { params: { years } }))(),
+        execute: (years) => wrapApiCall(() => apiClient.post('/api/v1/media/image-version-cleanup/', { years }))(),
+    },
     upload: mediaUploadApi,
     search: mediaSearchApi,
     tags: mediaTagsApi,

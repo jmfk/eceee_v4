@@ -50,7 +50,7 @@ const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }
             const imageData = {
                 url: result.url,
                 publicUrl: result.publicUrl,
-                imgproxyBaseUrl: result.imgproxyBaseUrl || result.url,
+                imgproxyBaseUrl: result.stableUrl || result.imgproxyBaseUrl || result.url,
                 filename: result.filename,
                 size: result.size,
             };
@@ -124,7 +124,7 @@ const DirectImageUpload = ({ themeId, value, onChange, label, disabled = false }
         const imageData = {
             url: image.url,
             publicUrl: image.publicUrl,
-            imgproxyBaseUrl: image.imgproxyBaseUrl || image.url,
+            imgproxyBaseUrl: image.stableUrl || image.imgproxyBaseUrl || image.url,
             filename: image.filename,
             size: image.size,
         };

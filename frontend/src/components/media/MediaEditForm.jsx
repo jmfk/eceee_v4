@@ -21,6 +21,7 @@ import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext
 import OptimizedImage from './OptimizedImage';
 import MediaTagWidget from './MediaTagWidget';
 import MediaReferencesDisplay from './MediaReferencesDisplay';
+import ImageVersionHistory from './ImageVersionHistory';
 
 const MediaEditForm = ({
     file,
@@ -205,7 +206,7 @@ const MediaEditForm = ({
         if (!selectedFile) return;
 
         // Confirm replacement
-        if (!window.confirm(`Are you sure you want to replace "${file.originalFilename}" with "${selectedFile.name}"? This action cannot be undone.`)) {
+        if (!window.confirm(`Replace "${file.originalFilename}" with "${selectedFile.name}"? The previous image will remain in version history.`)) {
             // Reset file input
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
@@ -385,6 +386,9 @@ const MediaEditForm = ({
             </div>
 
             {/* Form Fields */}
+            {mode === 'edit' && (file.fileType === 'image' || file.file_type === 'image') && (
+                <ImageVersionHistory file={localFile} onRestored={(restored) => { setLocalFile(restored); onSave(restored) }} />
+            )}
             <div className="space-y-4">
                     {/* Title */}
                     <div>

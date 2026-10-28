@@ -1,6 +1,7 @@
 """Restricted API surface for the theme Designer workspace."""
 
 import json
+import uuid
 from datetime import timedelta
 
 from django.contrib.auth.models import User
@@ -18,9 +19,10 @@ from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
-from file_manager.storage import S3MediaStorage
+from file_manager.storage import S3MediaStorage, system_storage
 from object_storage.models import ObjectInstance, ObjectVersion
 from webpages.models import (
+    DesignerImageVersion,
     PageTheme,
     ThemeDesignerAssignment,
     ThemeDesignerExportJob,
@@ -33,6 +35,8 @@ from webpages.services.designer_theme import (
     MAX_IMAGE_PIXELS,
     DesignerDraftConflict,
     build_draft_workspace,
+    _find_asset,
+    theme_from_designer_draft,
     delete_designer_preview_view,
     designer_preview_layout,
     designer_preview_version,
@@ -847,6 +851,83 @@ class DesignerThemeAssetView(APIView):
             )
         except PermissionError:
             return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
+        except DesignerDraftConflict as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
+        return Response(_draft_workspace(request, theme, draft))
+
+
+class DesignerThemeImageVersionsView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    renderer_classes = [DesignerJSONRenderer]
+    parser_classes = [DesignerJSONParser]
+
+    def _series(self, request, theme_id, asset_key):
+        theme = _theme(request, theme_id)
+        draft = get_or_create_designer_draft(theme, request.user)
+        asset = _find_asset(theme_from_designer_draft(theme, draft), asset_key)
+        if not asset:
+            return theme, draft, None
+        url = asset.get("url") or ""
+        prefix = f"theme_images/{theme.id}/designer_drafts/"
+        if prefix not in url:
+            return theme, draft, None
+        path = url[url.index(prefix):].split("?", 1)[0].split("#", 1)[0]
+        version = DesignerImageVersion.objects.filter(series__theme=theme, file_path=path).select_related("series").first()
+        return theme, draft, version.series if version else None
+
+    def get(self, request, theme_id):
+        theme, draft, series = self._series(request, theme_id, request.query_params.get("asset_key"))
+        if not series:
+            return Response({"versions": [], "protected_from_cleanup": False})
+        versions = [{
+            "id": str(version.id), "version_number": version.version_number,
+            "file_size": version.file_size, "content_type": version.content_type,
+            "width": version.width, "height": version.height,
+            "uploaded_at": version.uploaded_at, "uploaded_by": version.uploaded_by_id,
+            "superseded_at": version.superseded_at,
+            "preview_url": system_storage.url(version.file_path),
+            "is_current": version.superseded_at is None,
+        } for version in series.versions.all()]
+        return Response({"series_id": str(series.id), "protected_from_cleanup": series.protected_from_cleanup, "versions": versions})
+
+    def post(self, request, theme_id):
+        theme, draft, series = self._series(request, theme_id, request.data.get("asset_key"))
+        if not series:
+            return Response({"error": "Designer image not found"}, status=status.HTTP_404_NOT_FOUND)
+        action_name = request.data.get("action")
+        if action_name == "protect":
+            protected = request.data.get("protected_from_cleanup")
+            if not isinstance(protected, bool):
+                return Response({"error": "protected_from_cleanup must be a boolean"}, status=status.HTTP_400_BAD_REQUEST)
+            from core.models import Tenant
+
+            with transaction.atomic():
+                Tenant.objects.select_for_update().get(pk=theme.tenant_id)
+                type(series).objects.filter(pk=series.pk).update(protected_from_cleanup=protected)
+            return Response({"protected_from_cleanup": protected})
+        if action_name != "restore":
+            return Response({"error": "Unknown image version action"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            version_id = uuid.UUID(str(request.data.get("version_id")))
+        except (TypeError, ValueError, AttributeError):
+            return Response({"error": "Invalid image version"}, status=status.HTTP_400_BAD_REQUEST)
+        version = series.versions.filter(pk=version_id).first()
+        if not version:
+            return Response({"error": "Image version not found"}, status=status.HTTP_404_NOT_FOUND)
+        from object_storage.services.transfer_checkpoints import tenant_transfer_lock
+
+        try:
+            with tenant_transfer_lock(request.tenant.pk):
+                version = series.versions.filter(pk=version_id).first()
+                if not version:
+                    return Response({"error": "Image version no longer exists"}, status=status.HTTP_404_NOT_FOUND)
+                with system_storage.open(version.file_path, "rb") as source:
+                    extension = {"image/jpeg": ".jpg", "image/png": ".png", "image/gif": ".gif", "image/webp": ".webp", "image/svg+xml": ".svg"}.get(version.content_type, ".png")
+                    upload = SimpleUploadedFile(f"restored-image{extension}", source.read(), content_type=version.content_type)
+                theme, draft = replace_designer_asset(
+                    theme.id, request.tenant, request.user, request.data.get("asset_key"),
+                    upload, request.data.get("draft_version"),
+                )
         except DesignerDraftConflict as exc:
             return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
         return Response(_draft_workspace(request, theme, draft))

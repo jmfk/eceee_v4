@@ -9,6 +9,7 @@ import { resolvePagePreviewModel } from '../resolvePagePreviewModel'
 import { designerPreviewWidth, themeBreakpointDefinition } from '../theme/breakpointConfig'
 import { inheritedLayoutStyle } from './layoutStyleInheritance'
 import TextOutlineStylesEditor from './TextOutlineStylesEditor'
+import DesignerImageVersionHistory from './DesignerImageVersionHistory'
 import { ThemeColorField, ThemeFontField, ThemeFontsEditor, ThemePaletteEditor } from './ThemeDesignTokens'
 const typographyLabels = {
     fontFamily: 'Font family', fontSize: 'Size', fontWeight: 'Weight', fontStyle: 'Style',
@@ -659,6 +660,7 @@ const SemanticThemeWorkspace = ({
     loadPageContent, loadObjectContent, importPreviewSource, deletePreviewContent,
     savePreviewText, replacePreviewImage, pendingPreviewTextsRef, onPendingPreviewTextsChange,
     previewTextResetVersion, disabled, mobilePane, onPublishOutlines,
+    onAssetVersionRestored, versionControlsDisabled,
 }) => {
     const initialViews = workspace.previewContent?.views || workspace.catalog.previewViews || []
     const initialExternalContent = [
@@ -1957,6 +1959,13 @@ const SemanticThemeWorkspace = ({
                                 {!breakpointState.isInherited && <><input ref={(node) => { uploadRefs.current[asset.assetKey] = node }} aria-label={`New source image for ${asset.displayName} at ${breakpointState.sourceLabel}`} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => replaceAsset(asset, event.target.files?.[0])} className="sr-only" /><button type="button" aria-label={`${asset.url ? 'Replace' : 'Upload'} ${asset.displayName} source at ${breakpointState.sourceLabel}`} onClick={() => uploadRefs.current[asset.assetKey]?.click()} className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">{asset.url ? 'Replace' : 'Upload'} source at {breakpointState.sourceLabel}</button></>}
                                 {breakpointState.isInherited && <><input ref={(node) => { uploadRefs.current[`override:${asset.assetKey}:${viewport}`] = node }} aria-label={`New ${breakpointState.activeLabel} image override for ${asset.displayName}`} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => replaceAsset(asset, event.target.files?.[0], viewport)} className="sr-only" /><button type="button" aria-label={`Create ${breakpointState.activeLabel} override for ${asset.displayName}`} onClick={() => uploadRefs.current[`override:${asset.assetKey}:${viewport}`]?.click()} className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">Create {breakpointState.activeLabel} override</button></>}
                             </div>}
+                        <DesignerImageVersionHistory
+                            themeId={workspace.id}
+                            asset={asset}
+                            draftVersion={workspace.draftVersion}
+                            onRestored={onAssetVersionRestored}
+                            disabled={versionControlsDisabled}
+                        />
                     </article>
                     )
                 })}

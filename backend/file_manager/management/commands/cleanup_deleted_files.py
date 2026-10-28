@@ -46,8 +46,9 @@ class Command(BaseCommand):
         # 2. Have no references
         # 3. Were deleted before the cutoff date
         files_to_delete = MediaFile.objects.with_deleted().filter(
-            is_deleted=True, reference_count=0, deleted_at__lt=cutoff_date
-        )
+            is_deleted=True, reference_count=0, deleted_at__lt=cutoff_date,
+            protected_from_cleanup=False,
+        ).filter(image_versions__isnull=True)
 
         total_count = files_to_delete.count()
         if total_count == 0:
@@ -78,7 +79,8 @@ class Command(BaseCommand):
                     try:
                         if not dry_run:
                             # Perform hard delete
-                            file.delete(force=True)
+                            if not file.delete(force=True):
+                                continue
                         self.stdout.write(
                             f"Deleted file: {file.original_filename} (ID: {file.id})"
                         )

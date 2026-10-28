@@ -983,7 +983,7 @@ class SitePackageServiceTests(TestCase):
         self.assertEqual([link.tag.name for link in links], [term.name])
         self.assertEqual([link.tag.namespace_id for link in links], [self.namespace.pk])
 
-    def test_clone_import_names_the_new_root_and_reuses_soft_deleted_media(self):
+    def test_clone_import_names_the_new_root_and_preserves_soft_deleted_media(self):
         PageVersion.objects.create(
             page=self.root,
             version_number=1,
@@ -1030,9 +1030,12 @@ class SitePackageServiceTests(TestCase):
             imported_root = SitePackageImporter(import_job, storage=storage).import_package(package)
 
         self.assertEqual(imported_root.title, "Root (clone)")
-        revived_media = MediaFile.objects.get(file_hash=self.media.file_hash)
-        self.assertFalse(revived_media.is_deleted)
-        self.assertEqual(MediaFile.objects.with_deleted().filter(file_hash=self.media.file_hash).count(), 1)
+        self.media.refresh_from_db()
+        self.assertTrue(self.media.is_deleted)
+        imported_media = MediaFile.objects.filter(file_hash=self.media.file_hash).get()
+        self.assertNotEqual(imported_media.pk, self.media.pk)
+        self.assertNotEqual(imported_media.file_path, self.media.file_path)
+        self.assertEqual(MediaFile.objects.with_deleted().filter(file_hash=self.media.file_hash).count(), 2)
 
     def test_zip_update_keeps_the_existing_root_without_duplicating_identical_versions(self):
         self.theme.image.name = "theme_images/source/preview.png"

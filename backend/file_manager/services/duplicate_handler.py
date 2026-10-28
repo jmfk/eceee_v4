@@ -52,22 +52,24 @@ class DuplicateFileHandler:
             file_hash = hashlib.sha256(file_content).hexdigest()
 
             # Check for existing files with same hash in MediaFile (including deleted)
-            existing_media_file = MediaFile.objects.with_deleted().filter(file_hash=file_hash).first()
+            existing_media_file = (
+                MediaFile.objects.with_deleted()
+                .filter(file_hash=file_hash, namespace=namespace)
+                .order_by("-created_at")
+                .first()
+            )
 
             if existing_media_file:
-                if existing_media_file.namespace_id != namespace.id:
-                    return self._handle_foreign_namespace_duplicate(file)
                 return self._handle_existing_media_file(existing_media_file, file, namespace, user)
 
             # Check for existing files with same hash in PendingMediaFile
             existing_pending_file = PendingMediaFile.objects.filter(
                 file_hash=file_hash,
+                namespace=namespace,
                 status__in=["pending", "approved"],
             ).first()
 
             if existing_pending_file:
-                if existing_pending_file.namespace_id != namespace.id:
-                    return self._handle_foreign_namespace_duplicate(file)
                 return self._handle_existing_pending_file(existing_pending_file, file, namespace, user)
 
             # No duplicates found
@@ -167,8 +169,6 @@ class DuplicateFileHandler:
     ) -> DuplicateCheckResult:
         """Handle case where file exists in MediaFile table."""
         if existing_file.is_deleted:
-            # Restore deleted file
-            existing_file.restore(user)
             # Create pending file for re-approval
             pending_file = self._create_or_update_pending_file(
                 None, uploaded_file, existing_file, namespace, user  # Create new
@@ -208,6 +208,7 @@ class DuplicateFileHandler:
                 # Try to get existing pending file first
                 pending_file = PendingMediaFile.objects.filter(
                     file_hash=existing_file.file_hash,
+                    namespace=namespace,
                     status__in=["pending", "approved"],
                 ).first()
             except PendingMediaFile.DoesNotExist:

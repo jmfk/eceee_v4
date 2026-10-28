@@ -3,15 +3,17 @@ Tests for MediaFile replace_file endpoint and replacement resolution.
 """
 
 import hashlib
+import io
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from content.models import Namespace
-from file_manager.models import MediaFile
+from file_manager.models import MediaFile, MediaFileVersion
 
 
 class MediaFileReplaceFileTests(APITestCase):
@@ -49,13 +51,15 @@ class MediaFileReplaceFileTests(APITestCase):
             last_modified_by=self.user,
         )
 
-    @patch("file_manager.views.media_file.S3MediaStorage.overwrite_file")
-    def test_replace_file_unique_hash_overwrites_in_place(self, mock_overwrite_file):
+    @patch("file_manager.views.media_file.S3MediaStorage.upload_file")
+    @patch("file_manager.views.media_file.S3MediaStorage.get_public_url")
+    def test_replace_file_creates_previous_version(self, mock_public_url, mock_upload_file):
         new_bytes = b"unique-image-bytes"
         new_hash = hashlib.sha256(new_bytes).hexdigest()
 
-        mock_overwrite_file.return_value = {
-            "file_path": self.media_file.file_path,
+        mock_public_url.return_value = "https://storage.test/new.jpg"
+        mock_upload_file.return_value = {
+            "file_path": "test-namespace/media/new.jpg",
             "file_size": len(new_bytes),
             "content_type": "image/jpeg",
             "file_hash": new_hash,
@@ -69,12 +73,15 @@ class MediaFileReplaceFileTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.media_file.refresh_from_db()
-        self.assertEqual(self.media_file.file_path, "test-namespace/media/original.jpg")
+        self.assertEqual(self.media_file.file_path, "test-namespace/media/new.jpg")
         self.assertEqual(self.media_file.file_hash, new_hash)
+        self.assertEqual(self.media_file.version_number, 2)
         self.assertIsNone(self.media_file.replaced_by_id)
-        mock_overwrite_file.assert_called_once()
+        previous = self.media_file.image_versions.get()
+        self.assertEqual(previous.file_path, "test-namespace/media/original.jpg")
+        mock_upload_file.assert_called_once()
 
-    def test_replace_file_hash_conflict_sets_replaced_by(self):
+    def test_replace_file_hash_conflict_keeps_separate_identity(self):
         conflict_bytes = b"conflict-bytes"
         conflict_hash = hashlib.sha256(conflict_bytes).hexdigest()
 
@@ -96,13 +103,68 @@ class MediaFileReplaceFileTests(APITestCase):
         url = f"/api/v1/media/files/{self.media_file.id}/replace_file/"
         uploaded = SimpleUploadedFile("replacement.jpg", conflict_bytes, content_type="image/jpeg")
 
-        with patch("file_manager.views.media_file.S3MediaStorage.overwrite_file") as mock_overwrite:
+        with (
+            patch(
+                "file_manager.views.media_file.S3MediaStorage.upload_file",
+                return_value={
+                    "file_path": "test-namespace/media/independent.jpg",
+                    "file_size": len(conflict_bytes),
+                    "content_type": "image/jpeg",
+                    "file_hash": conflict_hash,
+                },
+            ) as mock_upload,
+            patch(
+                "file_manager.views.media_file.S3MediaStorage.get_public_url",
+                return_value="https://storage.test/independent.jpg",
+            ),
+        ):
             response = self.client.post(url, {"file": uploaded}, format="multipart")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.media_file.refresh_from_db()
-        self.assertEqual(self.media_file.replaced_by_id, existing.id)
-        mock_overwrite.assert_not_called()
+        self.assertIsNone(self.media_file.replaced_by_id)
+        self.assertNotEqual(self.media_file.file_path, existing.file_path)
+        mock_upload.assert_called_once()
+
+    @patch("file_manager.views.media_file.S3MediaStorage._open", return_value=io.BytesIO(b"old-image"))
+    @patch(
+        "file_manager.views.media_file.S3MediaStorage.get_public_url", return_value="https://storage.test/restored.jpg"
+    )
+    @patch("file_manager.views.media_file.S3MediaStorage.upload_file")
+    def test_restore_creates_new_current_version(self, mock_upload, _public_url, _open):
+        old = MediaFileVersion.objects.create(
+            media_file=self.media_file,
+            version_number=1,
+            file_path="test-namespace/media/older.jpg",
+            original_filename="older.jpg",
+            file_size=9,
+            content_type="image/jpeg",
+            file_hash="1" * 64,
+            uploaded_at=timezone.now(),
+            superseded_at=timezone.now(),
+            uploaded_by=self.user,
+        )
+        self.media_file.version_number = 2
+        self.media_file.save(update_fields=["version_number"])
+        mock_upload.return_value = {
+            "file_path": "test-namespace/media/restored.jpg",
+            "file_size": 9,
+            "content_type": "image/jpeg",
+            "file_hash": "1" * 64,
+        }
+
+        response = self.client.post(
+            f"/api/v1/media/files/{self.media_file.id}/restore_version/",
+            {"version_id": str(old.id)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.media_file.refresh_from_db()
+        self.assertEqual(self.media_file.version_number, 3)
+        self.assertEqual(self.media_file.file_path, "test-namespace/media/restored.jpg")
+        self.assertEqual(self.media_file.image_versions.count(), 2)
+        mock_upload.assert_called_once()
 
     def test_replace_file_refetches_after_waiting_for_transfer_lock(self):
         replacement_bytes = b"replacement-that-already-won"
@@ -123,12 +185,18 @@ class MediaFileReplaceFileTests(APITestCase):
                 "object_storage.services.transfer_checkpoints.tenant_transfer_lock",
                 return_value=MutatingLock(),
             ),
-            patch("file_manager.views.media_file.S3MediaStorage.overwrite_file") as mock_overwrite,
+            patch("file_manager.views.media_file.S3MediaStorage.upload_file") as mock_upload,
         ):
+            mock_upload.return_value = {
+                "file_path": "test-namespace/media/after-lock.jpg",
+                "file_size": len(replacement_bytes),
+                "content_type": "image/jpeg",
+                "file_hash": replacement_hash,
+            }
             response = self.client.post(url, {"file": uploaded}, format="multipart")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        mock_overwrite.assert_not_called()
+        mock_upload.assert_called_once()
 
 
 class MediaFileReplacementResolutionTests(APITestCase):
@@ -189,3 +257,4 @@ class MediaFileReplacementResolutionTests(APITestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], "https://signed.example/replacement")
+        self.assertEqual(response["Cache-Control"], "no-store, max-age=0")

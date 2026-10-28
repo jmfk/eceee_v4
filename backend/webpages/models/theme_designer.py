@@ -109,3 +109,32 @@ class ThemeDesignerExportJob(models.Model):
         self.status = self.STATUS_FAILED
         self.errors = [*self.errors, str(error)]
         self.save(update_fields=["status", "errors", "updated_at"])
+
+
+class DesignerImageSeries(models.Model):
+    """Stable identity for a Designer-owned image across draft replacements."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    theme = models.ForeignKey("webpages.PageTheme", on_delete=models.CASCADE, related_name="designer_image_series")
+    protected_from_cleanup = models.BooleanField(default=False)
+
+
+class DesignerImageVersion(models.Model):
+    """An immutable Designer image object; snapshots keep its concrete path."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    series = models.ForeignKey(DesignerImageSeries, on_delete=models.CASCADE, related_name="versions")
+    version_number = models.PositiveIntegerField()
+    file_path = models.CharField(max_length=500, unique=True)
+    file_size = models.BigIntegerField()
+    content_type = models.CharField(max_length=100)
+    width = models.PositiveIntegerField(null=True, blank=True)
+    height = models.PositiveIntegerField(null=True, blank=True)
+    uploaded_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="uploaded_designer_images")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    superseded_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["series", "version_number"], name="unique_designer_image_version")]
+        ordering = ["-version_number"]
+        indexes = [models.Index(fields=["superseded_at"], name="designer_image_superseded_idx")]

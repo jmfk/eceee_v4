@@ -41,6 +41,8 @@ def _media_url(media):
         (
             media.get(key)
             for key in (
+                "stableUrl",
+                "stable_url",
                 "imgproxyBaseUrl",
                 "imgproxy_base_url",
                 "fileUrl",
@@ -315,9 +317,7 @@ class ImageWidget(BaseWidget):
                 media_type = "video" if media_file.file_type == "video" else "image"
 
                 # Honor an explicit public URL before deriving one from storage.
-                file_url = media_file.file_url or (
-                    media_file.get_file_url() if hasattr(media_file, "get_file_url") else ""
-                )
+                file_url = media_file.get_uuid_url()
 
                 if media_file.file_type == "image" and hasattr(media_file, "get_imgproxy_url"):
                     # Use imgproxy for thumbnail (e.g., 800px wide)
@@ -417,10 +417,23 @@ class ImageWidget(BaseWidget):
         elif image and not is_collection:
             # Single image: convert to media_items array format
             if isinstance(image, dict):
+                media_file = None
+                if theme and image.get("id"):
+                    import uuid
+
+                    from file_manager.models import MediaFile
+
+                    try:
+                        media_id = uuid.UUID(str(image["id"]))
+                    except (TypeError, ValueError):
+                        media_id = None
+                    if media_id:
+                        media_file = MediaFile.objects.filter(id=media_id, tenant=theme.tenant, file_type="image").first()
+                current_url = media_file.get_uuid_url() if media_file else _media_url(image)
                 # Convert camelCase to snake_case for template
                 media_item = {
                     "id": image.get("id"),
-                    "url": _media_url(image),
+                    "url": current_url,
                     "type": image.get("type", "image"),
                     "alt_text": image.get("altText") or image.get("alt_text") or image.get("title", ""),
                     "caption": image.get("caption") or image.get("description", ""),
@@ -428,9 +441,9 @@ class ImageWidget(BaseWidget):
                     "title": image.get("title", ""),
                     "photographer": image.get("photographer", ""),
                     "source": image.get("source", ""),
-                    "width": image.get("width"),
-                    "height": image.get("height"),
-                    "thumbnail_url": image.get("thumbnailUrl") or image.get("thumbnail_url") or _media_url(image),
+                    "width": media_file.width if media_file else image.get("width"),
+                    "height": media_file.height if media_file else image.get("height"),
+                    "thumbnail_url": media_file.get_imgproxy_thumbnail_url() if media_file else image.get("thumbnailUrl") or image.get("thumbnail_url") or current_url,
                 }
                 template_config["media_items"] = [media_item]
 
@@ -445,9 +458,21 @@ class ImageWidget(BaseWidget):
                 snake_case_items = []
                 for item in camel_case_items:
                     if isinstance(item, dict):
+                        item_url = item.get("url")
+                        if theme and item.get("id") and item.get("type", "image") == "image":
+                            import uuid
+
+                            from file_manager.models import MediaFile
+
+                            try:
+                                media_id = uuid.UUID(str(item["id"]))
+                            except (TypeError, ValueError):
+                                media_id = None
+                            if media_id and MediaFile.objects.filter(id=media_id, tenant=theme.tenant, file_type="image").exists():
+                                item_url = f"/api/v1/media/file/{media_id}/"
                         snake_case_item = {
                             "id": item.get("id"),
-                            "url": item.get("url"),
+                            "url": item_url,
                             "type": item.get("type", "image"),
                             "alt_text": item.get("altText", ""),
                             "caption": item.get("caption", ""),
@@ -457,7 +482,7 @@ class ImageWidget(BaseWidget):
                             "source": item.get("source", ""),
                             "width": item.get("width"),
                             "height": item.get("height"),
-                            "thumbnail_url": item.get("thumbnailUrl"),
+                            "thumbnail_url": item_url if item_url != item.get("url") else item.get("thumbnailUrl"),
                         }
                         snake_case_items.append(snake_case_item)
                     else:

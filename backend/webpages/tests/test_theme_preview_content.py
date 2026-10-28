@@ -325,7 +325,7 @@ class ThemePreviewContentTests(TestCase):
         self.assertEqual(_managed_storage_path("s3://media/uploads/article.jpg"), "uploads/article.jpg")
 
     @patch("webpages.services.theme_preview_content.system_storage")
-    def test_page_import_detaches_source_and_copies_managed_images(self, storage):
+    def test_page_import_detaches_source_and_links_managed_media(self, storage):
         storage.bucket_name = "media"
         storage.exists.return_value = True
         storage.open.return_value = io.BytesIO(b"copied-image")
@@ -339,12 +339,12 @@ class ThemePreviewContentTests(TestCase):
         self.assertNotIn("siteId", preview["content"]["pageData"])
         self.assertNotIn("currentVersionId", preview["content"]["pageData"])
         self.assertNotIn("published_version_id", preview["content"]["pageData"])
-        self.assertIn("theme_images/1/library/article-copy.jpg", preview["content"]["pageData"]["body"])
+        self.assertIn(self.media_file.get_uuid_url(), preview["content"]["pageData"]["body"])
         config = preview["content"]["widgets"]["main"][0]["config"]
         self.assertNotIn("pageId", config)
-        self.assertIn("theme_images/1/library/article-copy.jpg", config["imageUrl"])
-        self.assertEqual(copied_images, 1)
-        storage.save.assert_called_once()
+        self.assertEqual(config["imageUrl"], self.media_file.get_uuid_url())
+        self.assertEqual(copied_images, 0)
+        storage.save.assert_not_called()
 
     def test_page_import_materializes_internal_links_before_removing_page_ids(self):
         self.page_version.widgets = {
@@ -413,7 +413,7 @@ class ThemePreviewContentTests(TestCase):
         self.assertNotIn("pageId", portable)
 
     @patch("webpages.services.theme_preview_content.system_storage")
-    def test_page_import_copies_canonical_and_uuid_media_urls(self, storage):
+    def test_page_import_keeps_canonical_and_uuid_media_references(self, storage):
         canonical_url = self.media_file.get_absolute_url()
         uuid_url = f"/api/v1/media/file/{self.media_file.id}/"
         self.page_version.page_data = {"body": f'<img data-media-id="{self.media_file.id}" src="{canonical_url}">'}
@@ -436,26 +436,19 @@ class ThemePreviewContentTests(TestCase):
             ]
         }
         self.page_version.save(update_fields=["page_data", "widgets"])
-        copied_path = f"theme_images/{self.theme.id}/library/article-copy.jpg"
-        copied_url = f"https://storage.test/media/{copied_path}"
-        storage.exists.return_value = True
-        storage.open.return_value = io.BytesIO(b"copied-image")
-        storage.save.return_value = copied_path
-        storage.url.return_value = copied_url
-
         preview, copied_images = import_theme_preview_document(self.theme, "page", self.page.id)
 
-        self.assertIn(copied_url, preview["content"]["pageData"]["body"])
-        self.assertNotIn("data-media-id", preview["content"]["pageData"]["body"])
+        self.assertIn(uuid_url, preview["content"]["pageData"]["body"])
+        self.assertIn("data-media-id", preview["content"]["pageData"]["body"])
         widget = preview["content"]["widgets"]["main"][0]
         media_item = widget["config"]["mediaItems"][0]
         self.assertEqual(widget["id"], "image-widget")
-        self.assertEqual(media_item["fileUrl"], copied_url)
-        self.assertNotIn("id", media_item)
-        self.assertNotIn("mediaId", media_item)
-        self.assertNotIn("fileId", media_item)
-        self.assertEqual(copied_images, 1)
-        storage.open.assert_called_once_with(self.media_file.file_path, "rb")
+        self.assertEqual(media_item["fileUrl"], uuid_url)
+        self.assertEqual(media_item["id"], str(self.media_file.id))
+        self.assertEqual(media_item["mediaId"], str(self.media_file.id))
+        self.assertEqual(media_item["fileId"], str(self.media_file.id))
+        self.assertEqual(copied_images, 0)
+        storage.open.assert_not_called()
 
     @patch("webpages.services.theme_preview_content.system_storage")
     def test_page_import_does_not_copy_another_tenants_canonical_media_url(self, storage):
@@ -610,9 +603,9 @@ class ThemePreviewContentTests(TestCase):
         config = preview["content"]["widgets"]["main"][0]["config"]
         self.assertNotIn("image", config)
         self.assertNotIn("collectionId", config)
-        self.assertEqual(copied_images, 1)
+        self.assertEqual(copied_images, 0)
         self.assertEqual(len(config["mediaItems"]), 1)
-        self.assertIn(f"theme_images/{self.theme.id}/library/", config["mediaItems"][0]["url"])
+        self.assertEqual(config["mediaItems"][0]["url"], self.media_file.get_uuid_url())
         self.assertNotIn(str(collection.id), str(config))
 
     def test_missing_collection_uses_only_tenant_owned_embedded_samples(self):

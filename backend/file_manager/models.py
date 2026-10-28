@@ -181,7 +181,7 @@ class PendingMediaFile(models.Model):
     file_path = models.CharField(max_length=500, help_text="S3 key/path")
     file_size = models.BigIntegerField(help_text="File size in bytes")
     content_type = models.CharField(max_length=100)
-    file_hash = models.CharField(max_length=64, unique=True, help_text="SHA-256 hash for deduplication")
+    file_hash = models.CharField(max_length=64, db_index=True, help_text="SHA-256 hash of the pending file")
 
     # Media-specific metadata
     file_type = models.CharField(max_length=20, choices=FILE_TYPE_CHOICES)
@@ -335,16 +335,18 @@ class PendingMediaFile(models.Model):
 
         logger = logging.getLogger(__name__)
 
-        # Check if the same file exists in MediaFile (approved files)
-        # If it does, don't delete from S3 as it's still being used
-        existing_media_file = MediaFile.objects.filter(file_hash=self.file_hash).first()
+        # Storage ownership follows the object key, not matching content bytes.
+        existing_media_file = (
+            MediaFile.objects.with_deleted().filter(file_path=self.file_path).first()
+            or MediaFileVersion.objects.filter(file_path=self.file_path).first()
+        )
 
         if existing_media_file:
             pass
         else:
             # Check if other pending files with same hash exist
             other_pending_files = (
-                PendingMediaFile.objects.filter(file_hash=self.file_hash, status__in=["pending", "approved"])
+                PendingMediaFile.objects.filter(file_path=self.file_path, status__in=["pending", "approved"])
                 .exclude(id=self.id)
                 .exists()
             )
@@ -405,9 +407,10 @@ class PendingMediaFile(models.Model):
 
         for pending_file in expired_files:
             try:
-                # Check if the same file exists in MediaFile (approved files)
-                # If it does, don't delete from S3 as it's still being used
-                existing_media_file = MediaFile.objects.filter(file_hash=pending_file.file_hash).first()
+                existing_media_file = (
+                    MediaFile.objects.with_deleted().filter(file_path=pending_file.file_path).first()
+                    or MediaFileVersion.objects.filter(file_path=pending_file.file_path).first()
+                )
 
                 if existing_media_file:
                     pass
@@ -415,7 +418,7 @@ class PendingMediaFile(models.Model):
                     # Check if other pending files with same hash exist
                     other_pending_files = (
                         cls.objects.filter(
-                            file_hash=pending_file.file_hash,
+                            file_path=pending_file.file_path,
                             status__in=["pending", "approved"],
                         )
                         .exclude(id=pending_file.id)
@@ -483,7 +486,7 @@ class MediaFile(models.Model):
     file_url = models.URLField(max_length=500, help_text="Public URL for the file", null=True, blank=True)
     file_size = models.BigIntegerField(help_text="File size in bytes")
     content_type = models.CharField(max_length=100)
-    file_hash = models.CharField(max_length=64, unique=True, help_text="SHA-256 hash for deduplication")
+    file_hash = models.CharField(max_length=64, db_index=True, help_text="SHA-256 hash of the current file")
     uploaded_by = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
@@ -572,6 +575,10 @@ class MediaFile(models.Model):
         help_text="If this file was replaced, points to the replacement",
     )
 
+    version_number = models.PositiveIntegerField(default=1)
+    version_uploaded_at = models.DateTimeField(null=True, blank=True)
+    protected_from_cleanup = models.BooleanField(default=False)
+
     # Timestamps and ownership
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -602,13 +609,7 @@ class MediaFile(models.Model):
     @classmethod
     def create_with_hash_cleanup(cls, file_hash: str, **kwargs):
         """
-        Create a new MediaFile, atomically handling any soft-deleted records with the same hash.
-
-        This method ensures that:
-        1. Any soft-deleted MediaFile with the same hash is hard-deleted first
-        2. The object in object storage is preserved (not deleted if referenced elsewhere)
-        3. A new MediaFile record is created with fresh metadata
-        4. All operations happen atomically in a single transaction
+        Create an independent MediaFile even when its bytes match another image.
 
         Args:
             file_hash: The SHA-256 hash of the file
@@ -617,37 +618,12 @@ class MediaFile(models.Model):
         Returns:
             MediaFile: The newly created MediaFile instance
 
-        Raises:
-            ValidationError: If an active (non-deleted) file with the same hash already exists
-            IntegrityError: If the creation fails due to other database constraints
+        A content hash is metadata, not a storage ownership key.
         """
-        import logging
-
-        from django.core.exceptions import ValidationError
         from django.db import transaction
 
-        logger = logging.getLogger(__name__)
-
         with transaction.atomic():
-            # Check for existing active file with same hash (true duplicate)
-            existing_active = cls.objects.filter(file_hash=file_hash).first()
-            if existing_active:
-                logger.warning(
-                    "Cannot create MediaFile: active file with hash %s already exists (ID: %s)",
-                    file_hash,
-                    existing_active.id,
-                )
-                raise ValidationError(f"An active file with this content already exists: {existing_active.title}")
-
-            # Find and hard delete any soft-deleted records with same hash
-            existing_deleted = cls.objects.with_deleted().filter(file_hash=file_hash, is_deleted=True).first()
-
-            if existing_deleted:
-                # Hard delete the soft-deleted record
-                # The delete method will preserve the S3 object if other files reference it
-                existing_deleted.delete(force=True)
-
-            # Create the new MediaFile
+            # A deleted image may still own historical versions needed by content.
             kwargs["file_hash"] = file_hash
 
             # Generate slug if not provided
@@ -756,14 +732,16 @@ class MediaFile(models.Model):
 
             logger = logging.getLogger(__name__)
 
-            # Check if other files reference the same S3 object (same file_hash)
-            # Need to check both active and soft-deleted MediaFile records
+            if self.protected_from_cleanup or self.image_versions.exists():
+                return False
+
+            # Storage ownership is determined by key, never by content hash.
             other_media_files = (
-                MediaFile.objects.with_deleted().filter(file_hash=self.file_hash).exclude(id=self.id).exists()
+                MediaFile.objects.with_deleted().filter(file_path=self.file_path).exclude(id=self.id).exists()
             )
 
             other_pending_files = PendingMediaFile.objects.filter(
-                file_hash=self.file_hash, status__in=["pending", "approved"]
+                file_path=self.file_path, status__in=["pending", "approved"]
             ).exists()
 
             # Only delete from S3 if no other files reference it
@@ -775,8 +753,8 @@ class MediaFile(models.Model):
                     logger.error(f"Failed to delete S3 file {self.file_path}: {e}")
                     # Don't fail the database deletion if S3 cleanup fails
 
-            # Delete any related PendingMediaFile records with same hash that are approved
-            related_pending = PendingMediaFile.objects.filter(file_hash=self.file_hash, status="approved")
+            # Only records for this exact object can be removed with it.
+            related_pending = PendingMediaFile.objects.filter(file_path=self.file_path, status="approved")
             if related_pending.exists():
                 related_pending.delete()
 
@@ -784,6 +762,9 @@ class MediaFile(models.Model):
             return super().delete(*args, **kwargs)
 
         if self.reference_count > 0:
+            return False
+
+        if self.protected_from_cleanup:
             return False
 
         from django.utils import timezone
@@ -1088,6 +1069,29 @@ class MediaFile(models.Model):
             True if thumbnail exists, False otherwise
         """
         return bool(self.get_thumbnail_path())
+
+
+class MediaFileVersion(models.Model):
+    """A superseded, immutable image object belonging to one MediaFile."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    media_file = models.ForeignKey(MediaFile, on_delete=models.CASCADE, related_name="image_versions")
+    version_number = models.PositiveIntegerField()
+    file_path = models.CharField(max_length=500, db_index=True)
+    original_filename = models.CharField(max_length=255)
+    file_size = models.BigIntegerField()
+    content_type = models.CharField(max_length=100)
+    file_hash = models.CharField(max_length=64)
+    width = models.PositiveIntegerField(null=True, blank=True)
+    height = models.PositiveIntegerField(null=True, blank=True)
+    uploaded_at = models.DateTimeField()
+    uploaded_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="uploaded_media_versions")
+    superseded_at = models.DateTimeField()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["media_file", "version_number"], name="unique_media_image_version")]
+        ordering = ["-version_number"]
+        indexes = [models.Index(fields=["superseded_at"], name="media_version_superseded_idx")]
 
 
 class MediaUsage(models.Model):

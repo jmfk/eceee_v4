@@ -186,7 +186,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
 
         # If file is already approved or we found an existing file, merge tags
         existing_file = MediaFile.objects.filter(
-            file_hash=pending_file.file_hash, namespace=pending_file.namespace
+            file_path=pending_file.file_path, namespace=pending_file.namespace
         ).first()
 
         if existing_file:

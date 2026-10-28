@@ -59,6 +59,9 @@ export const designerThemesApi = {
             headers: { 'Content-Type': 'multipart/form-data' },
         }))
     },
+    imageVersions: async (themeId, assetKey) => unwrap(await api.get(`${base}/themes/${themeId}/image-versions/`, { params: { asset_key: assetKey } })),
+    restoreImageVersion: async (themeId, assetKey, versionId, draftVersion) => unwrap(await api.post(`${base}/themes/${themeId}/image-versions/`, { action: 'restore', assetKey, versionId, draftVersion })),
+    protectImageVersions: async (themeId, assetKey, protectedFromCleanup) => unwrap(await api.post(`${base}/themes/${themeId}/image-versions/`, { action: 'protect', assetKey, protectedFromCleanup })),
     createPlaceholder: async (themeId, data) => unwrap(await api.post(`${base}/themes/${themeId}/placeholder/`, data)),
     createExport: async (themeId) => unwrap(await api.post(`${base}/themes/${themeId}/export/`)),
     getExport: async (jobId) => unwrap(await api.get(`${base}/theme-exports/${jobId}/`)),
