@@ -2655,11 +2655,11 @@ class SitePackageImporter:
         replacements = {}
         for old_id, media in media_map.items():
             source = self.media_source_metadata.get(str(old_id), {})
-            destination_url = media.file_url or self.storage.url(media.file_path)
+            destination_url = media.get_uuid_url()
             if source.get("file_url"):
                 replacements[source["file_url"]] = destination_url
             if source.get("file_path"):
-                replacements[source["file_path"]] = media.file_path
+                replacements[source["file_path"]] = destination_url
             replacements[old_id] = str(media.id)
             replacements[f"/media/{old_id}/"] = f"/media/{media.id}/"
         return replacements
