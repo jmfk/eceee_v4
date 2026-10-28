@@ -1,0 +1,102 @@
+/* The object editor uses the approved, roomier control scale inside its details panel. */
+.object-property-panel .object-reference-search {
+    min-height: 42px;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.object-property-panel .object-reference-result {
+    min-height: 40px;
+    font-size: 14px;
+}
+
+.object-property-panel .object-reference-selected {
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.object-property-panel .object-reference-clear {
+    min-height: 32px;
+    margin-left: auto;
+    font-size: 13px;
+}
+
+.object-property-panel .expandable-image-dropzone {
+    border-radius: 4px;
+}
+
+.object-property-panel .media-select-trigger {
+    min-height: 58px;
+    padding: 12px;
+    font-size: 14px;
+}
+
+.object-property-panel .object-property-fields :is(input[type='text'], input[type='email'], input[type='url'], input[type='number'], input[type='date'], input[type='datetime-local'], select) {
+    min-height: 42px;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.object-property-panel .object-property-fields textarea {
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.object-property-panel .classification-manager {
+    font-size: 14px;
+}
+
+.object-property-panel .classification-manager .classification-search {
+    min-height: 42px;
+    padding: 4px 8px 4px 12px;
+    border-radius: 4px;
+}
+
+.object-property-panel .classification-manager .classification-search-content {
+    min-height: 32px;
+}
+
+.object-property-panel .classification-manager .classification-search-label,
+.object-property-panel .classification-manager .classification-search input {
+    font-size: 14px;
+}
+
+.object-property-panel .classification-manager .classification-search-label {
+    left: 40px;
+}
+
+.object-property-panel .classification-manager .classification-search:is(:focus-within, [data-filled='true']) .classification-search-label {
+    font-size: 11px;
+    line-height: 11px;
+}
+
+.object-property-panel .classification-manager .classification-search .classification-icon {
+    width: 32px;
+    min-height: 32px;
+    border-radius: 4px;
+}
+
+.object-property-panel .classification-results > li > button {
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.object-property-panel .classification-manager .classification-filter-menu button {
+    min-height: 40px;
+    font-size: 14px;
+}
+
+.object-property-panel .classification-picker .classification-selected-remove {
+    width: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    border-radius: 4px;
+}
+
+.object-property-panel .classification-manager > button {
+    min-height: 32px;
+    font-size: 13px;
+}

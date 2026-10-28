@@ -191,7 +191,7 @@ const ExpandableImageField = ({
 
             {/* Main Container with Dropzone */}
             <div
-                className={`border-2 rounded-lg transition-all duration-300 ${hasError
+                className={`expandable-image-dropzone border-2 rounded-lg transition-all duration-300 ${hasError
                     ? 'border-red-300'
                     : dragOver && !hasImages
                         ? 'border-blue-400 bg-blue-50'
@@ -218,7 +218,7 @@ const ExpandableImageField = ({
                     <button
                         type="button"
                         onClick={() => setIsModalOpen(true)}
-                        className={`w-full flex items-center justify-center gap-2 p-6 transition-colors ${hasError
+                        className={`media-select-trigger w-full flex items-center justify-center gap-2 p-6 transition-colors ${hasError
                             ? 'border-dashed hover:bg-red-50'
                             : dragOver
                                 ? 'border-dashed bg-blue-100'
