@@ -18,7 +18,10 @@ from .page_version import PageVersion, PageVersionTag
 from .preview_size import PreviewSize
 from .public_form_submission import PublicFormSubmission
 from .site_package_job import SitePackageJob
-from .theme_designer import ThemeDesignerAssignment, ThemeDesignerDraft, ThemeDesignerExportJob, ThemeDesignerRevision
+from .theme_designer import (
+    DesignerImageSeries, DesignerImageVersion, ThemeDesignerAssignment, ThemeDesignerDraft,
+    ThemeDesignerExportJob, ThemeDesignerRevision,
+)
 from .theme_remote import RemoteSiteBinding, ThemeRemoteAccessKey, ThemeRemoteConnection
 from .theme_version import ThemeVersion
 from .web_page import WebPage
@@ -37,6 +40,8 @@ __all__ = [
     "ThemeDesignerDraft",
     "ThemeDesignerExportJob",
     "ThemeDesignerRevision",
+    "DesignerImageSeries",
+    "DesignerImageVersion",
     "ThemeVersion",
     "ThemeRemoteAccessKey",
     "ThemeRemoteConnection",

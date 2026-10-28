@@ -4,6 +4,7 @@ import copy
 import html
 import io
 import logging
+import mimetypes
 import os
 import re
 import uuid
@@ -13,6 +14,7 @@ from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils.html import strip_tags
+from django.utils import timezone
 from django.utils.text import slugify
 from PIL import Image, ImageDraw, ImageFont
 from rest_framework.exceptions import ValidationError
@@ -25,6 +27,8 @@ from object_storage.models import ObjectInstance
 from utils.templatetags.security_filters import sanitize_html
 from webpages.error_page_defaults import exclude_legacy_error_subtrees
 from webpages.models import (
+    DesignerImageSeries,
+    DesignerImageVersion,
     PageTheme,
     ThemeDesignerAssignment,
     ThemeDesignerDraft,
@@ -958,7 +962,8 @@ def delete_unreferenced_designer_assets(theme_id, candidate_paths):
         referenced.update(designer_snapshot_asset_paths(snapshot, theme_id))
 
     deleted = 0
-    for path in candidates - referenced:
+    versioned = set(DesignerImageVersion.objects.filter(file_path__in=candidates).values_list("file_path", flat=True))
+    for path in candidates - referenced - versioned:
         try:
             if system_storage.exists(path):
                 system_storage.delete(path)
@@ -966,6 +971,34 @@ def delete_unreferenced_designer_assets(theme_id, candidate_paths):
         except Exception:
             logger.exception("Could not remove unreferenced Designer asset %s", path)
     return deleted
+
+
+def register_designer_image_version(theme, old_source, new_path, content, content_type, width, height, user):
+    """Record a draft image without relying on positional Designer asset keys."""
+    prefix = f"theme_images/{theme.id}/designer_drafts/"
+    old_path = None
+    if isinstance(old_source, str) and prefix in old_source:
+        old_path = old_source[old_source.index(prefix):].split("?", 1)[0].split("#", 1)[0]
+    previous = DesignerImageVersion.objects.filter(series__theme=theme, file_path=old_path).select_related("series").first() if old_path else None
+    if previous:
+        series = previous.series
+        next_number = series.versions.order_by("-version_number").values_list("version_number", flat=True).first() + 1
+        series.versions.filter(superseded_at__isnull=True).update(superseded_at=timezone.now())
+    else:
+        series = DesignerImageSeries.objects.create(theme=theme)
+        next_number = 1
+        if old_path and system_storage.exists(old_path):
+            DesignerImageVersion.objects.create(
+                series=series, version_number=1, file_path=old_path,
+                file_size=0, content_type=mimetypes.guess_type(old_path)[0] or "application/octet-stream",
+                uploaded_by=user, superseded_at=timezone.now(),
+            )
+            next_number = 2
+    return DesignerImageVersion.objects.create(
+        series=series, version_number=next_number, file_path=new_path,
+        file_size=len(content), content_type=content_type,
+        width=width, height=height, uploaded_by=user,
+    )
 
 
 def _cleanup_designer_assets_after_commit(theme_id, snapshots):
@@ -2323,18 +2356,8 @@ def replace_designer_preview_image(
             if not view:
                 raise ValidationError("Unknown preview view.")
 
-            extension = {
-                "image/jpeg": ".jpg",
-                "image/png": ".png",
-                "image/gif": ".gif",
-                "image/webp": ".webp",
-                "image/svg+xml": ".svg",
-            }[upload.content_type]
-            safe_name = slugify(os.path.splitext(upload.name)[0]) or "example-image"
-            filename = f"{safe_name}-{uuid.uuid4().hex[:10]}{extension}"
-            path = f"theme_images/{theme.id}/designer_drafts/{draft.id}/{filename}"
-            saved_path = system_storage.save(path, ContentFile(content))
-            replacement_url = system_storage.url(saved_path)
+            filename = media.original_filename
+            replacement_url = media.get_uuid_url()
             rewritten, replacements = _replace_preview_image_reference(
                 {"content": view.get("content", {}), "images": view.get("images", {})},
                 source_url,
@@ -2354,6 +2377,7 @@ def replace_designer_preview_image(
                 "width": width,
                 "height": height,
                 "size": len(content),
+                "sourceMediaId": str(media.id),
             }
             draft_theme.designer_preview = preview
             _save_designer_preview_draft(draft, draft_theme, user)
@@ -2418,6 +2442,7 @@ def replace_designer_asset(
             asset = _find_asset(draft_theme, asset_key)
             if not asset:
                 raise ValidationError("Asset slot was not found.")
+            previous_source = asset.get("url") if not target_breakpoint else None
             if asset_key.startswith("library:"):
                 raise ValidationError("Unused library assets cannot be replaced from the Designer draft.")
             required_width = asset.get("requiredWidth")
@@ -2437,6 +2462,9 @@ def replace_designer_asset(
             filename = f"{safe_name}-{uuid.uuid4().hex[:10]}{extension}"
             path = f"theme_images/{theme.id}/designer_drafts/{draft.id}/{filename}"
             saved_path = system_storage.save(path, ContentFile(content))
+            register_designer_image_version(
+                theme, previous_source, saved_path, content, upload.content_type, width, height, user,
+            )
 
             if asset_key == "preview":
                 draft_theme.image.name = saved_path

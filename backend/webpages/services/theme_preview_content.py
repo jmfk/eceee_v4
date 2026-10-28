@@ -683,6 +683,14 @@ def _copy_preview_images(theme, value):
         source_path = media_file.file_path if media_file else _managed_storage_path(reference)
         if not source_path or os.path.splitext(source_path)[1].lower() not in IMAGE_EXTENSIONS:
             return reference
+        if not media_file:
+            # A raw storage URL can be converted only when it identifies exactly
+            # one image in this tenant. Ambiguous legacy paths remain untouched.
+            matches = list(MediaFile.objects.filter(tenant=theme.tenant, file_path=source_path, file_type="image")[:2])
+            if len(matches) == 1:
+                media_file = matches[0]
+        if media_file and media_file.file_type == "image":
+            return media_file.get_uuid_url()
         if media_file:
             authorized_paths[source_path] = True
         if not is_tenant_owned(source_path):
@@ -762,10 +770,7 @@ def _copy_preview_images(theme, value):
         ).order_by("-created_at", "id")
         items = []
         for media_file in files:
-            authorized_paths[media_file.file_path] = True
-            copied_url = copy_reference(media_file.file_path)
-            if copied_url == media_file.file_path:
-                continue
+            copied_url = media_file.get_uuid_url()
             metadata = media_file.metadata if isinstance(media_file.metadata, dict) else {}
             items.append(
                 {
@@ -823,7 +828,12 @@ def _copy_preview_images(theme, value):
                 isinstance(current.get(key), str) and rewritten.get(key) != current.get(key)
                 for key in media_reference_keys
             )
-            if copied_media_reference:
+            points_to_library = any(
+                isinstance(rewritten.get(key), str)
+                and rewritten[key].startswith("/api/v1/media/file/")
+                for key in media_reference_keys
+            )
+            if copied_media_reference and not points_to_library:
                 for key in ("mediaId", "media_id", "fileId", "file_id"):
                     rewritten.pop(key, None)
                 if current.get("type") in {"image", "media", "file"} or any(
@@ -835,7 +845,8 @@ def _copy_preview_images(theme, value):
             return [rewrite(child, parent_key) for child in current]
         if isinstance(current, str):
             rewritten_string = EMBEDDED_IMAGE_PATTERN.sub(lambda match: copy_reference(match.group(0)), current)
-            rewritten_string = MEDIA_ID_ATTRIBUTE_PATTERN.sub("", rewritten_string)
+            if "/api/v1/media/file/" not in rewritten_string:
+                rewritten_string = MEDIA_ID_ATTRIBUTE_PATTERN.sub("", rewritten_string)
             if rewritten_string != current:
                 return rewritten_string
             normalized_key = parent_key.lower().replace("-", "_")

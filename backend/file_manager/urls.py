@@ -22,6 +22,7 @@ from .views import (
 from django.views.decorators.csrf import csrf_exempt
 from .views.imgproxy_sign import sign_imgproxy_url, batch_sign_imgproxy_urls, generate_responsive_imgproxy_urls
 from .views.table_import import import_table_view
+from .views.image_version_cleanup import ImageVersionCleanupView
 
 app_name = "file_manager"
 
@@ -33,6 +34,7 @@ router.register(r"collections", MediaCollectionViewSet, basename="mediacollectio
 router.register(r"pending-files", PendingMediaFileViewSet, basename="pendingmediafile")
 
 urlpatterns = [
+    path("image-version-cleanup/", ImageVersionCleanupView.as_view(), name="image-version-cleanup"),
     # Include router URLs
     path("", include(router.urls)),
     # Upload and search endpoints

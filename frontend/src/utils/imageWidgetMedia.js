@@ -4,7 +4,12 @@ export const imageSourceUrl = source => {
     if (typeof source === 'string') return source
     if (!source || typeof source !== 'object') return ''
 
-    return source.src || source.srcUrl || source.src_url
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(source.id || '')
+        && (source.type || source.fileType || source.file_type || 'image') !== 'video') {
+        return `/api/v1/media/file/${source.id}/`
+    }
+    return source.stableUrl || source.stable_url
+        || source.src || source.srcUrl || source.src_url
         || source.sourceUrl || source.source_url
         || source.imgproxyBaseUrl || source.imgproxy_base_url
         || source.fileUrl || source.file_url

@@ -1183,7 +1183,7 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
             customTitle="Choose a shared theme image"
             onSelect={(items) => {
                 const image = Array.isArray(items) ? items[0] : null
-                const imageUrl = image?.imgproxyBaseUrl || image?.absoluteUrl || image?.url
+                const imageUrl = image?.stableUrl || image?.imgproxyBaseUrl || image?.absoluteUrl || image?.url
                 if (!imageUrl) return false
                 setStyleOverride('background_image', imageUrl)
                 setImagePickerOpen(false)

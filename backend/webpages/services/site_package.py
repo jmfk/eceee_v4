@@ -2520,52 +2520,7 @@ class SitePackageImporter:
         media_map = {}
         for data in manifest.get("files", []):
             self.media_source_metadata[str(data["source_id"])] = data
-            existing = (
-                MediaFile.objects.with_deleted().filter(file_hash=data["file_hash"], tenant=namespace.tenant).first()
-            )
             destination_hash = data["file_hash"]
-            if (
-                existing is None
-                and MediaFile.objects.with_deleted()
-                .filter(file_hash=destination_hash)
-                .exclude(tenant=namespace.tenant)
-                .exists()
-            ):
-                destination_hash = hashlib.sha256(
-                    f"{data['file_hash']}:{namespace.tenant_id}".encode("utf-8")
-                ).hexdigest()
-                existing = (
-                    MediaFile.objects.with_deleted()
-                    .filter(
-                        file_hash=destination_hash,
-                        tenant=namespace.tenant,
-                    )
-                    .first()
-                )
-            if existing:
-                if existing.is_deleted:
-                    file_member = self._find_media_file_member(package, data["source_id"])
-                    if not file_member:
-                        continue
-                    verified_file = self._verified_media_file(package, file_member, data["file_hash"])
-                    try:
-                        restored_path = self.storage._save(
-                            existing.file_path,
-                            verified_file,
-                        )
-                    finally:
-                        verified_file.close()
-                    if restored_path != existing.file_path:
-                        existing.file_path = restored_path
-                        existing.file_url = self.storage.url(restored_path)
-                    existing.is_deleted = False
-                    existing.deleted_at = None
-                    existing.deleted_by = None
-                    existing.save(update_fields=["file_path", "file_url", "is_deleted", "deleted_at", "deleted_by"])
-                media_map[data["source_id"]] = existing
-                self._restore_media_relations(existing, data, namespace)
-                continue
-
             file_member = self._find_media_file_member(package, data["source_id"])
             if not file_member:
                 continue

@@ -339,11 +339,13 @@ class MediaFileBySlugView(APIView):
             signed_url = storage.generate_signed_url(media_file.file_path)
 
             if signed_url:
-                return redirect(signed_url)
+                response = redirect(signed_url)
             else:
                 # Fallback to public URL
                 public_url = storage.get_public_url(media_file.file_path)
-                return redirect(public_url)
+                response = redirect(public_url)
+            response["Cache-Control"] = "no-store, max-age=0"
+            return response
 
         except (Namespace.DoesNotExist, MediaFile.DoesNotExist):
             raise Http404("Media file not found")
@@ -440,11 +442,13 @@ class MediaFileByUUIDView(APIView):
             signed_url = storage.generate_signed_url(media_file.file_path)
 
             if signed_url:
-                return redirect(signed_url)
+                response = redirect(signed_url)
             else:
                 # Fallback to public URL
                 public_url = storage.get_public_url(media_file.file_path)
-                return redirect(public_url)
+                response = redirect(public_url)
+            response["Cache-Control"] = "no-store, max-age=0"
+            return response
 
         except MediaFile.DoesNotExist:
             raise Http404("Media file not found")

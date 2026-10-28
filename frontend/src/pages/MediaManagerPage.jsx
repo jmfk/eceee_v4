@@ -14,10 +14,13 @@ import { Loader2, FolderOpen } from 'lucide-react';
 import { namespacesApi } from '../api';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 import MediaManager from '../components/media/MediaManager';
+import ImageVersionCleanup from '../components/media/ImageVersionCleanup';
+import { useAuth } from '../contexts/AuthContext';
 import ContextualHelpLink from '../components/help/ContextualHelpLink';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const MediaManagerPage = () => {
+  const { user } = useAuth();
   // Set document title
   useDocumentTitle('Media Manager');
 
@@ -86,6 +89,7 @@ const MediaManagerPage = () => {
           </div>
 
           <div className="flex items-center gap-3 mt-1">
+            {(user?.isSuperuser || user?.permissions?.includes('tenant.admin')) && <ImageVersionCleanup />}
             <label htmlFor="namespace-select" className="font-medium text-gray-700">
               Namespace:
             </label>

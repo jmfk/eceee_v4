@@ -2268,7 +2268,27 @@ class PageTheme(models.Model):
         in its own library folder, prefer that URL so generated CSS does not depend
         on stale source-theme objects.
         """
-        if not image_url or "theme_images/" not in str(image_url):
+        if not image_url:
+            return image_url
+
+        # Older Designer snapshots may contain the storage URL of a MediaFile.
+        # Resolve archived keys to its current bytes without rewriting a release.
+        from urllib.parse import urlparse
+
+        from file_manager.models import MediaFileVersion
+
+        parsed_path = urlparse(str(image_url)).path.strip("/")
+        pieces = parsed_path.split("/")
+        suffixes = ["/".join(pieces[index:]) for index in range(len(pieces))]
+        previous = (
+            MediaFileVersion.objects.filter(media_file__tenant_id=self.tenant_id, file_path__in=suffixes)
+            .select_related("media_file")
+            .first()
+        )
+        if previous:
+            return previous.media_file.get_file_url()
+
+        if "theme_images/" not in str(image_url):
             return image_url
 
         try:

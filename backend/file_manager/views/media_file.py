@@ -3,7 +3,10 @@ MediaFileViewSet for managing media files with security controls.
 """
 
 import logging
+import uuid
 
+from django.db import transaction
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.http import Http404
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
@@ -14,7 +17,7 @@ from rest_framework.response import Response
 
 from core.roles import is_tenant_admin
 
-from ..models import MediaFile
+from ..models import MediaFile, MediaFileVersion
 from ..serializers import MediaFileDetailSerializer, MediaFileListSerializer
 from ..storage import S3MediaStorage, storage
 from .pagination import MediaFilePagination
@@ -34,6 +37,69 @@ def _resolve_replaced_media_file(media_file: MediaFile, max_hops: int = 10) -> M
         seen.add(current.id)
         current = current.replaced_by
     return current
+
+
+def _store_image_version(media_file, uploaded_file, user):
+    """Upload first, then atomically move the logical image to the new object."""
+    s3_storage = S3MediaStorage()
+    folder_path = media_file.file_path.rsplit("/", 1)[0] if "/" in media_file.file_path else "uploads"
+    upload_result = s3_storage.upload_file(uploaded_file, folder_path)
+    try:
+        with transaction.atomic():
+            media_file = MediaFile.objects.select_for_update().get(pk=media_file.pk, tenant_id=media_file.tenant_id)
+            now = timezone.now()
+            MediaFileVersion.objects.create(
+                media_file=media_file,
+                version_number=media_file.version_number,
+                file_path=media_file.file_path,
+                original_filename=media_file.original_filename,
+                file_size=media_file.file_size,
+                content_type=media_file.content_type,
+                file_hash=media_file.file_hash,
+                width=media_file.width,
+                height=media_file.height,
+                uploaded_at=media_file.version_uploaded_at or media_file.created_at,
+                uploaded_by=media_file.uploaded_by or media_file.created_by,
+                superseded_at=now,
+            )
+            media_file.file_path = upload_result["file_path"]
+            media_file.file_url = s3_storage.get_public_url(media_file.file_path)
+            media_file.file_size = upload_result["file_size"]
+            media_file.content_type = upload_result["content_type"]
+            media_file.file_hash = upload_result["file_hash"]
+            media_file.width = upload_result.get("width")
+            media_file.height = upload_result.get("height")
+            media_file.original_filename = uploaded_file.name
+            media_file.uploaded_by = user
+            media_file.last_modified_by = user
+            media_file.replaced_by = None
+            media_file.version_number += 1
+            media_file.version_uploaded_at = now
+            media_file.save()
+            transaction.on_commit(lambda: _safe_invalidate_tenant_theme_css(media_file.tenant_id))
+    except Exception:
+        s3_storage.delete(upload_result["file_path"])
+        raise
+    return media_file
+
+
+def _invalidate_tenant_theme_css(tenant_id):
+    """Theme CSS URLs and cached bodies may contain an older media source URL."""
+    from webpages.models import PageTheme
+    from webpages.services import ThemeCSSGenerator
+
+    theme_ids = list(PageTheme.objects.filter(tenant_id=tenant_id).values_list("id", flat=True))
+    PageTheme.objects.filter(id__in=theme_ids).update(updated_at=timezone.now())
+    generator = ThemeCSSGenerator()
+    for theme_id in theme_ids:
+        generator.invalidate_cache(theme_id)
+
+
+def _safe_invalidate_tenant_theme_css(tenant_id):
+    try:
+        _invalidate_tenant_theme_css(tenant_id)
+    except Exception:
+        logger.exception("Could not invalidate theme CSS after image replacement for tenant %s", tenant_id)
 
 
 class MediaFileViewSet(viewsets.ModelViewSet):
@@ -57,6 +123,82 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         from ..security import MediaFilePermission
 
         return [MediaFilePermission()]
+
+    def _can_modify(self, request, media_file):
+        return media_file.created_by_id == request.user.id or is_tenant_admin(request.user, media_file.tenant)
+
+    @action(detail=True, methods=["get"])
+    def versions(self, request, pk=None):
+        media_file = self.get_object()
+        if media_file.file_type != "image":
+            return Response({"error": "Only images have versions"}, status=status.HTTP_400_BAD_REQUEST)
+        versions = [{
+            "id": str(version.id),
+            "version_number": version.version_number,
+            "original_filename": version.original_filename,
+            "file_size": version.file_size,
+            "content_type": version.content_type,
+            "width": version.width,
+            "height": version.height,
+            "uploaded_at": version.uploaded_at,
+            "uploaded_by": version.uploaded_by_id,
+            "superseded_at": version.superseded_at,
+            "preview_url": storage.generate_signed_url(version.file_path),
+            "is_current": False,
+        } for version in media_file.image_versions.select_related("uploaded_by")]
+        versions.insert(0, {
+            "id": None,
+            "version_number": media_file.version_number,
+            "original_filename": media_file.original_filename,
+            "file_size": media_file.file_size,
+            "content_type": media_file.content_type,
+            "width": media_file.width,
+            "height": media_file.height,
+            "uploaded_at": media_file.version_uploaded_at or media_file.created_at,
+            "uploaded_by": media_file.uploaded_by_id or media_file.created_by_id,
+            "superseded_at": None,
+            "preview_url": storage.generate_signed_url(media_file.file_path),
+            "is_current": True,
+        })
+        return Response({"protected_from_cleanup": media_file.protected_from_cleanup, "versions": versions})
+
+    @action(detail=True, methods=["post"])
+    def protect_versions(self, request, pk=None):
+        media_file = self.get_object()
+        if not is_tenant_admin(request.user, media_file.tenant):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+        protected = request.data.get("protected_from_cleanup")
+        if not isinstance(protected, bool):
+            return Response({"error": "protected_from_cleanup must be a boolean"}, status=status.HTTP_400_BAD_REQUEST)
+        from core.models import Tenant
+
+        with transaction.atomic():
+            Tenant.objects.select_for_update().get(pk=media_file.tenant_id)
+            MediaFile.objects.filter(pk=media_file.pk).update(protected_from_cleanup=protected)
+        return Response({"protected_from_cleanup": protected})
+
+    @action(detail=True, methods=["post"])
+    def restore_version(self, request, pk=None):
+        media_file = self.get_object()
+        if not self._can_modify(request, media_file):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+        try:
+            version_id = uuid.UUID(str(request.data.get("version_id")))
+        except (TypeError, ValueError, AttributeError):
+            return Response({"error": "Invalid image version"}, status=status.HTTP_400_BAD_REQUEST)
+        version = media_file.image_versions.filter(pk=version_id).first()
+        if not version:
+            return Response({"error": "Image version not found"}, status=status.HTTP_404_NOT_FOUND)
+        from object_storage.services.transfer_checkpoints import tenant_transfer_lock
+
+        with tenant_transfer_lock(media_file.tenant_id):
+            version = media_file.image_versions.filter(pk=version_id).first()
+            if not version:
+                return Response({"error": "Image version no longer exists"}, status=status.HTTP_404_NOT_FOUND)
+            with S3MediaStorage()._open(version.file_path) as source:
+                upload = SimpleUploadedFile(version.original_filename, source.read(), content_type=version.content_type)
+            media_file = _store_image_version(media_file, upload, request.user)
+        return Response(self.get_serializer(media_file).data)
 
     @action(detail=True, methods=["post"])
     def restore(self, request, pk=None):
@@ -106,7 +248,13 @@ class MediaFileViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        instance.delete(user=request.user, force=True)
+        if instance.protected_from_cleanup:
+            return Response({"error": "This image is protected from deletion"}, status=status.HTTP_409_CONFLICT)
+        if not instance.delete(user=request.user, force=True):
+            return Response(
+                {"error": "Remove unused historical versions before permanently deleting this image"},
+                status=status.HTTP_409_CONFLICT,
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["get"])
@@ -325,7 +473,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
 
             raise ValidationError(
                 {
-                    "error": "Cannot delete file that is referenced in content",
+                    "error": "Cannot delete a referenced or cleanup-protected file",
                     "reference_count": instance.reference_count,
                     "references": instance.get_references(),
                 }
@@ -372,14 +520,12 @@ class MediaFileViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def replace_file(self, request, pk=None):
-        """Replace the file in storage while preserving all metadata."""
-        import hashlib
-
-        from django.db import transaction
-
+        """Store an image replacement at a new key and retain its previous bytes."""
         from ..security import SecurityAuditLogger
 
         media_file = self.get_object()
+        if not self._can_modify(request, media_file):
+            return Response(status=status.HTTP_403_FORBIDDEN)
 
         # Check if file is provided
         if "file" not in request.FILES:
@@ -425,50 +571,9 @@ class MediaFileViewSet(viewsets.ModelViewSet):
             # instance fetched before acquiring the tenant barrier.
             media_file = MediaFile.objects.get(pk=media_file.pk, tenant_id=media_file.tenant_id)
 
-            # Compute hash up-front (avoids uploading something we can't store)
-            uploaded_file.seek(0)
-            file_bytes = uploaded_file.read()
-            uploaded_file.seek(0)
-            new_file_hash = hashlib.sha256(file_bytes).hexdigest()
-
-            # Scenario 1: Same content as current - no-op (optionally overwrite anyway)
-            if new_file_hash == media_file.file_hash:
-                logger.info(f"Replacement file has same hash as current file {media_file.id}, no changes needed")
-                serializer = self.get_serializer(media_file)
-                return Response(serializer.data, status=status.HTTP_200_OK)
-
-            # Scenario 2: Hash matches a different active file -> link replacement (keep uniqueness)
-            existing_active = MediaFile.objects.filter(file_hash=new_file_hash).exclude(id=media_file.id).first()
-
-            if existing_active:
-                with transaction.atomic():
-                    media_file.replaced_by = existing_active
-                    media_file.last_modified_by = request.user
-                    media_file.save(update_fields=["replaced_by", "last_modified_by", "updated_at"])
-
-                serializer = self.get_serializer(media_file)
-                return Response(serializer.data, status=status.HTTP_200_OK)
-
-            # Scenario 3: Unique hash -> overwrite object in-place at current key
-            s3_storage = S3MediaStorage()
-            old_source_url = s3_storage.get_public_url(media_file.file_path)
-            upload_result = s3_storage.overwrite_file(media_file.file_path, uploaded_file)
-
-            with transaction.atomic():
-                media_file.file_size = upload_result["file_size"]
-                media_file.content_type = upload_result["content_type"]
-                media_file.file_hash = upload_result["file_hash"]
-                media_file.width = upload_result.get("width")
-                media_file.height = upload_result.get("height")
-                media_file.original_filename = uploaded_file.name
-                media_file.last_modified_by = request.user
-                media_file.replaced_by = None
-                media_file.save()
-
-            # Clear imgproxy cache entries for the old source URL
-            # Since we now use version parameters, old cache entries will be bypassed,
-            # but we should still try to clear them for immediate effect
-            self._clear_imgproxy_cache(old_source_url)
+            if media_file.file_type != "image" or not uploaded_file.content_type.startswith("image/"):
+                return Response({"error": "Image versions require an image file"}, status=status.HTTP_400_BAD_REQUEST)
+            media_file = _store_image_version(media_file, uploaded_file, request.user)
 
             # Log the file replacement
             SecurityAuditLogger.log_file_upload(

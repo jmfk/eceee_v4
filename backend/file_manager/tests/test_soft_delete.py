@@ -219,16 +219,13 @@ class AtomicFileHashHandlingTests(TestCase):
         self.assertEqual(file2.file_hash, self.test_hash)
         self.assertFalse(file2.is_deleted)
 
-        # Verify old file was hard deleted
-        self.assertFalse(MediaFile.objects.with_deleted().filter(id=file1_id).exists())
+        # The old identity and its history are retained independently.
+        self.assertTrue(MediaFile.objects.with_deleted().filter(id=file1_id).exists())
 
-        # Verify only one file with this hash exists
         files_with_hash = MediaFile.objects.with_deleted().filter(file_hash=self.test_hash)
-        self.assertEqual(files_with_hash.count(), 1)
-        self.assertEqual(files_with_hash.first().id, file2.id)
+        self.assertEqual(files_with_hash.count(), 2)
 
-    def test_cannot_create_duplicate_active_file(self):
-        """Test that creating a file with existing active hash raises error."""
+    def test_can_create_duplicate_active_file_with_independent_identity(self):
         # Create an active file
         MediaFile.objects.create(
             title="Active File",
@@ -245,8 +242,7 @@ class AtomicFileHashHandlingTests(TestCase):
         )
 
         # Try to create another file with same hash
-        with self.assertRaises(ValidationError) as context:
-            MediaFile.create_with_hash_cleanup(
+        duplicate = MediaFile.create_with_hash_cleanup(
                 file_hash=self.test_hash,
                 title="Duplicate File",
                 original_filename="duplicate.jpg",
@@ -258,9 +254,9 @@ class AtomicFileHashHandlingTests(TestCase):
                 tenant=self.tenant,
                 created_by=self.user,
                 last_modified_by=self.user,
-            )
-
-        self.assertIn("already exists", str(context.exception))
+        )
+        self.assertEqual(duplicate.file_hash, self.test_hash)
+        self.assertEqual(MediaFile.objects.filter(file_hash=self.test_hash).count(), 2)
 
     def test_s3_object_cleanup_during_hash_handling(self):
         """Test that S3 cleanup works correctly when re-uploading after soft delete."""
@@ -300,9 +296,7 @@ class AtomicFileHashHandlingTests(TestCase):
                 last_modified_by=self.user,
             )
 
-            # Verify S3 delete WAS called for the old file
-            # (since there are no other references to it at deletion time)
-            mock_storage.delete.assert_called_once_with("test/old_upload.jpg")
+            mock_storage.delete.assert_not_called()
 
             # Verify new file was created
             self.assertIsNotNone(file2)
@@ -465,12 +459,10 @@ class AtomicFileHashHandlingTests(TestCase):
         self.assertIsNotNone(file3)
         self.assertEqual(file3.title, "File 3")
 
-        # Verify file2 was hard deleted
-        self.assertFalse(MediaFile.objects.with_deleted().filter(id=file2_id).exists())
+        self.assertTrue(MediaFile.objects.with_deleted().filter(id=file2_id).exists())
 
-        # Verify only one file with this hash exists
         files_with_hash = MediaFile.objects.with_deleted().filter(file_hash=self.test_hash)
-        self.assertEqual(files_with_hash.count(), 1)
+        self.assertEqual(files_with_hash.count(), 2)
 
     def test_hard_delete_checks_all_references(self):
         """Test that hard delete checks both active and soft-deleted references."""

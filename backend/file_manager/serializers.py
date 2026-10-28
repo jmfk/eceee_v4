@@ -373,6 +373,7 @@ class MediaFileListSerializer(serializers.ModelSerializer):
     # SEO-friendly URLs
     absolute_url = serializers.SerializerMethodField()
     uuid_url = serializers.SerializerMethodField()
+    stable_url = serializers.SerializerMethodField()
     download_url = serializers.SerializerMethodField()
     annotation = serializers.SerializerMethodField()
     replaced_by = serializers.UUIDField(source="replaced_by_id", read_only=True)
@@ -398,9 +399,12 @@ class MediaFileListSerializer(serializers.ModelSerializer):
             "thumbnail_url",
             "absolute_url",
             "uuid_url",
+            "stable_url",
             "download_url",
             "annotation",
             "replaced_by",
+            "version_number",
+            "protected_from_cleanup",
             "created_at",
             "created_by",
             "created_by_name",
@@ -432,6 +436,11 @@ class MediaFileListSerializer(serializers.ModelSerializer):
         except Exception:
             return None
 
+    def get_stable_url(self, obj):
+        url = obj.get_uuid_url()
+        request = self.context.get("request")
+        return request.build_absolute_uri(url) if request else url
+
     def get_download_url(self, obj):
         """Get download URL."""
         try:
@@ -455,7 +464,7 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
 
     def get_is_deletable(self, obj):
         """Check if file can be deleted (no references)."""
-        return obj.reference_count == 0
+        return obj.reference_count == 0 and not obj.protected_from_cleanup
 
     tags = MediaTagSerializer(many=True, read_only=True)
     collections = MediaCollectionSerializer(many=True, read_only=True)
@@ -472,6 +481,7 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
     file_size_human = serializers.CharField(read_only=True)
     dimensions = serializers.CharField(read_only=True)
     file_url = serializers.SerializerMethodField()
+    stable_url = serializers.SerializerMethodField()
 
     # imgproxy base URL for dynamic resizing
     imgproxy_base_url = serializers.SerializerMethodField()
@@ -513,10 +523,13 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
             "tag_ids",
             "collection_ids",
             "file_url",
+            "stable_url",
             "imgproxy_base_url",
             "thumbnail_url",
             "annotation",
             "replaced_by",
+            "version_number",
+            "protected_from_cleanup",
             "created_at",
             "updated_at",
             "created_by",
@@ -564,6 +577,8 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
             "reference_count",
             "last_referenced",
             "is_deletable",
+            "version_number",
+            "protected_from_cleanup",
         ]
 
     def get_file_url(self, obj):
@@ -572,6 +587,11 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
             return obj.get_absolute_url()
         except Exception:
             return f"/api/media/files/{obj.id}/download/"
+
+    def get_stable_url(self, obj):
+        url = obj.get_uuid_url()
+        request = self.context.get("request")
+        return request.build_absolute_uri(url) if request else url
 
     def validate_slug(self, value):
         """Validate slug format and uniqueness within namespace."""
