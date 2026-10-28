@@ -17,6 +17,7 @@ const dataDrivenNewsTypes = new Set([
 const linkTypes = new Set(['internal', 'external', 'email', 'phone', 'anchor', 'media'])
 const imgproxyBatchSize = 50
 const pageLookupBatchSize = 500
+const newsVersionBatchSize = 8
 
 const collectionFileToMediaItem = (file: any) => {
     const url = file.imgproxyBaseUrl || file.imgproxy_base_url || file.fileUrl || file.file_url || file.url || ''
@@ -111,32 +112,6 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
     const tenantRequestConfig = model.context.tenantId
         ? { headers: { 'X-Tenant-ID': model.context.tenantId } }
         : undefined
-    let publishedNewsPromise: Promise<any[]> | undefined
-    const publishedNews = () => {
-        publishedNewsPromise ??= (async () => {
-            const response: any = await objectInstancesApi.getPublished({}, tenantRequestConfig)
-            const published = response?.data || response
-            const candidates = (Array.isArray(published) ? published : []).filter((item: any) => {
-                const type = item.objectType || item.object_type || {}
-                return type.name === 'news'
-            })
-            const versions = await Promise.all(candidates.map(async (item: any) => {
-                const versionResponse: any = await objectInstancesApi.getCurrentPublishedVersion(item.id, tenantRequestConfig)
-                const version = versionResponse?.data?.data ?? versionResponse?.data ?? versionResponse
-                if (!version || !version.effective_date) return null
-                return {
-                    ...item,
-                    title: version.title || item.title,
-                    data: version.data || {},
-                    classificationIds: version.classification_ids || [],
-                    isFeatured: version.is_featured === true,
-                    publishDate: version.effective_date,
-                }
-            }))
-            return versions.filter(Boolean)
-        })()
-        return publishedNewsPromise
-    }
     const collectWidgets = (widgets: RenderWidgetModel[]): RenderWidgetModel[] => widgets.flatMap((widget) => {
         const nested = [
             ...(Array.isArray(widget.config.widgets) ? widget.config.widgets : []),
@@ -145,6 +120,42 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
         return [widget, ...collectWidgets(nested)]
     })
     let allWidgets = collectWidgets(Object.values(next.slots).flat())
+    const selectedNewsTypes = new Set<string>()
+    allWidgets.forEach((widget) => {
+        if (widget.type !== 'easy_widgets.TopNewsPlugWidget' && widget.type !== 'easy_widgets.SidebarTopNewsWidget') return
+        const configured = widget.config.objectTypes ?? widget.config.object_types ?? ['news']
+        if (Array.isArray(configured)) configured.forEach((type) => selectedNewsTypes.add(String(type)))
+    })
+    let publishedNewsPromise: Promise<any[]> | undefined
+    const publishedNews = () => {
+        publishedNewsPromise ??= (async () => {
+            const response: any = await objectInstancesApi.getPublished({}, tenantRequestConfig)
+            const published = response?.data || response
+            const candidates = (Array.isArray(published) ? published : []).filter((item: any) => {
+                const type = item.objectType || item.object_type || {}
+                return selectedNewsTypes.has(String(type.id)) || selectedNewsTypes.has(String(type.name))
+            })
+            const versions = []
+            for (let index = 0; index < candidates.length; index += newsVersionBatchSize) {
+                const batch = await Promise.all(candidates.slice(index, index + newsVersionBatchSize).map(async (item: any) => {
+                    const versionResponse: any = await objectInstancesApi.getCurrentPublishedVersion(item.id, tenantRequestConfig)
+                    const version = versionResponse?.data?.data ?? versionResponse?.data ?? versionResponse
+                    if (!version || !version.effective_date) return null
+                    return {
+                        ...item,
+                        title: version.title || item.title,
+                        data: version.data || {},
+                        classificationIds: version.classification_ids || [],
+                        isFeatured: version.is_featured === true,
+                        publishDate: version.effective_date,
+                    }
+                }))
+                versions.push(...batch)
+            }
+            return versions.filter(Boolean)
+        })()
+        return publishedNewsPromise
+    }
     const internalPageIds = new Set<string>()
     allWidgets.forEach((widget) => collectInternalPageIds(widget.config, internalPageIds))
     const pageLookup = new Map<string, any>()
