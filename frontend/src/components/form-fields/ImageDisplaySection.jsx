@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useEffect } from 'react'
-import { X, Eye, Tag, Plus, FolderOpen } from 'lucide-react'
+import { X, Eye, Tag, Plus, FolderOpen, ExternalLink } from 'lucide-react'
 import { getImageUrl, formatFileSize } from './ImageValidationUtils'
 import MediaItemTagEditor from '../media/MediaItemTagEditor'
 import { getGridStyle, getObjectFitClass } from '../../utils/imageGridLayout'
@@ -222,6 +222,14 @@ const ImageDisplaySection = ({
 
     // For collections, we'll show a collection preview with thumbnails (1-9 images in 3x3 grid)
     if (isCollection) {
+        const collectionNamespace = typeof image.namespace === 'string'
+            ? image.namespace
+            : image.namespace?.slug || namespace
+        const collectionSearch = new URLSearchParams({
+            tab: 'collections',
+            collection: String(image.id),
+            ...(collectionNamespace ? { namespace: collectionNamespace } : {})
+        })
         // Determine grid layout based on number of files (1-9 images)
         const fileCount = collectionFiles.length
         const getGridCols = (count) => {
@@ -233,7 +241,7 @@ const ImageDisplaySection = ({
 
         return (
             <div className="bg-white rounded-lg">
-                <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 p-4">
+                <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 p-4">
                     <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
                         {loadingCollection ? (
                             <div className="w-full h-full flex items-center justify-center">
@@ -282,6 +290,16 @@ const ImageDisplaySection = ({
                     </div>
 
                     {/* Change button to open modal */}
+                    <a
+                        href={`/media?${collectionSearch}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 whitespace-nowrap focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
+                        aria-label={`Edit collection ${collectionData?.title || image.title || ''}`.trim()}
+                    >
+                        <ExternalLink className="w-4 h-4" aria-hidden="true" />
+                        Edit
+                    </a>
                     <button
                         type="button"
                         onClick={onOpenModal}

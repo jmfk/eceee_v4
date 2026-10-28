@@ -8,7 +8,7 @@ import { FolderOpen } from 'lucide-react';
 import OptimizedImage from './OptimizedImage';
 import { getImageAspectRatio, getGridSpan, getGridStyle, getObjectFitClass } from '../../utils/imageGridLayout';
 
-const CollectionThumbnailGrid = ({ collection, className = '' }) => {
+const CollectionThumbnailGrid = ({ collection, className = '', compact = false }) => {
     // Helper function to determine grid layout based on file count
     const getGridLayout = (fileCount) => {
         if (fileCount === 1) return { cols: 1, rows: 1, maxImages: 1 };
@@ -19,14 +19,19 @@ const CollectionThumbnailGrid = ({ collection, className = '' }) => {
 
     // Helper function to get image files from collection
     const getImageFiles = (collection) => {
-        if (!collection.sampleImages || !Array.isArray(collection.sampleImages)) return [];
-        const layout = getGridLayout(collection.fileCount || collection.file_count || 0);
-        return collection.sampleImages.slice(0, layout.maxImages);
+        const samples = collection.sampleImages || collection.sample_images || collection.files;
+        if (!Array.isArray(samples)) return [];
+        const layout = compact && samples.length > 1
+            ? { maxImages: 4 }
+            : getGridLayout(collection.fileCount || collection.file_count || samples.length);
+        return samples.slice(0, layout.maxImages);
     };
 
     const fileCount = collection.fileCount || collection.file_count || 0;
     const imageFiles = getImageFiles(collection);
-    const layout = getGridLayout(fileCount);
+    const layout = compact && imageFiles.length > 1
+        ? { cols: 2, rows: 2, maxImages: 4 }
+        : getGridLayout(fileCount || imageFiles.length);
 
     if (imageFiles.length === 0) {
         return (
@@ -69,7 +74,7 @@ const CollectionThumbnailGrid = ({ collection, className = '' }) => {
                             style={gridStyle}
                         >
                             <OptimizedImage
-                                src={file.imgproxyBaseUrl || file.imgproxy_base_url}
+                                src={file.imgproxyBaseUrl || file.imgproxy_base_url || file.fileUrl || file.file_url || file.url}
                                 alt=""
                                 width={100}
                                 height={100}

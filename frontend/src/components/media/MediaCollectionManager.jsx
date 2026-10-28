@@ -1184,7 +1184,7 @@ const EditCollectionView = ({ collection, namespace, onBack, onSave }) => {
     );
 };
 
-const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
+const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, onCollectionClose }) => {
     const [collections, setCollections] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -1337,7 +1337,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
     };
 
     // Handle edit collection
-    const handleEdit = (collection) => {
+    const handleEdit = useCallback((collection) => {
         setEditingCollection(collection);
         setFormData({
             title: collection.title,
@@ -1347,7 +1347,22 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
         tagIds: collection.tags?.map(tag => tag.id) || []
         });
         setCurrentView('edit');
-    };
+    }, []);
+
+    useEffect(() => {
+        if (!collectionId || !namespace) return;
+        let active = true;
+        const openCollection = async () => {
+            try {
+                const collection = await mediaCollectionsApi.get(collectionId, { namespace })();
+                if (active) handleEdit(collection);
+            } catch (error) {
+                if (active) addNotification(`Could not open collection: ${extractErrorMessage(error)}`, 'error');
+            }
+        };
+        openCollection();
+        return () => { active = false; };
+    }, [collectionId, namespace, handleEdit, addNotification]);
 
     // Handle delete collection
     const handleDelete = (collection) => {
@@ -1385,6 +1400,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
         setCurrentView('collections');
         setViewingCollection(null);
         setEditingCollection(null);
+        onCollectionClose?.();
     };
 
     // Submit create/edit form

@@ -4,6 +4,14 @@ import { describe, expect, it, vi } from 'vitest'
 
 import MediaSelectModal from '../media/MediaSelectModal'
 
+const collectionsApi = vi.hoisted(() => ({
+    list: vi.fn(() => async () => ({ results: [] })),
+    get: vi.fn(),
+}))
+
+vi.mock('../../api', () => ({ mediaCollectionsApi: collectionsApi }))
+vi.mock('../media/OptimizedImage', () => ({ default: ({ src, alt }) => <img src={src} alt={alt} /> }))
+
 vi.mock('../media/MediaBrowser', () => ({
     default: ({ onFileSelect, requireTags }) => <button
         type="button"
@@ -15,6 +23,29 @@ vi.mock('../media/MediaBrowser', () => ({
 }))
 
 describe('MediaSelectModal', () => {
+    it('shows a collage for a saved collection reference without a files property', async () => {
+        collectionsApi.get.mockImplementation(() => async () => ({
+            id: 'collection-1',
+            title: 'summerstudy 2025 logos',
+            fileCount: 11,
+            sampleImages: [1, 2, 3, 4].map(id => ({ id, imgproxyBaseUrl: `/logo-${id}.jpg` })),
+        }))
+        render(<MediaSelectModal
+            isOpen
+            onClose={vi.fn()}
+            onSelect={vi.fn()}
+            namespace="default"
+            currentSelection={{ id: 'collection-1', type: 'collection', title: 'summerstudy 2025 logos' }}
+        />)
+
+        expect(await screen.findByText('Collection (11 images)')).toBeInTheDocument()
+        expect(collectionsApi.get).toHaveBeenCalledWith('collection-1', { namespace: 'default' })
+        expect(Array.from(document.querySelectorAll('img')).map(image => image.getAttribute('src'))).toEqual([
+            '/logo-1.jpg', '/logo-2.jpg', '/logo-3.jpg', '/logo-4.jpg',
+        ])
+        expect(screen.queryByText('No image')).not.toBeInTheDocument()
+    })
+
     it('keeps the picker open when an asynchronous selection is rejected', async () => {
         const user = userEvent.setup()
         const onClose = vi.fn()

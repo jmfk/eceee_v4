@@ -30,9 +30,12 @@ const MediaManager = ({
     onFileSelect,
     onFilesLoaded,
     selectionMode = 'single',
-    fileTypes = []
+    fileTypes = [],
+    initialTab = 'library',
+    collectionId = null,
+    onCollectionClose
 }) => {
-    const [activeTab, setActiveTab] = useState('library');
+    const [activeTab, setActiveTab] = useState(initialTab);
     const [pendingCount, setPendingCount] = useState(0);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     // Load pending files count for badge
@@ -178,6 +181,8 @@ const MediaManager = ({
                 {activeTab === 'collections' && (
                     <MediaCollectionManager
                         namespace={namespace}
+                        collectionId={collectionId}
+                        onCollectionClose={onCollectionClose}
                         onCollectionSelect={onFileSelect} // Allow selecting collections if needed
                     />
                 )}
