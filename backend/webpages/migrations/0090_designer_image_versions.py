@@ -1,8 +1,8 @@
 import uuid
 
+import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
-import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
@@ -17,7 +17,14 @@ class Migration(migrations.Migration):
             fields=[
                 ("id", models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
                 ("protected_from_cleanup", models.BooleanField(default=False)),
-                ("theme", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="designer_image_series", to="webpages.pagetheme")),
+                (
+                    "theme",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="designer_image_series",
+                        to="webpages.pagetheme",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
@@ -32,14 +39,30 @@ class Migration(migrations.Migration):
                 ("height", models.PositiveIntegerField(blank=True, null=True)),
                 ("uploaded_at", models.DateTimeField(auto_now_add=True)),
                 ("superseded_at", models.DateTimeField(blank=True, null=True)),
-                ("series", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="versions", to="webpages.designerimageseries")),
-                ("uploaded_by", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="uploaded_designer_images", to=settings.AUTH_USER_MODEL)),
+                (
+                    "series",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="versions",
+                        to="webpages.designerimageseries",
+                    ),
+                ),
+                (
+                    "uploaded_by",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="uploaded_designer_images",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={"ordering": ["-version_number"]},
         ),
         migrations.AddConstraint(
             model_name="designerimageversion",
-            constraint=models.UniqueConstraint(fields=("series", "version_number"), name="unique_designer_image_version"),
+            constraint=models.UniqueConstraint(
+                fields=("series", "version_number"), name="unique_designer_image_version"
+            ),
         ),
         migrations.AddIndex(
             model_name="designerimageversion",

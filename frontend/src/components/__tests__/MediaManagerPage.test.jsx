@@ -13,6 +13,10 @@ vi.mock('../../api', () => ({
     },
 }))
 
+vi.mock('../../contexts/AuthContext', () => ({
+    useAuth: () => ({ user: { id: 1, permissions: [] } }),
+}))
+
 vi.mock('../../hooks/useDocumentTitle', () => ({
     useDocumentTitle: vi.fn(),
 }))

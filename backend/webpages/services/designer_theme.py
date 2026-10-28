@@ -13,8 +13,8 @@ import xml.etree.ElementTree as ET
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
 from django.db.models import Q
-from django.utils.html import strip_tags
 from django.utils import timezone
+from django.utils.html import strip_tags
 from django.utils.text import slugify
 from PIL import Image, ImageDraw, ImageFont
 from rest_framework.exceptions import ValidationError
