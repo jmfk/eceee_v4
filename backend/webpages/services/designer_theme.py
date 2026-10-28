@@ -990,7 +990,7 @@ def register_designer_image_version(theme, old_source, new_path, content, conten
         next_number = series.versions.order_by("-version_number").values_list("version_number", flat=True).first() + 1
         series.versions.filter(superseded_at__isnull=True).update(superseded_at=timezone.now())
     else:
-        series = DesignerImageSeries.objects.create(theme=theme)
+        series = DesignerImageSeries.objects.create(tenant=theme.tenant, theme=theme)
         next_number = 1
         if old_path and system_storage.exists(old_path):
             DesignerImageVersion.objects.create(

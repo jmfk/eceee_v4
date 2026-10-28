@@ -45,7 +45,7 @@ def backfill(apps, schema_editor):
             if Version.objects.using(db).filter(file_path=path).exists():
                 continue
             with transaction.atomic(using=db):
-                series = Series.objects.using(db).create(id=uuid.uuid4(), theme_id=theme.pk)
+                series = Series.objects.using(db).create(id=uuid.uuid4(), tenant_id=theme.tenant_id, theme_id=theme.pk)
                 Version.objects.using(db).create(
                     id=uuid.uuid4(),
                     series_id=series.pk,

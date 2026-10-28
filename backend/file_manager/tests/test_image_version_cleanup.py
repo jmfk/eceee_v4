@@ -11,7 +11,7 @@ from content.models import Namespace
 from core.models import Tenant
 from file_manager.image_version_cleanup import execute_cleanup, preview_cleanup
 from file_manager.models import MediaFile, MediaFileVersion
-from webpages.models import PageTheme, ThemeVersion
+from webpages.models import DesignerImageSeries, DesignerImageVersion, PageTheme, ThemeVersion
 
 
 class ImageVersionCleanupTests(TestCase):
@@ -75,6 +75,38 @@ class ImageVersionCleanupTests(TestCase):
         )
 
         self.assertEqual(preview_cleanup(self.tenant, 1)["count"], 0)
+
+    @patch("file_manager.storage.system_storage")
+    def test_deleting_theme_retains_registered_designer_versions(self, storage):
+        theme = PageTheme.objects.create(tenant=self.tenant, created_by=self.user, name="Deleted theme")
+        path = f"theme_images/{theme.pk}/designer_drafts/header.png"
+        series = DesignerImageSeries.objects.create(
+            tenant=self.tenant, theme=theme, protected_from_cleanup=True
+        )
+        version = DesignerImageVersion.objects.create(
+            series=series,
+            version_number=1,
+            file_path=path,
+            file_size=10,
+            content_type="image/png",
+            uploaded_by=self.user,
+        )
+        with patch.object(theme, "get_design_group_image_urls", return_value=[(path, {})]):
+            theme.delete()
+
+        series.refresh_from_db()
+        version.refresh_from_db()
+        self.assertIsNone(series.theme_id)
+        self.assertTrue(series.protected_from_cleanup)
+        self.assertIsNotNone(version.superseded_at)
+        storage.delete.assert_not_called()
+        self.assertEqual(preview_cleanup(self.tenant, 1)["count"], 1)
+
+        series.protected_from_cleanup = False
+        series.save(update_fields=["protected_from_cleanup"])
+        version.superseded_at = timezone.now() - timedelta(days=800)
+        version.save(update_fields=["superseded_at"])
+        self.assertEqual(preview_cleanup(self.tenant, 1)["count"], 2)
 
     @patch("file_manager.image_version_cleanup.S3MediaStorage")
     def test_storage_failure_leaves_version_retryable(self, storage_class):
