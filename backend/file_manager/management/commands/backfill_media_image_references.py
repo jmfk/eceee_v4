@@ -3,7 +3,7 @@
 from collections import defaultdict
 
 from django.core.management.base import BaseCommand
-from django.db import models, transaction
+from django.db import models
 
 from core.models import Tenant
 from file_manager.models import MediaFile, MediaFileVersion
@@ -70,24 +70,23 @@ class Command(BaseCommand):
             references, ambiguous = _references_for_tenant(tenant)
             total_ambiguous += ambiguous
             changed_rows = 0
-            with transaction.atomic():
-                for queryset in _sources(tenant):
-                    fields = [
-                        field.name
-                        for field in queryset.model._meta.concrete_fields
-                        if isinstance(field, (models.JSONField, models.TextField))
-                    ]
-                    for item in queryset.only("pk", *fields).iterator(chunk_size=100):
-                        changes = {}
-                        for field in fields:
-                            original = getattr(item, field)
-                            rewritten = _rewrite(original, references)
-                            if rewritten != original:
-                                changes[field] = rewritten
-                        if changes:
-                            changed_rows += 1
-                            if options["apply"]:
-                                queryset.model.objects.filter(pk=item.pk).update(**changes)
+            for queryset in _sources(tenant):
+                fields = [
+                    field.name
+                    for field in queryset.model._meta.concrete_fields
+                    if isinstance(field, (models.JSONField, models.TextField))
+                ]
+                for item in queryset.only("pk", *fields).iterator(chunk_size=100):
+                    changes = {}
+                    for field in fields:
+                        original = getattr(item, field)
+                        rewritten = _rewrite(original, references)
+                        if rewritten != original:
+                            changes[field] = rewritten
+                    if changes:
+                        changed_rows += 1
+                        if options["apply"]:
+                            queryset.model.objects.filter(pk=item.pk).update(**changes)
             total_rows += changed_rows
             self.stdout.write(f"{tenant.identifier}: rows={changed_rows}, ambiguous_references={ambiguous}")
         self.stdout.write(
