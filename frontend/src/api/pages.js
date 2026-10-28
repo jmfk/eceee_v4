@@ -25,6 +25,12 @@ import { wrapApiCall, buildQueryParams } from './utils.js'
  * Pages API operations
  */
 export const pagesApi = {
+    getHostnames: async (tenantIdentifier) => {
+        const response = await api.get(`${endpoints.pages.base}/hostnames/`, {
+            headers: { 'X-Tenant-ID': tenantIdentifier },
+        })
+        return response.data
+    },
     /**
      * Get root pages (pages without parent)
      * @param {PageFilters} filters - Query filters

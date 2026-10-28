@@ -3,18 +3,21 @@ import { useState, type FormEvent } from 'react'
 type Props = {
     value: string[]
     onChange: (hostnames: string[]) => void
+    checkAvailability?: (hostname: string) => Promise<boolean>
 }
 
 const label = '[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?'
 const hostname = new RegExp(`^${label}(?:\\.${label})*$`)
 const scopedWildcard = new RegExp(`^\\*\\.${label}(?:\\.${label})+$`)
 
-export default function HostnameListEditor({ value, onChange }: Props) {
+export default function HostnameListEditor({ value, onChange, checkAvailability }: Props) {
     const [candidate, setCandidate] = useState('')
     const [error, setError] = useState('')
+    const [checking, setChecking] = useState(false)
 
-    const add = (event: FormEvent<HTMLFormElement>) => {
+    const add = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault()
+        if (checking) return
         const next = candidate.trim().toLowerCase()
         if (!hostname.test(next) && !scopedWildcard.test(next)) {
             setError('Enter a hostname or scoped wildcard such as *.colliberty.com.')
@@ -23,6 +26,20 @@ export default function HostnameListEditor({ value, onChange }: Props) {
         if (value.some(existing => existing.toLowerCase() === next)) {
             setError('This hostname is already in the list.')
             return
+        }
+        if (checkAvailability) {
+            setChecking(true)
+            try {
+                if (!await checkAvailability(next)) {
+                    setError(`Hostname '${next}' is already used by another site.`)
+                    return
+                }
+            } catch {
+                setError('Could not check whether this hostname is available. Try again.')
+                return
+            } finally {
+                setChecking(false)
+            }
         }
         onChange([...value, next])
         setCandidate('')
@@ -55,13 +72,14 @@ export default function HostnameListEditor({ value, onChange }: Props) {
                     type="text"
                     value={candidate}
                     onChange={event => { setCandidate(event.target.value); setError('') }}
+                    disabled={checking}
                     className="min-w-0 flex-1 rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="example.com or *.colliberty.com"
                     aria-invalid={Boolean(error)}
                     aria-describedby={error ? 'hostname-error hostname-help' : 'hostname-help'}
                 />
-                <button type="submit" className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    Add
+                <button type="submit" disabled={checking} className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50">
+                    {checking ? 'Checking…' : 'Add'}
                 </button>
             </form>
             {error && <p id="hostname-error" role="alert" className="mt-2 text-sm text-red-700">{error}</p>}

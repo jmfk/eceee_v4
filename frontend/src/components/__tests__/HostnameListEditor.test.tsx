@@ -33,4 +33,18 @@ describe('HostnameListEditor', () => {
         await user.click(screen.getByRole('button', { name: 'Remove summerstudy.eceee.org' }))
         expect(onChange).toHaveBeenCalledWith([])
     })
+
+    it('shows when another site already uses the hostname', async () => {
+        const user = userEvent.setup()
+        const onChange = vi.fn()
+        const checkAvailability = vi.fn().mockResolvedValue(false)
+        render(<HostnameListEditor value={[]} onChange={onChange} checkAvailability={checkAvailability} />)
+
+        await user.type(screen.getByLabelText('Hostnames'), 'summerstudy.localhost')
+        await user.click(screen.getByRole('button', { name: 'Add' }))
+
+        expect(await screen.findByRole('alert')).toHaveTextContent('already used by another site')
+        expect(checkAvailability).toHaveBeenCalledWith('summerstudy.localhost')
+        expect(onChange).not.toHaveBeenCalled()
+    })
 })
