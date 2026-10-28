@@ -4,6 +4,8 @@ import ClassificationPicker from './classification/ClassificationPicker'
 import PathPatternSelector from './PathPatternSelector'
 import PathPreviewInput from './PathPreviewInput'
 import HostnameListEditor from './HostnameListEditor'
+import { pagesApi } from '../api/pages'
+import { useAuth } from '../contexts/AuthContext'
 import ThemeSelector from './ThemeSelector'
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../contexts/unified-data/types/operations'
@@ -45,11 +47,28 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
 }, ref) => {
     // UDC Integration
     const { getState, publishUpdate, useExternalChanges } = useUnifiedData()
+    const { user } = useAuth()
 
     // Get initial data from UDC
     const state = getState()
     const webpageData: any = state.pages?.[context.pageId]
     const pageVersionData: any = state.versions?.[context.versionId]
+    const savedHostnames = React.useRef<string[]>(webpageData?.hostnames || [])
+
+    const checkHostnameAvailability = useCallback(async (hostname: string) => {
+        const workspaces = user?.isSuperuser && user.designerTenants?.length
+            ? user.designerTenants
+            : user?.currentWorkspace ? [user.currentWorkspace] : []
+        if (!workspaces.length) throw new Error('No workspace selected')
+        const currentWorkspace = user?.currentWorkspace?.identifier
+        const lists = await Promise.all(workspaces.map(async (workspace: { identifier: string }) => ({
+            identifier: workspace.identifier,
+            hostnames: await pagesApi.getHostnames(workspace.identifier),
+        })))
+        return !lists.some(({ identifier, hostnames }) =>
+            hostnames.some((used: string) => used.toLowerCase() === hostname
+                && !(identifier === currentWorkspace && savedHostnames.current.some(own => own.toLowerCase() === hostname))))
+    }, [user])
 
     // Local state for immediate UI updates (self-controlled fields)
     const [localValues, setLocalValues] = useState({
@@ -321,6 +340,7 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                         {!webpageData?.parent && <HostnameListEditor
                             value={localValues.hostnames}
                             onChange={hostnames => handlePageFieldChange('hostnames', hostnames)}
+                            checkAvailability={checkHostnameAvailability}
                         />}
                     </div>
                 </div>
