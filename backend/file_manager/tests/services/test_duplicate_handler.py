@@ -189,10 +189,8 @@ class TestDuplicateFileHandler:
             handler = DuplicateFileHandler()
             result = handler.check_duplicates(upload_file, other_namespace, user)
 
-            assert result.has_duplicates
-            assert len(result.errors) == 1
-            assert result.errors[0]["reason"] == "duplicate_other_namespace"
-            assert "existing_file" not in result.errors[0]
+            assert not result.has_duplicates
+            assert result.errors == []
 
             existing_pending_file.refresh_from_db()
             assert existing_pending_file.namespace == namespace

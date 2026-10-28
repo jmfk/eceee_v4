@@ -890,7 +890,7 @@ class MediaFile(models.Model):
         """Get the UUID-based URL for this media file."""
         from django.urls import reverse
 
-        return reverse("file_manager:media-file-by-uuid", kwargs={"file_uuid": str(self.id)})
+        return reverse("api:file_manager:media-file-by-uuid", kwargs={"file_uuid": str(self.id)})
 
     def get_download_url(self):
         """Get the download URL (SEO-friendly slug version)."""

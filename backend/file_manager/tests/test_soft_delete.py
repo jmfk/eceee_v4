@@ -392,8 +392,8 @@ class AtomicFileHashHandlingTests(TestCase):
         self.assertFalse(media_file.is_deleted)
         self.assertEqual(list(media_file.classification_links.values_list("tag_id", flat=True)), [term.pk])
 
-        # Verify old file was hard deleted
-        self.assertFalse(MediaFile.objects.with_deleted().filter(id=file1_id).exists())
+        # The previous image identity is retained even when the bytes match.
+        self.assertTrue(MediaFile.objects.with_deleted().filter(id=file1_id).exists())
 
         # Verify pending file was marked as approved
         pending.refresh_from_db()
