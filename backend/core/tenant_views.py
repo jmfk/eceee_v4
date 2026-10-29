@@ -138,7 +138,12 @@ class TenantDetailView(APIView):
                 tenant.settings = previous
                 raise ValidationError({"hostnamePolicy": f"Existing hostname '{denied[0]}' is outside the new grant."})
         if "is_active" in schema.validated_data:
-            tenant.is_active = schema.validated_data["is_active"]
+            new_active = schema.validated_data["is_active"]
+            if new_active != tenant.is_active:
+                from webpages.middleware import DynamicHostValidationMiddleware
+
+                transaction.on_commit(DynamicHostValidationMiddleware.clear_hostname_cache, robust=True)
+            tenant.is_active = new_active
         tenant.save(update_fields=["settings", "is_active", "updated_at"])
         updated = next(item for item in tenants_with_counts() if item.pk == tenant.pk)
         return Response(tenant_data(updated))

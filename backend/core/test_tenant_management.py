@@ -1,4 +1,7 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.test import TestCase
 from django.test.utils import override_settings
@@ -6,6 +9,7 @@ from rest_framework.test import APIClient
 
 from core.hostname_policy import hostname_allowed
 from core.models import Tenant, TenantRole
+from webpages.middleware import DynamicHostValidationMiddleware
 from webpages.models import WebPage
 
 
@@ -42,12 +46,29 @@ class TenantManagementTests(TestCase):
         tenant = Tenant.objects.create(name="A", identifier="a", created_by=self.owner)
         self.client.force_authenticate(self.owner)
         url = f"/api/v1/utils/tenants/{tenant.pk}/"
-        self.assertEqual(self.client.patch(url, {"is_active": False}, format="json").status_code, 200)
+        cache_key = DynamicHostValidationMiddleware.get_cache_key()
+        cache.set(cache_key, ["a.example.test"], 300)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.assertEqual(self.client.patch(url, {"is_active": False}, format="json").status_code, 200)
+        self.assertIsNone(cache.get(cache_key))
         tenant.refresh_from_db()
         self.assertFalse(tenant.is_active)
-        self.assertEqual(self.client.patch(url, {"is_active": True}, format="json").status_code, 200)
+        cache.set(cache_key, [], 300)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.assertEqual(self.client.patch(url, {"is_active": True}, format="json").status_code, 200)
+        self.assertIsNone(cache.get(cache_key))
         tenant.refresh_from_db()
         self.assertTrue(tenant.is_active)
+
+    def test_cache_outage_does_not_fail_committed_status_change(self):
+        tenant = Tenant.objects.create(name="A", identifier="a", created_by=self.owner)
+        self.client.force_authenticate(self.owner)
+        with patch("webpages.middleware.cache.delete", side_effect=RuntimeError("cache offline")):
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.patch(f"/api/v1/utils/tenants/{tenant.pk}/", {"is_active": False}, format="json")
+        self.assertEqual(response.status_code, 200)
+        tenant.refresh_from_db()
+        self.assertFalse(tenant.is_active)
 
     @override_settings(DEFAULT_TENANT_ID=None, REQUIRE_TENANT=True)
     def test_owner_can_reactivate_selected_last_tenant(self):
