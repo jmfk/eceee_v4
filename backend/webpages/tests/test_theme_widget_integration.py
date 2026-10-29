@@ -46,10 +46,7 @@ class ThemeWidgetIntegrationTests(TestCase):
         )
         request.tenant = self.tenant
         force_authenticate(request, self.user)
-        from unittest.mock import patch
-
-        with patch("webpages.views.page_theme_views.imgproxy_service.health_check", return_value=True):
-            imported = PageThemeViewSet.as_view({"post": "import_theme"})(request)
+        imported = PageThemeViewSet.as_view({"post": "import_theme"})(request)
         self.assertEqual(imported.status_code, 201, imported.data)
         self.assertEqual(PageTheme.objects.get(pk=imported.data["theme"]["id"]).widget_types, self.theme.widget_types)
 
@@ -105,8 +102,7 @@ class ThemeWidgetIntegrationTests(TestCase):
             )
             request.tenant = self.tenant
             force_authenticate(request, self.user)
-            with patch("webpages.views.page_theme_views.imgproxy_service.health_check", return_value=True):
-                imported = PageThemeViewSet.as_view({"post": "import_theme"})(request)
+            imported = PageThemeViewSet.as_view({"post": "import_theme"})(request)
             self.assertEqual(imported.status_code, 201, imported.data)
 
         new_theme = PageTheme.objects.get(pk=imported.data["theme"]["id"])

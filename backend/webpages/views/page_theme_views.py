@@ -28,7 +28,6 @@ from rest_framework.response import Response
 
 from core.models import Tenant
 from core.roles import is_tenant_admin
-from file_manager.imgproxy import imgproxy_service
 from file_manager.storage import system_storage
 from webpages.text_outline_styles import default_text_outline_styles, validate_text_outline_styles
 
@@ -1731,19 +1730,6 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 text_outline_styles = validate_text_outline_styles(
                     theme_data.get("text_outline_styles", default_text_outline_styles())
                 )
-
-                # Check the image service before creating a theme or writing assets.
-                # The editor needs it to display imported library images.
-                if not imgproxy_service.health_check():
-                    return Response(
-                        {
-                            "error": (
-                                "Theme import cancelled: the image proxy is unavailable. "
-                                "No theme or images were imported. Start the image proxy and try again."
-                            )
-                        },
-                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    )
 
                 # Create theme
                 new_theme = PageTheme.objects.create(
