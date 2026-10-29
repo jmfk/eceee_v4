@@ -253,33 +253,33 @@ export async function mockCmsApi(page, {
 
   await page.routeWebSocket('**/ws/pages/**', webSocket => {
     const connectionId = `playwright-${editorState.nextConnectionId++}`
-    const connection = { socket: webSocket, presence: { section: 'content', widget_id: null } }
+    const connection = { socket: webSocket, presence: { section: 'content', widgetId: null } }
     editorState.sockets.set(connectionId, connection)
-    webSocket.send(JSON.stringify({ type: 'connection_established', connection_id: connectionId }))
+    webSocket.send(JSON.stringify({ type: 'connection_established', pageId: 101, connectionId }))
 
     for (const [otherId, other] of editorState.sockets.entries()) {
       if (otherId === connectionId) continue
       webSocket.send(JSON.stringify({
-        type: 'presence', action: 'join', page_id: 101, connection_id: otherId,
-        user: { id: 1, username: 'admin', display_name: 'Admin Editor' },
-        section: other.presence.section, widget_id: other.presence.widget_id,
+        type: 'presence', action: 'join', pageId: 101, connectionId: otherId,
+        user: { id: 1, username: 'admin', displayName: 'Admin Editor' },
+        section: other.presence.section, widgetId: other.presence.widgetId,
       }))
     }
 
     const broadcastPresence = (action, presence = {}) => {
       connection.presence = {
         section: presence.section || connection.presence.section,
-        widget_id: presence.widget_id || null,
+        widgetId: presence.widgetId || null,
       }
       for (const entry of editorState.sockets.values()) {
         entry.socket.send(JSON.stringify({
           type: 'presence',
           action,
-          page_id: 101,
-          connection_id: connectionId,
-          user: { id: 1, username: 'admin', display_name: 'Admin Editor' },
+          pageId: 101,
+          connectionId,
+          user: { id: 1, username: 'admin', displayName: 'Admin Editor' },
           section: connection.presence.section,
-          widget_id: connection.presence.widget_id,
+          widgetId: connection.presence.widgetId,
         }))
       }
     }
@@ -627,14 +627,14 @@ export async function mockCmsApi(page, {
       for (const entry of editorState.sockets.values()) {
         entry.socket.send(JSON.stringify({
           type: 'version_updated',
-          page_id: 101,
-          version_id: editorState.version.id,
-          version_number: editorState.version.versionNumber,
-          updated_at: editorState.version.updatedAt,
+          pageId: 101,
+          versionId: editorState.version.id,
+          versionNumber: editorState.version.versionNumber,
+          updatedAt: editorState.version.updatedAt,
           revision: editorState.version.editRevision,
-          updated_by: 'admin',
-          session_id: sessionId,
-          mutation_type: 'saved',
+          updatedBy: 'admin',
+          sessionId,
+          mutationType: 'saved',
         }))
       }
       return
