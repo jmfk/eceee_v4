@@ -1789,7 +1789,9 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 library_images = [f for f in zf.namelist() if f.startswith("library_images/") and not f.endswith("/")]
 
                 # Also check for legacy design_group_images
-                legacy_images = [f for f in zf.namelist() if f.startswith("design_group_images/") and not f.endswith("/")]
+                legacy_images = [
+                    f for f in zf.namelist() if f.startswith("design_group_images/") and not f.endswith("/")
+                ]
 
                 # Combine both lists
                 all_images = library_images + legacy_images

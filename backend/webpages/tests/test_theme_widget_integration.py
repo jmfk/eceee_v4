@@ -111,7 +111,9 @@ class ThemeWidgetIntegrationTests(TestCase):
 
         new_theme = PageTheme.objects.get(pk=imported.data["theme"]["id"])
         new_url = f"https://storage.test/theme_images/{new_theme.id}/library/hero.png"
-        self.assertEqual(new_theme.design_groups["groups"][0]["layoutProperties"]["hero"]["xs"]["backgroundImage"]["url"], new_url)
+        self.assertEqual(
+            new_theme.design_groups["groups"][0]["layoutProperties"]["hero"]["xs"]["backgroundImage"]["url"], new_url
+        )
         self.assertEqual(new_theme.designer_preview["imageUrl"], new_url)
         self.assertEqual(new_theme.designer_preview["foreignImageUrl"], foreign_url)
         self.assertEqual(files[new_theme.site_icon.name], b"icon")
