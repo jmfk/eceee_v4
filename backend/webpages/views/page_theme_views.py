@@ -1728,6 +1728,9 @@ class PageThemeViewSet(viewsets.ModelViewSet):
 
                 layouts = theme_data.get("layouts") or default_theme_layouts()
                 validate_theme_layouts(layouts)
+                text_outline_styles = validate_text_outline_styles(
+                    theme_data.get("text_outline_styles", default_text_outline_styles())
+                )
 
                 # Check the image service before creating a theme or writing assets.
                 # The editor needs it to display imported library images.
@@ -1757,9 +1760,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     layouts=layouts,
                     widget_types=theme_data.get("widget_types", {"version": 1, "items": []}),
                     image_styles=theme_data.get("image_styles", {}),
-                    text_outline_styles=validate_text_outline_styles(
-                        theme_data.get("text_outline_styles", default_text_outline_styles())
-                    ),
+                    text_outline_styles=text_outline_styles,
                     gallery_styles=theme_data.get("gallery_styles", {}),
                     carousel_styles=theme_data.get("carousel_styles", {}),
                     table_templates=theme_data.get("table_templates", {}),
