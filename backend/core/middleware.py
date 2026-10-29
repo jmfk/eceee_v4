@@ -50,6 +50,27 @@ class TenantContextMiddleware:
 
         self.authenticate_api_user(request)
 
+        system_owner = (
+            request.user.is_authenticated
+            and request.user.is_superuser
+            and not isinstance(getattr(request, "auth", None), MachineAPIKey)
+        )
+        system_owner_path = request.path.startswith("/api/v1/utils/tenants/")
+        owner_without_workspace = (
+            system_owner
+            and request.path == "/api/v1/utils/current-user/"
+            and not Tenant.objects.filter(is_active=True).exists()
+        )
+        if system_owner and (system_owner_path or owner_without_workspace):
+            # A system owner must be able to reactivate the last workspace even
+            # when the browser still holds its now-inactive tenant selection.
+            request.tenant = None
+            clear_tenant_context()
+            try:
+                return self.get_response(request)
+            finally:
+                clear_tenant_context()
+
         if request.path.startswith("/api/v1/diagnostics/"):
             # Diagnostics validates its complete tenant selection independently.
             # Never change the CMS connection's tenant context for a multi-tenant read.

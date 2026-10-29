@@ -26,7 +26,7 @@ function errorText(error: unknown): string {
 
 export default function TenantManagementPage() {
   useDocumentTitle('Workspaces')
-  const { user } = useAuth()
+  const { user, checkAuthStatus } = useAuth()
   const queryClient = useQueryClient()
   const [name, setName] = useState('')
   const [identifier, setIdentifier] = useState('')
@@ -38,17 +38,17 @@ export default function TenantManagementPage() {
   const { data: tenants = [], isLoading, error } = useQuery<Tenant[]>({
     queryKey: ['system-tenants'],
     enabled: Boolean(user?.isSuperuser),
-    queryFn: async () => (await client.get('/api/v1/utils/tenants/')).data,
+    queryFn: async () => (await client.get('/api/v1/utils/tenants/', { skipTenantHeader: true })).data,
   })
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['system-tenants'] })
   const create = useMutation({
-    mutationFn: async () => client.post('/api/v1/utils/tenants/', { name, identifier }),
-    onSuccess: () => { setName(''); setIdentifier(''); setMessage('Workspace created. Assign hostname access before publishing.'); refresh() },
+    mutationFn: async () => client.post('/api/v1/utils/tenants/', { name, identifier }, { skipTenantHeader: true }),
+    onSuccess: () => { setName(''); setIdentifier(''); setMessage('Workspace created. Assign hostname access before publishing.'); refresh(); void checkAuthStatus() },
     onError: (failure) => setMessage(errorText(failure)),
   })
   const update = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Record<string, unknown> }) => client.patch(`/api/v1/utils/tenants/${id}/`, data),
-    onSuccess: () => { setEditing(null); setMessage('Workspace updated.'); refresh() },
+    mutationFn: async ({ id, data }: { id: string; data: Record<string, unknown> }) => client.patch(`/api/v1/utils/tenants/${id}/`, data, { skipTenantHeader: true }),
+    onSuccess: () => { setEditing(null); setMessage('Workspace updated.'); refresh(); void checkAuthStatus() },
     onError: (failure) => setMessage(errorText(failure)),
   })
 
