@@ -79,6 +79,20 @@ describe('MediaManagerPage', () => {
         expect(manager).toHaveTextContent('Collection: 42')
     })
 
+    it('clears a linked collection when switching namespaces', async () => {
+        const user = userEvent.setup()
+        window.history.replaceState({}, '', '/media?tab=collections&collection=42&namespace=archive')
+        renderPage()
+
+        await screen.findByTestId('media-manager')
+        await user.selectOptions(screen.getByRole('combobox', { name: /namespace/i }), 'main')
+
+        expect(screen.getByTestId('media-manager')).toHaveTextContent('Media manager for main')
+        expect(screen.getByTestId('media-manager')).toHaveTextContent('Collection:')
+        expect(screen.getByTestId('media-manager')).not.toHaveTextContent('Collection: 42')
+        expect(window.location.search).toBe('?tab=collections&namespace=main')
+    })
+
     it('shows a loading state while namespaces load', () => {
         namespacesApi.list.mockImplementationOnce(() => new Promise(() => { }))
 

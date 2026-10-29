@@ -101,7 +101,17 @@ const MediaManagerPage = () => {
             <select
               id="namespace-select"
               value={selectedNamespace || ''}
-              onChange={(e) => setSelectedNamespace(e.target.value)}
+              onChange={(e) => {
+                const nextNamespace = e.target.value;
+                setSelectedNamespace(nextNamespace);
+                if (collectionId) {
+                  const nextParams = new URLSearchParams(searchParams);
+                  nextParams.delete('collection');
+                  if (nextNamespace) nextParams.set('namespace', nextNamespace);
+                  else nextParams.delete('namespace');
+                  setSearchParams(nextParams, { replace: true });
+                }
+              }}
               className="px-3 py-2 border border-gray-300 rounded-md bg-white min-w-48 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">Select a namespace...</option>
@@ -127,6 +137,7 @@ const MediaManagerPage = () => {
           </div>
         ) : (
           <MediaManager
+            key={selectedNamespace}
             namespace={selectedNamespace}
             initialTab={searchParams.get('tab') === 'collections' || collectionId ? 'collections' : 'library'}
             collectionId={collectionId}
