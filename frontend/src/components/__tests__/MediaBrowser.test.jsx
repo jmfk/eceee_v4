@@ -23,7 +23,9 @@ vi.mock('../../api', () => ({
 }))
 
 vi.mock('../media/OptimizedImage', () => ({
-    default: ({ src, alt, className }) => <img src={src} alt={alt} className={className} />,
+    default: ({ src, alt, className, width, height, resizeType }) => (
+        <img src={src} alt={alt} className={className} data-width={width} data-height={height} data-resize-type={resizeType} />
+    ),
 }))
 
 vi.mock('../media/MediaSearchWidget', () => ({
@@ -195,6 +197,35 @@ describe('MediaBrowser', () => {
             pageSize: 20,
             show_deleted: false,
         }))
+    })
+
+    it('requests sharp card-sized previews and preserves extreme image proportions', async () => {
+        mediaApi.search.search.mockResolvedValue({
+            results: [
+                mockMediaFiles[0],
+                { ...mockMediaFiles[0], id: 'wide', title: 'Wide banner', width: 3000, height: 700 },
+                { ...mockMediaFiles[0], id: 'tall', title: 'Tall poster', width: 500, height: 1800 },
+            ],
+            count: 3,
+        })
+
+        renderBrowser()
+
+        const image = await screen.findByAltText('Test Image 1')
+        expect(image).toHaveAttribute('data-width', '800')
+        expect(image).toHaveAttribute('data-height', '600')
+        expect(image).toHaveAttribute('data-resize-type', 'fill')
+        expect(image).toHaveClass('object-cover')
+
+        const banner = screen.getByAltText('Wide banner')
+        expect(banner).toHaveAttribute('data-width', '2400')
+        expect(banner).toHaveAttribute('data-resize-type', 'fit')
+        expect(banner).toHaveClass('object-contain')
+
+        const poster = screen.getByAltText('Tall poster')
+        expect(poster).toHaveAttribute('data-height', '600')
+        expect(poster).toHaveAttribute('data-resize-type', 'fit')
+        expect(poster).toHaveClass('object-contain')
     })
 
     it('displays current file metadata', async () => {

@@ -43,7 +43,7 @@ import DuplicateResolveDialog from './DuplicateResolveDialog';
 import SimplifiedApprovalForm from './SimplifiedApprovalForm';
 import ImageQuickView from './ImageQuickView';
 import { extractErrorMessage } from '../../utils/errorHandling';
-import { getImageAspectRatio, getGridSpan, getGridStyle, isExtendedImage } from '../../utils/imageGridLayout';
+import { getImageAspectRatio, getGridSpan, isExtendedImage } from '../../utils/imageGridLayout';
 
 const MediaBrowser = ({
     onFileSelect,
@@ -657,8 +657,8 @@ const MediaBrowser = ({
     };
 
     // Render file thumbnail
-    const renderThumbnail = (file, size = 150, objectFit = 'cover') => {
-        const fileType = file.fileType;
+    const renderThumbnail = (file, width = 150, height = width, objectFit = 'cover') => {
+        const fileType = file.fileType || file.file_type;
         const originalUrl = file.imgproxyBaseUrl || file.fileUrl;
 
         if (fileType === 'image' && originalUrl) {
@@ -667,10 +667,12 @@ const MediaBrowser = ({
                 <OptimizedImage
                     src={originalUrl}
                     alt={file.title || file.original_filename || 'Media file'}
-                    width={size}
-                    height={size}
+                    width={width}
+                    height={height}
                     actualWidth={file.width}
                     actualHeight={file.height}
+                    quality={90}
+                    resizeType={objectFit === 'cover' ? 'fill' : 'fit'}
                     className={`w-full h-full object-${objectFit}`}
                     loading="lazy"
                     fallback={
@@ -720,16 +722,11 @@ const MediaBrowser = ({
                     gridColumn: compact ? 'auto' : `span ${colSpan}`
                 };
 
-                // Calculate proper image size for retina displays (@2x)
-                // Base cell width is ~150px per 4-column span on a 12-column grid
-                // For a 1200px container: 12 cols = 1200px, 4 cols = 400px
-                // With retina (@2x) we need 800px for 4-col, 1600px for 8-col, 2400px for 12-col
-                const baseCellWidth = compact ? 200 : 400; // Smaller base width for compact mode
-                const imageWidth = Math.floor((compact ? 1 : colSpan / 4) * baseCellWidth * 2); // 2x for retina
-
-                // Always use 'contain' to prevent upscaling and maintain aspect ratio
-                // This ensures images never display larger than their actual dimensions
-                const objectFit = 'contain';
+                // Match the requested image to the card's visible proportions at 2x density.
+                const imageWidth = compact ? 400 : Math.floor((colSpan / 4) * 800);
+                const imageHeight = compact ? 240 : 600;
+                // Keep the whole subject visible when a square crop would hide most of it.
+                const objectFit = isTall || aspectRatio > 2.5 ? 'contain' : 'cover';
 
                 return (
                     <div
@@ -796,7 +793,7 @@ const MediaBrowser = ({
                         )}
 
                         <div className={`w-full flex-1 flex items-center justify-center bg-gray-50 ${compact ? 'p-1 h-[120px] max-h-[120px]' : `p-2 ${isTall ? 'h-[300px] max-h-[300px]' : 'min-h-[300px]'}`}`}>
-                            {renderThumbnail(file, imageWidth, objectFit)}
+                            {renderThumbnail(file, imageWidth, imageHeight, objectFit)}
                         </div>
                         <div className={`${compact ? 'p-1.5' : 'p-3'} border-t border-gray-100 flex-shrink-0`}>
                             <div
@@ -860,7 +857,7 @@ const MediaBrowser = ({
                 >
                     <div className="col-span-1">
                         <div className="w-12 h-12">
-                            {renderThumbnail(file, 48)}
+                            {renderThumbnail(file, 96, 96)}
                         </div>
                     </div>
                     <div className="col-span-3">
