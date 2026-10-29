@@ -16,6 +16,15 @@ describe.skipIf(!testDatabaseUrl)('hostname root lookup against PostgreSQL', () 
     fixtureClient = new Client({ connectionString: testDatabaseUrl });
     await fixtureClient.connect();
     await fixtureClient.query(`
+      CREATE TABLE IF NOT EXISTS core_tenant (
+        id bigint PRIMARY KEY, is_active boolean NOT NULL
+      )
+    `);
+    await fixtureClient.query(`
+      INSERT INTO core_tenant (id, is_active) VALUES (1, true)
+      ON CONFLICT (id) DO UPDATE SET is_active = true
+    `);
+    await fixtureClient.query(`
       CREATE TABLE IF NOT EXISTS webpages_webpage (
         id bigint PRIMARY KEY, tenant_id bigint NOT NULL, parent_id bigint,
         slug text NOT NULL, title text NOT NULL, hostnames varchar[] NOT NULL,
@@ -36,6 +45,7 @@ describe.skipIf(!testDatabaseUrl)('hostname root lookup against PostgreSQL', () 
   afterAll(async () => {
     if (fixtureClient) {
       await fixtureClient.query('DELETE FROM webpages_webpage WHERE id IN (910001, 910002, 910003)');
+      await fixtureClient.query('DELETE FROM core_tenant WHERE id = 1');
       await fixtureClient.end();
     }
   });
@@ -45,5 +55,14 @@ describe.skipIf(!testDatabaseUrl)('hostname root lookup against PostgreSQL', () 
     expect((await database.withSnapshot(reader => reader.root('news.test.colliberty.com')))?.id).toBe('910003');
     expect((await database.withSnapshot(reader => reader.root('news.colliberty.com')))?.id).toBe('910002');
     expect(await database.withSnapshot(reader => reader.root('colliberty.com'))).toBeNull();
+  });
+
+  it('does not route hostnames owned by an inactive tenant', async () => {
+    await fixtureClient.query('UPDATE core_tenant SET is_active = false WHERE id = 1');
+    try {
+      expect(await database.withSnapshot(reader => reader.root('summerstudy-test.colliberty.com'))).toBeNull();
+    } finally {
+      await fixtureClient.query('UPDATE core_tenant SET is_active = true WHERE id = 1');
+    }
   });
 });
