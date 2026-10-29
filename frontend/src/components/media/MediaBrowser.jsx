@@ -44,6 +44,7 @@ import SimplifiedApprovalForm from './SimplifiedApprovalForm';
 import ImageQuickView from './ImageQuickView';
 import { extractErrorMessage } from '../../utils/errorHandling';
 import { getImageAspectRatio, getGridSpan, isExtendedImage } from '../../utils/imageGridLayout';
+import './MediaBrowser.css';
 
 const MediaBrowser = ({
     onFileSelect,
@@ -672,7 +673,7 @@ const MediaBrowser = ({
                     actualWidth={file.width}
                     actualHeight={file.height}
                     quality={90}
-                    resizeType={objectFit === 'cover' ? 'fill' : 'fit'}
+                    resizeType="fit"
                     className={`w-full h-full object-${objectFit}`}
                     loading="lazy"
                     fallback={
@@ -725,8 +726,11 @@ const MediaBrowser = ({
                 // Match the requested image to the card's visible proportions at 2x density.
                 const imageWidth = compact ? 400 : Math.floor((colSpan / 4) * 800);
                 const imageHeight = compact ? 240 : 600;
-                // Keep the whole subject visible when a square crop would hide most of it.
-                const objectFit = isTall || aspectRatio > 2.5 ? 'contain' : 'cover';
+                // Preserve the full image when its shape is unknown or cropping would hide much of it.
+                const objectFit = compact || aspectRatio == null || aspectRatio < 1 || aspectRatio > 2.5 ? 'contain' : 'cover';
+                // Keep enough pixels for the visible area without cropping on the server.
+                const requestedWidth = objectFit === 'cover' ? Math.ceil(Math.max(imageWidth, imageHeight * aspectRatio)) : imageWidth;
+                const requestedHeight = objectFit === 'cover' ? Math.ceil(Math.max(imageHeight, imageWidth / aspectRatio)) : imageHeight;
 
                 return (
                     <div
@@ -792,8 +796,8 @@ const MediaBrowser = ({
                             </div>
                         )}
 
-                        <div className={`w-full flex-1 flex items-center justify-center bg-gray-50 ${compact ? 'p-1 h-[120px] max-h-[120px]' : `p-2 ${isTall ? 'h-[300px] max-h-[300px]' : 'min-h-[300px]'}`}`}>
-                            {renderThumbnail(file, imageWidth, imageHeight, objectFit)}
+                        <div className={`media-browser-grid-preview w-full flex-1 flex items-center justify-center bg-gray-50 ${compact ? 'p-1 h-[120px] max-h-[120px]' : `p-2 ${isTall ? 'h-[300px] max-h-[300px]' : 'min-h-[300px]'}`}`}>
+                            {renderThumbnail(file, requestedWidth, requestedHeight, objectFit)}
                         </div>
                         <div className={`${compact ? 'p-1.5' : 'p-3'} border-t border-gray-100 flex-shrink-0`}>
                             <div
@@ -857,7 +861,7 @@ const MediaBrowser = ({
                 >
                     <div className="col-span-1">
                         <div className="w-12 h-12">
-                            {renderThumbnail(file, 96, 96)}
+                            {renderThumbnail(file, 96, 96, 'contain')}
                         </div>
                     </div>
                     <div className="col-span-3">
