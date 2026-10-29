@@ -30,7 +30,7 @@ export const changePassword = (data) => {
 
 /** Validate and select the current workspace for a privileged user. */
 export const switchCurrentWorkspace = (identifier) => {
-    return client.post('/api/v1/utils/current-workspace/', { identifier });
+    return client.post('/api/v1/utils/current-workspace/', { identifier }, { skipTenantHeader: true });
 };
 
 /**

@@ -12,6 +12,7 @@ Core page entity supporting hierarchical organization and inheritance.
 """
 
 import uuid
+from contextlib import nullcontext
 
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
@@ -2143,32 +2144,36 @@ class WebPage(models.Model):
 
     def save(self, *args, **kwargs):
         """Override save to clear hostname cache when hostnames change."""
-        # Ensure all hostnames are normalized (strips ports by default)
-        if self.hostnames:
-            self.hostnames = [self.normalize_hostname(h) for h in self.hostnames if h]
-            from core.hostname_policy import validate_hostnames
+        # Hostname assignments and grant changes use the same tenant row lock.
+        # Keep it until the page write commits so a policy change cannot race it.
+        with transaction.atomic() if self.hostnames else nullcontext():
+            if self.hostnames:
+                self.hostnames = [self.normalize_hostname(h) for h in self.hostnames if h]
+                from core.hostname_policy import validate_hostnames
+                from core.models import Tenant
 
-            validate_hostnames(self.tenant, self.hostnames)
+                tenant = Tenant.objects.select_for_update().get(pk=self.tenant_id)
+                validate_hostnames(tenant, self.hostnames)
 
-        # Check if the active hostname registration is changing. Draft,
-        # unpublished, and soft-deleted roots do not own routing hostnames.
-        hostname_registration_changed = False
-        if self.pk:  # Only check for existing objects
-            try:
-                old_instance = WebPage.objects.get(pk=self.pk)
-                old_is_active = bool(
-                    old_instance.hostnames and not old_instance.is_deleted and old_instance.is_currently_published
-                )
-                new_is_active = bool(self.hostnames and not self.is_deleted and self.is_currently_published)
-                hostname_registration_changed = (
-                    old_instance.hostnames != self.hostnames or old_is_active != new_is_active
-                )
-            except WebPage.DoesNotExist:
-                pass
-        elif self.hostnames and not self.is_deleted and self.is_currently_published:
-            hostname_registration_changed = True
+            # Check if the active hostname registration is changing. Draft,
+            # unpublished, and soft-deleted roots do not own routing hostnames.
+            hostname_registration_changed = False
+            if self.pk:  # Only check for existing objects
+                try:
+                    old_instance = WebPage.objects.get(pk=self.pk)
+                    old_is_active = bool(
+                        old_instance.hostnames and not old_instance.is_deleted and old_instance.is_currently_published
+                    )
+                    new_is_active = bool(self.hostnames and not self.is_deleted and self.is_currently_published)
+                    hostname_registration_changed = (
+                        old_instance.hostnames != self.hostnames or old_is_active != new_is_active
+                    )
+                except WebPage.DoesNotExist:
+                    pass
+            elif self.hostnames and not self.is_deleted and self.is_currently_published:
+                hostname_registration_changed = True
 
-        super().save(*args, **kwargs)
+            super().save(*args, **kwargs)
 
         # Clear hostname cache if the active registration changed.
         if hostname_registration_changed:

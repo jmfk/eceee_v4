@@ -7,7 +7,7 @@ from rest_framework.routers import DefaultRouter
 
 from core.profile_views import ProfilePhotoView
 from core.role_views import RolesView, WorkspaceMemberView
-from core.tenant_views import TenantListView, TenantDetailView
+from core.tenant_views import TenantDetailView, TenantListView
 
 from . import views
 

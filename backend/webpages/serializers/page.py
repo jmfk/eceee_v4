@@ -23,8 +23,9 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
     """Page serializer with version management support"""
 
     def validate_hostnames(self, value):
-        from core.hostname_policy import validate_hostnames
         from django.core.exceptions import ValidationError as DjangoValidationError
+
+        from core.hostname_policy import validate_hostnames
 
         tenant = self.instance.tenant if self.instance else getattr(self.context["request"], "tenant", None)
         if tenant:

@@ -14,7 +14,6 @@ from rest_framework.views import APIView
 from .hostname_policy import hostname_allowed, policy_for
 from .models import MachineAPIKey, Tenant, TenantRole
 
-
 HOSTNAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$")
 
 
@@ -93,7 +92,21 @@ class TenantListView(APIView):
         )
         for name, permissions in (
             ("Administratör", ["tenant.admin", "roles.manage"]),
-            ("Redaktör", ["page.read", "page.write", "media.read", "media.write", "object.read", "object.write", "content.read", "content.write", "layout.read", "site.read"]),
+            (
+                "Redaktör",
+                [
+                    "page.read",
+                    "page.write",
+                    "media.read",
+                    "media.write",
+                    "object.read",
+                    "object.write",
+                    "content.read",
+                    "content.write",
+                    "layout.read",
+                    "site.read",
+                ],
+            ),
             ("Publicerare", ["page.read", "page.publish", "object.read", "object.publish"]),
             ("Designer", ["theme.read", "theme.write", "theme.version", "layout.read", "site.read"]),
             ("Läsare", ["page.read", "media.read", "object.read", "content.read", "layout.read", "site.read"]),
