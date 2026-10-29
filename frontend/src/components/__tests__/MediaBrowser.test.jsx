@@ -199,14 +199,17 @@ describe('MediaBrowser', () => {
         }))
     })
 
-    it('requests sharp card-sized previews and preserves extreme image proportions', async () => {
+    it('requests sharp card-sized previews and keeps portraits or unknown shapes intact', async () => {
         mediaApi.search.search.mockResolvedValue({
             results: [
                 mockMediaFiles[0],
+                { ...mockMediaFiles[0], id: 'square', title: 'Square logo', width: 800, height: 800 },
                 { ...mockMediaFiles[0], id: 'wide', title: 'Wide banner', width: 3000, height: 700 },
                 { ...mockMediaFiles[0], id: 'tall', title: 'Tall poster', width: 500, height: 1800 },
+                { ...mockMediaFiles[0], id: 'portrait', title: 'Portrait', width: 750, height: 1000 },
+                { ...mockMediaFiles[0], id: 'unknown', title: 'Unknown dimensions', width: null, height: null },
             ],
-            count: 3,
+            count: 6,
         })
 
         renderBrowser()
@@ -214,8 +217,14 @@ describe('MediaBrowser', () => {
         const image = await screen.findByAltText('Test Image 1')
         expect(image).toHaveAttribute('data-width', '800')
         expect(image).toHaveAttribute('data-height', '600')
-        expect(image).toHaveAttribute('data-resize-type', 'fill')
+        expect(image).toHaveAttribute('data-resize-type', 'fit')
         expect(image).toHaveClass('object-cover')
+        expect(image.closest('.media-browser-grid-preview')).toBeInTheDocument()
+
+        const square = screen.getByAltText('Square logo')
+        expect(square).toHaveAttribute('data-width', '800')
+        expect(square).toHaveAttribute('data-height', '800')
+        expect(square).toHaveClass('object-cover')
 
         const banner = screen.getByAltText('Wide banner')
         expect(banner).toHaveAttribute('data-width', '2400')
@@ -226,6 +235,29 @@ describe('MediaBrowser', () => {
         expect(poster).toHaveAttribute('data-height', '600')
         expect(poster).toHaveAttribute('data-resize-type', 'fit')
         expect(poster).toHaveClass('object-contain')
+
+        const portrait = screen.getByAltText('Portrait')
+        expect(portrait).toHaveAttribute('data-resize-type', 'fit')
+        expect(portrait).toHaveClass('object-contain')
+
+        const unknown = screen.getByAltText('Unknown dimensions')
+        expect(unknown).toHaveAttribute('data-resize-type', 'fit')
+        expect(unknown).toHaveClass('object-contain')
+    })
+
+    it('keeps the full image visible in compact media pickers', async () => {
+        mediaApi.search.search.mockResolvedValue({
+            results: [{ ...mockMediaFiles[0], width: 800, height: 800 }],
+            count: 1,
+        })
+
+        renderBrowser({ compact: true })
+
+        const image = await screen.findByAltText('Test Image 1')
+        expect(image).toHaveAttribute('data-width', '400')
+        expect(image).toHaveAttribute('data-height', '240')
+        expect(image).toHaveAttribute('data-resize-type', 'fit')
+        expect(image).toHaveClass('object-contain')
     })
 
     it('displays current file metadata', async () => {
