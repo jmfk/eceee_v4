@@ -23,10 +23,13 @@ import MediaCollectionManager from '../MediaCollectionManager'
 describe('MediaCollectionManager', () => {
     beforeEach(() => {
         vi.clearAllMocks()
-        mocks.listCollections.mockReturnValue(vi.fn().mockResolvedValue({ results: [{
+        mocks.listCollections.mockImplementation(params => vi.fn().mockResolvedValue(params.page === 1 ? { results: [{
             id: 'collection-1', title: 'summerstudy 2025 logos', fileCount: 12,
             accessLevel: 'public', sampleImages: [], tags: [],
-        }] }))
+        }], next: '?page=2' } : { results: [{
+            id: 'collection-2', title: 'other collection', fileCount: 1,
+            accessLevel: 'public', sampleImages: [], tags: [],
+        }], next: null }))
         mocks.fetchTags.mockResolvedValue({ results: [] })
         mocks.listTags.mockReturnValue(mocks.fetchTags)
     })
@@ -35,9 +38,10 @@ describe('MediaCollectionManager', () => {
         render(<MediaCollectionManager namespace="default" />)
 
         expect(await screen.findByRole('heading', { name: 'summerstudy 2025 logos' })).toBeInTheDocument()
+        expect(await screen.findByRole('heading', { name: 'other collection' })).toBeInTheDocument()
         expect(screen.queryByText('No collections found')).not.toBeInTheDocument()
         await waitFor(() => expect(mocks.listCollections).toHaveBeenCalledWith(expect.objectContaining({
-            namespace: 'default', ordering: '-updated_at',
+            namespace: 'default', ordering: '-updated_at', page: 2,
         })))
         expect(mocks.fetchTags).toHaveBeenCalled()
     })

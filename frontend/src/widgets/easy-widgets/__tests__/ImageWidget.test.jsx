@@ -179,9 +179,9 @@ describe('ImageWidget', () => {
     it('signs collection images using their storage URL while retaining the stable media URL', async () => {
         const id = '0811cd9e-8132-4864-9b1a-8e3027f017d7'
         const storageUrl = 'https://media.example/uploads/ademe.png'
-        mediaCollectionsApi.getFiles.mockImplementation(() => () => Promise.resolve({ results: [{
-            id, fileType: 'image', imgproxyBaseUrl: storageUrl, title: 'ademe', width: 698,
-        }] }))
+        mediaCollectionsApi.getFiles.mockImplementation((_collectionId, params) => () => Promise.resolve(params.page === 1
+            ? { results: [{ id, fileType: 'image', imgproxyBaseUrl: storageUrl, title: 'ademe', width: 698 }], next: '?page=2' }
+            : { results: [{ id: 'second', fileType: 'image', imgproxyBaseUrl: '/rockwool.png', title: 'rockwool' }], next: null }))
 
         render(<ImageWidget mode="editor" widgetId="image-1" slotName="main" config={{
             image: { id: 'collection-1', type: 'collection', namespace: 'default' },
@@ -191,6 +191,8 @@ describe('ImageWidget', () => {
         expect(await screen.findByRole('img', { name: 'ademe' })).toHaveAttribute(
             'src', `/imgproxy/resize:fit/${storageUrl}`
         )
+        expect(await screen.findByRole('img', { name: 'rockwool' })).toBeInTheDocument()
+        expect(mediaCollectionsApi.getFiles).toHaveBeenCalledWith('collection-1', { namespace: 'default', page: 2 })
         expect(imgproxyApi.getUrl).toHaveBeenCalledWith(storageUrl, {
             width: 698, resize_type: 'fit', quality: 85, format: 'webp',
         })
@@ -292,6 +294,22 @@ describe('ImageWidget', () => {
             'src',
             '/imgproxy/resize:fit//partner-logo.png'
         )
+    })
+
+    it('hides stale collection samples after a successful empty response', async () => {
+        mediaCollectionsApi.getFiles.mockImplementation(() => () => Promise.resolve({ results: [], next: null }))
+
+        const { container } = render(<ImageWidget mode="editor" widgetId="image-1" slotName="main" config={{
+            displayType: 'gallery',
+            image: { id: 'collection-1', type: 'collection', sample_images: [
+                { id: 'sample-1', title: 'Old logo', imgproxy_base_url: '/old-logo.png' },
+            ] },
+            imageUrl: '/stale-legacy.png',
+        }} />)
+
+        expect(await screen.findByText('This collection has no images')).toBeInTheDocument()
+        expect(screen.queryByRole('img', { name: 'Old logo' })).not.toBeInTheDocument()
+        expect(container.querySelector('img')).toBeNull()
     })
 })
 

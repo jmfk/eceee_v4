@@ -53,6 +53,7 @@ import { mediaCollectionsApi, mediaTagsApi, mediaApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 import MediaSearchWidget from './MediaSearchWidget';
 import { extractErrorMessage } from '../../utils/errorHandling';
+import { fetchPaginatedResults } from '../../utils/fetchPaginatedResults';
 
 // Compact Tag Input Component for inline forms
 // Unified Collection Editor View Component (metadata + upload + files)
@@ -1251,9 +1252,8 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                 }
             });
 
-            const result = await mediaCollectionsApi.list(params)();
-            const collectionsData = result.results || result || [];
-            setCollections(Array.isArray(collectionsData) ? collectionsData : []);
+            const collectionsData = await fetchPaginatedResults(page => mediaCollectionsApi.list({ ...params, page })());
+            setCollections(collectionsData);
         } catch (error) {
             console.error('Failed to load collections:', error);
             setError(extractErrorMessage(error));

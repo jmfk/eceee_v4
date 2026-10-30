@@ -223,7 +223,10 @@ describe('page preview model resolution', () => {
     })
 
     it('resolves collection-backed image widgets in the preview tenant', async () => {
-        mediaApi.getFiles.mockReturnValue(vi.fn().mockResolvedValue({ results: [{ id: 7, fileType: 'image', imgproxyBaseUrl: '/collection.jpg', title: 'Collection image' }] }))
+        const firstId = '0811cd9e-8132-4864-9b1a-8e3027f017d7'
+        mediaApi.getFiles.mockImplementation((_id, params) => vi.fn().mockResolvedValue(params.page === 1
+            ? { results: [{ id: firstId, fileType: 'image', imgproxyBaseUrl: '/collection.jpg', title: 'Collection image' }], next: '/api/v1/media/collections/3/files/?page=2' }
+            : { results: [{ id: 8, fileType: 'image', imgproxyBaseUrl: '/second.jpg', title: 'Second image' }], next: null }))
         const model = createPageRenderModel({
             widgets: { main: [{ id: 'images', type: 'easy_widgets.ImageWidget', config: { displayType: 'gallery', image: { id: 3, type: 'collection', namespace: 'press' } } }] },
             context: { tenantId: 'tenant-b' },
@@ -231,13 +234,28 @@ describe('page preview model resolution', () => {
 
         const resolved = await resolvePagePreviewModel(model)
 
-        expect(mediaApi.getFiles).toHaveBeenCalledWith(3, { page_size: 100, namespace: 'press' }, { headers: { 'X-Tenant-ID': 'tenant-b' } })
-        expect(resolved.slots.main[0].config.mediaItems).toEqual([expect.objectContaining({
-            id: '7',
-            url: '/collection.jpg',
-            src: '/imgproxy/resize:fit:896:0//collection.jpg',
-            altText: 'Collection image',
-        })])
+        expect(mediaApi.getFiles).toHaveBeenCalledWith(3, { page: 1, namespace: 'press' }, { headers: { 'X-Tenant-ID': 'tenant-b' } })
+        expect(mediaApi.getFiles).toHaveBeenCalledWith(3, { page: 2, namespace: 'press' }, { headers: { 'X-Tenant-ID': 'tenant-b' } })
+        expect(resolved.slots.main[0].config.mediaItems).toEqual([
+            expect.objectContaining({ id: firstId, src: '/imgproxy/resize:fit:896:0//collection.jpg', altText: 'Collection image' }),
+            expect.objectContaining({ id: '8', url: '/second.jpg', altText: 'Second image' }),
+        ])
+        expect(imgproxyApi.getBatch).toHaveBeenCalledWith(expect.arrayContaining([
+            expect.objectContaining({ sourceUrl: '/collection.jpg' }),
+        ]))
+    })
+
+    it('does not reuse a legacy image URL when a collection has no files', async () => {
+        mediaApi.getFiles.mockReturnValue(vi.fn().mockResolvedValue({ results: [], next: null }))
+        const model = createPageRenderModel({ widgets: { main: [{
+            id: 'empty-collection', type: 'easy_widgets.ImageWidget', config: {
+                image: { id: 3, type: 'collection' }, imageUrl: '/stale-image.png', displayType: 'gallery',
+            },
+        }] } })
+
+        const resolved = await resolvePagePreviewModel(model)
+        expect(resolved.slots.main[0].config.mediaItems).toEqual([])
+        expect(resolved.slots.main[0].config.imageUrl).toBeUndefined()
     })
 
     it('resolves canonical ImageWidget media through imgproxy', async () => {

@@ -704,13 +704,8 @@ describe('public resolution', () => {
         depth: 2,
         currentChildren: [expect.objectContaining({ label: 'Child', path: '/news/story/child/' })],
       });
-      expect(nested[2].config.mediaItems).toEqual([expect.objectContaining({
-        title: 'Fallback partner',
-        url: '/fallback-logo.png',
-        src: expect.stringContaining('resize:fit:200:80'),
-        displayWidth: 200,
-        displayHeight: 80,
-      })]);
+      expect(nested[2].config.mediaItems).toEqual([]);
+      expect(JSON.stringify(model)).not.toContain('/fallback-logo.png');
       expect(model?.slots.main[4].config.mediaItems).toEqual([expect.objectContaining({
         url: '/legacy.png',
         src: expect.stringContaining('resize:fill:60:40/quality:72/format:webp'),
@@ -726,6 +721,47 @@ describe('public resolution', () => {
       if (previousSalt === undefined) delete process.env.PUBLISHER_IMGPROXY_SALT;
       else process.env.PUBLISHER_IMGPROXY_SALT = previousSalt;
     }
+  });
+
+  it('publishes every file from a saved collection selector without an explicit type', async () => {
+    const collectionId = '67d9020f-1d73-47be-bd24-1fe52d2dbef8';
+    const publicMedia = vi.fn(async () => ({
+      files: [],
+      collections: { [collectionId]: [
+        { id: 'first', url: '/ademe.png', type: 'image' as const, altText: 'Ademe', caption: '', annotation: '', title: 'Ademe', width: 100, height: 50, thumbnailUrl: '/ademe.png' },
+        { id: 'second', url: '/rockwool.png', type: 'image' as const, altText: 'Rockwool', caption: '', annotation: '', title: 'Rockwool', width: 100, height: 50, thumbnailUrl: '/rockwool.png' },
+      ] },
+    }));
+    const collectionReader: PageReader = {
+      ...reader,
+      version: async (id, at) => {
+        const selected = await reader.version(id, at);
+        if (id !== article.id || !selected) return selected;
+        return version({ ...selected, widgets: { main: [{
+          id: 'logos', type: 'easy_widgets.ImageWidget', config: {
+            image: { id: collectionId, slug: 'summerstudy-2025-logos', file_count: 2,
+              sample_images: [{ id: 'private', url: '/private-sample.png' }] },
+            display_type: 'gallery',
+          },
+        }] } });
+      },
+      publicMedia,
+    };
+
+    const model = await buildPublishedPageModel({ withSnapshot: async read => read(collectionReader) }, 'example.org', '/news/story', new Date('2026-06-01'));
+    expect(publicMedia).toHaveBeenCalledWith([], [collectionId], root.tenant_id);
+    expect(model?.slots.main[0].config.mediaItems).toEqual([
+      expect.objectContaining({ url: '/ademe.png' }),
+      expect.objectContaining({ url: '/rockwool.png' }),
+    ]);
+    expect(model?.slots.main[0].config.image).toEqual({ id: collectionId, type: 'collection' });
+    expect(JSON.stringify(model)).not.toContain('/private-sample.png');
+
+    const privateModel = await buildPublishedPageModel({ withSnapshot: async read => read({
+      ...collectionReader, publicMedia: async () => ({ files: [], collections: {} }),
+    }) }, 'example.org', '/news/story', new Date('2026-06-01'));
+    expect(privateModel?.slots.main[0].config.mediaItems).toEqual([]);
+    expect(JSON.stringify(privateModel)).not.toContain('/private-sample.png');
   });
 
   it('resolves registered dynamic paths and published object list/detail data', async () => {
