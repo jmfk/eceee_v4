@@ -23,10 +23,15 @@ export const isImageCollectionReference = image => Boolean(
     && image.id
     && (
         image.type === 'collection'
-        || ((image.fileCount !== undefined || image.file_count !== undefined
+        || ((!image.type || image.type === 'collection') && !image.fileType && !image.file_type
+            && (image.fileCount !== undefined || image.file_count !== undefined
             || image.sampleImages !== undefined || image.sample_images !== undefined
             || image.slug !== undefined)
-            && !imageSourceUrl(image))
+            && !(
+                image.stableUrl || image.stable_url || image.src || image.srcUrl || image.src_url
+                || image.sourceUrl || image.source_url || image.imgproxyBaseUrl || image.imgproxy_base_url
+                || image.fileUrl || image.file_url || image.url
+            ))
     )
 )
 
@@ -40,6 +45,8 @@ export const normalizeImageMediaItem = item => {
     return {
         ...item,
         url,
+        processingSourceUrl: item.processingSourceUrl || item.imgproxyBaseUrl || item.imgproxy_base_url
+            || item.fileUrl || item.file_url || item.url || '',
         src: item.src || item.srcUrl || item.src_url || '',
         srcSet: item.srcSet || item.srcset || '',
         type: item.type || ((item.fileType || item.file_type) === 'video' ? 'video' : 'image'),

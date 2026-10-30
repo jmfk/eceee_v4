@@ -769,6 +769,27 @@ describe('PageRenderer', () => {
         expect(screen.getByRole('button', { name: 'Go to slide 2' })).toHaveAttribute('aria-current', 'true')
     })
 
+    it('renders a saved collection without an explicit type as a gallery', () => {
+        const model = createPageRenderModel({ widgets: { main: [{
+            id: 'partner-logos', type: 'easy_widgets.ImageWidget', config: {
+                image: {
+                    id: '67d9020f-1d73-47be-bd24-1fe52d2dbef8',
+                    slug: 'summerstudy-2025-logos', file_count: 2, sample_images: [],
+                },
+                display_type: 'gallery',
+                mediaItems: [
+                    { id: 'logo-1', type: 'image', url: '/ademe.png', altText: 'ademe' },
+                    { id: 'logo-2', type: 'image', url: '/rockwool.png', altText: 'rockwool' },
+                ],
+            },
+        }] } })
+
+        const { container } = render(<PageRenderer model={model} />)
+        expect(container.querySelectorAll('.gallery-item')).toHaveLength(2)
+        expect(screen.getByRole('img', { name: 'ademe' })).toBeInTheDocument()
+        expect(screen.getByRole('img', { name: 'rockwool' })).toBeInTheDocument()
+    })
+
     it('associates image captions with semantic figures', () => {
         const model = createPageRenderModel({
             widgets: { main: [{ id: 'image', type: 'easy_widgets.ImageWidget', config: {

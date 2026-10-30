@@ -176,6 +176,38 @@ describe('ImageWidget', () => {
         })
     })
 
+    it('signs collection images using their storage URL while retaining the stable media URL', async () => {
+        const id = '0811cd9e-8132-4864-9b1a-8e3027f017d7'
+        const storageUrl = 'https://media.example/uploads/ademe.png'
+        mediaCollectionsApi.getFiles.mockImplementation(() => () => Promise.resolve({ results: [{
+            id, fileType: 'image', imgproxyBaseUrl: storageUrl, title: 'ademe', width: 698,
+        }] }))
+
+        render(<ImageWidget mode="editor" widgetId="image-1" slotName="main" config={{
+            image: { id: 'collection-1', type: 'collection', namespace: 'default' },
+            displayType: 'gallery',
+        }} />)
+
+        expect(await screen.findByRole('img', { name: 'ademe' })).toHaveAttribute(
+            'src', `/imgproxy/resize:fit/${storageUrl}`
+        )
+        expect(imgproxyApi.getUrl).toHaveBeenCalledWith(storageUrl, {
+            width: 698, resize_type: 'fit', quality: 85, format: 'webp',
+        })
+    })
+
+    it('uses a stable URL for a selected library image so replacements remain visible', async () => {
+        const id = '0811cd9e-8132-4864-9b1a-8e3027f017d7'
+        render(<ImageWidget mode="editor" widgetId="image-1" slotName="main" config={{
+            image: { id, imgproxyBaseUrl: 'https://media.example/uploads/old-version.png', title: 'Logo' },
+        }} />)
+
+        expect(await screen.findByRole('img', { name: 'Logo' })).toHaveAttribute(
+            'src', `/api/v1/media/file/${id}/`
+        )
+        expect(imgproxyApi.getUrl).not.toHaveBeenCalled()
+    })
+
     it('renders safe inline images when imgproxy returns the source unchanged', async () => {
         const inlineSvg = 'data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22/%3E'
         imgproxyApi.getUrl.mockResolvedValue(inlineSvg)
