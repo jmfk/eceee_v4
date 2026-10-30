@@ -4,6 +4,7 @@ import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext
 import ImageDisplaySection from './ImageDisplaySection'
 import MediaSelectModal from '../media/MediaSelectModal'
 import FieldHelpText from './FieldHelpText'
+import { isImageCollectionReference } from '../../utils/imageWidgetMedia'
 import {
     validateImageFile,
     getImageUrl,
@@ -117,8 +118,8 @@ const ExpandableImageField = ({
             // For single selection, extract first item if array
             const singleItem = Array.isArray(selected) ? selected[0] : selected
 
-            // If it's a collection (has files property), store as {id, type: "collection"}
-            if (singleItem && singleItem.files) {
+            // Persist a collection reference independently of the list response shape.
+            if (singleItem && (singleItem.files || isImageCollectionReference(singleItem))) {
                 // It's a collection - store only the ID and type marker
                 onChange({
                     id: singleItem.id,

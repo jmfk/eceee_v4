@@ -52,6 +52,7 @@ import {
 import { mediaCollectionsApi, mediaTagsApi, mediaApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 import MediaSearchWidget from './MediaSearchWidget';
+import MediaBrowser from './MediaBrowser';
 import { extractErrorMessage } from '../../utils/errorHandling';
 import { fetchPaginatedResults } from '../../utils/fetchPaginatedResults';
 
@@ -159,6 +160,18 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
         } catch (error) {
             console.error('Failed to remove file from collection:', error);
             addNotification('Failed to remove file from collection', 'error');
+        }
+    };
+
+    const handleAddFile = async (file) => {
+        if (existingFiles.some(item => item.id === file.id)) return;
+        try {
+            await mediaCollectionsApi.addFiles(collection.id, [file.id])();
+            addNotification('File added to collection', 'success');
+            await loadExistingFiles();
+        } catch (error) {
+            console.error('Failed to add file to collection:', error);
+            addNotification(extractErrorMessage(error), 'error');
         }
     };
 
@@ -315,6 +328,21 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
                                 </div>
                             </form>
                         )}
+                    </div>
+
+                    <div className="bg-white rounded border border-gray-200 p-4">
+                        <div className="text-lg font-semibold text-gray-900 mb-1" role="heading" aria-level="3">Add images</div>
+                        <p className="text-sm text-gray-600 mb-3">Select an existing image or upload and tag a new one. Pending uploads can be approved here.</p>
+                        <MediaBrowser
+                            namespace={namespace}
+                            fileTypes={['image']}
+                            selectionMode="single"
+                            onFileSelect={handleAddFile}
+                            showUploader
+                            hideShowDeleted
+                            hideTypeFilter
+                            compact
+                        />
                     </div>
 
                     {/* Collection Files Section */}
