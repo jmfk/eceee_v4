@@ -40,6 +40,10 @@ prod-deploy: ## Run checks, then deploy to production (FAST_RELEASE=1 uses front
 	echo "Resolved deploy ref: $$DEPLOY_REF"; \
 	if [ "$(FAST_RELEASE)" = 1 ]; then \
 		bash deploy/scripts/validate-fast-release.sh "$(FAST_BASE_REF)" "$$DEPLOY_REF" "$(TAG)"; \
+		CURRENT_REF=$$(ssh -o BatchMode=yes -o ConnectTimeout=10 "$(PROD_HOST)" "git -C '$(PROD_DIR)' rev-parse HEAD"); \
+		if [ "$$CURRENT_REF" != "$(FAST_BASE_REF)" ]; then \
+			echo "Fast release base no longer matches production; request a new gate." >&2; exit 2; \
+		fi; \
 		echo "Fast release preflight: frontend-lint frontend-test"; \
 		PREFLIGHT_TARGETS="frontend-lint frontend-test" bash deploy/scripts/preflight.sh "$$DEPLOY_REF"; \
 	else \
