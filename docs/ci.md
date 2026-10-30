@@ -18,7 +18,49 @@ Selection uses the event's PR **base SHA through the tested merge checkout**, no
 just the most recent commit. Deleted paths still select their package. Unknown
 and infrastructure paths select all packages; shared widget contracts also select
 all packages. Full CI selects everything, including for documentation-only PRs.
-Fast feedback is deliberately incomplete and cannot authorize a merge.
+Fast feedback is deliberately incomplete. The ordinary merge path requires Full
+CI. The opt-in fast-track lane below accepts its limited evidence for a narrowly
+eligible patch and requires a combined review afterward.
+
+## Fast track for small fixes
+
+Use this lane only when the owner explicitly requests fast track for a small,
+isolated, reversible fix. Exclude migrations, stored-data contracts, tenant scope,
+authorization, secrets, dependencies, CI/deployment controls, and production
+data paths. A small diff is not enough by itself.
+
+Run focused local checks, wait for `Fast CI / Fast CI gate` on the exact head,
+and make a brief risk assessment. Report the PR number and head, changed
+behavior, checks, residual risk, submitted reviews, review decision, unresolved
+threads, and mergeability. Ask the owner for `Yes` or `y` to merge that PR. Do
+not bypass active GitHub branch protection if it requires Full CI.
+
+Mark each PR body `Fast-track follow-up: pending` and record its head commit in
+the task handoff. Within one week or after five fast-track merges, whichever
+comes first, review their combined diff and run
+`make prod-preflight TAG=<latest-fast-track-tag>` on the latest release tag.
+Batch any findings into one follow-up PR, then update the original PR bodies
+with the review result and any fix link. Do not fast-track more changes while
+that follow-up is unresolved.
+
+For an eligible frontend-only release, first read the exact commit currently
+deployed in production through an authorized read-only check. Inspect the full
+diff from that commit to the new release tag; a frontend path alone does not
+make a behavior change safe. After the owner approves the reported tag, commit,
+base commit, and narrow checks, run:
+
+```sh
+make prod-deploy TAG=v0.x.y FAST_RELEASE=1 FAST_BASE_REF=<deployed-commit>
+```
+
+This uses the reviewed deploy path with `frontend-lint frontend-test` as its
+fixed preflight. The script rejects changes outside `frontend/src/`,
+`frontend/public/`, and `frontend/index.html`, a missing base, or a base that is
+not an ancestor of the release. Use ordinary `make prod-deploy TAG=...` for all
+other releases. Both paths still back up the database, check migrations, restart
+services, and verify health. GitHub's active main branch ruleset was inspected
+on 2026-10-30: it requires a PR but does not require status checks. Check it
+again before the first fast-track merge or after any ruleset change.
 
 ## Requesting the final run
 
@@ -47,34 +89,21 @@ check. The full gate requires **success** for every expected job: missing, skipp
 failed or cancelled required jobs are rejected. Fast CI allows only intentionally
 unselected jobs to be skipped. Tests exercise both policies.
 
-## Activate repository enforcement after rollout
+## Optional status-check enforcement
 
-The existing repository ruleset does not require status checks. This PR prepares
-enforcement; **it does not change live GitHub settings**. Until the following
-activation is complete, owner/agent merge discipline remains the enforcement.
-Merge this rollout only after its exact-head Full CI passes and owner approval.
-Then separately authorize the settings change and run:
+The existing repository ruleset does not require status checks. The existing
+`scripts/ci_ruleset.py` would require both Fast CI and Full CI on every PR,
+which is incompatible with the fast-track lane. Do not apply it while fast track
+is in use. If status-check enforcement is desired later, first design a rule
+that preserves both merge paths and get separate owner approval. The script can
+still be previewed offline:
 
 ```sh
 python3 scripts/ci_ruleset.py
-python3 scripts/ci_ruleset.py --apply --verification-sha <40-character-tested-PR-head>
 ```
 
-The first command is an offline JSON preview. Apply verifies the workflow files
-exist on `main` and both check names have succeeded from GitHub Actions on the
-specified verification revision. It creates the separate **ECEEE CI merge gates**
-ruleset for `main`, with strict up-to-date checks and no bypass actors. Existing
-rulesets are preserved. A matching ruleset is a no-op; drift is rejected rather
-than overwritten. Readback must match the desired policy. It does not change
-reviews, merge methods, release tags, deployment settings or other branches.
-
-After activation, inspect GitHub's active rules for `main`. Confirm a PR with only
-fast checks is blocked by the missing full gate, then request full CI and confirm
-both exact-revision gate checks are successful. Repeat after a new push to confirm
-the old full result cannot authorize the new commit. Record this live rollout
-verification separately from the local policy tests and CI results. Reverting
-workflow files alone does not remove the required checks: rollback requires a
-separately authorized removal of only this named ruleset before retiring its jobs.
+Do not use `--apply` without a revised policy and its own owner gate. Reverting
+workflow files alone would not remove required checks from an activated ruleset.
 
 The workflow files remain review-sensitive: these gates assume normal repository
 code review, rather than protecting against a contributor deliberately rewriting
