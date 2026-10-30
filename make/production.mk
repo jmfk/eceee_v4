@@ -5,6 +5,8 @@
 PROD_HOST ?= root@139.162.154.219
 PROD_DIR  ?= /srv/eceee_v4
 TAG       ?=
+FAST_RELEASE ?= 0
+FAST_BASE_REF ?=
 RUN_ID    ?= typed-tags-v1
 CANARY_SIZE ?= 100
 BACKUP_FILE ?=
@@ -28,11 +30,21 @@ prod-support-recipient: ## Plan support-only login creation; SUPPORT_RECIPIENT=e
 prod-preflight: ## Run checks required before production deploy (use: make prod-preflight [TAG=v0.x.x|hash])
 	bash deploy/scripts/preflight.sh "$(TAG)"
 
-prod-deploy: ## Run checks, then deploy to production (use: make prod-deploy [TAG=v0.x.x|hash])
+prod-deploy: ## Run checks, then deploy to production (FAST_RELEASE=1 uses frontend-only preflight for eligible tagged fixes)
 	@set -e; \
+	case "$(FAST_RELEASE)" in 0|1) ;; *) echo "FAST_RELEASE must be 0 or 1" >&2; exit 2;; esac; \
+	if [ "$(FAST_RELEASE)" = 1 ]; then \
+		case "$(TAG)" in v[0-9]*) ;; *) echo "Fast release requires a version tag" >&2; exit 2;; esac; \
+	fi; \
 	DEPLOY_REF=$$(bash deploy/scripts/resolve-deploy-ref.sh "$(TAG)"); \
 	echo "Resolved deploy ref: $$DEPLOY_REF"; \
-	bash deploy/scripts/preflight.sh "$$DEPLOY_REF"; \
+	if [ "$(FAST_RELEASE)" = 1 ]; then \
+		bash deploy/scripts/validate-fast-release.sh "$(FAST_BASE_REF)" "$$DEPLOY_REF" "$(TAG)"; \
+		echo "Fast release preflight: frontend-lint frontend-test"; \
+		PREFLIGHT_TARGETS="frontend-lint frontend-test" bash deploy/scripts/preflight.sh "$$DEPLOY_REF"; \
+	else \
+		PREFLIGHT_TARGETS="lint test regression-test" bash deploy/scripts/preflight.sh "$$DEPLOY_REF"; \
+	fi; \
 	bash deploy/scripts/setup-env.sh "$(PROD_HOST)" "$(PROD_DIR)" --deploy "$$DEPLOY_REF"
 
 prod-restart: ## Sync deploy/.env and restart production containers
