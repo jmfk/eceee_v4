@@ -729,10 +729,11 @@ class MediaCollectionAPITest(APITestCase):
         )
         other.tags.add(summer)
         url = reverse("api:file_manager:mediacollection-list")
+        headers = {"HTTP_X_TENANT_ID": tenant.identifier}
 
-        by_title = self.client.get(url, {"namespace": namespace.slug, "search": "Programme"})
-        by_tag = self.client.get(url, {"namespace": namespace.slug, "search": "Study"})
-        by_both_tags = self.client.get(f"{url}?namespace={namespace.slug}&tag_names=Summer&tag_names=Study")
+        by_title = self.client.get(url, {"namespace": namespace.slug, "search": "Programme"}, **headers)
+        by_tag = self.client.get(url, {"namespace": namespace.slug, "search": "Study"}, **headers)
+        by_both_tags = self.client.get(f"{url}?namespace={namespace.slug}&tag_names=Summer&tag_names=Study", **headers)
 
         self.assertEqual([item["id"] for item in by_title.data["results"]], [str(matching.id)])
         self.assertEqual([item["id"] for item in by_tag.data["results"]], [str(matching.id)])
