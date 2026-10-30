@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { imageWidgetMediaItems } from '../imageWidgetMedia'
+import { imageWidgetMediaItems, isImageCollectionReference } from '../imageWidgetMedia'
 
 describe('imageWidgetMediaItems', () => {
     it('keeps a library image bound to its stable media identity', () => {
@@ -12,5 +12,11 @@ describe('imageWidgetMediaItems', () => {
 
     it('leaves non-library image URLs intact', () => {
         expect(imageWidgetMediaItems({ imageUrl: '/theme/header.jpg' })[0].url).toBe('/theme/header.jpg')
+    })
+
+    it('distinguishes a saved collection from an image with a stable UUID route', () => {
+        const id = '67d9020f-1d73-47be-bd24-1fe52d2dbef8'
+        expect(isImageCollectionReference({ id, slug: 'logos', file_count: 12, sample_images: [] })).toBe(true)
+        expect(isImageCollectionReference({ id, slug: 'logo', file_type: 'image' })).toBe(false)
     })
 })

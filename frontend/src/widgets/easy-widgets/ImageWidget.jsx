@@ -269,8 +269,9 @@ const ImageWidget = ({
         const imageItems = sourceItems.filter(item => item.type !== 'video')
 
         Promise.all(imageItems.map(async item => {
-            const sourceUrl = imageSourceUrl(item)
+            const sourceUrl = (isCollection && item.processingSourceUrl) || imageSourceUrl(item)
             if (!sourceUrl) return [sourceUrl, '']
+            if (sourceUrl.startsWith('/api/v1/media/file/')) return [sourceUrl, sourceUrl]
             const width = Math.min(Number(item.width) || IMAGE_WIDGET_DEFAULT_WIDTH, IMAGE_WIDGET_DEFAULT_WIDTH)
             const url = await getImgproxyUrl(sourceUrl, {
                 width,
@@ -286,14 +287,14 @@ const ImageWidget = ({
         return () => {
             cancelled = true
         }
-    }, [sourceItems])
+    }, [isCollection, sourceItems])
 
     const items = useMemo(() => sourceItems.map(item => {
         if (item.type === 'video') return item
-        const sourceUrl = imageSourceUrl(item)
+        const sourceUrl = (isCollection && item.processingSourceUrl) || imageSourceUrl(item)
         const url = processedImageUrls[sourceUrl]
         return url ? { ...item, sourceUrl, url, src: url } : null
-    }).filter(Boolean), [sourceItems, processedImageUrls])
+    }).filter(Boolean), [isCollection, sourceItems, processedImageUrls])
 
     // Auto-play functionality for carousel
     useEffect(() => {

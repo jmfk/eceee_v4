@@ -82,7 +82,7 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
         const loadTags = async () => {
             if (!namespace) return;
             try {
-                const result = await mediaTagsApi.list({ namespace });
+                const result = await mediaTagsApi.list({ namespace })();
                 const tagsData = result.results || result || [];
                 setAvailableTags(Array.isArray(tagsData) ? tagsData : []);
             } catch (error) {
@@ -1046,7 +1046,7 @@ const EditCollectionView = ({ collection, namespace, onBack, onSave }) => {
         const loadTags = async () => {
             if (!namespace) return;
             try {
-                const result = await mediaTagsApi.list({ namespace });
+                const result = await mediaTagsApi.list({ namespace })();
                 const tagsData = result.results || result || [];
                 setAvailableTags(Array.isArray(tagsData) ? tagsData : []);
             } catch (error) {
@@ -1251,7 +1251,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                 }
             });
 
-            const result = await mediaCollectionsApi.list(params);
+            const result = await mediaCollectionsApi.list(params)();
             const collectionsData = result.results || result || [];
             setCollections(Array.isArray(collectionsData) ? collectionsData : []);
         } catch (error) {
@@ -1269,7 +1269,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
         if (!namespace) return;
 
         try {
-            const result = await mediaTagsApi.list({ namespace });
+            const result = await mediaTagsApi.list({ namespace })();
             setAvailableTags(result.results || result);
         } catch (error) {
             console.error('Failed to load tags:', error);
