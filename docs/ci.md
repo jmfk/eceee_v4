@@ -61,7 +61,9 @@ make prod-deploy TAG=v0.x.y FAST_RELEASE=1 FAST_BASE_REF=<deployed-commit>
 This uses the reviewed deploy path with `frontend-lint frontend-test` as its
 fixed preflight. The script rejects changes outside `frontend/src/`,
 `frontend/public/`, and `frontend/index.html`, a missing base, or a base that is
-not an ancestor of the release. Use ordinary `make prod-deploy TAG=...` for all
+not an ancestor of the release. The target rereads the production commit and
+aborts if it no longer matches the approved base. Use ordinary
+`make prod-deploy TAG=...` for all
 other releases. Both paths still back up the database, check migrations, restart
 services, and verify health. GitHub's active main branch ruleset was inspected
 on 2026-10-30: it requires a PR but does not require status checks. Check it
