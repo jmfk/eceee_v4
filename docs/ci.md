@@ -43,6 +43,11 @@ Batch any findings into one follow-up PR, then update the original PR bodies
 with the review result and any fix link. Do not fast-track more changes while
 that follow-up is unresolved.
 
+The thread heartbeat `ECEEE fast-track catch-up review` checks the pending PR
+markers daily and starts the combined review when it is due. The setup PR itself
+changes deployment controls and must pass the ordinary merge and deploy path
+once before a later frontend-only release can use `FAST_RELEASE=1`.
+
 For an eligible frontend-only release, first read the exact commit currently
 deployed in production through an authorized read-only check. Inspect the full
 diff from that commit to the new release tag; a frontend path alone does not
