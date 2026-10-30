@@ -702,3 +702,38 @@ class MediaCollectionAPITest(APITestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_collection_search_matches_title_and_tags_with_and_filters(self):
+        tenant = Tenant.objects.create(name="Collection Search", identifier="collection-search", created_by=self.user)
+        namespace = Namespace.objects.create(
+            name="Collection Search",
+            slug="collection-search",
+            is_active=True,
+            created_by=self.user,
+            tenant=tenant,
+        )
+        summer = MediaTag.objects.create(name="Summer", slug="summer", namespace=namespace, created_by=self.user)
+        study = MediaTag.objects.create(name="Study", slug="study", namespace=namespace, created_by=self.user)
+        matching = MediaCollection.objects.create(
+            title="Programme",
+            namespace=namespace,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        matching.tags.add(summer, study)
+        other = MediaCollection.objects.create(
+            title="Winter",
+            namespace=namespace,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        other.tags.add(summer)
+        url = reverse("api:file_manager:mediacollection-list")
+
+        by_title = self.client.get(url, {"namespace": namespace.slug, "search": "Programme"})
+        by_tag = self.client.get(url, {"namespace": namespace.slug, "search": "Study"})
+        by_both_tags = self.client.get(f"{url}?namespace={namespace.slug}&tag_names=Summer&tag_names=Study")
+
+        self.assertEqual([item["id"] for item in by_title.data["results"]], [str(matching.id)])
+        self.assertEqual([item["id"] for item in by_tag.data["results"]], [str(matching.id)])
+        self.assertEqual([item["id"] for item in by_both_tags.data["results"]], [str(matching.id)])

@@ -112,6 +112,7 @@ const MediaBrowser = ({
     }, [filters.fileType]);
 
     const { addNotification } = useGlobalNotifications();
+    const imageOnly = fileTypes.length === 1 && fileTypes[0] === 'image';
 
     // Use refs to avoid dependency issues
     const paginationRef = useRef(pagination);
@@ -373,6 +374,10 @@ const MediaBrowser = ({
     };
 
     const handleUpload = async (files, replaceDecisions = null) => {
+        if (imageOnly && files.some(file => !file.type.startsWith('image/'))) {
+            addNotification('Only image files can be uploaded here', 'error');
+            return;
+        }
         if (!namespace) {
             addNotification('Please select a namespace before uploading', 'error');
             return;
@@ -1106,7 +1111,7 @@ const MediaBrowser = ({
                                             <span className="font-semibold">Drag files here</span> or <span className="text-blue-600 underline">click to browse</span>
                                         </div>
                                         <div className="text-xs text-gray-500">
-                                            Supports images, documents, videos, and audio files
+                                            {imageOnly ? 'Supports images' : 'Supports images, documents, videos, and audio files'}
                                         </div>
                                     </div>
                                 </div>
@@ -1116,7 +1121,7 @@ const MediaBrowser = ({
                             id="file-input"
                             type="file"
                             multiple
-                            accept="image/*,application/pdf,.doc,.docx,video/*,audio/*,.zip,application/zip"
+                            accept={imageOnly ? 'image/*' : 'image/*,application/pdf,.doc,.docx,video/*,audio/*,.zip,application/zip'}
                             onChange={handleFileInputChange}
                             className="hidden"
                         />

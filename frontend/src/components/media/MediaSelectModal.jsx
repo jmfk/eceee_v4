@@ -10,11 +10,13 @@
  * - Optional collection selection
  */
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Image as ImageIcon, FolderOpen, Loader2, AlertCircle, Check, Trash2 } from 'lucide-react';
 import MediaBrowser from './MediaBrowser';
 import CollectionThumbnailGrid from './CollectionThumbnailGrid';
+import CollectionPicker from './CollectionPicker';
+import { collectionEditorUrl } from './collectionEditorUrl';
 import SimplifiedApprovalForm from './SimplifiedApprovalForm';
 import OptimizedImage from './OptimizedImage';
 import { mediaCollectionsApi } from '../../api';
@@ -42,22 +44,9 @@ const MediaSelectModal = ({
     customTitle = null, // e.g., "Select Hero Background Image"
 }) => {
     const [mediaSelectionType, setMediaSelectionType] = useState('image');
-    const [collections, setCollections] = useState([]);
-    const [loadingCollections, setLoadingCollections] = useState(false);
     const [currentCollection, setCurrentCollection] = useState(null);
     const [pendingFiles, setPendingFiles] = useState([]);
 
-    // Ensure collections is always an array - memoized to prevent recalculation
-    const safeCollections = useMemo(() => {
-        if (Array.isArray(collections)) {
-            return collections;
-        }
-        if (collections && typeof collections === 'object') {
-            // Handle case where API returns {results: [...]} directly
-            return collections.results || [];
-        }
-        return [];
-    }, [collections]);
     const [loadingPendingFiles, setLoadingPendingFiles] = useState(false);
     const [selectedItems, setSelectedItems] = useState([]);
     const [selecting, setSelecting] = useState(false);
@@ -85,29 +74,6 @@ const MediaSelectModal = ({
 
         prevOpenRef.current = isOpen;
     }, [isOpen]);
-
-    // Load collections
-    useEffect(() => {
-        if (!isOpen || !allowCollections) {
-            return;
-        }
-
-        const loadCollections = async () => {
-            setLoadingCollections(true);
-            try {
-                const response = await await await await await await await await await await await mediaCollectionsApi.list({ namespace })();
-                const collectionsData = response.results || response || [];
-                setCollections(Array.isArray(collectionsData) ? collectionsData : []);
-            } catch (error) {
-                console.error('Error loading collections:', error);
-                setCollections([]);
-            } finally {
-                setLoadingCollections(false);
-            }
-        };
-
-        loadCollections();
-    }, [isOpen, namespace, allowCollections]);
 
     const currentIsCollection = Boolean(currentSelection?.files || isImageCollectionReference(currentSelection));
 
@@ -259,9 +225,12 @@ const MediaSelectModal = ({
                                             {currentSelection.title || currentSelection.original_filename || 'Untitled'}
                                         </div>
                                         {currentIsCollection && (
-                                            <div className="text-xs text-gray-600 mt-1">
-                                                Collection ({(currentCollection?.id === currentSelection.id ? currentCollection.fileCount ?? currentCollection.file_count : null) ?? currentSelection.fileCount ?? currentSelection.file_count ?? currentSelection.files?.length ?? 0} images)
-                                            </div>
+                                            <>
+                                                <div className="text-xs text-gray-600 mt-1">
+                                                    Collection ({(currentCollection?.id === currentSelection.id ? currentCollection.fileCount ?? currentCollection.file_count : null) ?? currentSelection.fileCount ?? currentSelection.file_count ?? currentSelection.files?.length ?? 0} images)
+                                                </div>
+                                                <a href={collectionEditorUrl(currentSelection, namespace)} target="_blank" rel="noopener noreferrer" className="inline-block mt-2 text-sm text-blue-700 underline">Edit collection</a>
+                                            </>
                                         )}
                                     </div>
                                     {allowRemove && <button
@@ -315,43 +284,7 @@ const MediaSelectModal = ({
 
                         {/* Content based on selection type */}
                         {mediaSelectionType === 'collection' ? (
-                            loadingCollections ? (
-                                <div className="flex items-center justify-center h-64">
-                                    <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-                                </div>
-                            ) : safeCollections.length === 0 ? (
-                                <div className="flex items-center justify-center h-64">
-                                    <div className="text-center">
-                                        <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                                        <div className="text-gray-600">No collections found</div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                    {safeCollections.map(collection => {
-                                        const isSelected = selectedItems.some(item => item.id === collection.id);
-                                        return (
-                                            <div
-                                                key={collection.id}
-                                                onClick={() => handleCollectionSelect(collection)}
-                                                className={`cursor-pointer border rounded-lg overflow-hidden transition-all ${isSelected
-                                                        ? 'border-blue-500 ring-2 ring-blue-500 shadow-lg'
-                                                        : 'border-gray-200 hover:border-blue-500 hover:shadow-md'
-                                                    }`}
-                                            >
-                                                <CollectionThumbnailGrid
-                                                    collection={collection}
-                                                    className="aspect-square"
-                                                />
-                                                <div className="p-3">
-                                                    <div className="font-medium text-sm text-gray-900 truncate" role="heading" aria-level="4">{collection.title}</div>
-                                                    <div className="text-xs text-gray-600">{collection.fileCount || collection.file_count || 0} images</div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )
+                            <CollectionPicker namespace={namespace} selectedId={selectedItems[0]?.id} onSelect={handleCollectionSelect} />
                         ) : mediaSelectionType === 'pending' ? (
                             loadingPendingFiles ? (
                                 <div className="flex items-center justify-center h-64">

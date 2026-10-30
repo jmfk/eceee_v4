@@ -15,10 +15,12 @@ import MediaBrowser from './MediaBrowser';
 import { useTheme } from '../../hooks/useTheme';
 import OverrideSettingsModal from './OverrideSettingsModal';
 import CollectionThumbnailGrid from './CollectionThumbnailGrid';
+import CollectionPicker from './CollectionPicker';
+import { collectionEditorUrl } from './collectionEditorUrl';
 import SimplifiedApprovalForm from './SimplifiedApprovalForm';
 import OptimizedImage from './OptimizedImage';
 import FieldHelpPopover from '../form-fields/FieldHelpPopover';
-import { mediaCollectionsApi, mediaApi } from '../../api';
+import { mediaApi } from '../../api';
 import { DEFAULT_IMGPROXY_CONFIG } from '../../utils/mediaInsertRenderer';
 
 const MediaInsertModal = ({
@@ -49,8 +51,6 @@ const MediaInsertModal = ({
     const [mediaType, setMediaType] = useState('image'); // 'image' or 'collection'
     const [showOverrideSettings, setShowOverrideSettings] = useState(false);
     const [mediaSelectionType, setMediaSelectionType] = useState('image');
-    const [collections, setCollections] = useState([]);
-    const [loadingCollections, setLoadingCollections] = useState(false);
     const [pendingFiles, setPendingFiles] = useState([]);
     const [loadingPendingFiles, setLoadingPendingFiles] = useState(false);
 
@@ -189,37 +189,12 @@ const MediaInsertModal = ({
         prevOpenRef.current = isOpen;
     }, [isOpen, isEditMode, isInsertMode]);
 
-    // Load collections when step is select and collection tab is selected
-    useEffect(() => {
-        if (isOpen && step === 'select' && mediaSelectionType === 'collection' && namespace) {
-            loadCollections();
-        }
-    }, [isOpen, step, mediaSelectionType, namespace]);
-
     // Load pending files when step is select and pending tab is selected
     useEffect(() => {
         if (isOpen && step === 'select' && mediaSelectionType === 'pending' && namespace) {
             loadPendingFiles();
         }
     }, [isOpen, step, mediaSelectionType, namespace]);
-
-    const loadCollections = async () => {
-        setLoadingCollections(true);
-        try {
-            const result = await mediaCollectionsApi.list({
-                namespace,
-                page_size: 100,
-                ordering: '-created_at'
-            });
-            const data = result.results || result || [];
-            setCollections(Array.isArray(data) ? data : []);
-        } catch (error) {
-            console.error('Failed to load collections:', error);
-            setCollections([]);
-        } finally {
-            setLoadingCollections(false);
-        }
-    };
 
     const loadPendingFiles = async () => {
         setLoadingPendingFiles(true);
@@ -405,6 +380,7 @@ const MediaInsertModal = ({
                             {step === 'configure' && selectedMedia && (
                                 <div className="text-sm text-gray-600 mt-1">
                                     Selected: {selectedMedia.title || selectedMedia.original_filename}
+                                    {mediaType === 'collection' && <a href={collectionEditorUrl(selectedMedia, namespace)} target="_blank" rel="noopener noreferrer" className="ml-3 text-blue-700 underline">Edit collection</a>}
                                 </div>
                             )}
                             {errorMessage && (
@@ -477,37 +453,7 @@ const MediaInsertModal = ({
 
                             {/* Content based on selection type */}
                             {mediaSelectionType === 'collection' ? (
-                                loadingCollections ? (
-                                    <div className="flex items-center justify-center h-64">
-                                        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-                                    </div>
-                                ) : collections.length === 0 ? (
-                                    <div className="flex items-center justify-center h-64">
-                                        <div className="text-center">
-                                            <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                                            <div className="text-gray-600">No collections found</div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                        {collections.map(collection => (
-                                            <div
-                                                key={collection.id}
-                                                onClick={() => handleMediaSelect(collection)}
-                                                className="cursor-pointer border border-gray-200 rounded-lg overflow-hidden hover:border-blue-500 hover:shadow-md transition-all"
-                                            >
-                                                <CollectionThumbnailGrid
-                                                    collection={collection}
-                                                    className="aspect-square"
-                                                />
-                                                <div className="p-3">
-                                                    <div className="font-medium text-sm text-gray-900 truncate" role="heading" aria-level="4">{collection.title}</div>
-                                                    <div className="text-xs text-gray-600">{collection.fileCount || collection.file_count || 0} images</div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )
+                                <CollectionPicker namespace={namespace} selectedId={mediaType === 'collection' ? selectedMedia?.id : null} onSelect={handleMediaSelect} />
                             ) : mediaSelectionType === 'pending' ? (
                                 loadingPendingFiles ? (
                                     <div className="flex items-center justify-center h-64">

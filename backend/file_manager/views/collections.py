@@ -9,7 +9,7 @@ import zipfile
 
 from django.conf import settings
 from django.db import models
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.http import FileResponse, Http404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions, status, viewsets
@@ -199,18 +199,26 @@ class MediaTagViewSet(viewsets.ModelViewSet):
 
 class MediaCollectionViewSet(viewsets.ModelViewSet):
     def filter_queryset(self, queryset):
+        from taxonomy.projections import media_term_query
         from taxonomy.services import requested_classifications
 
-        return requested_classifications(
-            self.request, super().filter_queryset(queryset), "classification_links__tag_id"
-        )
+        queryset = super().filter_queryset(queryset)
+        tenant = getattr(self.request, "tenant", None)
+        search = self.request.query_params.get("search", "").strip()
+        if search:
+            queryset = queryset.filter(
+                Q(title__icontains=search) | Q(slug__icontains=search) | media_term_query(tenant, search)
+            )
+        for name in self.request.query_params.getlist("tag_names"):
+            if name.strip():
+                queryset = queryset.filter(media_term_query(tenant, name.strip(), exact=True))
+        return requested_classifications(self.request, queryset.distinct(), "classification_links__tag_id")
 
     """ViewSet for managing media collections."""
 
     serializer_class = MediaCollectionSerializer
     permission_classes = [permissions.IsAuthenticated]
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    search_fields = ["title", "slug"]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
     ordering_fields = ["title", "created_at", "updated_at"]
     ordering = ["-updated_at"]
 

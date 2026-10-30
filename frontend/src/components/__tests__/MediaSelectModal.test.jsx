@@ -9,7 +9,10 @@ const collectionsApi = vi.hoisted(() => ({
     get: vi.fn(),
 }))
 
-vi.mock('../../api', () => ({ mediaCollectionsApi: collectionsApi }))
+vi.mock('../../api', () => ({
+    mediaCollectionsApi: collectionsApi,
+    mediaApi: { tags: { list: vi.fn(() => async () => ({ results: [] })) } },
+}))
 vi.mock('../media/OptimizedImage', () => ({ default: ({ src, alt }) => <img src={src} alt={alt} /> }))
 
 vi.mock('../media/MediaBrowser', () => ({
@@ -23,6 +26,23 @@ vi.mock('../media/MediaBrowser', () => ({
 }))
 
 describe('MediaSelectModal', () => {
+    it('searches collections by name and links directly to their editor', async () => {
+        const user = userEvent.setup()
+        collectionsApi.list.mockImplementation(() => async () => ({ results: [
+            { id: 'collection-2', title: 'Summer images', namespace: 'main', fileCount: 2 },
+        ] }))
+        render(<MediaSelectModal isOpen onClose={vi.fn()} onSelect={vi.fn()} namespace="main" />)
+
+        await user.click(screen.getByRole('button', { name: 'Select Collection' }))
+        expect(await screen.findByRole('link', { name: 'Edit collection' })).toHaveAttribute(
+            'href', '/media?tab=collections&collection=collection-2&namespace=main'
+        )
+        await user.type(screen.getByPlaceholderText('Search collections by name or tags...'), 'Summer')
+        await waitFor(() => expect(collectionsApi.list).toHaveBeenCalledWith(expect.objectContaining({
+            namespace: 'main', search: 'Summer', tag_names: [],
+        })), { timeout: 1500 })
+    })
+
     it('shows a collage for a saved collection reference without a files property', async () => {
         collectionsApi.get.mockImplementation(() => async () => ({
             id: 'collection-1',
@@ -44,6 +64,9 @@ describe('MediaSelectModal', () => {
             '/logo-1.jpg', '/logo-2.jpg', '/logo-3.jpg', '/logo-4.jpg',
         ])
         expect(screen.queryByText('No image')).not.toBeInTheDocument()
+        expect(screen.getByRole('link', { name: 'Edit collection' })).toHaveAttribute(
+            'href', '/media?tab=collections&collection=collection-1&namespace=default'
+        )
     })
 
     it('keeps the picker open when an asynchronous selection is rejected', async () => {
