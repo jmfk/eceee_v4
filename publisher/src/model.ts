@@ -403,6 +403,17 @@ function addUuidReference(ids: Set<DbId>, input: unknown): void {
   if (UUID_PATTERN.test(id)) ids.add(id.toLowerCase());
 }
 
+function isCollectionReference(item: Record<string, unknown>): boolean {
+  return Boolean(item.id && (item.type === 'collection' || (
+    !item.type && !item.fileType && !item.file_type
+    && (item.fileCount !== undefined || item.file_count !== undefined
+      || item.sampleImages !== undefined || item.sample_images !== undefined || item.slug !== undefined)
+    && !(item.stableUrl || item.stable_url || item.src || item.srcUrl || item.src_url
+      || item.sourceUrl || item.source_url || item.imgproxyBaseUrl || item.imgproxy_base_url
+      || item.fileUrl || item.file_url || item.url)
+  )));
+}
+
 function collectReferences(value: unknown, pageIds: Set<DbId>, mediaIds: Set<DbId>, collectionIds: Set<DbId>): void {
   if (typeof value === 'string') {
     const decoded = value.replaceAll('&quot;', '"').replaceAll('&#34;', '"');
@@ -425,7 +436,7 @@ function collectReferences(value: unknown, pageIds: Set<DbId>, mediaIds: Set<DbI
   const id = item.id === undefined || item.id === null ? '' : String(item.id);
   const collectionId = item.collectionId ?? item.collection_id;
   if (collectionId) addUuidReference(collectionIds, collectionId);
-  if (id && (item.type === 'collection' || item.fileCount !== undefined || item.file_count !== undefined || item.sampleImages !== undefined || item.sample_images !== undefined)) {
+  if (isCollectionReference(item)) {
     addUuidReference(collectionIds, id);
   } else if (UUID_PATTERN.test(id) && (item.type === 'image' || item.type === 'video' || item.fileUrl !== undefined || item.file_url !== undefined || item.originalFilename !== undefined)) {
     addUuidReference(mediaIds, id);
@@ -543,31 +554,6 @@ function prepareWidgets(
   pages: Page[],
   navigationPages: PublishedNavigationPage[],
 ): Record<string, Widget[]> {
-  const sampleMediaItems = (selector: Record<string, unknown>): PublicMediaItem[] => {
-    const samples = selector.sampleImages ?? selector.sample_images;
-    if (!Array.isArray(samples)) return [];
-    return samples.flatMap(candidate => {
-      const sample = object(candidate);
-      const url = String(value(sample, 'url', 'fileUrl', 'file_url', 'imgproxyBaseUrl', 'imgproxy_base_url') ?? '').trim();
-      if (!url) return [];
-      const title = String(value(sample, 'title', 'altText', 'alt_text') ?? '');
-      return [{
-        id: String(sample.id ?? url),
-        url,
-        type: String(sample.type ?? 'image'),
-        altText: String(value(sample, 'altText', 'alt_text') ?? title),
-        caption: String(sample.caption ?? ''),
-        annotation: String(sample.annotation ?? ''),
-        title,
-        width: Number.isFinite(Number(sample.width)) && Number(sample.width) > 0 ? Number(sample.width) : null,
-        height: Number.isFinite(Number(sample.height)) && Number(sample.height) > 0 ? Number(sample.height) : null,
-        thumbnailUrl: String(value(sample, 'thumbnailUrl', 'thumbnail_url') ?? url),
-      }];
-    });
-  };
-  const collectionItemsWithFallback = (items: PublicMediaItem[], selector: Record<string, unknown>): PublicMediaItem[] => (
-    items.length ? items : sampleMediaItems(selector)
-  );
   const shuffled = <T,>(items: T[]): T[] => {
     const result = [...items];
     for (let index = result.length - 1; index > 0; index -= 1) {
@@ -656,9 +642,15 @@ function prepareWidgets(
         ...normalizeImgproxyOptions(styleImgproxy),
         ...normalizeImgproxyOptions(overrideImgproxy),
       };
-      const collectionId = image.type === 'collection' ? image.id : (image.collectionId ?? image.collection_id ?? config.collectionId ?? config.collection_id);
+      const collectionId = isCollectionReference(image) ? image.id : (image.collectionId ?? image.collection_id ?? config.collectionId ?? config.collection_id);
       if (collectionId) {
-        let items = collectionItemsWithFallback(collections[String(collectionId).toLowerCase()] ?? [], image)
+        // Saved samples can be stale or private. Only publish files returned by
+        // the current tenant-scoped, public-only media query.
+        config.image = { id: collectionId, type: 'collection' };
+        delete config.media_items;
+        delete config.imageUrl;
+        delete config.image_url;
+        let items = (collections[String(collectionId).toLowerCase()] ?? [])
           .map(item => responsiveItem(item, processing));
         const collectionConfig = object(config.collectionConfig ?? config.collection_config);
         const limit = Number(collectionConfig.maxItems ?? collectionConfig.max_items ?? 0);

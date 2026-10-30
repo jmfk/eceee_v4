@@ -14,6 +14,7 @@ import { getGridStyle, getObjectFitClass } from '../../utils/imageGridLayout'
 import { mediaCollectionsApi } from '../../api/media'
 import { getImgproxyUrl } from '../../utils/imgproxySecure'
 import { IMAGE_WIDGET_DEFAULT_WIDTH, imageSourceUrl, imageWidgetMediaItems, isImageCollectionReference } from '../../utils/imageWidgetMedia'
+import { fetchPaginatedResults } from '../../utils/fetchPaginatedResults'
 
 const shuffleWithSeed = (items, initialSeed) => {
     const shuffled = [...items]
@@ -84,6 +85,7 @@ const ImageWidget = ({
     // Collection resolution state
     const [collectionMediaItems, setCollectionMediaItems] = useState([])
     const [loadingCollection, setLoadingCollection] = useState(false)
+    const [collectionLoaded, setCollectionLoaded] = useState(false)
 
     // Carousel state - always initialized to avoid hook order issues
     const [currentIndex, setCurrentIndex] = useState(0)
@@ -177,10 +179,12 @@ const ImageWidget = ({
         if (!isCollection || !collectionId) {
             setCollectionMediaItems([])
             setLoadingCollection(false)
+            setCollectionLoaded(false)
             return
         }
         let active = true
         setCollectionMediaItems([])
+        setCollectionLoaded(false)
 
         const fetchCollectionFiles = async () => {
             setLoadingCollection(true)
@@ -189,12 +193,11 @@ const ImageWidget = ({
                 // default namespace unless an explicit namespace slug is
                 // provided. Forward it from the collection object so files
                 // from non-default namespaces resolve in production.
-                const params = { page_size: 100 }
+                const params = {}
                 if (collectionNamespace) {
                     params.namespace = collectionNamespace
                 }
-                const result = await mediaCollectionsApi.getFiles(collectionId, params)()
-                const files = result.results || result || []
+                const files = await fetchPaginatedResults(page => mediaCollectionsApi.getFiles(collectionId, { ...params, page })())
 
                 // Convert collection files to media_items format
                 const mediaItems = files.map(file => {
@@ -218,7 +221,10 @@ const ImageWidget = ({
                         thumbnailUrl: thumbUrl
                     }
                 })
-                if (active) setCollectionMediaItems(mediaItems)
+                if (active) {
+                    setCollectionMediaItems(mediaItems)
+                    setCollectionLoaded(true)
+                }
             } catch (error) {
                 console.error('Failed to load collection files:', error)
                 if (active) setCollectionMediaItems([])
@@ -243,7 +249,7 @@ const ImageWidget = ({
     }, [localConfig.mediaItems, localConfig.media_items, collectionSampleMediaItems])
 
     // If we have resolved collection files, use those instead
-    const effectiveMediaItems = isCollection && collectionMediaItems.length > 0
+    const effectiveMediaItems = isCollection && collectionLoaded
         ? collectionMediaItems
         : configuredMediaItems
 
@@ -259,8 +265,9 @@ const ImageWidget = ({
     }, [effectiveMediaItems, localConfig.randomize, randomizationSeed])
 
     const sourceItems = useMemo(
-        () => imageWidgetMediaItems(localConfig, randomizedMediaItems),
-        [localConfig, randomizedMediaItems]
+        () => isCollection && collectionLoaded && !collectionMediaItems.length
+            ? [] : imageWidgetMediaItems(localConfig, randomizedMediaItems),
+        [isCollection, collectionLoaded, collectionMediaItems.length, localConfig, randomizedMediaItems]
     )
     const [processedImageUrls, setProcessedImageUrls] = useState({})
 

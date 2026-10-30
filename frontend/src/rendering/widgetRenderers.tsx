@@ -211,6 +211,7 @@ const ImageRender: WidgetRenderComponent = ({ widget }) => {
             </div>
         </div>
     }
+    if (isImageCollectionReference(canonicalImage) && !items.length) return null
     const source = items[0] || value(config, 'imageUrl', 'image_url', 'image', 'src', 'url')
     if (!imageUrl(source)) return null
     const alt = source && typeof source === 'object'

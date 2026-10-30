@@ -790,6 +790,19 @@ describe('PageRenderer', () => {
         expect(screen.getByRole('img', { name: 'rockwool' })).toBeInTheDocument()
     })
 
+    it('does not render a stale collection sample when no public files remain', () => {
+        const model = createPageRenderModel({ widgets: { main: [{
+            id: 'private-logos', type: 'easy_widgets.ImageWidget', config: {
+                image: { id: '67d9020f-1d73-47be-bd24-1fe52d2dbef8', type: 'collection' },
+                display_type: 'gallery', mediaItems: [],
+            },
+        }] } })
+
+        const { container } = render(<PageRenderer model={model} />)
+        expect(container.querySelector('.image-widget')).toBeNull()
+        expect(container.querySelector('img')).toBeNull()
+    })
+
     it('associates image captions with semantic figures', () => {
         const model = createPageRenderModel({
             widgets: { main: [{ id: 'image', type: 'easy_widgets.ImageWidget', config: {

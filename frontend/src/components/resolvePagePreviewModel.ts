@@ -5,6 +5,7 @@ import { objectInstancesApi } from '../api/objectStorage'
 import type { RenderPageModel, RenderWidgetModel } from '../rendering/types'
 import { getBatchImgproxyUrls } from '../utils/imgproxySecure'
 import { IMAGE_WIDGET_DEFAULT_WIDTH, imageSourceUrl, imageWidgetMediaItems, isImageCollectionReference } from '../utils/imageWidgetMedia'
+import { fetchPaginatedResults } from '../utils/fetchPaginatedResults'
 import { portableInternalHref } from '../utils/portableLinks'
 
 const dataDrivenNewsTypes = new Set([
@@ -243,12 +244,13 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
     await Promise.all(allWidgets.map(async (widget) => {
         if (widget.type === 'easy_widgets.ImageWidget' && isImageCollectionReference(widget.config.image)) {
             const collection = widget.config.image
-            const params: Record<string, any> = { page_size: 100 }
+            delete widget.config.imageUrl
+            delete widget.config.image_url
+            const params: Record<string, any> = {}
             if (collection.namespace) params.namespace = collection.namespace
             try {
-                const result: any = await mediaCollectionsApi.getFiles(collection.id, params, tenantRequestConfig)()
-                const files = result?.results || result?.data?.results || result?.data || result || []
-                widget.config.mediaItems = (Array.isArray(files) ? files : []).map(collectionFileToMediaItem)
+                const files = await fetchPaginatedResults(page => mediaCollectionsApi.getFiles(collection.id, { ...params, page }, tenantRequestConfig)())
+                widget.config.mediaItems = files.map(collectionFileToMediaItem)
             } catch {
                 widget.config.mediaItems = []
             }
@@ -323,8 +325,9 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
         widget.config.mediaItems = items
         items.forEach(item => {
             if (item.type === 'video' || item.src) return
-            const sourceUrl = imageSourceUrl(item)
+            const sourceUrl = (isImageCollectionReference(widget.config.image) && item.processingSourceUrl) || imageSourceUrl(item)
             if (!sourceUrl) return
+            if (sourceUrl.startsWith('/api/v1/media/file/')) return
             const width = Math.min(Number(item.width) || IMAGE_WIDGET_DEFAULT_WIDTH, IMAGE_WIDGET_DEFAULT_WIDTH)
             imageRequests.push({ sourceUrl, width, resize_type: 'fit', quality: 85, format: 'webp' })
             imageAssignments.push(url => {
