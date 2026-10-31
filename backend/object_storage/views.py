@@ -27,6 +27,7 @@ from rest_framework.response import Response
 
 from core.models import MachineAPIKey
 from core.permissions import HasTenantAccess
+from core.roles import is_tenant_admin
 from taxonomy.models import Tag
 
 from .browser_config import (
@@ -37,7 +38,7 @@ from .browser_config import (
     searchable_query,
     validate_browser_config,
 )
-from .models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
+from .models import ObjectInstance, ObjectTypeDefinition, ObjectVersion, lock_object_tree
 from .serializers import (
     ObjectInstanceListSerializer,
     ObjectInstanceSerializer,
@@ -115,7 +116,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
     filterset_fields = ["is_active", "hierarchy_level"]
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().filter(is_deleted=False)
         # Definition writers are limited to their selected tenant; global types
         # remain an explicitly privileged server operation.
         if self.request.method not in permissions.SAFE_METHODS and isinstance(
@@ -145,7 +146,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
         if child_names is not None:
             allowed_names = set(
                 ObjectTypeDefinition.objects.filter(
-                    name__in=child_names, is_active=True, namespace__tenant=self.request.tenant
+                    name__in=child_names, is_active=True, is_deleted=False, namespace__tenant=self.request.tenant
                 ).values_list("name", flat=True)
             )
             if set(child_names) != allowed_names:
@@ -187,40 +188,44 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
         serializer.save(created_by=self.request.user)
 
     def destroy(self, request, *args, **kwargs):
-        """
-        Delete an object type.
-        Supports force_delete query parameter to delete even when instances exist.
-        """
+        """Move a tenant-owned type and optionally its instances to Trash."""
         instance = self.get_object()
-        force_delete = request.query_params.get("force_delete", "false").lower() == "true"
-
-        # Check for existing instances
-        instance_count = ObjectInstance.objects.filter(object_type=instance).count()
-
-        if instance_count > 0 and not force_delete:
+        tenant = getattr(request, "tenant", None)
+        if tenant is None or instance.namespace_id is None or instance.namespace.tenant_id != tenant.pk:
             return Response(
-                {
-                    "error": f"Cannot delete object type: {instance_count} instance(s) exist",
-                    "instance_count": instance_count,
-                    "force_delete_required": True,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+                {"error": "Only workspace-owned object types can be deleted"}, status=status.HTTP_403_FORBIDDEN
             )
-
-        # If force_delete, delete all instances first
-        if force_delete and instance_count > 0:
-            ObjectInstance.objects.filter(object_type=instance).delete()
-
-        # Delete the object type
-        instance.delete()
-
-        return Response(
-            {
-                "message": "Object type deleted successfully",
-                "instances_deleted": instance_count if force_delete else 0,
-            },
-            status=status.HTTP_200_OK,
-        )
+        if not is_tenant_admin(request.user, tenant):
+            raise PermissionDenied("Workspace administration is required to delete object types.")
+        if request.query_params.get("force_delete") is not None:
+            return Response({"error": "Permanent deletion is disabled"}, status=status.HTTP_410_GONE)
+        raw_delete_instances = request.query_params.get("delete_instances", "false").lower()
+        if raw_delete_instances not in {"true", "false"}:
+            raise serializers.ValidationError({"delete_instances": "Use true or false."})
+        with transaction.atomic():
+            lock_object_tree(tenant.pk)
+            instance = ObjectTypeDefinition.objects.select_for_update().get(pk=instance.pk, is_deleted=False)
+            instances = ObjectInstance.objects.filter(object_type=instance, is_deleted=False)
+            instance_count = instances.count()
+            if instance_count and raw_delete_instances == "false":
+                return Response(
+                    {
+                        "error": "Move the instances to Trash too, or delete them first.",
+                        "instance_count": instance_count,
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+            if instances.exclude(tenant=tenant).exists():
+                return Response(
+                    {"error": "This type has instances in another workspace"}, status=status.HTTP_409_CONFLICT
+                )
+            deleted_instances = 0
+            if raw_delete_instances == "true":
+                for obj in list(instances.order_by("tree_id", "lft")):
+                    if ObjectInstance.objects.filter(pk=obj.pk, is_deleted=False).exists():
+                        deleted_instances += obj.soft_delete(request.user)
+            instance.soft_delete(request.user)
+        return Response({"message": "Object type moved to Trash", "instances_deleted": deleted_instances})
 
     @action(detail=False, methods=["get"])
     def main_browser_types(self, request):
@@ -498,6 +503,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
         instances = ObjectInstance.objects.filter(
             object_type=obj_type,
             tenant=getattr(request, "tenant", None),
+            is_deleted=False,
         ).select_related("created_by", "parent")
 
         # Apply filters
@@ -626,7 +632,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Filter queryset by tenant"""
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().filter(is_deleted=False, object_type__is_deleted=False)
 
         # Filter by tenant from middleware
         tenant = getattr(self.request, "tenant", None)
@@ -679,7 +685,58 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
             from rest_framework.exceptions import ValidationError
 
             raise ValidationError("Tenant is required. Provide X-Tenant-ID header.")
-        serializer.save(created_by=self.request.user, tenant=tenant)
+        with transaction.atomic():
+            lock_object_tree(tenant.pk)
+            object_type = ObjectTypeDefinition.objects.select_for_update().get(
+                pk=serializer.validated_data["object_type_id"]
+            )
+            if object_type.is_deleted:
+                raise serializers.ValidationError({"object_type": "Restore this object type before creating objects."})
+            parent = serializer.validated_data.get("parent")
+            if parent is not None:
+                parent = ObjectInstance.objects.select_for_update().get(pk=parent.pk, tenant=tenant)
+                if parent.is_deleted or parent.object_type.is_deleted:
+                    raise serializers.ValidationError({"parent": "Restore the parent before adding a child."})
+                serializer.validated_data["parent"] = parent
+            serializer.save(created_by=self.request.user, tenant=tenant)
+
+    def perform_destroy(self, instance):
+        instance.soft_delete(self.request.user)
+
+    def perform_update(self, serializer):
+        if "parent" not in serializer.validated_data:
+            serializer.save()
+            return
+        parent = serializer.validated_data["parent"]
+        instance = serializer.instance
+        with transaction.atomic():
+            lock_object_tree(self.request.tenant.pk)
+            parent_ids = set()
+            if instance.parent_id:
+                parent_ids.add(instance.parent_id)
+            if parent:
+                parent_ids.add(parent.pk)
+            locked = {
+                obj.pk: obj
+                for obj in ObjectInstance.objects.filter(tenant=self.request.tenant, pk__in=parent_ids)
+                .order_by("pk")
+                .select_for_update()
+            }
+            instance = ObjectInstance.objects.select_for_update().get(pk=instance.pk, tenant=self.request.tenant)
+            parent = locked.get(parent.pk) if parent else None
+            if (
+                not instance
+                or instance.is_deleted
+                or instance.object_type.is_deleted
+                or (
+                    serializer.validated_data["parent"] is not None
+                    and (not parent or parent.is_deleted or parent.object_type.is_deleted)
+                )
+            ):
+                raise serializers.ValidationError({"parent": "Restore the object and parent before moving it."})
+            serializer.instance = instance
+            serializer.validated_data["parent"] = parent
+            serializer.save()
 
     def update(self, request, *args, **kwargs):
         if {
@@ -801,7 +858,11 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
     def children(self, request, pk=None):
         """Get direct child objects of this instance"""
         instance = self.get_object()
-        children = instance.get_children().select_related("object_type", "created_by")
+        children = (
+            instance.get_children()
+            .filter(is_deleted=False, object_type__is_deleted=False)
+            .select_related("object_type", "created_by")
+        )
         serializer = ObjectInstanceListSerializer(children, many=True)
         return Response(serializer.data)
 
@@ -809,7 +870,11 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
     def descendants(self, request, pk=None):
         """Get all descendant objects (children, grandchildren, etc.)"""
         instance = self.get_object()
-        descendants = instance.get_descendants().select_related("object_type", "created_by")
+        descendants = (
+            instance.get_descendants()
+            .filter(is_deleted=False, object_type__is_deleted=False)
+            .select_related("object_type", "created_by")
+        )
         serializer = ObjectInstanceListSerializer(descendants, many=True)
         return Response(serializer.data)
 
@@ -817,7 +882,11 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
     def ancestors(self, request, pk=None):
         """Get all ancestor objects (parent, grandparent, etc.)"""
         instance = self.get_object()
-        ancestors = instance.get_ancestors().select_related("object_type", "created_by")
+        ancestors = (
+            instance.get_ancestors()
+            .filter(is_deleted=False, object_type__is_deleted=False)
+            .select_related("object_type", "created_by")
+        )
         serializer = ObjectInstanceListSerializer(ancestors, many=True)
         return Response(serializer.data)
 
@@ -825,7 +894,11 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
     def siblings(self, request, pk=None):
         """Get sibling objects (same parent)"""
         instance = self.get_object()
-        siblings = instance.get_siblings().select_related("object_type", "created_by")
+        siblings = (
+            instance.get_siblings()
+            .filter(is_deleted=False, object_type__is_deleted=False)
+            .select_related("object_type", "created_by")
+        )
         serializer = ObjectInstanceListSerializer(siblings, many=True)
         return Response(serializer.data)
 
@@ -833,7 +906,11 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
     def tree(self, request, pk=None):
         """Get the entire tree this object belongs to"""
         instance = self.get_object()
-        tree_objects = instance.get_tree_objects().select_related("object_type", "created_by")
+        tree_objects = (
+            instance.get_tree_objects()
+            .filter(is_deleted=False, object_type__is_deleted=False)
+            .select_related("object_type", "created_by")
+        )
         serializer = ObjectInstanceListSerializer(tree_objects, many=True)
         return Response(serializer.data)
 
@@ -841,7 +918,11 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
     def path_to_root(self, request, pk=None):
         """Get the path from this object to the root"""
         instance = self.get_object()
-        path = instance.get_path_to_root().select_related("object_type", "created_by")
+        path = (
+            instance.get_path_to_root()
+            .filter(is_deleted=False, object_type__is_deleted=False)
+            .select_related("object_type", "created_by")
+        )
         serializer = ObjectInstanceListSerializer(path, many=True)
         return Response(serializer.data)
 
@@ -860,25 +941,34 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
             except ObjectInstance.DoesNotExist:
                 return Response({"error": "New parent not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Check if move is allowed
-        if not instance.can_move_to_parent(new_parent):
-            return Response(
-                {"error": "Cannot move to this parent"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Perform the move
         try:
-            if position == "first-child":
-                instance.move_to(new_parent, "first-child")
-            elif position == "last-child":
-                instance.move_to(new_parent, "last-child")
-            elif position == "left":
-                instance.move_to(new_parent, "left")
-            elif position == "right":
-                instance.move_to(new_parent, "right")
-            else:
-                instance.move_to(new_parent, "last-child")  # default
+            with transaction.atomic():
+                lock_object_tree(request.tenant.pk)
+                requested_parent = new_parent is not None
+                parent_ids = set()
+                if instance.parent_id:
+                    parent_ids.add(instance.parent_id)
+                if new_parent:
+                    parent_ids.add(new_parent.pk)
+                locked = {
+                    obj.pk: obj
+                    for obj in ObjectInstance.objects.filter(tenant=request.tenant, pk__in=parent_ids)
+                    .order_by("pk")
+                    .select_for_update()
+                }
+                instance = ObjectInstance.objects.select_for_update().get(pk=instance.pk, tenant=request.tenant)
+                new_parent = locked.get(new_parent.pk) if new_parent else None
+                if not instance or instance.is_deleted or instance.object_type.is_deleted:
+                    return Response({"error": "Object is unavailable"}, status=status.HTTP_404_NOT_FOUND)
+                if requested_parent and new_parent is None:
+                    return Response({"error": "New parent is unavailable"}, status=status.HTTP_404_NOT_FOUND)
+                if new_parent and (new_parent.is_deleted or new_parent.object_type.is_deleted):
+                    return Response({"error": "New parent is unavailable"}, status=status.HTTP_404_NOT_FOUND)
+                if not instance.can_move_to_parent(new_parent):
+                    return Response({"error": "Cannot move to this parent"}, status=status.HTTP_400_BAD_REQUEST)
+                instance.move_to(
+                    new_parent, position if position in {"first-child", "last-child", "left", "right"} else "last-child"
+                )
 
             serializer = self.get_serializer(instance)
             return Response(serializer.data)
@@ -1245,7 +1335,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         # Text search across multiple fields
         if query:
             if request.query_params.get("browser") == "true":
-                definitions = ObjectTypeDefinition.objects.filter(is_active=True)
+                definitions = ObjectTypeDefinition.objects.filter(is_active=True, is_deleted=False)
                 if request.query_params.get("type"):
                     definitions = definitions.filter(name=request.query_params["type"])
                 definitions = definitions.filter(Q(namespace__tenant=request.tenant) | Q(namespace__isnull=True))
@@ -1357,7 +1447,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         type_name = request.query_params.get("type")
         filter_key = request.query_params.get("filter")
         query = request.query_params.get("q", "")[:100]
-        definition = ObjectTypeDefinition.objects.filter(name=type_name, is_active=True).first()
+        definition = ObjectTypeDefinition.objects.filter(name=type_name, is_active=True, is_deleted=False).first()
         if not definition or (definition.namespace_id and definition.namespace.tenant_id != request.tenant.pk):
             raise serializers.ValidationError({"type": "Choose an available Object type."})
         configured = {item["key"] for item in browser_config(definition).get("filters", [])}
@@ -1389,7 +1479,9 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         field = (definition.schema or {}).get("properties", {})[filter_key[6:]]
         if option["kind"] == "reference":
             allowed = field.get("allowed_object_types") or field.get("allowedObjectTypes") or []
-            values = ObjectInstance.objects.filter(tenant=request.tenant)
+            values = ObjectInstance.objects.filter(
+                tenant=request.tenant, is_deleted=False, object_type__is_deleted=False
+            )
             if allowed:
                 values = values.filter(object_type__name__in=allowed)
             if query:
@@ -1594,7 +1686,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
 
                     elif operation == "delete":
                         obj_id = obj.id
-                        obj.delete()
+                        obj.soft_delete(request.user)
                         results.append({"id": obj_id, "status": "deleted"})
 
                     elif operation == "archive":
@@ -1642,7 +1734,15 @@ class ObjectVersionViewSet(viewsets.ReadOnlyModelViewSet):
         tenant = getattr(self.request, "tenant", None)
         if tenant is None:
             return super().get_queryset().none()
-        return super().get_queryset().filter(object_instance__tenant=tenant)
+        return (
+            super()
+            .get_queryset()
+            .filter(
+                object_instance__tenant=tenant,
+                object_instance__is_deleted=False,
+                object_instance__object_type__is_deleted=False,
+            )
+        )
 
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""

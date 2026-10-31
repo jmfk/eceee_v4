@@ -36,6 +36,8 @@ class ObjectVersionWorkflow:
             raise ObjectWorkflowConflict(
                 "The Object moved to another workspace. Reload before trying again."
             ) from error
+        if self.obj.is_deleted or self.obj.object_type.is_deleted:
+            raise ObjectWorkflowConflict("Restore the Object and its type before editing or publishing it.")
         # A schedule may have activated while waiting for the Object lock.
         self.now = timezone.now()
 
@@ -83,7 +85,9 @@ class ObjectVersionWorkflow:
                 else (
                     "not_published"
                     if editable
-                    else "publication_ended" if self.versions().exists() else "not_published"
+                    else "publication_ended"
+                    if self.versions().exists()
+                    else "not_published"
                 )
             )
         drafts = self.versions().filter(effective_date__isnull=True)

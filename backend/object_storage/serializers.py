@@ -49,7 +49,7 @@ class RelationshipSerializer(serializers.Serializer):
 
     def validate_object_id(self, value):
         """Validate that the referenced object exists"""
-        if not ObjectInstance.objects.filter(id=value).exists():
+        if not ObjectInstance.objects.filter(id=value, is_deleted=False, object_type__is_deleted=False).exists():
             raise serializers.ValidationError(f"ObjectInstance with id {value} does not exist")
         return value
 
@@ -65,7 +65,9 @@ class RelatedObjectSerializer(serializers.Serializer):
         """Get the related object details"""
         from .models import ObjectInstance
 
-        instance = ObjectInstance.objects.filter(id=obj.get("object_id")).first()
+        instance = ObjectInstance.objects.filter(
+            id=obj.get("object_id"), is_deleted=False, object_type__is_deleted=False
+        ).first()
         if instance:
             return {
                 "id": instance.id,
@@ -130,7 +132,7 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
     )
     browser_group = serializers.SerializerMethodField()
     browser_group_id = serializers.PrimaryKeyRelatedField(
-        queryset=ObjectTypeDefinition.objects.all(),
+        queryset=ObjectTypeDefinition.objects.filter(is_deleted=False),
         source="browser_group",
         write_only=True,
         required=False,
@@ -203,7 +205,7 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
 
     def get_instance_count(self, obj):
         """Return count of object instances of this type"""
-        return obj.objectinstance_set.count()
+        return obj.objectinstance_set.filter(is_deleted=False).count()
 
     def _get_absolute_url(self, url):
         """Helper to ensure URL is absolute for imgproxy"""
@@ -250,7 +252,7 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
 
     def get_allowed_child_types(self, obj):
         """Return full object data for allowed child types"""
-        child_types = obj.allowed_child_types.filter(is_active=True)
+        child_types = obj.allowed_child_types.filter(is_active=True, is_deleted=False)
         return [
             {
                 "id": ct.id,
@@ -595,9 +597,9 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
             return value
 
         # Check that all provided names exist and are active
-        existing_types = ObjectTypeDefinition.objects.filter(name__in=value, is_active=True).values_list(
-            "name", flat=True
-        )
+        existing_types = ObjectTypeDefinition.objects.filter(
+            name__in=value, is_active=True, is_deleted=False
+        ).values_list("name", flat=True)
 
         invalid_names = set(value) - set(existing_types)
         if invalid_names:
@@ -626,7 +628,11 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
 
         if self.instance and browser_group.pk == self.instance.pk:
             raise serializers.ValidationError({"browser_group_id": "An object type cannot be its own browser group."})
-        if not browser_group.is_active or browser_group.hierarchy_level not in ["top_level_only", "both"]:
+        if (
+            browser_group.is_deleted
+            or not browser_group.is_active
+            or browser_group.hierarchy_level not in ["top_level_only", "both"]
+        ):
             raise serializers.ValidationError(
                 {"browser_group_id": "The browser group must be an active top-level object type."}
             )
@@ -647,7 +653,9 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
 
         # Set the allowed child types
         if allowed_child_types_names:
-            child_types = ObjectTypeDefinition.objects.filter(name__in=allowed_child_types_names, is_active=True)
+            child_types = ObjectTypeDefinition.objects.filter(
+                name__in=allowed_child_types_names, is_active=True, is_deleted=False
+            )
             instance.allowed_child_types.set(child_types)
 
         return instance
@@ -662,7 +670,9 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
         # Update the allowed child types if provided
         if allowed_child_types_names is not None:
             if allowed_child_types_names:
-                child_types = ObjectTypeDefinition.objects.filter(name__in=allowed_child_types_names, is_active=True)
+                child_types = ObjectTypeDefinition.objects.filter(
+                    name__in=allowed_child_types_names, is_active=True, is_deleted=False
+                )
                 instance.allowed_child_types.set(child_types)
             else:
                 # Clear all child types if empty list is provided
@@ -713,7 +723,7 @@ class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
 
     def get_instance_count(self, obj):
         """Return count of object instances of this type"""
-        return obj.objectinstance_set.count()
+        return obj.objectinstance_set.filter(is_deleted=False).count()
 
     def _get_absolute_url(self, url):
         """Helper to ensure URL is absolute for imgproxy"""
@@ -750,7 +760,7 @@ class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
 
     def get_allowed_child_types(self, obj):
         """Return full object data for allowed child types"""
-        child_types = obj.allowed_child_types.filter(is_active=True)
+        child_types = obj.allowed_child_types.filter(is_active=True, is_deleted=False)
         return [
             {
                 "id": ct.id,
@@ -786,7 +796,11 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
     object_type = ObjectTypeDefinitionSerializer(read_only=True)
     object_type_id = serializers.IntegerField(write_only=True)
     created_by = UserSerializer(read_only=True)
-    parent = serializers.PrimaryKeyRelatedField(queryset=ObjectInstance.objects.all(), required=False, allow_null=True)
+    parent = serializers.PrimaryKeyRelatedField(
+        queryset=ObjectInstance.objects.filter(is_deleted=False, object_type__is_deleted=False),
+        required=False,
+        allow_null=True,
+    )
     status = serializers.SerializerMethodField()  # Computed status based on version publication
     is_published = serializers.SerializerMethodField()
     children_count = serializers.SerializerMethodField()
@@ -849,7 +863,7 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
 
     def get_children_count(self, obj):
         """Return count of child objects"""
-        return obj.get_children().count()
+        return obj.get_children().filter(is_deleted=False, object_type__is_deleted=False).count()
 
     def get_version_count(self, obj):
         """Return count of versions"""
@@ -863,6 +877,14 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
         from .services.version_workflow import ObjectVersionWorkflow
 
         data = super().to_representation(instance)
+        for field, lookup in (
+            ("relationships", instance.get_related_objects),
+            ("related_from", instance.get_related_from_objects),
+        ):
+            visible_ids = {str(pk) for pk in lookup().values_list("pk", flat=True)}
+            data[field] = [
+                relation for relation in (data.get(field) or []) if str(relation.get("object_id")) in visible_ids
+            ]
         workflow = ObjectVersionWorkflow(instance)
         editable = workflow.editable()
         version = editable or workflow.live() or workflow.versions().first()
@@ -893,7 +915,7 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
         """Validate that object type exists and is active"""
         try:
             obj_type = ObjectTypeDefinition.objects.get(id=value)
-            if not obj_type.is_active:
+            if not obj_type.is_active or obj_type.is_deleted:
                 raise serializers.ValidationError("Object type is not active")
             return value
         except ObjectTypeDefinition.DoesNotExist:
@@ -940,7 +962,12 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
             # Object relationships are tenant-local. A global lookup here used
             # to permit cross-workspace references that restore could later
             # delete or leave dangling.
-            if tenant is None or not ObjectInstance.objects.filter(id=rel["object_id"], tenant=tenant).exists():
+            if (
+                tenant is None
+                or not ObjectInstance.objects.filter(
+                    id=rel["object_id"], tenant=tenant, is_deleted=False, object_type__is_deleted=False
+                ).exists()
+            ):
                 raise serializers.ValidationError(f"ObjectInstance with id {rel['object_id']} does not exist")
 
             # Prevent self-reference (will be checked in validate() with instance context)

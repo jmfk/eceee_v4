@@ -204,3 +204,12 @@ class NewsDetailWidgetTenantTests(TestCase):
         result, _version = NewsDetailWidget()._get_news_object("shared", [object_type.id], local_tenant)
 
         self.assertEqual(result, local)
+
+        local.soft_delete(user)
+        trashed_result, _version = NewsDetailWidget()._get_news_object("shared", [object_type.id], local_tenant)
+        self.assertIsNone(trashed_result)
+
+        local.restore(user)
+        object_type.soft_delete(user)
+        deleted_type_result, _version = NewsDetailWidget()._get_news_object("shared", [object_type.id], local_tenant)
+        self.assertIsNone(deleted_type_result)

@@ -205,7 +205,13 @@ class NewsDetailWidget(BaseWidget):
         try:
             # Step 1: Get the object - don't filter by status, use date-based publishing
             obj = (
-                ObjectInstance.objects.filter(tenant=tenant, slug=slug, object_type_id__in=object_type_ids)
+                ObjectInstance.objects.filter(
+                    tenant=tenant,
+                    slug=slug,
+                    object_type_id__in=object_type_ids,
+                    is_deleted=False,
+                    object_type__is_deleted=False,
+                )
                 .select_related("object_type")
                 .first()
             )
