@@ -14,6 +14,7 @@ from cms_auth.tokens import PersonalTokenVerifyView as TokenVerifyView
 from cms_auth.views import security_status
 from content.views import CategoryViewSet, NamespaceViewSet, TagViewSet
 from core.api_views import MachineAPIKeyViewSet
+from core.trash_views import TrashRestoreView, TrashView
 
 app_name = "api"
 
@@ -27,6 +28,8 @@ router.register(r"namespaces", NamespaceViewSet)
 router.register(r"core/machine-api-keys", MachineAPIKeyViewSet, basename="machine-api-key")
 
 urlpatterns = [
+    path("trash/", TrashView.as_view(), name="trash"),
+    path("trash/restore/", TrashRestoreView.as_view(), name="trash-restore"),
     path("diagnostics/", include("core.diagnostics.urls")),
     path("support/", include("tenant_support.urls")),
     path("auth/security/", security_status, name="account-security"),

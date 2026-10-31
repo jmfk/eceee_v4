@@ -2,6 +2,7 @@
 const routes = [
     ['/pages/new', ['page.write']], ['/pages', ['page.read']],
     ['/objects', ['object.read']], ['/media', ['media.read']],
+    ['/trash', ['page.read', 'media.read', 'object.read', 'settings.read']],
     ['/statistics', ['statistics.read']], ['/tags', ['content.read']],
     ['/designer', ['theme.read']], ['/kanban', ['kanban.read']],
     ['/settings/roles', ['roles.manage']], ['/settings/support', ['roles.manage']],

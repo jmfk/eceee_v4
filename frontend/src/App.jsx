@@ -27,6 +27,7 @@ import SystemSchemaPage from '@pages/SystemSchemaPage'
 import LayoutSchemaPage from '@pages/LayoutSchemaPage'
 import LayoutSchemaEditorPage from '@pages/LayoutSchemaEditorPage'
 import MediaManagerPage from '@pages/MediaManagerPage'
+import TrashPage from '@pages/TrashPage'
 import KanbanPage from './pages/KanbanPage'
 import TagsPage from '@pages/TagsPage'
 import ProfilePage from '@pages/ProfilePage'
@@ -255,6 +256,15 @@ export const AppRoutes = () => {
                 </div>
               </main>
               <StatusBar customStatusContent={<span>Media Manager - Ready</span>} />
+            </div>
+          </PrivateRoute>
+        } />
+        <Route path="/trash" element={
+          <PrivateRoute>
+            <div className="fixed inset-0 flex flex-col bg-gray-50">
+              <Navbar />
+              <main className="flex-1 overflow-y-auto"><TrashPage /></main>
+              <StatusBar customStatusContent={<span>Trash - Ready</span>} />
             </div>
           </PrivateRoute>
         } />

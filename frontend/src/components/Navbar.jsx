@@ -3,7 +3,7 @@ import { useSupportContext } from './support/useSupportContext'
 import { safeReportLocation } from '../api/support'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Menu, X, Settings, Grid3X3, FolderOpen, Database, Hash, User as UserIcon, BarChart2, Palette, Flag, Building2 } from 'lucide-react'
+import { Menu, X, Settings, Grid3X3, FolderOpen, Database, Hash, Trash2, User as UserIcon, BarChart2, Palette, Flag, Building2 } from 'lucide-react'
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { cmsText } from '../utils/cmsCopy'
 import { switchCurrentWorkspace } from '../api/users'
@@ -14,6 +14,7 @@ const navigation = [
   { name: 'Pages', href: '/pages', icon: Grid3X3 },
   { name: 'Publisher', href: '/objects', icon: Database },
   { name: 'Media', href: '/media', icon: FolderOpen },
+  { name: 'Trash', href: '/trash', icon: Trash2 },
   { name: 'Statistics', href: '/statistics', icon: BarChart2 },
   { name: 'Tags', href: '/tags', icon: Hash },
   { name: 'Designer', href: '/designer/themes', icon: Palette, Flag },
