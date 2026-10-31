@@ -242,6 +242,7 @@ class ObjectTransferHelperTests(SimpleTestCase):
         foreign_namespace = SimpleNamespace(tenant_id=2)
         own_child = SimpleNamespace(
             id=2,
+            is_deleted=False,
             namespace_id=20,
             namespace=own_namespace,
             allowed_child_types=Relation([]),
@@ -249,6 +250,7 @@ class ObjectTransferHelperTests(SimpleTestCase):
         )
         foreign_child = SimpleNamespace(
             id=3,
+            is_deleted=False,
             namespace_id=30,
             namespace=foreign_namespace,
             allowed_child_types=Relation([]),
@@ -256,6 +258,7 @@ class ObjectTransferHelperTests(SimpleTestCase):
         )
         root_type = SimpleNamespace(
             id=1,
+            is_deleted=False,
             namespace_id=10,
             namespace=own_namespace,
             allowed_child_types=Relation([own_child, foreign_child]),
