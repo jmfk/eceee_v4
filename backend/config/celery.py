@@ -71,19 +71,14 @@ def debug_task(self):
 
 
 # Periodic task configuration. Keep settings.py as the shared schedule source and
-# extend it here with tasks that use richer crontab expressions.
+# extend it here with tasks that use richer crontab expressions. Deleted media is
+# retained in Trash until an explicitly initiated purge; never schedule its cleanup.
 app.conf.beat_schedule = {
     **dict(settings.CELERY_BEAT_SCHEDULE),
     # Clean up old AI agent tasks daily at 2 AM
     "cleanup-old-ai-tasks": {
         "task": "utils.tasks.cleanup_old_tasks",
         "schedule": crontab(hour=2, minute=0),
-    },
-    # Clean up soft-deleted files daily at 3 AM
-    "cleanup-deleted-files": {
-        "task": "file_manager.tasks.cleanup_deleted_files",
-        "schedule": crontab(hour=3, minute=0),
-        "args": (30, 100),  # 30 days retention, batch size 100
     },
     "cleanup-expired-object-packages": {
         "task": "object_storage.tasks.cleanup_expired_object_packages",

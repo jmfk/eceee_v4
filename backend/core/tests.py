@@ -63,6 +63,9 @@ class CeleryScheduleTest(TestCase):
 
         self.assertEqual(task["task"], "webpages.tasks.refresh_scheduled_publication_caches")
 
+    def test_deleted_media_is_not_automatically_purged(self):
+        self.assertNotIn("cleanup-deleted-files", app.conf.beat_schedule)
+
 
 class RedisChannelLayerConfigurationTest(SimpleTestCase):
     def test_idle_channel_receives_have_no_socket_timeout(self):
