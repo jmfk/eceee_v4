@@ -154,7 +154,7 @@ const BulkOperations = ({
             id: 'delete',
             label: 'Delete Files',
             icon: <Trash2 className="w-4 h-4" />,
-            description: 'Permanently delete selected files',
+            description: 'Move selected files to Trash',
             color: 'bg-red-600 hover:bg-red-700'
         }
     ];
@@ -491,8 +491,8 @@ const BulkOperations = ({
                             <div className={`font-semibold text-red-800 ${compact ? 'text-base' : 'text-lg'}`} role="heading" aria-level="4">Confirm Deletion</div>
                         </div>
                         <div className={`text-red-700 mb-4 leading-relaxed ${compact ? 'text-sm' : ''}`}>
-                            This action will permanently delete {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''}
-                            and cannot be undone. All references to these files will be broken.
+                            Move {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} to Trash.
+                            Referenced or protected files cannot be deleted.
                         </div>
                         <label className="flex items-start space-x-3 cursor-pointer p-3 rounded-lg hover:bg-gradient-to-r hover:from-red-100 hover:to-pink-100 transition-all duration-200 hover:shadow-sm">
                             <input
@@ -505,7 +505,7 @@ const BulkOperations = ({
                                 className="rounded border-gray-300 text-red-600 focus:ring-red-500 mt-0.5 flex-shrink-0 w-4 h-4"
                             />
                             <span className={`text-red-700 font-medium ${compact ? 'text-sm' : ''}`}>
-                                I understand this action cannot be undone
+                                Move these files to Trash
                             </span>
                         </label>
                     </div>

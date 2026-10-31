@@ -490,6 +490,25 @@ export const mediaCollectionsApi = {
         apiClient.delete(endpoints.media.collection(id))
     ),
 
+    trash: (params = {}) => wrapApiCall(() =>
+        apiClient.get(`${endpoints.media.collections}trash/${buildQueryParams(params)}`)
+    ),
+
+    restore: (id) => wrapApiCall(() =>
+        apiClient.post(`${endpoints.media.collection(id)}restore/`)
+    ),
+
+    bulkRestore: (collectionIds) => wrapApiCall(() =>
+        apiClient.post(`${endpoints.media.collections}bulk_restore/`, { collectionIds })
+    ),
+
+    bulkDelete: (collectionIds, deleteFiles = false, namespace) => wrapApiCall(() =>
+        apiClient.post(`${endpoints.media.collections}bulk_delete/${buildQueryParams({ namespace })}`, {
+            collectionIds,
+            deleteFiles,
+        })
+    ),
+
     /**
      * Add files to a collection
      * @param {string} id - Collection ID

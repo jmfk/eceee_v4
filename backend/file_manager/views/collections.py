@@ -5,19 +5,22 @@ ViewSets for managing media tags and collections.
 import logging
 import os
 import tempfile
+import uuid
 import zipfile
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Count, Q
 from django.http import FileResponse, Http404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
+
+from core.roles import is_tenant_admin
 
 from ..models import MediaCollection, MediaFile, MediaTag
 from ..security import filter_media_files_for_user, user_can_access_namespace
@@ -240,9 +243,12 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
         """
         from content.models import Namespace
 
-        queryset = MediaCollection.objects.select_related(
-            "namespace", "created_by", "last_modified_by"
-        ).prefetch_related("tags")
+        queryset = (
+            MediaCollection.objects.with_deleted()
+            .filter(is_deleted=getattr(self, "action", None) == "trash")
+            .select_related("namespace", "created_by", "last_modified_by")
+            .prefetch_related("tags")
+        )
         tenant = getattr(self.request, "tenant", None)
         if tenant is not None:
             queryset = queryset.filter(namespace__tenant=tenant)
@@ -281,6 +287,109 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
         # default namespace to keep the browse experience scoped.
         default_namespace = Namespace.get_default(tenant=tenant)
         return queryset.filter(namespace=default_namespace)
+
+    def perform_destroy(self, instance):
+        instance.soft_delete(self.request.user)
+
+    @action(detail=False, methods=["get"])
+    def trash(self, request):
+        """List deleted collections in the selected tenant and namespace."""
+        queryset = self.filter_queryset(self.get_queryset().order_by("-deleted_at"))
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            return self.get_paginated_response(self.get_serializer(page, many=True).data)
+        return Response(self.get_serializer(queryset, many=True).data)
+
+    @action(detail=True, methods=["post"])
+    def restore(self, request, pk=None):
+        """Restore the collection and its memberships; files remain independently deleted."""
+        tenant = getattr(request, "tenant", None)
+        queryset = MediaCollection.objects.with_deleted().filter(pk=pk, is_deleted=True).select_related("namespace")
+        if tenant is not None:
+            queryset = queryset.filter(namespace__tenant=tenant)
+        collection = queryset.first()
+        if collection is None or not _namespace_visible_to_request(collection.namespace, request):
+            raise Http404
+        self.check_object_permissions(request, collection)
+        collection.restore()
+        return Response(self.get_serializer(collection).data)
+
+    @action(detail=False, methods=["post"])
+    def bulk_restore(self, request):
+        raw_ids = request.data.get("collection_ids")
+        if not isinstance(raw_ids, list) or not 1 <= len(raw_ids) <= 100:
+            return Response({"error": "Select between 1 and 100 collections"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            ids = {uuid.UUID(str(value)) for value in raw_ids}
+        except (TypeError, ValueError, AttributeError):
+            return Response({"error": "Invalid collection ID"}, status=status.HTTP_400_BAD_REQUEST)
+        tenant = getattr(request, "tenant", None)
+        with transaction.atomic():
+            queryset = MediaCollection.objects.with_deleted().filter(pk__in=ids, is_deleted=True)
+            if tenant is not None:
+                queryset = queryset.filter(namespace__tenant=tenant)
+            collections = list(queryset.select_related("namespace").select_for_update())
+            if len(collections) != len(ids) or any(
+                not _namespace_visible_to_request(collection.namespace, request) for collection in collections
+            ):
+                return Response({"error": "One or more collections are unavailable"}, status=status.HTTP_404_NOT_FOUND)
+            for collection in collections:
+                self.check_object_permissions(request, collection)
+                collection.restore()
+        return Response({"restored_count": len(collections)})
+
+    @action(detail=False, methods=["post"])
+    def bulk_delete(self, request):
+        """Atomically move selected collections, and optionally their files, to Trash."""
+        raw_ids = request.data.get("collection_ids")
+        if not isinstance(raw_ids, list) or not 1 <= len(raw_ids) <= 100:
+            return Response({"error": "Select between 1 and 100 collections"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            ids = {uuid.UUID(str(value)) for value in raw_ids}
+        except (TypeError, ValueError, AttributeError):
+            return Response({"error": "Invalid collection ID"}, status=status.HTTP_400_BAD_REQUEST)
+        delete_files = request.data.get("delete_files", False)
+        if not isinstance(delete_files, bool):
+            return Response({"error": "delete_files must be a boolean"}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            collections = list(self.get_queryset().filter(pk__in=ids).select_for_update())
+            if len(collections) != len(ids):
+                return Response({"error": "One or more collections are unavailable"}, status=status.HTTP_404_NOT_FOUND)
+            files = []
+            if delete_files:
+                file_ids = MediaFile.objects.filter(collections__in=collections).values_list("pk", flat=True)
+                files = list(
+                    MediaFile.objects.filter(pk__in=file_ids).select_for_update().prefetch_related("collections")
+                )
+                selected_ids = {collection.id for collection in collections}
+                selected_namespace_ids = {collection.namespace_id for collection in collections}
+                selected_tenant_ids = {collection.namespace.tenant_id for collection in collections}
+                can_delete_other_users_files = is_tenant_admin(request.user, collections[0].namespace.tenant)
+                conflicts = [
+                    str(file.id)
+                    for file in files
+                    if file.namespace_id not in selected_namespace_ids
+                    or file.tenant_id not in selected_tenant_ids
+                    or (file.created_by_id != request.user.id and not can_delete_other_users_files)
+                    or file.reference_count > 0
+                    or file.protected_from_cleanup
+                    or any(not member.is_deleted and member.id not in selected_ids for member in file.collections.all())
+                ]
+                if conflicts:
+                    return Response(
+                        {
+                            "error": "Some files are unavailable, referenced, protected, or shared with collections outside the selection",
+                            "file_ids": conflicts,
+                        },
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                for file in files:
+                    if not file.delete(user=request.user):
+                        raise ValidationError({"error": "A file could not be moved to Trash"})
+            for collection in collections:
+                collection.soft_delete(request.user)
+        return Response({"deleted_count": len(collections), "deleted_file_count": len(files)})
 
     def create(self, request, *args, **kwargs):
         """Create a new collection with tag validation."""
