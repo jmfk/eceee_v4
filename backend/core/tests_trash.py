@@ -59,7 +59,16 @@ class GlobalTrashTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data["count"], 3)
         self.assertEqual({item["type"] for item in response.data["results"]}, {"page", "media", "collection"})
-        self.assertEqual(response.data["counts"], {"page": 1, "media": 1, "collection": 1})
+        self.assertEqual(
+            response.data["counts"],
+            {
+                "page": 1,
+                "media": 1,
+                "collection": 1,
+                "object": 0,
+                "object_type": 0,
+            },
+        )
         searched = self.client.get(reverse("api:trash"), {"search": "photo"})
         self.assertEqual([item["type"] for item in searched.data["results"]], ["media"])
         filtered = self.client.get(reverse("api:trash"), {"type": "collection"})

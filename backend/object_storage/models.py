@@ -95,6 +95,11 @@ class ObjectTypeDefinition(models.Model):
         help_text="Namespace for organizing content and media for this object type",
     )
     is_active = models.BooleanField(default=True, help_text="Whether this object type is available for use")
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="deleted_object_types"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)
@@ -114,6 +119,24 @@ class ObjectTypeDefinition(models.Model):
 
     def __str__(self):
         return self.label
+
+    def soft_delete(self, user):
+        if self.is_deleted:
+            return False
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.deleted_by = user
+        self.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"])
+        return True
+
+    def restore(self):
+        if not self.is_deleted:
+            return False
+        self.is_deleted = False
+        self.deleted_at = None
+        self.deleted_by = None
+        self.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"])
+        return True
 
     def get_effective_namespace(self):
         """Get the effective namespace for this object type (assigned namespace or default)"""
@@ -419,7 +442,9 @@ class PublishedObjectManager(models.Manager):
             object_instance=OuterRef("pk"), effective_date__lte=now
         ).filter(models.Q(expiry_date__isnull=True) | models.Q(expiry_date__gt=now))
 
-        return self.get_queryset().filter(Exists(published_versions), current_version__isnull=False)
+        return self.get_queryset().filter(
+            Exists(published_versions), current_version__isnull=False, is_deleted=False, object_type__is_deleted=False
+        )
 
     def with_featured_first(self):
         """
@@ -580,6 +605,12 @@ class ObjectInstance(MPTTModel):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="deleted_object_instances"
+    )
+
     # Multi-tenancy support
     tenant = models.ForeignKey(
         "core.Tenant",
@@ -626,6 +657,39 @@ class ObjectInstance(MPTTModel):
 
     def __str__(self):
         return f"{self.object_type.label}: {self.title}"
+
+    def soft_delete(self, user):
+        """Move the object and its active descendants to Trash without losing versions or links."""
+        now = timezone.now()
+        with transaction.atomic():
+            ids = list(
+                self.get_descendants(include_self=True)
+                .filter(tenant=self.tenant, is_deleted=False)
+                .order_by("pk")
+                .select_for_update()
+                .values_list("pk", flat=True)
+            )
+            if ids:
+                ObjectInstance.objects.filter(pk__in=ids).update(
+                    is_deleted=True, deleted_at=now, deleted_by=user, updated_at=now
+                )
+        if self.pk in ids:
+            self.is_deleted = True
+            self.deleted_at = now
+            self.deleted_by = user
+        return len(ids)
+
+    def restore(self, user):
+        """Restore one object; descendants stay in Trash until selected separately."""
+        if not self.is_deleted:
+            return False
+        if self.object_type.is_deleted or (self.parent_id and self.parent.is_deleted):
+            raise ValidationError("Restore the object type and parent first.")
+        self.is_deleted = False
+        self.deleted_at = None
+        self.deleted_by = None
+        self.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"])
+        return True
 
     @property
     def data(self):

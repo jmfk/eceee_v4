@@ -1172,7 +1172,9 @@ class DesignerThemePreviewObjectView(APIView):
         serializer = DesignerPreviewObjectSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         instance = get_object_or_404(
-            ObjectInstance.objects.select_related("object_type"),
+            ObjectInstance.objects.filter(is_deleted=False, object_type__is_deleted=False).select_related(
+                "object_type"
+            ),
             id=serializer.validated_data["source_object_id"],
             tenant=theme.tenant,
             current_version_id__isnull=False,

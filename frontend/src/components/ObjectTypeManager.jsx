@@ -11,7 +11,7 @@ import ContextualHelpLink from './help/ContextualHelpLink'
 const ObjectTypeManager = () => {
     const [searchTerm, setSearchTerm] = useState('')
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
-    const [forceDeleteConfirmed, setForceDeleteConfirmed] = useState(false)
+    const [deleteInstances, setDeleteInstances] = useState(false)
 
     const navigate = useNavigate()
     const queryClient = useQueryClient()
@@ -33,20 +33,20 @@ const ObjectTypeManager = () => {
 
     // Delete object type mutation
     const deleteTypeMutation = useMutation({
-        mutationFn: async ({ id, forceDelete }) => await objectTypesApi.delete(id, forceDelete),
+        mutationFn: async ({ id, includeInstances }) => await objectTypesApi.delete(id, includeInstances),
         onSuccess: (response) => {
             queryClient.invalidateQueries(['objectTypes'])
             setShowDeleteConfirm(null)
-            setForceDeleteConfirmed(false)
+            setDeleteInstances(false)
 
-            const instancesDeleted = response?.data?.instances_deleted || 0
+            const instancesDeleted = response?.data?.instancesDeleted || 0
             if (instancesDeleted > 0) {
                 addNotification(
-                    `Object type and ${instancesDeleted} instance${instancesDeleted === 1 ? '' : 's'} deleted successfully`,
+                    `Object type and ${instancesDeleted} instance${instancesDeleted === 1 ? '' : 's'} moved to Trash`,
                     'success'
                 )
             } else {
-                addNotification('Object type deleted successfully', 'success')
+                addNotification('Object type moved to Trash', 'success')
             }
         },
         onError: (error) => {
@@ -58,31 +58,30 @@ const ObjectTypeManager = () => {
             if (status === 401) {
                 addNotification('Authentication failed. Please log in again.', 'error')
                 setShowDeleteConfirm(null)
-                setForceDeleteConfirmed(false)
+                setDeleteInstances(false)
                 return
             }
 
             if (status === 404) {
                 addNotification('Object type not found. It may have already been deleted.', 'error')
                 setShowDeleteConfirm(null)
-                setForceDeleteConfirmed(false)
+                setDeleteInstances(false)
                 // Refresh the list
                 queryClient.invalidateQueries(['objectTypes'])
                 return
             }
 
-            // Check if it requires force delete
-            if (error.response?.data?.force_delete_required) {
+            if (error.response?.status === 409 && error.response?.data?.instanceCount) {
                 // Keep dialog open and show warning
                 addNotification(
-                    `Cannot delete: ${error.response.data.instance_count} instance(s) exist. Enable "Delete all instances" to proceed.`,
+                    `${error.response.data.instanceCount} instance(s) exist. Select "Move instances to Trash" to include them.`,
                     'warning'
                 )
             } else {
                 const errorMessage = error.response?.data?.error || 'Failed to delete object type'
                 addNotification(errorMessage, 'error')
                 setShowDeleteConfirm(null)
-                setForceDeleteConfirmed(false)
+                setDeleteInstances(false)
             }
         }
     })
@@ -94,14 +93,14 @@ const ObjectTypeManager = () => {
             const hasInstances = (showDeleteConfirm.instanceCount || 0) > 0
             deleteTypeMutation.mutate({
                 id: showDeleteConfirm.id,
-                forceDelete: hasInstances && forceDeleteConfirmed
+                includeInstances: hasInstances && deleteInstances
             })
         }
     }
 
     const handleCancelDelete = () => {
         setShowDeleteConfirm(null)
-        setForceDeleteConfirmed(false)
+        setDeleteInstances(false)
     }
 
     const handleEditType = (objectType) => {
@@ -231,8 +230,8 @@ const ObjectTypeManager = () => {
                     onConfirm={handleDeleteType}
                     onCancel={handleCancelDelete}
                     isLoading={deleteTypeMutation.isPending}
-                    forceDeleteConfirmed={forceDeleteConfirmed}
-                    onForceDeleteChange={setForceDeleteConfirmed}
+                    deleteInstances={deleteInstances}
+                    onDeleteInstancesChange={setDeleteInstances}
                 />
             )}
         </div>
@@ -240,7 +239,7 @@ const ObjectTypeManager = () => {
 }
 
 // Delete Confirmation Dialog Component
-const DeleteConfirmDialog = ({ objectType, onConfirm, onCancel, isLoading, forceDeleteConfirmed, onForceDeleteChange }) => {
+const DeleteConfirmDialog = ({ objectType, onConfirm, onCancel, isLoading, deleteInstances, onDeleteInstancesChange }) => {
     const hasInstances = (objectType.instanceCount || 0) > 0
 
     return (
@@ -248,11 +247,11 @@ const DeleteConfirmDialog = ({ objectType, onConfirm, onCancel, isLoading, force
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
                 <div className="p-6">
                     <div className="text-xl font-semibold text-gray-900 mb-4" role="heading" aria-level="2">
-                        Delete Object Type
+                        Move Object Type to Trash
                     </div>
 
                     <div className="text-gray-600 mb-4">
-                        Are you sure you want to delete <span className="font-bold">"{objectType.label}"</span>?
+                        Move <span className="font-bold">"{objectType.label}"</span> to Trash?
                     </div>
 
                     {hasInstances && (
@@ -261,17 +260,17 @@ const DeleteConfirmDialog = ({ objectType, onConfirm, onCancel, isLoading, force
                                 <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5 mr-2 flex-shrink-0" />
                                 <div className="flex-1">
                                     <div className="text-sm font-medium text-orange-800 mb-2">
-                                        Warning: This object type has {objectType.instanceCount} existing instance{objectType.instanceCount === 1 ? '' : 's'}
+                                        This object type has {objectType.instanceCount} active instance{objectType.instanceCount === 1 ? '' : 's'}
                                     </div>
                                     <label className="flex items-start cursor-pointer">
                                         <input
                                             type="checkbox"
-                                            checked={forceDeleteConfirmed}
-                                            onChange={(e) => onForceDeleteChange(e.target.checked)}
+                                            checked={deleteInstances}
+                                            onChange={(e) => onDeleteInstancesChange(e.target.checked)}
                                             className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded mt-0.5 mr-2"
                                         />
                                         <span className="text-sm text-orange-800">
-                                            <span className="font-bold">Delete all {objectType.instanceCount} instance{objectType.instanceCount === 1 ? '' : 's'}</span> along with the object type. This action cannot be undone.
+                                            <span className="font-bold">Move all {objectType.instanceCount} instance{objectType.instanceCount === 1 ? '' : 's'} and their descendants to Trash</span> with the object type.
                                         </span>
                                     </label>
                                 </div>
@@ -280,7 +279,7 @@ const DeleteConfirmDialog = ({ objectType, onConfirm, onCancel, isLoading, force
                     )}
 
                     <div className="text-sm text-gray-500 mb-6">
-                        This action cannot be undone.
+                        You can restore the type and its instances from Trash.
                     </div>
 
                     <div className="flex space-x-3">
@@ -293,7 +292,7 @@ const DeleteConfirmDialog = ({ objectType, onConfirm, onCancel, isLoading, force
                         </button>
                         <button
                             onClick={onConfirm}
-                            disabled={isLoading || (hasInstances && !forceDeleteConfirmed)}
+                            disabled={isLoading || (hasInstances && !deleteInstances)}
                             className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {isLoading ? (
@@ -302,7 +301,7 @@ const DeleteConfirmDialog = ({ objectType, onConfirm, onCancel, isLoading, force
                                     Deleting...
                                 </>
                             ) : (
-                                'Delete'
+                                'Move to Trash'
                             )}
                         </button>
                     </div>

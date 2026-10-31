@@ -27,6 +27,7 @@ from rest_framework.response import Response
 
 from core.models import MachineAPIKey
 from core.permissions import HasTenantAccess
+from core.roles import is_tenant_admin
 from taxonomy.models import Tag
 
 from .browser_config import (
@@ -115,7 +116,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
     filterset_fields = ["is_active", "hierarchy_level"]
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().filter(is_deleted=False)
         # Definition writers are limited to their selected tenant; global types
         # remain an explicitly privileged server operation.
         if self.request.method not in permissions.SAFE_METHODS and isinstance(
@@ -145,7 +146,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
         if child_names is not None:
             allowed_names = set(
                 ObjectTypeDefinition.objects.filter(
-                    name__in=child_names, is_active=True, namespace__tenant=self.request.tenant
+                    name__in=child_names, is_active=True, is_deleted=False, namespace__tenant=self.request.tenant
                 ).values_list("name", flat=True)
             )
             if set(child_names) != allowed_names:
@@ -187,40 +188,43 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
         serializer.save(created_by=self.request.user)
 
     def destroy(self, request, *args, **kwargs):
-        """
-        Delete an object type.
-        Supports force_delete query parameter to delete even when instances exist.
-        """
+        """Move a tenant-owned type and optionally its instances to Trash."""
         instance = self.get_object()
-        force_delete = request.query_params.get("force_delete", "false").lower() == "true"
-
-        # Check for existing instances
-        instance_count = ObjectInstance.objects.filter(object_type=instance).count()
-
-        if instance_count > 0 and not force_delete:
+        tenant = getattr(request, "tenant", None)
+        if tenant is None or instance.namespace_id is None or instance.namespace.tenant_id != tenant.pk:
             return Response(
-                {
-                    "error": f"Cannot delete object type: {instance_count} instance(s) exist",
-                    "instance_count": instance_count,
-                    "force_delete_required": True,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+                {"error": "Only workspace-owned object types can be deleted"}, status=status.HTTP_403_FORBIDDEN
             )
-
-        # If force_delete, delete all instances first
-        if force_delete and instance_count > 0:
-            ObjectInstance.objects.filter(object_type=instance).delete()
-
-        # Delete the object type
-        instance.delete()
-
-        return Response(
-            {
-                "message": "Object type deleted successfully",
-                "instances_deleted": instance_count if force_delete else 0,
-            },
-            status=status.HTTP_200_OK,
-        )
+        if not is_tenant_admin(request.user, tenant):
+            raise PermissionDenied("Workspace administration is required to delete object types.")
+        if request.query_params.get("force_delete") is not None:
+            return Response({"error": "Permanent deletion is disabled"}, status=status.HTTP_410_GONE)
+        raw_delete_instances = request.query_params.get("delete_instances", "false").lower()
+        if raw_delete_instances not in {"true", "false"}:
+            raise serializers.ValidationError({"delete_instances": "Use true or false."})
+        with transaction.atomic():
+            instance = ObjectTypeDefinition.objects.select_for_update().get(pk=instance.pk, is_deleted=False)
+            instances = ObjectInstance.objects.filter(object_type=instance, is_deleted=False)
+            instance_count = instances.count()
+            if instance_count and raw_delete_instances == "false":
+                return Response(
+                    {
+                        "error": "Move the instances to Trash too, or delete them first.",
+                        "instance_count": instance_count,
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+            if instances.exclude(tenant=tenant).exists():
+                return Response(
+                    {"error": "This type has instances in another workspace"}, status=status.HTTP_409_CONFLICT
+                )
+            deleted_instances = 0
+            if raw_delete_instances == "true":
+                for obj in list(instances.order_by("tree_id", "lft")):
+                    if ObjectInstance.objects.filter(pk=obj.pk, is_deleted=False).exists():
+                        deleted_instances += obj.soft_delete(request.user)
+            instance.soft_delete(request.user)
+        return Response({"message": "Object type moved to Trash", "instances_deleted": deleted_instances})
 
     @action(detail=False, methods=["get"])
     def main_browser_types(self, request):
@@ -626,7 +630,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Filter queryset by tenant"""
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().filter(is_deleted=False, object_type__is_deleted=False)
 
         # Filter by tenant from middleware
         tenant = getattr(self.request, "tenant", None)
@@ -679,7 +683,16 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
             from rest_framework.exceptions import ValidationError
 
             raise ValidationError("Tenant is required. Provide X-Tenant-ID header.")
-        serializer.save(created_by=self.request.user, tenant=tenant)
+        with transaction.atomic():
+            object_type = ObjectTypeDefinition.objects.select_for_update().get(
+                pk=serializer.validated_data["object_type_id"]
+            )
+            if object_type.is_deleted:
+                raise serializers.ValidationError({"object_type": "Restore this object type before creating objects."})
+            serializer.save(created_by=self.request.user, tenant=tenant)
+
+    def perform_destroy(self, instance):
+        instance.soft_delete(self.request.user)
 
     def update(self, request, *args, **kwargs):
         if {
@@ -1245,7 +1258,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         # Text search across multiple fields
         if query:
             if request.query_params.get("browser") == "true":
-                definitions = ObjectTypeDefinition.objects.filter(is_active=True)
+                definitions = ObjectTypeDefinition.objects.filter(is_active=True, is_deleted=False)
                 if request.query_params.get("type"):
                     definitions = definitions.filter(name=request.query_params["type"])
                 definitions = definitions.filter(Q(namespace__tenant=request.tenant) | Q(namespace__isnull=True))
@@ -1357,7 +1370,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         type_name = request.query_params.get("type")
         filter_key = request.query_params.get("filter")
         query = request.query_params.get("q", "")[:100]
-        definition = ObjectTypeDefinition.objects.filter(name=type_name, is_active=True).first()
+        definition = ObjectTypeDefinition.objects.filter(name=type_name, is_active=True, is_deleted=False).first()
         if not definition or (definition.namespace_id and definition.namespace.tenant_id != request.tenant.pk):
             raise serializers.ValidationError({"type": "Choose an available Object type."})
         configured = {item["key"] for item in browser_config(definition).get("filters", [])}
@@ -1389,7 +1402,9 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         field = (definition.schema or {}).get("properties", {})[filter_key[6:]]
         if option["kind"] == "reference":
             allowed = field.get("allowed_object_types") or field.get("allowedObjectTypes") or []
-            values = ObjectInstance.objects.filter(tenant=request.tenant)
+            values = ObjectInstance.objects.filter(
+                tenant=request.tenant, is_deleted=False, object_type__is_deleted=False
+            )
             if allowed:
                 values = values.filter(object_type__name__in=allowed)
             if query:
@@ -1594,7 +1609,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
 
                     elif operation == "delete":
                         obj_id = obj.id
-                        obj.delete()
+                        obj.soft_delete(request.user)
                         results.append({"id": obj_id, "status": "deleted"})
 
                     elif operation == "archive":

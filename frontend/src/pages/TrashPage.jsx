@@ -10,6 +10,8 @@ const types = [
     { value: 'page', label: 'Pages' },
     { value: 'media', label: 'Media' },
     { value: 'collection', label: 'Collections' },
+    { value: 'object', label: 'Objects' },
+    { value: 'object_type', label: 'Object types' },
 ]
 
 const itemKey = (item) => `${item.type}:${item.id}`

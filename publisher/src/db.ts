@@ -230,6 +230,7 @@ function reader(client: PoolClient): PageReader {
               LIMIT 1
             ) AS parent_published ON true
             WHERE parent.id = object.parent_id AND parent.tenant_id = $1
+              AND parent.is_deleted = false AND parent_type.is_deleted = false
               AND parent.current_version_id IS NOT NULL
               AND parent_type.is_active = true
               AND (parent_type.namespace_id IS NULL OR parent_namespace.tenant_id = $1)
@@ -253,6 +254,7 @@ function reader(client: PoolClient): PageReader {
               LIMIT 1
             ) AS ancestor_published ON true
             WHERE ancestor.tenant_id = $1 AND ancestor.tree_id = object.tree_id
+              AND ancestor.is_deleted = false AND ancestor_type.is_deleted = false
               AND ancestor.current_version_id IS NOT NULL
               AND ancestor_type.is_active = true
               AND (ancestor_type.namespace_id IS NULL OR ancestor_namespace.tenant_id = $1)
@@ -278,6 +280,7 @@ function reader(client: PoolClient): PageReader {
               LIMIT 1
             ) AS child_published ON true
             WHERE child.tenant_id = $1 AND child.parent_id = object.id
+              AND child.is_deleted = false AND child_type.is_deleted = false
               AND child.current_version_id IS NOT NULL
               AND child_type.is_active = true
               AND (child_type.namespace_id IS NULL OR child_namespace.tenant_id = $1)
@@ -295,6 +298,7 @@ function reader(client: PoolClient): PageReader {
           LIMIT 1
         ) AS published ON true
         WHERE object.tenant_id = $1
+          AND object.is_deleted = false AND type.is_deleted = false
           AND object.current_version_id IS NOT NULL
           AND ($7::bigint[] <> '{}'::bigint[] AND object.id = ANY($7::bigint[])
             OR $2::bigint[] <> '{}'::bigint[] AND type.id = ANY($2::bigint[])
