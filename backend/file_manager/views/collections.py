@@ -379,7 +379,10 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
                 if conflicts:
                     return Response(
                         {
-                            "error": "Some files are unavailable, referenced, protected, or shared with collections outside the selection",
+                            "error": (
+                                "Some files are unavailable, referenced, protected, or shared with collections "
+                                "outside the selection"
+                            ),
                             "file_ids": conflicts,
                         },
                         status=status.HTTP_409_CONFLICT,
