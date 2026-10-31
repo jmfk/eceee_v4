@@ -235,7 +235,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def force_delete(self, request, pk=None):
-        """Permanently delete a file, bypassing reference checks."""
+        """Retain the legacy route without allowing permanent CMS deletion."""
         try:
             instance = MediaFile.objects.with_deleted().get(pk=pk)
         except MediaFile.DoesNotExist:
@@ -256,14 +256,10 @@ class MediaFileViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if instance.protected_from_cleanup:
-            return Response({"error": "This image is protected from deletion"}, status=status.HTTP_409_CONFLICT)
-        if not instance.delete(user=request.user, force=True):
-            return Response(
-                {"error": "Remove unused historical versions before permanently deleting this image"},
-                status=status.HTTP_409_CONFLICT,
-            )
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(
+            {"error": "Permanent deletion through the CMS API is disabled."},
+            status=status.HTTP_410_GONE,
+        )
 
     @action(detail=True, methods=["get"])
     def references(self, request, pk=None):

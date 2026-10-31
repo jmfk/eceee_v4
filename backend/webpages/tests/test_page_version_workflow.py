@@ -181,8 +181,8 @@ class PageVersionWorkflowTest(TestCase):
         self.assertEqual(listed_ids, [own_deleted.id])
         self.assertEqual(bulk_restore.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(permanent_delete.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(delete_all.status_code, status.HTTP_200_OK)
-        self.assertFalse(WebPage.objects.filter(pk=own_deleted.id).exists())
+        self.assertEqual(delete_all.status_code, status.HTTP_410_GONE)
+        self.assertTrue(WebPage.objects.filter(pk=own_deleted.id, is_deleted=True).exists())
         self.assertTrue(WebPage.objects.filter(pk=foreign_deleted.id, is_deleted=True).exists())
 
     def test_page_version_maintenance_cannot_pack_another_tenant(self):

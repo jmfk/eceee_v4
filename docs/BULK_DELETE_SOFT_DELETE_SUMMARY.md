@@ -20,6 +20,8 @@ other CMS resources gain reversible deletion.
 
 Deleted media is retained until an explicitly initiated purge. There is no
 scheduled automatic Trash cleanup.
+Legacy CMS API routes for permanent page and media deletion now return HTTP 410
+without changing data. Permanent cleanup requires a separate maintenance process.
 
 ## Overview
 

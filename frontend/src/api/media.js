@@ -90,15 +90,6 @@ export const mediaFilesApi = {
     ),
 
     /**
-     * Permanently delete a media file (force delete)
-     * @param {string} id - Media file ID
-     * @returns {Promise} API response
-     */
-    forceDelete: (id) => wrapApiCall(() =>
-        apiClient.post(`${endpoints.media.file(id)}force_delete/`)
-    ),
-
-    /**
      * Get download URL for a media file
      * @param {string} id - Media file ID
      * @returns {string} Download URL

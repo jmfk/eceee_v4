@@ -149,3 +149,13 @@ class GlobalTrashTests(APITestCase):
         child.refresh_from_db()
         self.assertEqual(child.parent_id, self.page.pk)
         self.assertFalse(child.is_deleted)
+
+    def test_legacy_page_purge_routes_are_non_destructive(self):
+        single = self.client.delete(reverse("api:webpage-permanent-delete", args=[self.page.pk]))
+        bulk = self.client.post(
+            reverse("api:webpage-bulk-permanent-delete"), {"pageIds": [self.page.pk]}, format="json"
+        )
+        all_pages = self.client.post(reverse("api:webpage-permanent-delete-all"), {"confirm": True}, format="json")
+        self.assertEqual([single.status_code, bulk.status_code, all_pages.status_code], [410, 410, 410])
+        self.page.refresh_from_db()
+        self.assertTrue(self.page.is_deleted)
