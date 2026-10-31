@@ -1338,6 +1338,14 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
         setSearchQuery(query);
     }, []);
 
+    const handleViewTabKeyDown = (event) => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault();
+        const nextTrash = event.key === 'End' ? true : event.key === 'Home' ? false : !showTrash;
+        setShowTrash(nextTrash);
+        event.currentTarget.parentElement.querySelectorAll('[role="tab"]')[nextTrash ? 1 : 0].focus();
+    };
+
     // Handle sort change
     const handleSortChange = (field) => {
         if (sortBy === field) {
@@ -1410,9 +1418,11 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
     };
 
     const toggleCollectionSelection = (id) => {
-        setSelectedCollectionIds(previous => previous.includes(id)
-            ? previous.filter(selectedId => selectedId !== id)
-            : [...previous, id]);
+        setSelectedCollectionIds(previous => {
+            if (previous.includes(id)) return previous.filter(selectedId => selectedId !== id);
+            if (previous.length >= 100) return previous;
+            return [...previous, id];
+        });
     };
 
     const restoreCollections = async (collectionsToRestore) => {
@@ -1740,6 +1750,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                         type="checkbox"
                         aria-label={`Select ${collection.title}`}
                         checked={selectedCollectionIds.includes(collection.id)}
+                        disabled={selectedCollectionIds.length >= 100 && !selectedCollectionIds.includes(collection.id)}
                         onChange={() => toggleCollectionSelection(collection.id)}
                         onClick={event => event.stopPropagation()}
                         className="mr-3 mt-1 h-4 w-4 accent-blue-600"
@@ -1866,6 +1877,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                             type="checkbox"
                             aria-label={`Select ${collection.title}`}
                             checked={selectedCollectionIds.includes(collection.id)}
+                            disabled={selectedCollectionIds.length >= 100 && !selectedCollectionIds.includes(collection.id)}
                             onChange={() => toggleCollectionSelection(collection.id)}
                             onClick={event => event.stopPropagation()}
                             className="mr-3 mt-1 h-4 w-4 accent-blue-600"
@@ -2027,8 +2039,8 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
             {/* Search and Controls */}
             <div className="bg-white border-b border-gray-200 px-6 py-4">
                 <div className="flex gap-4 border-b border-gray-200 mb-4" role="tablist" aria-label="Collection view">
-                    <button type="button" role="tab" aria-selected={!showTrash} onClick={() => setShowTrash(false)} className={`pb-2 text-sm ${!showTrash ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-600'}`}>Collections</button>
-                    <button type="button" role="tab" aria-selected={showTrash} onClick={() => setShowTrash(true)} className={`pb-2 text-sm ${showTrash ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-600'}`}>Trash</button>
+                    <button id="collections-tab" aria-controls="collection-results" type="button" role="tab" aria-selected={!showTrash} tabIndex={showTrash ? -1 : 0} onKeyDown={handleViewTabKeyDown} onClick={() => setShowTrash(false)} className={`pb-2 text-sm ${!showTrash ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-600'}`}>Collections</button>
+                    <button id="collections-trash-tab" aria-controls="collection-results" type="button" role="tab" aria-selected={showTrash} tabIndex={showTrash ? 0 : -1} onKeyDown={handleViewTabKeyDown} onClick={() => setShowTrash(true)} className={`pb-2 text-sm ${showTrash ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-600'}`}>Trash</button>
                 </div>
                 {showTrash && <p className="mb-3 text-xs text-gray-600">Restoring a collection keeps its original memberships. Restore deleted files separately from Media Library → Trash.</p>}
                 <div className="flex flex-col sm:flex-row gap-4">
@@ -2095,9 +2107,10 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                     </div>
                 </div>
                 {visibleCollections.length > 0 && <div className="flex flex-wrap items-center gap-3 mt-3 text-sm">
-                    <button type="button" onClick={() => setSelectedCollectionIds(visibleCollections.map(collection => collection.id))} className="text-blue-600 underline">Select all visible</button>
+                    <button type="button" onClick={() => setSelectedCollectionIds(visibleCollections.slice(0, 100).map(collection => collection.id))} className="text-blue-600 underline">{visibleCollections.length > 100 ? 'Select first 100' : 'Select all visible'}</button>
                     {selectedCollectionIds.length > 0 && <>
                         <span>{selectedCollectionIds.length} selected</span>
+                        {visibleCollections.length > 100 && <span className="text-gray-500">100 per batch</span>}
                         <button type="button" onClick={() => setSelectedCollectionIds([])} className="text-gray-600 underline">Clear selection</button>
                         {showTrash ? (
                             <button type="button" disabled={bulkBusy} onClick={() => restoreCollections(collections.filter(collection => selectedCollectionIds.includes(collection.id)))} className="px-3 py-1.5 rounded bg-blue-600 text-white disabled:opacity-50">Restore selected</button>
@@ -2109,7 +2122,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-1 overflow-auto">
+            <div id="collection-results" role="tabpanel" aria-labelledby={showTrash ? 'collections-trash-tab' : 'collections-tab'} className="flex-1 overflow-auto">
                 <div className="p-6">
                     {/* Loading State */}
                     {loading && (

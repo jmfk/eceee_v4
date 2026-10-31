@@ -339,6 +339,7 @@ const MediaBrowser = ({
             loadFiles(true);
         } catch (error) {
             addNotification('Could not restore every selected file', 'error');
+            setSelectedFiles([]);
             loadFiles(true);
         }
     };
@@ -749,7 +750,7 @@ const MediaBrowser = ({
                         title={`${orientation}${aspectRatio ? ` - AR: ${aspectRatio.toFixed(2)}` : ''}`}
                     >
                         {/* Quick View Button (for extended images only) */}
-                        {isExtended && isImage && !file.is_deleted && !compact && (
+                        {isExtended && isImage && !file.isDeleted && !compact && (
                             <button
                                 onClick={(e) => handleQuickViewClick(file, e)}
                                 className="absolute top-2 left-2 z-10 p-1.5 bg-black/50 hover:bg-black/70 text-white rounded-full shadow-md transition-all duration-200 opacity-0 group-hover:opacity-100"
@@ -762,7 +763,7 @@ const MediaBrowser = ({
                         {/* Action Buttons */}
                         {!hideActions && !compact && (
                             <div className="absolute top-2 right-2 z-10 flex gap-1">
-                                {file.is_deleted ? (
+                                {file.isDeleted ? (
                                     <>
                                         <button
                                             onClick={(e) => handleRestoreClick(file, e)}
@@ -785,7 +786,7 @@ const MediaBrowser = ({
                         )}
 
                         {/* Deleted Status Badge */}
-                        {file.is_deleted && (
+                        {file.isDeleted && (
                             <div className={`absolute top-2 left-2 z-10 px-2 py-1 bg-red-500 text-white text-xs font-medium rounded-full shadow-md ${compact ? 'scale-75' : ''}`}>
                                 Deleted
                             </div>
@@ -888,7 +889,7 @@ const MediaBrowser = ({
                     <div className="col-span-3 text-sm text-gray-600 flex items-center">{formatDate(file.createdAt || file.created_at)}</div>
                     {!(hideActions || compact) && (
                         <div className="col-span-1 flex justify-center items-center gap-1">
-                            {file.is_deleted ? (
+                            {file.isDeleted ? (
                                 <>
                                     <button
                                         onClick={(e) => handleRestoreClick(file, e)}
@@ -909,7 +910,7 @@ const MediaBrowser = ({
                             )}
                         </div>
                     )}
-                    {file.is_deleted && (
+                    {file.isDeleted && (
                         <div className="absolute right-full mr-2 px-2 py-0.5 bg-red-500 text-white text-xs font-medium rounded-full">
                             Deleted
                         </div>
