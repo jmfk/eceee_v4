@@ -19,7 +19,9 @@ from webpages.models import WebPage
 
 class TrashView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    kinds = ("page", "media", "collection")
+    # Collection deletion locks the collection before its files; restore in the
+    # same order to avoid a deadlock when both operations run concurrently.
+    kinds = ("page", "collection", "media")
 
     def _tenant(self, request):
         tenant = getattr(request, "tenant", None)
