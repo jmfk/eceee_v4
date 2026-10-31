@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
-import { Trash2, RefreshCw, Search, X, AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react'
+import { Trash2, RefreshCw, Search, X, AlertCircle, CheckCircle } from 'lucide-react'
 import { pagesApi } from '@/api/pages'
 import useNotifications from '@/hooks/useNotifications'
 import RestorePageDialog from './RestorePageDialog'
@@ -9,7 +9,7 @@ import RestorePageDialog from './RestorePageDialog'
  * DeletedPagesView Component
  * 
  * Displays a searchable, infinite-scroll list of soft-deleted pages
- * with restoration and permanent deletion capabilities.
+ * with restoration controls.
  */
 export default function DeletedPagesView({ isStaff = false }) {
     const [searchTerm, setSearchTerm] = useState('')
@@ -163,87 +163,6 @@ export default function DeletedPagesView({ isStaff = false }) {
         }
     }, [selectedPageIds, showNotification, showConfirm, queryClient])
 
-    // Handle permanent delete single page
-    const handlePermanentDelete = useCallback(async (page) => {
-        const confirmed = await showConfirm({
-            title: '⚠️ Permanently Delete Page',
-            message: `Are you ABSOLUTELY SURE you want to permanently delete "${page.title || page.slug}"?\n\n⚠️ WARNING: This action CANNOT be undone! The page and all its data will be permanently removed from the database.`,
-            confirmText: 'Permanently Delete',
-            confirmButtonStyle: 'danger',
-            cancelText: 'Cancel'
-        })
-
-        if (!confirmed) return
-
-        try {
-            const result = await pagesApi.permanentDelete(page.id, { recursive: false })
-            showNotification(result.message || 'Page permanently deleted', 'success')
-
-            // Refetch
-            queryClient.invalidateQueries({ queryKey: ['deleted-pages'] })
-            setSelectedPageIds(prev => {
-                const next = new Set(prev)
-                next.delete(page.id)
-                return next
-            })
-        } catch (error) {
-            console.error('Failed to permanently delete page:', error)
-            showNotification(error.message || 'Failed to permanently delete page', 'error')
-        }
-    }, [showNotification, showConfirm, queryClient])
-
-    // Handle bulk permanent delete
-    const handleBulkPermanentDelete = useCallback(async () => {
-        const idsArray = Array.from(selectedPageIds)
-
-        const confirmed = await showConfirm({
-            title: '⚠️ Permanently Delete Multiple Pages',
-            message: `Are you ABSOLUTELY SURE you want to permanently delete ${idsArray.length} page(s)?\n\n⚠️ WARNING: This action CANNOT be undone! All selected pages and their data will be permanently removed from the database.`,
-            confirmText: `Permanently Delete ${idsArray.length} Page(s)`,
-            confirmButtonStyle: 'danger',
-            cancelText: 'Cancel'
-        })
-
-        if (!confirmed) return
-
-        try {
-            const result = await pagesApi.bulkPermanentDelete(idsArray, false)
-            showNotification(result.message || 'Pages permanently deleted', 'success')
-
-            // Refetch
-            queryClient.invalidateQueries({ queryKey: ['deleted-pages'] })
-            setSelectedPageIds(new Set())
-        } catch (error) {
-            console.error('Failed to bulk permanently delete:', error)
-            showNotification(error.message || 'Failed to permanently delete pages', 'error')
-        }
-    }, [selectedPageIds, showNotification, showConfirm, queryClient])
-
-    // Handle permanent delete all
-    const handlePermanentDeleteAll = useCallback(async () => {
-        const confirmed = await showConfirm({
-            title: '⚠️ DANGER: Permanently Delete ALL Deleted Pages',
-            message: `Are you ABSOLUTELY SURE you want to permanently delete ALL ${deletedPages.length} deleted page(s)?\n\n⚠️ CRITICAL WARNING: This action CANNOT be undone! ALL soft-deleted pages will be permanently removed from the database forever.`,
-            confirmText: `Permanently Delete ALL ${deletedPages.length} Page(s)`,
-            confirmButtonStyle: 'danger',
-            cancelText: 'Cancel'
-        })
-
-        if (!confirmed) return
-
-        try {
-            const result = await pagesApi.permanentDeleteAll(true)
-            showNotification(result.message || 'All deleted pages permanently deleted', 'success')
-
-            // Refetch
-            queryClient.invalidateQueries({ queryKey: ['deleted-pages'] })
-            setSelectedPageIds(new Set())
-        } catch (error) {
-            console.error('Failed to permanently delete all:', error)
-            showNotification(error.message || 'Failed to permanently delete all pages', 'error')
-        }
-    }, [deletedPages.length, showNotification, showConfirm, queryClient])
-
     // Permission check
     if (!isStaff) {
         return (
@@ -299,28 +218,8 @@ export default function DeletedPagesView({ isStaff = false }) {
                         {deletedPages.length} deleted page{deletedPages.length !== 1 ? 's' : ''}
                     </div>
                     <div className="flex items-center gap-1 sm:gap-2">
-                        {deletedPages.length > 0 && (
-                            <button
-                                onClick={handlePermanentDeleteAll}
-                                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-red-600 text-white rounded-md hover:bg-red-700"
-                                title="Permanently delete all deleted pages"
-                            >
-                                <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                <span className="hidden sm:inline">Clean All</span>
-                                <span className="sm:hidden">All</span>
-                            </button>
-                        )}
                         {selectedPageIds.size > 0 && (
                             <>
-                                <button
-                                    onClick={handleBulkPermanentDelete}
-                                    className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-red-600 text-white rounded-md hover:bg-red-700"
-                                    title="Permanently delete selected pages"
-                                >
-                                    <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                    <span className="hidden sm:inline">Clean ({selectedPageIds.size})</span>
-                                    <span className="sm:hidden">Del</span>
-                                </button>
                                 <button
                                     onClick={handleBulkRestore}
                                     className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -397,7 +296,6 @@ export default function DeletedPagesView({ isStaff = false }) {
                                 isSelected={selectedPageIds.has(page.id)}
                                 onToggleSelect={handleToggleSelect}
                                 onRestore={handleRestorePage}
-                                onPermanentDelete={handlePermanentDelete}
                             />
                         ))}
 
@@ -426,7 +324,7 @@ export default function DeletedPagesView({ isStaff = false }) {
 /**
  * Deleted Page Row Component
  */
-function DeletedPageRow({ page, isSelected, onToggleSelect, onRestore, onPermanentDelete }) {
+function DeletedPageRow({ page, isSelected, onToggleSelect, onRestore }) {
     const hasWarnings = page.restorationWarnings && page.restorationWarnings.length > 0
 
     return (
@@ -481,14 +379,6 @@ function DeletedPageRow({ page, isSelected, onToggleSelect, onRestore, onPermane
 
                     {/* Action buttons */}
                     <div className="flex-shrink-0 flex items-center gap-1 sm:gap-2">
-                        <button
-                            onClick={() => onPermanentDelete(page)}
-                            className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 text-xs sm:text-sm bg-red-600 text-white rounded-md hover:bg-red-700"
-                            title="Permanently delete this page (cannot be undone)"
-                        >
-                            <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                            <span className="hidden sm:inline">Clean</span>
-                        </button>
                         <button
                             onClick={() => onRestore(page)}
                             className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 text-xs sm:text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"

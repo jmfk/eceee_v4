@@ -30,7 +30,6 @@ import {
     Edit3,
     ArrowLeft,
     RefreshCw,
-    Trash2,
     Eye
 } from 'lucide-react';
 import { mediaApi } from '../../api';
@@ -56,7 +55,7 @@ const MediaBrowser = ({
     showUploader = true,
     refreshTrigger = 0, // External trigger to force refresh
     prefilterTags = [], // Initial tag filter (array of tag IDs)
-    hideShowDeleted = false, // Hide the "Show Deleted" button
+    hideShowDeleted = true, // Only management surfaces expose the Trash view
     hideTypeFilter = false, // Hide the type filter dropdown
     onPendingApprovalChange, // Callback when pending approval state changes
     hideInlineApprovalForm = false, // Hide the inline approval form (when using external pending tab)
@@ -139,6 +138,7 @@ const MediaBrowser = ({
                 pageSize: currentPageSize,
                 namespace: namespace,
                 show_deleted: memoizedFilters.showDeleted,
+                deleted_only: memoizedFilters.showDeleted,
                 ...(requireTags ? { has_tags: true } : {}),
             };
 
@@ -267,23 +267,6 @@ const MediaBrowser = ({
         }
     };
 
-    const handleForceDeleteClick = async (file, event) => {
-        event.stopPropagation(); // Prevent file selection
-
-        if (!window.confirm('Are you sure you want to permanently delete this file? This action cannot be undone.')) {
-            return;
-        }
-
-        try {
-            await mediaApi.files.forceDelete(file.id)();
-            addNotification('File permanently deleted', 'success');
-            loadFiles(); // Refresh the list
-        } catch (error) {
-            console.error('Failed to delete file:', error);
-            addNotification('Failed to delete file', 'error');
-        }
-    };
-
     const handleEditClick = async (file, event) => {
         event.stopPropagation(); // Prevent file selection
 
@@ -344,6 +327,20 @@ const MediaBrowser = ({
         // Refresh file list after bulk operation
         loadFiles(true);
         setSelectedFiles([]);
+    };
+
+    const handleRestoreSelected = async () => {
+        try {
+            for (const file of selectedFiles) {
+                await mediaApi.files.restore(file.id)();
+            }
+            addNotification(`Restored ${selectedFiles.length} file(s)`, 'success');
+            setSelectedFiles([]);
+            loadFiles(true);
+        } catch (error) {
+            addNotification('Could not restore every selected file', 'error');
+            loadFiles(true);
+        }
     };
 
     // Upload handlers
@@ -774,13 +771,6 @@ const MediaBrowser = ({
                                         >
                                             <RefreshCw className="w-3.5 h-3.5" />
                                         </button>
-                                        <button
-                                            onClick={(e) => handleForceDeleteClick(file, e)}
-                                            className="p-1.5 bg-red-500 text-white rounded-full shadow-md transition-opacity duration-200 hover:bg-red-600"
-                                            title="Permanently delete file"
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
                                     </>
                                 ) : (
                                     <button
@@ -907,13 +897,6 @@ const MediaBrowser = ({
                                     >
                                         <RefreshCw className="w-4 h-4" />
                                     </button>
-                                    <button
-                                        onClick={(e) => handleForceDeleteClick(file, e)}
-                                        className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
-                                        title="Permanently delete file"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
                                 </>
                             ) : (
                                 <button
@@ -1006,6 +989,12 @@ const MediaBrowser = ({
                     </div>
 
                     <div className="flex items-start gap-2 flex-shrink-0">
+                        {!hideShowDeleted && <button
+                            type="button"
+                            onClick={() => { setSelectedFiles([]); setFilters(previous => ({ ...previous, showDeleted: !previous.showDeleted })); }}
+                            className={`px-3 py-2 text-sm border rounded ${filters.showDeleted ? 'border-blue-600 text-blue-600' : 'border-gray-300 text-gray-700'}`}
+                            aria-pressed={filters.showDeleted}
+                        >{filters.showDeleted ? 'Media Library' : 'Trash'}</button>}
                         {!hideTypeFilter && (
                             <select
                                 value={filters.fileType}
@@ -1129,7 +1118,13 @@ const MediaBrowser = ({
                 )}
 
                 {/* Bulk Operations Interface */}
-                {selectedFiles.length > 0 && (
+                {selectedFiles.length > 0 && filters.showDeleted && (
+                    <div className="border-t border-gray-200 p-3 text-sm">
+                        <span>{selectedFiles.length} deleted file(s) selected</span>
+                        <button type="button" onClick={handleRestoreSelected} className="ml-3 px-3 py-1.5 rounded bg-blue-600 text-white">Restore selected</button>
+                    </div>
+                )}
+                {selectedFiles.length > 0 && !filters.showDeleted && (
                     <BulkOperations
                         selectedFiles={selectedFiles}
                         namespace={namespace}

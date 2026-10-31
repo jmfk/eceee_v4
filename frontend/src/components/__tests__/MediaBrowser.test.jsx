@@ -199,6 +199,23 @@ describe('MediaBrowser', () => {
         }))
     })
 
+    it('shows deleted files in Trash and can restore a selected file', async () => {
+        mediaApi.search.search.mockImplementation(params => Promise.resolve({
+            results: params.deleted_only ? [mockMediaFiles[2]] : [mockMediaFiles[0]],
+            count: 1, page: 1, pageSize: 20, totalPages: 1,
+        }))
+        renderBrowser({ hideShowDeleted: false, selectionMode: 'multiple' })
+        expect(await screen.findByText('Test Image 1')).toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Trash' }))
+        expect(await screen.findByText('Deleted Document')).toBeInTheDocument()
+        expect(screen.queryByText('Test Image 1')).not.toBeInTheDocument()
+        expect(mediaApi.search.search).toHaveBeenCalledWith(expect.objectContaining({
+            show_deleted: true, deleted_only: true,
+        }))
+        await user.click(screen.getByRole('button', { name: /Restore file/i }))
+        await waitFor(() => expect(mediaApi.files.restore).toHaveBeenCalledWith('3'))
+    })
+
     it('requests sharp card-sized previews and keeps portraits or unknown shapes intact', async () => {
         mediaApi.search.search.mockResolvedValue({
             results: [
@@ -474,17 +491,14 @@ describe('MediaBrowser', () => {
         expect(await screen.findByText('Test Image 1')).toBeInTheDocument()
     })
 
-    it('restores and permanently deletes deleted files', async () => {
+    it('restores deleted files without offering permanent deletion', async () => {
         renderBrowser()
 
         await screen.findByText('Deleted Document')
 
         await user.click(screen.getByTitle('Restore file'))
         expect(mediaApi.files.restore).toHaveBeenCalledWith('3')
-
-        await user.click(screen.getByTitle('Permanently delete file'))
-        expect(window.confirm).toHaveBeenCalled()
-        expect(mediaApi.files.forceDelete).toHaveBeenCalledWith('3')
+        expect(screen.queryByTitle('Permanently delete file')).not.toBeInTheDocument()
     })
 
     it('uploads files through the current upload API and shows approval state', async () => {

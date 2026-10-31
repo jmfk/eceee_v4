@@ -10,6 +10,8 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.roles import is_tenant_admin
+
 from ..ai_services import ai_service
 from ..models import MediaCollection, MediaFile
 from ..security import filter_media_files_for_user
@@ -51,9 +53,16 @@ class MediaSearchView(APIView):
             include_theme_media = bool(theme_namespace and user_can_access_namespace(request.user, theme_namespace))
 
         # Start with base queryset
+        media_files = MediaFile.objects.all()
+        if filters.get("show_deleted"):
+            media_files = MediaFile.objects.with_deleted()
+            if not is_tenant_admin(request.user, tenant):
+                media_files = media_files.filter(created_by=request.user)
+            if filters.get("deleted_only"):
+                media_files = media_files.filter(is_deleted=True)
         queryset = (
             filter_media_files_for_user(
-                MediaFile.objects.all(),
+                media_files,
                 request.user,
                 tenant=tenant,
                 include_theme_media=include_theme_media,

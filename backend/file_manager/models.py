@@ -49,10 +49,19 @@ class MediaTag(models.Model):
         super().save(*args, **kwargs)
 
 
+class MediaCollectionManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(is_deleted=False)
+
+    def with_deleted(self):
+        return super().get_queryset()
+
+
 class MediaCollection(models.Model):
     """Collections for grouping related media files."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    objects = MediaCollectionManager()
     title = models.CharField(max_length=255)
     slug = models.SlugField(
         max_length=255,
@@ -84,6 +93,11 @@ class MediaCollection(models.Model):
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="deleted_media_collections"
+    )
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_media_collections")
     last_modified_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="modified_media_collections")
 
@@ -98,6 +112,26 @@ class MediaCollection(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.namespace.name})"
+
+    def soft_delete(self, user):
+        if self.is_deleted:
+            return False
+        from django.utils import timezone
+
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.deleted_by = user
+        self.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"])
+        return True
+
+    def restore(self):
+        if not self.is_deleted:
+            return False
+        self.is_deleted = False
+        self.deleted_at = None
+        self.deleted_by = None
+        self.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"])
+        return True
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -116,7 +150,12 @@ class MediaCollection(models.Model):
         counter = 1
 
         # Check for existing slugs in the same namespace
-        while MediaCollection.objects.filter(namespace=self.namespace, slug=slug).exclude(pk=self.pk).exists():
+        while (
+            MediaCollection.objects.with_deleted()
+            .filter(namespace=self.namespace, slug=slug)
+            .exclude(pk=self.pk)
+            .exists()
+        ):
             slug = f"{base_slug}-{counter}"
             counter += 1
 

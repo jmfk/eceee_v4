@@ -219,6 +219,8 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         tenant = getattr(request, "tenant", None)
         if tenant is not None and instance.tenant_id != tenant.pk:
             raise Http404
+        if instance.created_by_id != request.user.id and not is_tenant_admin(request.user, instance.tenant):
+            raise Http404
         self.check_object_permissions(request, instance)
 
         if not instance.is_deleted:
@@ -286,7 +288,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         - collection: Exclude files already in this collection (shows potential additions)
         - file_type: Filter by file type (image, video, audio, document, etc.)
         - text_search: Search across title, description, filename, and AI text
-        - show_deleted: Include soft-deleted files (staff only)
+        - show_deleted: Include soft-deleted files (workspace admins or the uploader)
         """
         user = self.request.user
 
@@ -295,9 +297,11 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         if show_deleted and is_tenant_admin(user, getattr(self.request, "tenant", None)):
             queryset = MediaFile.objects.with_deleted()
         elif show_deleted:
-            return MediaFile.objects.none()  # Non-staff users can't see deleted files
+            queryset = MediaFile.objects.with_deleted().filter(created_by=user)
         else:
             queryset = MediaFile.objects.all()
+        if show_deleted and self.request.query_params.get("deleted_only", "").lower() == "true":
+            queryset = queryset.filter(is_deleted=True)
 
         tenant = getattr(self.request, "tenant", None)
         from ..security import filter_media_files_for_user

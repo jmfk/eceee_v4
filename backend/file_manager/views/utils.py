@@ -279,13 +279,15 @@ class BulkMediaOperationsView(APIView):
                             continue
 
                 elif operation == "delete":
+                    if not file_obj.delete(user=request.user):
+                        errors.append({"file_id": file_id, "message": "File is referenced or protected from deletion"})
+                        continue
                     # Log the deletion for security audit
                     SecurityAuditLogger.log_file_deletion(
                         user=request.user,
                         file_obj=file_obj,
                         context={"bulk_operation": True},
                     )
-                    file_obj.delete()
 
                 successful_count += 1
                 results.append({"file_id": file_id, "status": "success"})

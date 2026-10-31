@@ -11,6 +11,10 @@ const mocks = vi.hoisted(() => ({
     getFiles: vi.fn(),
     addFiles: vi.fn(),
     create: vi.fn(),
+    trash: vi.fn(),
+    restore: vi.fn(),
+    bulkRestore: vi.fn(),
+    bulkDelete: vi.fn(),
 }))
 
 vi.mock('../../../api', () => ({
@@ -20,6 +24,10 @@ vi.mock('../../../api', () => ({
         getFiles: mocks.getFiles,
         addFiles: mocks.addFiles,
         create: mocks.create,
+        trash: mocks.trash,
+        restore: mocks.restore,
+        bulkRestore: mocks.bulkRestore,
+        bulkDelete: mocks.bulkDelete,
     },
     mediaTagsApi: { list: mocks.listTags },
     mediaApi: {},
@@ -50,6 +58,10 @@ describe('MediaCollectionManager', () => {
         }], next: null }))
         mocks.fetchTags.mockResolvedValue({ results: [] })
         mocks.listTags.mockReturnValue(mocks.fetchTags)
+        mocks.trash.mockReturnValue(vi.fn().mockResolvedValue({ results: [], next: null }))
+        mocks.restore.mockReturnValue(vi.fn().mockResolvedValue({}))
+        mocks.bulkRestore.mockReturnValue(vi.fn().mockResolvedValue({ restored_count: 1 }))
+        mocks.bulkDelete.mockReturnValue(vi.fn().mockResolvedValue({ deleted_count: 2, deleted_file_count: 0 }))
     })
 
     it('loads and displays collections from the selected namespace', async () => {
@@ -111,5 +123,39 @@ describe('MediaCollectionManager', () => {
 
         expect(await screen.findByRole('heading', { name: 'Add images' })).toBeInTheDocument()
         expect(mocks.create).toHaveBeenCalled()
+    })
+
+    it('selects collections and moves them to Trash without deleting files by default', async () => {
+        const user = userEvent.setup()
+        render(<MediaCollectionManager namespace="default" />)
+        await screen.findByRole('heading', { name: 'other collection' })
+
+        await user.click(screen.getByRole('button', { name: 'Select all visible' }))
+        expect(screen.getByText('2 selected')).toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Delete selected' }))
+        expect(screen.getByText('You can restore these items from Trash.')).toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Move to Trash' }))
+
+        await waitFor(() => expect(mocks.bulkDelete).toHaveBeenCalledWith(
+            ['collection-1', 'collection-2'], false, 'default',
+        ))
+    })
+
+    it('offers file deletion and restores a collection from Trash', async () => {
+        const user = userEvent.setup()
+        mocks.trash.mockReturnValue(vi.fn().mockResolvedValue({ results: [{
+            id: 'deleted-1', title: 'Deleted collection', fileCount: 0, tags: [],
+        }], next: null }))
+        render(<MediaCollectionManager namespace="default" />)
+        await screen.findByRole('heading', { name: 'summerstudy 2025 logos' })
+        await user.click(screen.getAllByRole('button', { name: 'Delete Collection' })[0])
+        await user.click(screen.getByRole('checkbox', { name: /Also move their media files to Trash/ }))
+        await user.click(screen.getByRole('button', { name: 'Move to Trash' }))
+        await waitFor(() => expect(mocks.bulkDelete).toHaveBeenCalledWith(['collection-1'], true, 'default'))
+
+        await user.click(screen.getByRole('tab', { name: 'Trash' }))
+        await screen.findByRole('heading', { name: 'Deleted collection' })
+        await user.click(screen.getByRole('button', { name: 'Restore Deleted collection' }))
+        await waitFor(() => expect(mocks.bulkRestore).toHaveBeenCalledWith(['deleted-1']))
     })
 })

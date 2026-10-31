@@ -231,6 +231,8 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
             "sample_images",
             "created_at",
             "updated_at",
+            "is_deleted",
+            "deleted_at",
             "created_by",
             "created_by_name",
             "last_modified_by",
@@ -240,6 +242,8 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
             "id",
             "created_at",
             "updated_at",
+            "is_deleted",
+            "deleted_at",
             "created_by",
             "created_by_name",
             "last_modified_by",
@@ -816,6 +820,8 @@ class MediaSearchSerializer(serializers.Serializer):
     min_size = serializers.IntegerField(required=False, min_value=0)
     max_size = serializers.IntegerField(required=False, min_value=0)
     namespace = serializers.CharField(required=False)
+    show_deleted = serializers.BooleanField(required=False, default=False)
+    deleted_only = serializers.BooleanField(required=False, default=False)
 
     def validate_namespace(self, value):
         """Validate namespace exists."""

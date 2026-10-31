@@ -1222,6 +1222,11 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
     const [sortOrder, setSortOrder] = useState('desc');
     const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
     const [showEmptyCollections, setShowEmptyCollections] = useState(false);
+    const [showTrash, setShowTrash] = useState(false);
+    const [selectedCollectionIds, setSelectedCollectionIds] = useState([]);
+    const [deleteFiles, setDeleteFiles] = useState(false);
+    const [deleteTargets, setDeleteTargets] = useState([]);
+    const [bulkBusy, setBulkBusy] = useState(false);
 
     // Filters
     const [showFilters, setShowFilters] = useState(false);
@@ -1281,8 +1286,11 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                 }
             });
 
-            const collectionsData = await fetchPaginatedResults(page => mediaCollectionsApi.list({ ...params, page })());
+            const collectionsData = await fetchPaginatedResults(page =>
+                (showTrash ? mediaCollectionsApi.trash : mediaCollectionsApi.list)({ ...params, page })()
+            );
             setCollections(collectionsData);
+            setSelectedCollectionIds([]);
         } catch (error) {
             console.error('Failed to load collections:', error);
             setError(extractErrorMessage(error));
@@ -1291,7 +1299,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
         } finally {
             setLoading(false);
         }
-    }, [namespace, searchQuery, sortBy, sortOrder, filters, addNotification]);
+    }, [namespace, searchQuery, sortBy, sortOrder, filters, showTrash, addNotification]);
 
     // Load available tags
     const loadAvailableTags = useCallback(async () => {
@@ -1396,7 +1404,29 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
     // Handle delete collection
     const handleDelete = (collection) => {
         setSelectedCollection(collection);
+        setDeleteTargets([collection]);
+        setDeleteFiles(false);
         setShowDeleteModal(true);
+    };
+
+    const toggleCollectionSelection = (id) => {
+        setSelectedCollectionIds(previous => previous.includes(id)
+            ? previous.filter(selectedId => selectedId !== id)
+            : [...previous, id]);
+    };
+
+    const restoreCollections = async (collectionsToRestore) => {
+        setBulkBusy(true);
+        try {
+            await mediaCollectionsApi.bulkRestore(collectionsToRestore.map(collection => collection.id))();
+            addNotification(`Restored ${collectionsToRestore.length} collection(s)`, 'success');
+            await loadCollections();
+        } catch (error) {
+            addNotification(extractErrorMessage(error), 'error');
+            await loadCollections();
+        } finally {
+            setBulkBusy(false);
+        }
     };
     
     // Handle download collection as ZIP
@@ -1499,17 +1529,21 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
     // Confirm delete
     const confirmDelete = async () => {
         try {
-            await await await await await await await await await await await mediaCollectionsApi.delete(selectedCollection.id)();
-            addNotification('Collection deleted successfully', 'success');
+            setBulkBusy(true);
+            const result = await mediaCollectionsApi.bulkDelete(deleteTargets.map(collection => collection.id), deleteFiles, namespace)();
+            addNotification(`Moved ${result.deletedCount ?? deleteTargets.length} collection(s) to Trash`, 'success');
 
             // Refresh collections
             await loadCollections();
 
             setShowDeleteModal(false);
             setSelectedCollection(null);
+            setDeleteTargets([]);
         } catch (error) {
             console.error('Failed to delete collection:', error);
             addNotification(extractErrorMessage(error), 'error');
+        } finally {
+            setBulkBusy(false);
         }
     };
 
@@ -1696,12 +1730,20 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
         const AccessIcon = accessInfo.icon;
 
         return (
-            <div 
+            <div
                 key={collection.id} 
                 className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all duration-200 p-4 cursor-pointer"
-                onClick={() => handleEdit(collection)}
+                onClick={() => { if (!showTrash) handleEdit(collection); }}
             >
                 <div className="flex items-start justify-between">
+                    <input
+                        type="checkbox"
+                        aria-label={`Select ${collection.title}`}
+                        checked={selectedCollectionIds.includes(collection.id)}
+                        onChange={() => toggleCollectionSelection(collection.id)}
+                        onClick={event => event.stopPropagation()}
+                        className="mr-3 mt-1 h-4 w-4 accent-blue-600"
+                    />
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
                             <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -1756,6 +1798,16 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
 
                     {/* Action buttons */}
                     <div className="flex items-center gap-1 ml-4">
+                        {showTrash ? (
+                            <button
+                                type="button"
+                                disabled={bulkBusy}
+                                onClick={event => { event.stopPropagation(); restoreCollections([collection]); }}
+                                className="p-2 text-blue-600 hover:bg-blue-50 rounded disabled:opacity-50"
+                                aria-label={`Restore ${collection.title}`}
+                                title={`Restore ${collection.title}`}
+                            >Restore</button>
+                        ) : <>
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -1786,6 +1838,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                         >
                             <Trash2 className="w-4 h-4" />
                         </button>
+                        </>}
                     </div>
                 </div>
             </div>
@@ -1798,10 +1851,10 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
         const AccessIcon = accessInfo.icon;
 
         return (
-            <div 
+            <div
                 key={collection.id} 
                 className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all duration-200 overflow-hidden cursor-pointer"
-                onClick={() => handleEdit(collection)}
+                onClick={() => { if (!showTrash) handleEdit(collection); }}
             >
                 {/* Thumbnail Grid - Top Section */}
                 {renderThumbnailGrid(collection)}
@@ -1809,6 +1862,14 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                 {/* Content - Bottom Section */}
                 <div className="p-4">
                     <div className="flex items-start justify-between mb-3">
+                        <input
+                            type="checkbox"
+                            aria-label={`Select ${collection.title}`}
+                            checked={selectedCollectionIds.includes(collection.id)}
+                            onChange={() => toggleCollectionSelection(collection.id)}
+                            onClick={event => event.stopPropagation()}
+                            className="mr-3 mt-1 h-4 w-4 accent-blue-600"
+                        />
                         <div className="flex-1 min-w-0">
                             <div className="text-lg font-semibold text-gray-900 truncate mb-1" role="heading" aria-level="3">
                                 {collection.title}
@@ -1825,6 +1886,16 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                             </div>
                         </div>
                         <div className="flex items-center gap-1 ml-3">
+                            {showTrash ? (
+                                <button
+                                    type="button"
+                                    disabled={bulkBusy}
+                                    onClick={event => { event.stopPropagation(); restoreCollections([collection]); }}
+                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded disabled:opacity-50"
+                                    aria-label={`Restore ${collection.title}`}
+                                    title={`Restore ${collection.title}`}
+                                >Restore</button>
+                            ) : <>
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -1855,6 +1926,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                             >
                                 <Trash2 className="w-4 h-4" />
                             </button>
+                            </>}
                         </div>
                     </div>
 
@@ -1909,7 +1981,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
     const emptyCollectionCount = collections.filter(collection =>
         (collection.fileCount ?? collection.file_count ?? 0) === 0
     ).length;
-    const visibleCollections = showEmptyCollections
+    const visibleCollections = showTrash || showEmptyCollections
         ? collections
         : collections.filter(collection => (collection.fileCount ?? collection.file_count ?? 0) > 0);
 
@@ -1940,7 +2012,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                         <div className="text-gray-600 mt-1">Organize your media files into collections</div>
                     </div>
 
-                    {!showInlineForm && (
+                    {!showInlineForm && !showTrash && (
                         <button
                             onClick={handleCreate}
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
@@ -1954,6 +2026,11 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
 
             {/* Search and Controls */}
             <div className="bg-white border-b border-gray-200 px-6 py-4">
+                <div className="flex gap-4 border-b border-gray-200 mb-4" role="tablist" aria-label="Collection view">
+                    <button type="button" role="tab" aria-selected={!showTrash} onClick={() => setShowTrash(false)} className={`pb-2 text-sm ${!showTrash ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-600'}`}>Collections</button>
+                    <button type="button" role="tab" aria-selected={showTrash} onClick={() => setShowTrash(true)} className={`pb-2 text-sm ${showTrash ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-600'}`}>Trash</button>
+                </div>
+                {showTrash && <p className="mb-3 text-xs text-gray-600">Restoring a collection keeps its original memberships. Restore deleted files separately from Media Library → Trash.</p>}
                 <div className="flex flex-col sm:flex-row gap-4">
                     {/* Search */}
                     <div className="flex-1 relative">
@@ -1968,7 +2045,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3">
-                        <label className="inline-flex items-center gap-2 text-xs text-gray-700 whitespace-nowrap cursor-pointer">
+                        {!showTrash && <label className="inline-flex items-center gap-2 text-xs text-gray-700 whitespace-nowrap cursor-pointer">
                             <input
                                 type="checkbox"
                                 checked={showEmptyCollections}
@@ -1976,7 +2053,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                                 className="h-4 w-4 accent-blue-600"
                             />
                             Show empty collections{emptyCollectionCount > 0 ? ` (${emptyCollectionCount})` : ''}
-                        </label>
+                        </label>}
                         {/* View Mode Toggle */}
                         <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
                             <button
@@ -2017,6 +2094,18 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                         </div>
                     </div>
                 </div>
+                {visibleCollections.length > 0 && <div className="flex flex-wrap items-center gap-3 mt-3 text-sm">
+                    <button type="button" onClick={() => setSelectedCollectionIds(visibleCollections.map(collection => collection.id))} className="text-blue-600 underline">Select all visible</button>
+                    {selectedCollectionIds.length > 0 && <>
+                        <span>{selectedCollectionIds.length} selected</span>
+                        <button type="button" onClick={() => setSelectedCollectionIds([])} className="text-gray-600 underline">Clear selection</button>
+                        {showTrash ? (
+                            <button type="button" disabled={bulkBusy} onClick={() => restoreCollections(collections.filter(collection => selectedCollectionIds.includes(collection.id)))} className="px-3 py-1.5 rounded bg-blue-600 text-white disabled:opacity-50">Restore selected</button>
+                        ) : (
+                            <button type="button" disabled={bulkBusy} onClick={() => { setDeleteTargets(collections.filter(collection => selectedCollectionIds.includes(collection.id))); setDeleteFiles(false); setShowDeleteModal(true); }} className="px-3 py-1.5 rounded bg-red-600 text-white disabled:opacity-50">Delete selected</button>
+                        )}
+                    </>}
+                </div>}
             </div>
 
             {/* Main Content Area */}
@@ -2057,14 +2146,14 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                                     <div className="bg-white rounded-lg p-8 max-w-md mx-auto">
                                         <Folder className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                                         <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">
-                                            {collections.length > 0 && !showEmptyCollections ? 'No visible collections' : 'No collections found'}
+                                            {showTrash ? 'Trash is empty' : collections.length > 0 && !showEmptyCollections ? 'No visible collections' : 'No collections found'}
                                         </div>
                                         <div className="text-gray-600 mb-6">
-                                            {collections.length > 0 && !showEmptyCollections
+                                            {showTrash ? 'Deleted collections will appear here.' : collections.length > 0 && !showEmptyCollections
                                                 ? 'Empty collections are hidden. Select Show empty collections to see them.'
                                                 : searchQuery ? 'No collections match your search criteria.' : 'Get started by creating your first collection.'}
                                         </div>
-                                        {!searchQuery && collections.length === 0 && (
+                                        {!showTrash && !searchQuery && collections.length === 0 && (
                                             <button
                                                 onClick={handleCreate}
                                                 className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -2192,7 +2281,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
             )}
 
             {/* Delete Confirmation Modal */}
-            {showDeleteModal && selectedCollection && (
+            {showDeleteModal && deleteTargets.length > 0 && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-xl max-w-md w-full shadow-2xl">
                         <div className="p-6">
@@ -2202,24 +2291,30 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                                 </div>
                                 <div className="flex-1">
                                     <div className="text-lg font-semibold text-gray-900 mb-1" role="heading" aria-level="3">Delete Collection</div>
-                                    <div className="text-sm text-gray-600">This action cannot be undone</div>
+                                    <div className="text-sm text-gray-600">You can restore these items from Trash.</div>
                                 </div>
                             </div>
 
                             <div className="bg-gray-50 rounded-lg p-4 mb-6">
                                 <div className="text-gray-700 leading-relaxed">
-                                    Are you sure you want to delete the collection <span className="font-medium">"{selectedCollection.title}"</span>?
+                                    Move {deleteTargets.length === 1 ? <span className="font-medium">"{deleteTargets[0].title}"</span> : <span className="font-medium">{deleteTargets.length} collections</span>} to Trash?
                                 </div>
                                 <div className="text-sm text-gray-600 mt-2">
-                                    This will remove the collection but not the files in it.
+                                    Collection memberships are kept for restoration.
                                 </div>
                             </div>
+
+                            <label className="flex items-start gap-2 text-sm text-gray-700 mb-6">
+                                <input type="checkbox" checked={deleteFiles} onChange={event => setDeleteFiles(event.target.checked)} className="mt-0.5 h-4 w-4 accent-red-600" />
+                                <span>Also move their media files to Trash. Files shared with other collections or used elsewhere cannot be deleted this way.</span>
+                            </label>
 
                             <div className="flex items-center justify-end gap-3">
                                 <button
                                     onClick={() => {
                                         setShowDeleteModal(false);
                                         setSelectedCollection(null);
+                                        setDeleteTargets([]);
                                     }}
                                     className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                                 >
@@ -2227,9 +2322,10 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                                 </button>
                                 <button
                                     onClick={confirmDelete}
-                                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium shadow-sm"
+                                    disabled={bulkBusy}
+                                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium shadow-sm disabled:opacity-50"
                                 >
-                                    Delete Collection
+                                    Move to Trash
                                 </button>
                             </div>
                         </div>
