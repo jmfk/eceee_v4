@@ -178,7 +178,7 @@ class TopNewsPlugWidget(BaseWidget):
         try:
             now = timezone.now()
             type_ids = (
-                ObjectTypeDefinition.objects.filter(name__in=config.object_types, is_active=True)
+                ObjectTypeDefinition.objects.filter(name__in=config.object_types, is_active=True, is_deleted=False)
                 .filter(Q(namespace__tenant=tenant) | Q(namespace__isnull=True))
                 .values_list("id", flat=True)
             )

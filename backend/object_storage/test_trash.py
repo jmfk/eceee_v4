@@ -55,6 +55,24 @@ class ObjectTrashTests(APITestCase):
         self.assertEqual(active.data["count"], 0)
         trash = self.client.get(reverse("api:trash"), {"type": "object"})
         self.assertEqual(trash.data["count"], 2)
+        type_instances = self.client.get(
+            reverse("api:object_storage:objecttypedefinition-instances", args=[self.object_type.pk])
+        )
+        self.assertEqual(type_instances.data, [])
+
+        child_only = self.client.post(
+            reverse("api:trash-restore"), {"items": [{"type": "object", "id": self.child.pk}]}, format="json"
+        )
+        self.assertEqual(child_only.status_code, status.HTTP_400_BAD_REQUEST)
+        self.child.refresh_from_db()
+        self.assertTrue(self.child.is_deleted)
+
+        restored_parent = self.client.post(
+            reverse("api:trash-restore"), {"items": [{"type": "object", "id": self.parent.pk}]}, format="json"
+        )
+        self.assertEqual(restored_parent.status_code, status.HTTP_200_OK)
+        tree = self.client.get(reverse("api:object_storage:objectinstance-tree", args=[self.parent.pk]))
+        self.assertEqual([item["id"] for item in tree.data], [self.parent.pk])
 
     def test_type_and_instances_are_restorable_as_one_selection(self):
         type_url = reverse("api:object_storage:objecttypedefinition-detail", args=[self.object_type.pk])
@@ -105,6 +123,24 @@ class ObjectTrashTests(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_trashed_relationship_target_is_hidden_until_restored(self):
+        self.parent.add_relationship("related", self.child.pk)
+        self.child.soft_delete(self.user)
+        relationships = self.client.get(
+            reverse("api:object_storage:objectinstance-relationships", args=[self.parent.pk])
+        )
+        self.assertEqual(relationships.data["count"], 0)
+        detail = self.client.get(reverse("api:object_storage:objectinstance-detail", args=[self.parent.pk]))
+        self.assertEqual(detail.data["relationships"], [])
+        with self.assertRaisesRegex(ValueError, "does not exist"):
+            self.parent.add_relationship("another", self.child.pk)
+
+        self.child.restore(self.user)
+        relationships = self.client.get(
+            reverse("api:object_storage:objectinstance-relationships", args=[self.parent.pk])
+        )
+        self.assertEqual(relationships.data["count"], 1)
 
     def test_global_type_cannot_be_deleted_from_a_workspace(self):
         global_type = ObjectTypeDefinition.objects.create(

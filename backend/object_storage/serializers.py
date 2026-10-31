@@ -863,7 +863,7 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
 
     def get_children_count(self, obj):
         """Return count of child objects"""
-        return obj.get_children().count()
+        return obj.get_children().filter(is_deleted=False, object_type__is_deleted=False).count()
 
     def get_version_count(self, obj):
         """Return count of versions"""
@@ -877,6 +877,14 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
         from .services.version_workflow import ObjectVersionWorkflow
 
         data = super().to_representation(instance)
+        for field, lookup in (
+            ("relationships", instance.get_related_objects),
+            ("related_from", instance.get_related_from_objects),
+        ):
+            visible_ids = {str(pk) for pk in lookup().values_list("pk", flat=True)}
+            data[field] = [
+                relation for relation in (data.get(field) or []) if str(relation.get("object_id")) in visible_ids
+            ]
         workflow = ObjectVersionWorkflow(instance)
         editable = workflow.editable()
         version = editable or workflow.live() or workflow.versions().first()

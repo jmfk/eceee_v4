@@ -213,12 +213,14 @@ class RemoteObjectSourceCatalogView(RemoteObjectSourceMixin, APIView):
 
     def post(self, request):
         selections = request.data.get("selections") or []
-        type_ids = ObjectInstance.objects.filter(tenant=request.tenant, parent__isnull=True).values("object_type_id")
+        type_ids = ObjectInstance.objects.filter(
+            tenant=request.tenant, parent__isnull=True, is_deleted=False, object_type__is_deleted=False
+        ).values("object_type_id")
         return Response(
             {
                 "object_types": [
                     serialize_type(item, tenant_id=request.tenant.id)
-                    for item in ObjectTypeDefinition.objects.filter(is_active=True, id__in=type_ids)
+                    for item in ObjectTypeDefinition.objects.filter(is_active=True, is_deleted=False, id__in=type_ids)
                     .filter(Q(namespace__isnull=True) | Q(namespace__tenant=request.tenant))
                     .order_by("label")
                 ],

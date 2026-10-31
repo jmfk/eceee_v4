@@ -59,6 +59,13 @@ class PublicObjectWidgetTest(TestCase):
         parsed = ObjectDetailConfig(objectId=self.object_type.id)
         self.assertEqual(parsed.object_id, self.object_type.id)
 
+    def test_deleted_type_is_not_exposed_in_public_object_list_context(self):
+        config = ObjectListConfig(object_type=self.object_type.name)
+        self.object_type.soft_delete(self.user)
+        context = ObjectListWidget().get_context_data(config, {"current_page": SimpleNamespace(tenant=self.tenant)})
+        self.assertEqual(context["objects"], [])
+        self.assertNotIn("object_type", context)
+
     def create_object(
         self,
         title,

@@ -15,7 +15,7 @@ from content.models import Namespace
 from core.roles import is_tenant_admin, permissions_for
 from file_manager.models import MediaCollection, MediaFile
 from file_manager.security import filter_media_files_for_user, user_can_access_namespace
-from object_storage.models import ObjectInstance, ObjectTypeDefinition
+from object_storage.models import ObjectInstance, ObjectTypeDefinition, lock_object_tree
 from webpages.models import WebPage
 
 
@@ -159,6 +159,23 @@ class TrashRestoreView(TrashView):
         restored = []
         warnings = []
         with transaction.atomic():
+            if any(item_type in {"object", "object_type"} for item_type, _ in keys):
+                lock_object_tree(tenant.pk)
+            # Type deletion locks the type before its objects; tree deletion locks
+            # object rows in primary-key order. Use that same order for restore so
+            # a concurrent delete cannot leave an active child under deleted data.
+            object_ids = [item_id for item_type, item_id in keys if item_type == "object"]
+            type_ids = {item_id for item_type, item_id in keys if item_type == "object_type"}
+            if object_ids:
+                candidate_objects = list(querysets["object"].filter(pk__in=object_ids))
+                type_ids.update(obj.object_type_id for obj in candidate_objects)
+            if type_ids:
+                list(ObjectTypeDefinition.objects.filter(pk__in=type_ids).order_by("pk").select_for_update())
+            if object_ids:
+                lock_ids = set(object_ids)
+                for obj in candidate_objects:
+                    lock_ids.update(obj.get_ancestors().values_list("pk", flat=True))
+                list(ObjectInstance.objects.filter(pk__in=lock_ids).order_by("level", "pk").select_for_update())
             selected = {}
             for kind in self.kinds:
                 ids = [item_id for item_type, item_id in keys if item_type == kind]
