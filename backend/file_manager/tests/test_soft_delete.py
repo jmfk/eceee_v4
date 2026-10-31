@@ -83,8 +83,8 @@ class MediaFileSoftDeleteTests(TestCase):
         self.assertIsNone(file.deleted_at)
         self.assertIsNone(file.deleted_by)
 
-    def test_force_delete_workspace_admin_only(self):
-        """Workspace administration, rather than the staff flag, controls force delete."""
+    def test_force_delete_is_disabled_for_cms_users(self):
+        """Neither media writers nor administrators may purge files through the CMS API."""
         regular = User.objects.create_user(username="regular-media-user")
         self.tenant.members.add(regular)
         from core.models import TenantRole
@@ -98,13 +98,12 @@ class MediaFileSoftDeleteTests(TestCase):
         response = self.client.post(url)
         self.assertEqual(response.status_code, 403)
 
-        # Workspace administrator can force delete
+        # Workspace administrator still cannot permanently delete from the CMS.
         self.client.force_authenticate(user=self.staff_user)
         response = self.client.post(url)
-        self.assertEqual(response.status_code, 204)
+        self.assertEqual(response.status_code, 410)
 
-        # File should be completely gone
-        self.assertFalse(MediaFile.objects.with_deleted().filter(id=self.file.id).exists())
+        self.assertTrue(MediaFile.objects.with_deleted().filter(id=self.file.id).exists())
 
     def test_prevent_delete_with_references(self):
         """Test that files with references can't be deleted."""
