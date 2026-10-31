@@ -85,9 +85,7 @@ class ObjectVersionWorkflow:
                 else (
                     "not_published"
                     if editable
-                    else "publication_ended"
-                    if self.versions().exists()
-                    else "not_published"
+                    else "publication_ended" if self.versions().exists() else "not_published"
                 )
             )
         drafts = self.versions().filter(effective_date__isnull=True)
