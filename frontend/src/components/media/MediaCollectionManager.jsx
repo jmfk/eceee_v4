@@ -1221,6 +1221,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
     const [sortBy, setSortBy] = useState('updated_at');
     const [sortOrder, setSortOrder] = useState('desc');
     const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
+    const [showEmptyCollections, setShowEmptyCollections] = useState(false);
 
     // Filters
     const [showFilters, setShowFilters] = useState(false);
@@ -1480,6 +1481,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
             setShowInlineForm(false);
             setShowEditModal(false);
             resetForm();
+            if (!isEdit && result?.id) handleEdit(result);
         } catch (error) {
             console.error('Failed to save collection:', error);
             addNotification(extractErrorMessage(error), 'error');
@@ -1904,6 +1906,13 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
         );
     }
 
+    const emptyCollectionCount = collections.filter(collection =>
+        (collection.fileCount ?? collection.file_count ?? 0) === 0
+    ).length;
+    const visibleCollections = showEmptyCollections
+        ? collections
+        : collections.filter(collection => (collection.fileCount ?? collection.file_count ?? 0) > 0);
+
     // Conditional rendering based on current view
     // Both 'files' and 'edit' views now use the unified CollectionEditorView
     if ((currentView === 'files' && viewingCollection) || (currentView === 'edit' && editingCollection)) {
@@ -1958,7 +1967,16 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                         />
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <label className="inline-flex items-center gap-2 text-xs text-gray-700 whitespace-nowrap cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={showEmptyCollections}
+                                onChange={event => setShowEmptyCollections(event.target.checked)}
+                                className="h-4 w-4 accent-blue-600"
+                            />
+                            Show empty collections{emptyCollectionCount > 0 ? ` (${emptyCollectionCount})` : ''}
+                        </label>
                         {/* View Mode Toggle */}
                         <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
                             <button
@@ -2034,15 +2052,19 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                     {/* Collections Grid/List */}
                     {!loading && !error && (
                         <>
-                            {collections.length === 0 && !showInlineForm ? (
+                            {visibleCollections.length === 0 && !showInlineForm ? (
                                 <div className="text-center py-16">
                                     <div className="bg-white rounded-lg p-8 max-w-md mx-auto">
                                         <Folder className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                                        <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">No collections found</div>
-                                        <div className="text-gray-600 mb-6">
-                                            {searchQuery ? 'No collections match your search criteria.' : 'Get started by creating your first collection.'}
+                                        <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">
+                                            {collections.length > 0 && !showEmptyCollections ? 'No visible collections' : 'No collections found'}
                                         </div>
-                                        {!searchQuery && (
+                                        <div className="text-gray-600 mb-6">
+                                            {collections.length > 0 && !showEmptyCollections
+                                                ? 'Empty collections are hidden. Select Show empty collections to see them.'
+                                                : searchQuery ? 'No collections match your search criteria.' : 'Get started by creating your first collection.'}
+                                        </div>
+                                        {!searchQuery && collections.length === 0 && (
                                             <button
                                                 onClick={handleCreate}
                                                 className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -2063,7 +2085,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                                     {showInlineForm && renderInlineForm()}
 
                                     {/* Existing collections */}
-                                    {Array.isArray(collections) && collections.map(collection =>
+                                    {visibleCollections.map(collection =>
                                         viewMode === 'grid'
                                             ? renderCollectionCard(collection)
                                             : renderCollectionListItem(collection)
