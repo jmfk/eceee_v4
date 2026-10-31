@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
     getCollection: vi.fn(),
     getFiles: vi.fn(),
     addFiles: vi.fn(),
+    create: vi.fn(),
 }))
 
 vi.mock('../../../api', () => ({
@@ -18,6 +19,7 @@ vi.mock('../../../api', () => ({
         get: mocks.getCollection,
         getFiles: mocks.getFiles,
         addFiles: mocks.addFiles,
+        create: mocks.create,
     },
     mediaTagsApi: { list: mocks.listTags },
     mediaApi: {},
@@ -26,7 +28,9 @@ vi.mock('../../../api', () => ({
 vi.mock('../MediaBrowser', () => ({
     default: ({ onFileSelect }) => <button onClick={() => onFileSelect({ id: 'image-1', title: 'New image' })}>Add new image</button>,
 }))
-vi.mock('../../classification/ClassificationPicker', () => ({ default: () => null }))
+vi.mock('../../classification/ClassificationPicker', () => ({
+    default: ({ onChange }) => <button type="button" onClick={() => onChange(['tag-1'])}>Choose tag</button>,
+}))
 
 vi.mock('../../../contexts/GlobalNotificationContext', () => ({
     useGlobalNotifications: () => ({ addNotification: mocks.addNotification }),
@@ -72,5 +76,40 @@ describe('MediaCollectionManager', () => {
         await user.click(await screen.findByRole('button', { name: 'Add new image' }))
 
         await waitFor(() => expect(mocks.addFiles).toHaveBeenCalledWith('collection-1', ['image-1']))
+    })
+
+    it('hides empty collections by default and lets editors reveal them', async () => {
+        const user = userEvent.setup()
+        mocks.listCollections.mockImplementation(() => vi.fn().mockResolvedValue({
+            results: [
+                { id: 'filled', title: 'Filled collection', fileCount: 2, tags: [] },
+                { id: 'empty', title: 'Empty collection', fileCount: 0, tags: [] },
+            ],
+            next: null,
+        }))
+
+        render(<MediaCollectionManager namespace="main" />)
+
+        expect(await screen.findByRole('heading', { name: 'Filled collection' })).toBeInTheDocument()
+        expect(screen.queryByRole('heading', { name: 'Empty collection' })).not.toBeInTheDocument()
+        await user.click(screen.getByRole('checkbox', { name: 'Show empty collections (1)' }))
+        expect(screen.getByRole('heading', { name: 'Empty collection' })).toBeInTheDocument()
+    })
+
+    it('opens a newly created empty collection for adding images', async () => {
+        const user = userEvent.setup()
+        mocks.getFiles.mockReturnValue(vi.fn().mockResolvedValue({ results: [] }))
+        mocks.create.mockReturnValue(vi.fn().mockResolvedValue({
+            id: 'new-collection', title: 'New collection', fileCount: 0, tags: [],
+        }))
+
+        render(<MediaCollectionManager namespace="main" />)
+        await user.click(await screen.findByRole('button', { name: 'New Collection' }))
+        await user.type(screen.getByPlaceholderText('Enter collection title...'), 'New collection')
+        await user.click(screen.getByRole('button', { name: 'Choose tag' }))
+        await user.click(screen.getByRole('button', { name: 'Create' }))
+
+        expect(await screen.findByRole('heading', { name: 'Add images' })).toBeInTheDocument()
+        expect(mocks.create).toHaveBeenCalled()
     })
 })

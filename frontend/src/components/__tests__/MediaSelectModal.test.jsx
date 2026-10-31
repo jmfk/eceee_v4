@@ -43,6 +43,21 @@ describe('MediaSelectModal', () => {
         })), { timeout: 1500 })
     })
 
+    it('hides empty collections in the picker until requested', async () => {
+        const user = userEvent.setup()
+        collectionsApi.list.mockImplementation(() => async () => ({ results: [
+            { id: 'filled', title: 'Filled collection', fileCount: 2 },
+            { id: 'empty', title: 'Empty collection', fileCount: 0 },
+        ] }))
+        render(<MediaSelectModal isOpen onClose={vi.fn()} onSelect={vi.fn()} namespace="main" />)
+
+        await user.click(screen.getByRole('button', { name: 'Select Collection' }))
+        expect(await screen.findByText('Filled collection')).toBeInTheDocument()
+        expect(screen.queryByText('Empty collection')).not.toBeInTheDocument()
+        await user.click(screen.getByRole('checkbox', { name: 'Show empty collections (1)' }))
+        expect(screen.getByText('Empty collection')).toBeInTheDocument()
+    })
+
     it('shows a collage for a saved collection reference without a files property', async () => {
         collectionsApi.get.mockImplementation(() => async () => ({
             id: 'collection-1',
