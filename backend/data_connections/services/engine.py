@@ -62,7 +62,7 @@ class InternalQueryEngine(BaseQueryEngine):
                 now = timezone.now()
                 queryset = ObjectInstance.published.published_only(now)
             else:
-                queryset = ObjectInstance.objects.all()
+                queryset = ObjectInstance.objects.filter(is_deleted=False, object_type__is_deleted=False)
 
             # For ObjectInstance, 'data' and 'widgets' are properties from the version
             # If these are requested, we must fetch objects and extract them
@@ -159,7 +159,7 @@ class InternalQueryEngine(BaseQueryEngine):
         elif model_name == "MediaFile":
             queryset = MediaFile.objects.filter(**processed_filters)
         elif model_name == "ObjectTypeDefinition":
-            queryset = ObjectTypeDefinition.objects.filter(**processed_filters)
+            queryset = ObjectTypeDefinition.objects.filter(is_deleted=False, **processed_filters)
         else:
             return []
 

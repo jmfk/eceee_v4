@@ -38,7 +38,7 @@ from .browser_config import (
     searchable_query,
     validate_browser_config,
 )
-from .models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
+from .models import ObjectInstance, ObjectTypeDefinition, ObjectVersion, lock_object_tree
 from .serializers import (
     ObjectInstanceListSerializer,
     ObjectInstanceSerializer,
@@ -203,6 +203,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
         if raw_delete_instances not in {"true", "false"}:
             raise serializers.ValidationError({"delete_instances": "Use true or false."})
         with transaction.atomic():
+            lock_object_tree(tenant.pk)
             instance = ObjectTypeDefinition.objects.select_for_update().get(pk=instance.pk, is_deleted=False)
             instances = ObjectInstance.objects.filter(object_type=instance, is_deleted=False)
             instance_count = instances.count()
@@ -502,6 +503,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
         instances = ObjectInstance.objects.filter(
             object_type=obj_type,
             tenant=getattr(request, "tenant", None),
+            is_deleted=False,
         ).select_related("created_by", "parent")
 
         # Apply filters
@@ -684,15 +686,57 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
 
             raise ValidationError("Tenant is required. Provide X-Tenant-ID header.")
         with transaction.atomic():
+            lock_object_tree(tenant.pk)
             object_type = ObjectTypeDefinition.objects.select_for_update().get(
                 pk=serializer.validated_data["object_type_id"]
             )
             if object_type.is_deleted:
                 raise serializers.ValidationError({"object_type": "Restore this object type before creating objects."})
+            parent = serializer.validated_data.get("parent")
+            if parent is not None:
+                parent = ObjectInstance.objects.select_for_update().get(pk=parent.pk, tenant=tenant)
+                if parent.is_deleted or parent.object_type.is_deleted:
+                    raise serializers.ValidationError({"parent": "Restore the parent before adding a child."})
+                serializer.validated_data["parent"] = parent
             serializer.save(created_by=self.request.user, tenant=tenant)
 
     def perform_destroy(self, instance):
         instance.soft_delete(self.request.user)
+
+    def perform_update(self, serializer):
+        if "parent" not in serializer.validated_data:
+            serializer.save()
+            return
+        parent = serializer.validated_data["parent"]
+        instance = serializer.instance
+        with transaction.atomic():
+            lock_object_tree(self.request.tenant.pk)
+            parent_ids = set()
+            if instance.parent_id:
+                parent_ids.add(instance.parent_id)
+            if parent:
+                parent_ids.add(parent.pk)
+            locked = {
+                obj.pk: obj
+                for obj in ObjectInstance.objects.filter(tenant=self.request.tenant, pk__in=parent_ids)
+                .order_by("pk")
+                .select_for_update()
+            }
+            instance = ObjectInstance.objects.select_for_update().get(pk=instance.pk, tenant=self.request.tenant)
+            parent = locked.get(parent.pk) if parent else None
+            if (
+                not instance
+                or instance.is_deleted
+                or instance.object_type.is_deleted
+                or (
+                    serializer.validated_data["parent"] is not None
+                    and (not parent or parent.is_deleted or parent.object_type.is_deleted)
+                )
+            ):
+                raise serializers.ValidationError({"parent": "Restore the object and parent before moving it."})
+            serializer.instance = instance
+            serializer.validated_data["parent"] = parent
+            serializer.save()
 
     def update(self, request, *args, **kwargs):
         if {
@@ -814,7 +858,11 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
     def children(self, request, pk=None):
         """Get direct child objects of this instance"""
         instance = self.get_object()
-        children = instance.get_children().select_related("object_type", "created_by")
+        children = (
+            instance.get_children()
+            .filter(is_deleted=False, object_type__is_deleted=False)
+            .select_related("object_type", "created_by")
+        )
         serializer = ObjectInstanceListSerializer(children, many=True)
         return Response(serializer.data)
 
@@ -822,7 +870,11 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
     def descendants(self, request, pk=None):
         """Get all descendant objects (children, grandchildren, etc.)"""
         instance = self.get_object()
-        descendants = instance.get_descendants().select_related("object_type", "created_by")
+        descendants = (
+            instance.get_descendants()
+            .filter(is_deleted=False, object_type__is_deleted=False)
+            .select_related("object_type", "created_by")
+        )
         serializer = ObjectInstanceListSerializer(descendants, many=True)
         return Response(serializer.data)
 
@@ -830,7 +882,11 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
     def ancestors(self, request, pk=None):
         """Get all ancestor objects (parent, grandparent, etc.)"""
         instance = self.get_object()
-        ancestors = instance.get_ancestors().select_related("object_type", "created_by")
+        ancestors = (
+            instance.get_ancestors()
+            .filter(is_deleted=False, object_type__is_deleted=False)
+            .select_related("object_type", "created_by")
+        )
         serializer = ObjectInstanceListSerializer(ancestors, many=True)
         return Response(serializer.data)
 
@@ -838,7 +894,11 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
     def siblings(self, request, pk=None):
         """Get sibling objects (same parent)"""
         instance = self.get_object()
-        siblings = instance.get_siblings().select_related("object_type", "created_by")
+        siblings = (
+            instance.get_siblings()
+            .filter(is_deleted=False, object_type__is_deleted=False)
+            .select_related("object_type", "created_by")
+        )
         serializer = ObjectInstanceListSerializer(siblings, many=True)
         return Response(serializer.data)
 
@@ -846,7 +906,11 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
     def tree(self, request, pk=None):
         """Get the entire tree this object belongs to"""
         instance = self.get_object()
-        tree_objects = instance.get_tree_objects().select_related("object_type", "created_by")
+        tree_objects = (
+            instance.get_tree_objects()
+            .filter(is_deleted=False, object_type__is_deleted=False)
+            .select_related("object_type", "created_by")
+        )
         serializer = ObjectInstanceListSerializer(tree_objects, many=True)
         return Response(serializer.data)
 
@@ -854,7 +918,11 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
     def path_to_root(self, request, pk=None):
         """Get the path from this object to the root"""
         instance = self.get_object()
-        path = instance.get_path_to_root().select_related("object_type", "created_by")
+        path = (
+            instance.get_path_to_root()
+            .filter(is_deleted=False, object_type__is_deleted=False)
+            .select_related("object_type", "created_by")
+        )
         serializer = ObjectInstanceListSerializer(path, many=True)
         return Response(serializer.data)
 
@@ -873,25 +941,34 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
             except ObjectInstance.DoesNotExist:
                 return Response({"error": "New parent not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Check if move is allowed
-        if not instance.can_move_to_parent(new_parent):
-            return Response(
-                {"error": "Cannot move to this parent"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Perform the move
         try:
-            if position == "first-child":
-                instance.move_to(new_parent, "first-child")
-            elif position == "last-child":
-                instance.move_to(new_parent, "last-child")
-            elif position == "left":
-                instance.move_to(new_parent, "left")
-            elif position == "right":
-                instance.move_to(new_parent, "right")
-            else:
-                instance.move_to(new_parent, "last-child")  # default
+            with transaction.atomic():
+                lock_object_tree(request.tenant.pk)
+                requested_parent = new_parent is not None
+                parent_ids = set()
+                if instance.parent_id:
+                    parent_ids.add(instance.parent_id)
+                if new_parent:
+                    parent_ids.add(new_parent.pk)
+                locked = {
+                    obj.pk: obj
+                    for obj in ObjectInstance.objects.filter(tenant=request.tenant, pk__in=parent_ids)
+                    .order_by("pk")
+                    .select_for_update()
+                }
+                instance = ObjectInstance.objects.select_for_update().get(pk=instance.pk, tenant=request.tenant)
+                new_parent = locked.get(new_parent.pk) if new_parent else None
+                if not instance or instance.is_deleted or instance.object_type.is_deleted:
+                    return Response({"error": "Object is unavailable"}, status=status.HTTP_404_NOT_FOUND)
+                if requested_parent and new_parent is None:
+                    return Response({"error": "New parent is unavailable"}, status=status.HTTP_404_NOT_FOUND)
+                if new_parent and (new_parent.is_deleted or new_parent.object_type.is_deleted):
+                    return Response({"error": "New parent is unavailable"}, status=status.HTTP_404_NOT_FOUND)
+                if not instance.can_move_to_parent(new_parent):
+                    return Response({"error": "Cannot move to this parent"}, status=status.HTTP_400_BAD_REQUEST)
+                instance.move_to(
+                    new_parent, position if position in {"first-child", "last-child", "left", "right"} else "last-child"
+                )
 
             serializer = self.get_serializer(instance)
             return Response(serializer.data)
@@ -1657,7 +1734,15 @@ class ObjectVersionViewSet(viewsets.ReadOnlyModelViewSet):
         tenant = getattr(self.request, "tenant", None)
         if tenant is None:
             return super().get_queryset().none()
-        return super().get_queryset().filter(object_instance__tenant=tenant)
+        return (
+            super()
+            .get_queryset()
+            .filter(
+                object_instance__tenant=tenant,
+                object_instance__is_deleted=False,
+                object_instance__object_type__is_deleted=False,
+            )
+        )
 
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""

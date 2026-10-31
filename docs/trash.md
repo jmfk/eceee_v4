@@ -6,4 +6,6 @@ Deleting an object moves its active descendants to Trash and preserves versions 
 
 Deleted objects and types are excluded from the CMS browsers, published object queries, the TypeScript publisher, and Designer source lists. The object and type migrations add flags and metadata without deleting or rewriting existing rows. Trash contents remain until an explicitly initiated permanent cleanup; there is no automatic media purge.
 
+Object tree creation, moves, deletion, and restore serialize within one workspace transaction so concurrent edits cannot leave an active child under a deleted parent. Internal data connections bypass their stream cache to reflect deletions immediately.
+
 Other CMS resource types still need to be added to this shared Trash contract before their deletion routes can be considered restorable.

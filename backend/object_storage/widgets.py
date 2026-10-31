@@ -80,7 +80,7 @@ class ObjectListConfig(BaseModel):
     def validate_object_type(cls, v):
         """Validate that object type exists and is active"""
         try:
-            ObjectTypeDefinition.objects.get(name=v, is_active=True)
+            ObjectTypeDefinition.objects.get(name=v, is_active=True, is_deleted=False)
             return v
         except ObjectTypeDefinition.DoesNotExist:
             raise ValueError(f"Object type '{v}' does not exist or is not active")
@@ -180,7 +180,9 @@ class ObjectListWidget(BaseWidget):
             tenant = getattr(current_page, "tenant", None)
             if tenant is None:
                 return {"objects": [], "error": "Tenant context is required", "config": config}
-            object_types = ObjectTypeDefinition.objects.filter(name=config.object_type, is_active=True)
+            object_types = ObjectTypeDefinition.objects.filter(
+                name=config.object_type, is_active=True, is_deleted=False
+            )
             if tenant:
                 object_types = object_types.filter(Q(namespace__tenant=tenant) | Q(namespace__isnull=True))
             object_type = object_types.get()
@@ -334,7 +336,9 @@ class ObjectDetailWidget(BaseWidget):
                     None,
                 )
             if not obj and object_slug and config.object_type:
-                object_types = ObjectTypeDefinition.objects.filter(name=config.object_type, is_active=True)
+                object_types = ObjectTypeDefinition.objects.filter(
+                    name=config.object_type, is_active=True, is_deleted=False
+                )
                 if tenant:
                     object_types = object_types.filter(Q(namespace__tenant=tenant) | Q(namespace__isnull=True))
                 object_type = object_types.get()
@@ -505,7 +509,9 @@ class ObjectChildrenWidget(BaseWidget):
 
             # Apply object type filter
             if config.object_type_filter:
-                object_type = ObjectTypeDefinition.objects.get(name=config.object_type_filter, is_active=True)
+                object_type = ObjectTypeDefinition.objects.get(
+                    name=config.object_type_filter, is_active=True, is_deleted=False
+                )
                 children = children.filter(object_type=object_type)
 
             # Apply ordering and limit using the live title when requested.

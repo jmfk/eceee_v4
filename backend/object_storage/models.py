@@ -26,6 +26,13 @@ from file_manager.storage import system_storage
 from utils.schema_system import get_field_types_for_django_choices, validate_schema
 
 
+def lock_object_tree(tenant_id):
+    """Serialize object-tree changes within one workspace transaction."""
+    from core.models import Tenant
+
+    Tenant.objects.select_for_update().only("pk").get(pk=tenant_id)
+
+
 class ObjectTypeDefinition(models.Model):
     """
     Defines object types with configurable schemas and widget slot configurations.
@@ -662,6 +669,11 @@ class ObjectInstance(MPTTModel):
         """Move the object and its active descendants to Trash without losing versions or links."""
         now = timezone.now()
         with transaction.atomic():
+            lock_object_tree(self.tenant_id)
+            # Creation and moves lock the destination parent before changing the
+            # tree. Lock this root first, then read fresh MPTT coordinates.
+            ObjectInstance.objects.select_for_update().get(pk=self.pk, tenant=self.tenant)
+            self.refresh_from_db(fields=["tree_id", "lft", "rght", "level"])
             ids = list(
                 self.get_descendants(include_self=True)
                 .filter(tenant=self.tenant, is_deleted=False)
@@ -1190,7 +1202,9 @@ class ObjectInstance(MPTTModel):
             raise ValueError("Cannot create relationship to self")
 
         # Check if target object exists
-        if not ObjectInstance.objects.filter(id=object_id, tenant=self.tenant).exists():
+        if not ObjectInstance.objects.filter(
+            id=object_id, tenant=self.tenant, is_deleted=False, object_type__is_deleted=False
+        ).exists():
             raise ValueError(f"ObjectInstance with id {object_id} does not exist")
 
         # Initialize relationships if None
@@ -1284,7 +1298,9 @@ class ObjectInstance(MPTTModel):
         for obj_id in object_ids:
             if obj_id == self.id:
                 raise ValueError("Cannot create relationship to self")
-            if not ObjectInstance.objects.filter(id=obj_id, tenant=self.tenant).exists():
+            if not ObjectInstance.objects.filter(
+                id=obj_id, tenant=self.tenant, is_deleted=False, object_type__is_deleted=False
+            ).exists():
                 raise ValueError(f"ObjectInstance with id {obj_id} does not exist")
 
         # Get current relationships of this type
@@ -1335,7 +1351,9 @@ class ObjectInstance(MPTTModel):
         # Verify the IDs match
         if set(object_ids_in_order) != current_ids:
             raise ValueError("Provided object IDs must exactly match existing relationships")
-        if ObjectInstance.objects.filter(id__in=object_ids_in_order, tenant=self.tenant).count() != len(current_ids):
+        if ObjectInstance.objects.filter(
+            id__in=object_ids_in_order, tenant=self.tenant, is_deleted=False, object_type__is_deleted=False
+        ).count() != len(current_ids):
             raise ValueError("Related ObjectInstances must belong to the same tenant")
 
         # Remove old relationships of this type
@@ -1370,22 +1388,19 @@ class ObjectInstance(MPTTModel):
         if not rels:
             return ObjectInstance.objects.none() if as_queryset else []
 
+        object_ids = [r.get("object_id") for r in rels]
+        active = ObjectInstance.objects.filter(
+            id__in=object_ids, tenant=self.tenant, is_deleted=False, object_type__is_deleted=False
+        )
         if as_queryset:
-            # Return queryset preserving order
-            object_ids = [r.get("object_id") for r in rels]
-            # Use Django's preserve order with case
             preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(object_ids)])
-            return ObjectInstance.objects.filter(id__in=object_ids, tenant=self.tenant).order_by(preserved)
-        else:
-            # Return list with relationship type info
-            return [
-                {
-                    "type": r.get("type"),
-                    "object_id": r.get("object_id"),
-                    "object": ObjectInstance.objects.filter(id=r.get("object_id"), tenant=self.tenant).first(),
-                }
-                for r in rels
-            ]
+            return active.order_by(preserved)
+        by_id = {str(obj.pk): obj for obj in active}
+        return [
+            {"type": r.get("type"), "object_id": r.get("object_id"), "object": by_id[str(r.get("object_id"))]}
+            for r in rels
+            if str(r.get("object_id")) in by_id
+        ]
 
     def get_related_from_objects(self, relationship_type=None, as_queryset=True):
         """
@@ -1410,21 +1425,19 @@ class ObjectInstance(MPTTModel):
         if not rels:
             return ObjectInstance.objects.none() if as_queryset else []
 
+        object_ids = [r.get("object_id") for r in rels]
+        active = ObjectInstance.objects.filter(
+            id__in=object_ids, tenant=self.tenant, is_deleted=False, object_type__is_deleted=False
+        )
         if as_queryset:
-            # Return queryset preserving order
-            object_ids = [r.get("object_id") for r in rels]
             preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(object_ids)])
-            return ObjectInstance.objects.filter(id__in=object_ids, tenant=self.tenant).order_by(preserved)
-        else:
-            # Return list with relationship type info
-            return [
-                {
-                    "type": r.get("type"),
-                    "object_id": r.get("object_id"),
-                    "object": ObjectInstance.objects.filter(id=r.get("object_id"), tenant=self.tenant).first(),
-                }
-                for r in rels
-            ]
+            return active.order_by(preserved)
+        by_id = {str(obj.pk): obj for obj in active}
+        return [
+            {"type": r.get("type"), "object_id": r.get("object_id"), "object": by_id[str(r.get("object_id"))]}
+            for r in rels
+            if str(r.get("object_id")) in by_id
+        ]
 
     def has_relationship(self, relationship_type, object_id):
         """

@@ -112,7 +112,15 @@ def collect_object_graph(tenant, root_ids):
     if len(root_ids) > MAX_OBJECTS:
         raise ValueError(f"The selection exceeds the {MAX_OBJECTS} root object limit.")
     root_ids = set(root_ids)
-    roots = list(ObjectInstance.objects.filter(tenant=tenant, parent__isnull=True, id__in=root_ids))
+    roots = list(
+        ObjectInstance.objects.filter(
+            tenant=tenant,
+            parent__isnull=True,
+            id__in=root_ids,
+            is_deleted=False,
+            object_type__is_deleted=False,
+        )
+    )
     if len(roots) != len(root_ids):
         raise ValueError("One or more selected root objects are unavailable.")
     collected = {}
@@ -124,7 +132,11 @@ def collect_object_graph(tenant, root_ids):
         collected[obj.id] = obj
         if len(collected) > MAX_OBJECTS:
             raise ValueError(f"The selection expands beyond the {MAX_OBJECTS} object limit.")
-        queue.extend(obj.children.filter(tenant=tenant).select_related("object_type"))
+        queue.extend(
+            obj.children.filter(tenant=tenant, is_deleted=False, object_type__is_deleted=False).select_related(
+                "object_type"
+            )
+        )
         related_ids = {
             rel.get("object_id") for rel in (obj.relationships or []) if isinstance(rel, dict) and rel.get("object_id")
         }
@@ -133,11 +145,17 @@ def collect_object_graph(tenant, root_ids):
             for field_name in reference_fields:
                 related_ids.update(_reference_ids((version.data or {}).get(field_name)))
         if related_ids:
-            queue.extend(ObjectInstance.objects.filter(tenant=tenant, id__in=related_ids).select_related("object_type"))
+            queue.extend(
+                ObjectInstance.objects.filter(
+                    tenant=tenant, id__in=related_ids, is_deleted=False, object_type__is_deleted=False
+                ).select_related("object_type")
+            )
     return list(collected.values())
 
 
 def _type_visible_to_tenant(obj_type, tenant_id):
+    if obj_type.is_deleted:
+        return False
     if not getattr(obj_type, "namespace_id", None):
         return True
     namespace_tenant_id = getattr(getattr(obj_type, "namespace", None), "tenant_id", None)
@@ -170,6 +188,8 @@ def candidate_catalog(tenant, selections):
     tenant_root_type_ids = ObjectInstance.objects.filter(
         tenant=tenant,
         parent__isnull=True,
+        is_deleted=False,
+        object_type__is_deleted=False,
     ).values("object_type_id")
     for selection in selections:
         type_name = str(selection.get("object_type") or "").strip()
@@ -182,6 +202,7 @@ def candidate_catalog(tenant, selections):
             ObjectTypeDefinition.objects.filter(
                 name=type_name,
                 is_active=True,
+                is_deleted=False,
                 id__in=tenant_root_type_ids,
             )
             .filter(Q(namespace__isnull=True) | Q(namespace__tenant=tenant))
@@ -189,9 +210,9 @@ def candidate_catalog(tenant, selections):
         )
         if not obj_type:
             continue
-        roots = ObjectInstance.objects.filter(tenant=tenant, object_type=obj_type, parent__isnull=True).order_by(
-            "-created_at", "-id"
-        )[:limit]
+        roots = ObjectInstance.objects.filter(
+            tenant=tenant, object_type=obj_type, parent__isnull=True, is_deleted=False
+        ).order_by("-created_at", "-id")[:limit]
         results.append(
             {
                 "object_type": serialize_type(obj_type, tenant_id=tenant.id),
@@ -203,7 +224,9 @@ def candidate_catalog(tenant, selections):
                         "slug": obj.slug,
                         "status": obj.status,
                         "created_at": obj.created_at,
-                        "descendant_count": obj.get_descendant_count(),
+                        "descendant_count": obj.get_descendants()
+                        .filter(is_deleted=False, object_type__is_deleted=False)
+                        .count(),
                     }
                     for obj in roots
                 ],
@@ -987,6 +1010,8 @@ class ObjectPackageImporter:
         pending_relations = []
         for data in payload["types"]:
             existing = ObjectTypeDefinition.objects.filter(name=data["name"]).first()
+            if existing and existing.is_deleted:
+                raise ValueError(f"Restore local object type {data['name']} before importing it.")
             created = existing is None
             differs = existing and type_definition_differs(existing, data)
             resolution = resolutions.get(data["name"], "keep")
@@ -1085,6 +1110,10 @@ class ObjectPackageImporter:
             obj_type = type_map.get(data["type"])
             if not obj_type or str(data["source_id"]) in skipped_ids:
                 continue
+            if ObjectInstance.objects.filter(
+                tenant=tenant, object_type=obj_type, slug=data["slug"], is_deleted=True
+            ).exists():
+                raise ValueError(f"Restore local object {data['slug']} before importing it.")
             obj, created = ObjectInstance.objects.get_or_create(
                 tenant=tenant,
                 object_type=obj_type,

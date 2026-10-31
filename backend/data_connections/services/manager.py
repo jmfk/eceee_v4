@@ -70,7 +70,9 @@ class DataConnectionManager:
         query_params=None,
     ) -> List[Dict[str, Any]]:
         # 1. Check Cache
-        if not bypass_cache and stream_id:
+        # Internal CMS content must reflect Trash immediately; stream caches can
+        # otherwise keep deleted objects visible for the default one-hour TTL.
+        if not bypass_cache and stream_id and connection.connection_type != "INTERNAL":
             cached_data = ConnectionCacheService.get(stream_id, query_params)
             if cached_data is not None:
                 return cached_data
@@ -92,7 +94,7 @@ class DataConnectionManager:
             transformed_data = processed_data
 
         # 5. Set Cache
-        if not bypass_cache and stream_id and cache_ttl > 0:
+        if not bypass_cache and stream_id and cache_ttl > 0 and connection.connection_type != "INTERNAL":
             ConnectionCacheService.set(stream_id, transformed_data, cache_ttl, query_params)
 
         return transformed_data

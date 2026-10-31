@@ -913,7 +913,7 @@ def validate_object_reference(value: Any, field_config: Dict[str, Any]) -> None:
 
         # Check object exists
         try:
-            obj = ObjectInstance.objects.get(id=ref_id)
+            obj = ObjectInstance.objects.get(id=ref_id, is_deleted=False, object_type__is_deleted=False)
         except ObjectInstance.DoesNotExist:
             raise ValidationError(f"Referenced object with ID {ref_id} does not exist")
 

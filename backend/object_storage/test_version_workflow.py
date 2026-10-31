@@ -75,6 +75,19 @@ class ObjectVersionWorkflowTests(TestCase):
         working.refresh_from_db()
         self.assertEqual(working.title, "Changed")
 
+    def test_trashed_objects_and_types_hide_versions_and_block_workflow(self):
+        version_url = reverse("api:object_storage:objectversion-detail", args=[self.initial.pk])
+        self.obj.soft_delete(self.user)
+        self.assertEqual(self.client.get(version_url).status_code, 404)
+        with self.assertRaisesRegex(ObjectWorkflowConflict, "Restore the Object"):
+            self.publish(self.initial)
+
+        self.obj.restore(self.user)
+        self.obj_type.soft_delete(self.user)
+        self.assertEqual(self.client.get(version_url).status_code, 404)
+        with self.assertRaisesRegex(ObjectWorkflowConflict, "Restore the Object"):
+            self.publish(self.initial)
+
     def test_publish_retires_live_and_never_reactivates_old_drafts(self):
         old_draft = self.initial
         newer = self.obj.create_version(self.user, data={"body": "Newer"})

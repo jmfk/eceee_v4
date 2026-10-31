@@ -290,6 +290,22 @@ class ObjectTransferServiceTests(TestCase):
             graph = collect_object_graph(self.tenant, [self.root.id])
         self.assertEqual({item.id for item in graph}, {self.root.id, self.child.id, self.related.id})
 
+    def test_catalog_and_graph_exclude_trashed_objects_and_types(self):
+        self.related.soft_delete(self.user)
+        self.child.soft_delete(self.user)
+        graph = collect_object_graph(self.tenant, [self.root.id])
+        self.assertEqual([item.id for item in graph], [self.root.id])
+        self.root.soft_delete(self.user)
+        self.root.refresh_from_db()
+        self.assertTrue(self.root.is_deleted)
+        self.assertEqual(candidate_catalog(self.tenant, [{"object_type": self.root_type.name}]), [])
+        with self.assertRaisesRegex(ValueError, "unavailable"):
+            collect_object_graph(self.tenant, [self.root.id])
+
+    def test_catalog_excludes_trashed_type(self):
+        self.root_type.soft_delete(self.user)
+        self.assertEqual(candidate_catalog(self.tenant, [{"object_type": self.root_type.name}]), [])
+
     def test_catalog_does_not_expose_types_from_another_tenant(self):
         foreign_user = User.objects.create_user("foreign-object-transfer")
         foreign_tenant = Tenant.objects.create(
@@ -683,6 +699,39 @@ class ObjectTransferServiceTests(TestCase):
 
         local_target.refresh_from_db()
         self.assertEqual(local_target.related_from, [])
+
+    def test_import_refuses_to_overwrite_trashed_object_or_type(self):
+        storage = MemoryStorage()
+        storage.files[self.media.file_path] = b"image"
+        export_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_EXPORT,
+            created_by=self.user,
+            options={"root_ids": [self.root.id]},
+        )
+        package_file = io.BytesIO()
+        with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as package:
+            ObjectPackageExporter(export_job, storage=storage).write_package(package)
+        import_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"type_resolutions": {}},
+        )
+
+        self.root.soft_delete(self.user)
+        package_file.seek(0)
+        with zipfile.ZipFile(package_file, "r") as package:
+            with self.assertRaisesRegex(ValueError, "Restore local object .* before importing"):
+                ObjectPackageImporter(import_job, storage=storage).import_package(package)
+        self.root.refresh_from_db()
+        self.assertTrue(self.root.is_deleted)
+
+        self.root_type.soft_delete(self.user)
+        package_file.seek(0)
+        with zipfile.ZipFile(package_file, "r") as package:
+            with self.assertRaisesRegex(ValueError, "Restore local object type transfer-root"):
+                ObjectPackageImporter(import_job, storage=storage).import_package(package)
 
     def test_package_round_trip_restores_changed_object_and_media_tags(self):
         storage = MemoryStorage()
