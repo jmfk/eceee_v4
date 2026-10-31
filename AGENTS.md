@@ -112,6 +112,16 @@ Backend static assets: `cd backend && npm run build` / `npm run watch:css`
 
 ## Pull Request Review And Merge Gate
 
+- Keep review and CI proportional to the changed risk. Before opening or updating
+  a PR, inspect the complete intended diff once, batch verified fixes, run focused
+  checks during editing, and run one broader local gate when shared behavior or
+  migrations warrant it. Match local formatter and tool versions to CI before
+  pushing. Do not start another full review or broad test run merely because a
+  routine fix was made; recheck the affected code and tests. A new full review is
+  warranted only when the fix changes the contract, risk, or substantial scope.
+  If a review round produces no new verified findings, stop reviewing and report
+  the result. Do not use repeated independent reviews as a substitute for a
+  clear risk decision. Keep required Full CI and owner merge gates below.
 - An owner may request the fast-track lane for a small, isolated, reversible fix.
   Eligible changes do not touch migrations, stored-data contracts, tenant scope,
   authorization, secrets, dependencies, CI/deployment controls, or production
