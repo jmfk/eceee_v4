@@ -54,8 +54,8 @@ export const objectTypesApi = {
     /**
      * Delete object type
      */
-    async delete(id, forceDelete = false) {
-        const params = forceDelete ? { force_delete: 'true' } : {}
+    async delete(id, deleteInstances = false) {
+        const params = deleteInstances ? { delete_instances: 'true' } : {}
         return await api.delete(`${BASE_URL}/object-types/${id}/`, { params })
     },
 

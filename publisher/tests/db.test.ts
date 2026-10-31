@@ -240,8 +240,12 @@ describe('database snapshot', () => {
     expect(sql).toContain('CASE WHEN $8::boolean');
     expect(sql).toContain('ancestor.tenant_id = $1');
     expect(sql).toContain('parent.id = object.parent_id AND parent.tenant_id = $1');
+    expect(sql).toContain('parent.is_deleted = false AND parent_type.is_deleted = false');
     expect(sql).toContain('parent_version.effective_date <= $4');
     expect(sql).toContain('child.tenant_id = $1 AND child.parent_id = object.id');
+    expect(sql).toContain('child.is_deleted = false AND child_type.is_deleted = false');
+    expect(sql).toContain('ancestor.is_deleted = false AND ancestor_type.is_deleted = false');
+    expect(sql).toContain('object.is_deleted = false AND type.is_deleted = false');
     expect(sql).toContain('child_version.effective_date <= $4');
     expect(sql).toContain('object.created_at::text AS "createdAt"');
     expect(sql).toContain('object.updated_at::text AS "updatedAt"');

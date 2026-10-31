@@ -7,13 +7,15 @@ from django.db import models, transaction
 from django.db.models import F, Q, Value
 from django.db.models.functions import Cast
 from rest_framework import permissions, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from content.models import Namespace
-from core.roles import is_tenant_admin
+from core.roles import is_tenant_admin, permissions_for
 from file_manager.models import MediaCollection, MediaFile
 from file_manager.security import filter_media_files_for_user, user_can_access_namespace
+from object_storage.models import ObjectInstance, ObjectTypeDefinition
 from webpages.models import WebPage
 
 
@@ -21,7 +23,7 @@ class TrashView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     # Collection deletion locks the collection before its files; restore in the
     # same order to avoid a deadlock when both operations run concurrently.
-    kinds = ("page", "collection", "media")
+    kinds = ("page", "collection", "media", "object_type", "object")
 
     def _tenant(self, request):
         tenant = getattr(request, "tenant", None)
@@ -50,7 +52,19 @@ class TrashView(APIView):
         collections = MediaCollection.objects.with_deleted().filter(
             namespace__tenant=tenant, namespace_id__in=allowed_namespaces, is_deleted=True
         )
-        return {"page": pages, "media": files, "collection": collections}
+        objects = ObjectInstance.objects.filter(tenant=tenant, is_deleted=True)
+        if "object.write" not in permissions_for(request.user, tenant):
+            objects = objects.none()
+        object_types = ObjectTypeDefinition.objects.filter(namespace__tenant=tenant, is_deleted=True)
+        if not admin:
+            object_types = object_types.none()
+        return {
+            "page": pages,
+            "media": files,
+            "collection": collections,
+            "object": objects,
+            "object_type": object_types,
+        }
 
     def get(self, request):
         tenant = self._tenant(request)
@@ -77,6 +91,10 @@ class TrashView(APIView):
             querysets["collection"] = querysets["collection"].filter(
                 Q(title__icontains=search) | Q(slug__icontains=search)
             )
+            querysets["object"] = querysets["object"].filter(Q(title__icontains=search) | Q(slug__icontains=search))
+            querysets["object_type"] = querysets["object_type"].filter(
+                Q(label__icontains=search) | Q(name__icontains=search)
+            )
         counts = {name: queryset.count() for name, queryset in querysets.items()}
         selected = self.kinds if kind == "all" else (kind,)
         rows = [
@@ -85,7 +103,7 @@ class TrashView(APIView):
             .annotate(
                 item_type=Value(name, output_field=models.CharField()),
                 item_id=Cast("id", output_field=models.CharField()),
-                item_title=F("title"),
+                item_title=F("label" if name == "object_type" else "title"),
                 trashed_at=F("deleted_at"),
             )
             .values("item_type", "item_id", "item_title", "trashed_at")
@@ -129,8 +147,10 @@ class TrashRestoreView(TrashView):
             if not isinstance(item, dict) or item.get("type") not in self.kinds or not item.get("id"):
                 return Response({"items": "Invalid item"}, status=status.HTTP_400_BAD_REQUEST)
             try:
-                item_id = int(item["id"]) if item["type"] == "page" else uuid.UUID(str(item["id"]))
-                if item["type"] == "page" and item_id < 1:
+                item_id = (
+                    int(item["id"]) if item["type"] in {"page", "object", "object_type"} else uuid.UUID(str(item["id"]))
+                )
+                if item["type"] in {"page", "object", "object_type"} and item_id < 1:
                     raise ValueError
             except (TypeError, ValueError, AttributeError):
                 return Response({"items": "Invalid item ID"}, status=status.HTTP_400_BAD_REQUEST)
@@ -168,4 +188,13 @@ class TrashRestoreView(TrashView):
             for collection in selected.get("collection", []):
                 collection.restore()
                 restored.append({"type": "collection", "id": str(collection.pk)})
+            for object_type in selected.get("object_type", []):
+                object_type.restore()
+                restored.append({"type": "object_type", "id": str(object_type.pk)})
+            selected_objects = {obj.pk: obj for obj in selected.get("object", [])}
+            for obj in sorted(selected_objects.values(), key=lambda item: item.level):
+                if obj.object_type.is_deleted or (obj.parent_id and obj.parent.is_deleted):
+                    raise ValidationError({"items": "Restore the object type and parent first."})
+                obj.restore(request.user)
+                restored.append({"type": "object", "id": str(obj.pk)})
         return Response({"restored_count": len(restored), "restored": restored, "warnings": warnings})

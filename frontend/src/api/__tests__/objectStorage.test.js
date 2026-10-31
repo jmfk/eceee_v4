@@ -1,10 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const postMock = vi.hoisted(() => vi.fn())
+const deleteMock = vi.hoisted(() => vi.fn())
 
-vi.mock('../client.js', () => ({ api: { post: postMock } }))
+vi.mock('../client.js', () => ({ api: { post: postMock, delete: deleteMock } }))
 
-import { objectInstancesApi } from '../objectStorage.js'
+import { objectInstancesApi, objectTypesApi } from '../objectStorage.js'
+
+describe('objectTypesApi.delete', () => {
+    it('requests a restorable type deletion with its instances', async () => {
+        await objectTypesApi.delete(12, true)
+        expect(deleteMock).toHaveBeenCalledWith('/api/v1/objects/object-types/12/', {
+            params: { delete_instances: 'true' },
+        })
+    })
+})
 
 describe('objectInstancesApi.saveWorkingCopy', () => {
     const version = { id: 7, editRevision: 2 }

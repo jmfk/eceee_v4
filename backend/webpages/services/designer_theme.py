@@ -655,7 +655,9 @@ def designer_object_sources(theme):
             "versionId": instance.current_version_id,
         }
         for instance in (
-            ObjectInstance.objects.filter(tenant=theme.tenant, current_version_id__isnull=False)
+            ObjectInstance.objects.filter(
+                tenant=theme.tenant, current_version_id__isnull=False, is_deleted=False, object_type__is_deleted=False
+            )
             .select_related("object_type")
             .order_by("object_type__label", "title", "id")
         )

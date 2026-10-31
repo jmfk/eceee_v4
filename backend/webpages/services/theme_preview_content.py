@@ -143,7 +143,7 @@ def list_theme_preview_sources(theme):
     pages = designer_page_sources(theme)
     objects = []
     instances = (
-        ObjectInstance.objects.filter(tenant=theme.tenant)
+        ObjectInstance.objects.filter(tenant=theme.tenant, is_deleted=False, object_type__is_deleted=False)
         .select_related("object_type")
         .order_by("object_type__label", "title", "id")
     )
@@ -161,7 +161,7 @@ def list_theme_preview_sources(theme):
     default_namespace = _default_namespace(theme)
     object_types = [
         _object_type_snapshot(object_type, theme, default_namespace)
-        for object_type in ObjectTypeDefinition.objects.filter(is_active=True)
+        for object_type in ObjectTypeDefinition.objects.filter(is_active=True, is_deleted=False)
         .select_related("namespace")
         .order_by("label", "id")
     ]
@@ -951,7 +951,9 @@ def import_theme_preview_document(theme, source_kind, source_id):
 
     if source_kind == "object":
         instance = (
-            ObjectInstance.objects.filter(id=source_id, tenant=theme.tenant)
+            ObjectInstance.objects.filter(
+                id=source_id, tenant=theme.tenant, is_deleted=False, object_type__is_deleted=False
+            )
             .select_related("object_type", "object_type__namespace")
             .first()
         )
