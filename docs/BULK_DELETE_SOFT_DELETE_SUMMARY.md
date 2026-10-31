@@ -1,5 +1,26 @@
 # Bulk Delete & Soft Delete Implementation Summary
 
+## Global Trash
+
+The CMS navigation now has a Trash view at `/trash`. It searches deleted pages,
+media files, and media collections across the selected workspace, with a type
+filter and selection of up to 100 items for one restore operation. Single-item
+restore uses the same endpoint. Only tenant administrators see deleted pages;
+media files are visible to their uploader or a tenant administrator. Restoring
+a collection preserves its file memberships, while deleted files must be
+restored separately. Page restoration may relocate a page or rename its slug
+when the original parent or slug is unavailable; warnings are shown to the editor.
+
+`GET /api/v1/trash/?type=all&search=&page=1&page_size=25` returns a paginated,
+date-ordered list with per-type counts. `POST /api/v1/trash/restore/` accepts
+`{"items": [{"type": "page", "id": "1"}, {"type": "media", "id": "<uuid>"}]}`.
+The whole selection is validated within the selected tenant before restoration;
+the database changes run in one transaction. The endpoint can be extended as
+other CMS resources gain reversible deletion.
+
+Deleted media is retained until an explicitly initiated purge. There is no
+scheduled automatic Trash cleanup.
+
 ## Overview
 
 Successfully implemented soft delete functionality with bulk operations for pages. This allows reversible deletion where pages are marked as deleted rather than being permanently removed from the database.
