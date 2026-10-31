@@ -130,7 +130,7 @@ const mockMediaFiles = [
         fileType: 'document',
         fileSize: 2048,
         createdAt: '2024-01-03T10:00:00Z',
-        is_deleted: true,
+        isDeleted: true,
         tags: [],
     },
 ]

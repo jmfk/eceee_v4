@@ -158,4 +158,14 @@ describe('MediaCollectionManager', () => {
         await user.click(screen.getByRole('button', { name: 'Restore Deleted collection' }))
         await waitFor(() => expect(mocks.bulkRestore).toHaveBeenCalledWith(['deleted-1']))
     })
+
+    it('supports keyboard navigation between collection and Trash tabs', async () => {
+        const user = userEvent.setup()
+        render(<MediaCollectionManager namespace="default" />)
+        const collectionsTab = await screen.findByRole('tab', { name: 'Collections' })
+        collectionsTab.focus()
+        await user.keyboard('{ArrowRight}')
+        expect(screen.getByRole('tab', { name: 'Trash' })).toHaveFocus()
+        expect(screen.getByRole('tab', { name: 'Trash' })).toHaveAttribute('aria-selected', 'true')
+    })
 })
