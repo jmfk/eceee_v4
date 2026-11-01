@@ -196,6 +196,8 @@ PATCH /api/v1/media/files/{id}/
 
 **Request Body:** Same as create, all fields optional for PATCH
 
+For an image, `PATCH` accepts `{"focal_point":{"x":0.5,"y":0.5}}`. Coordinates are normalized from 0 (left/top) to 1 (right/bottom). The list and detail responses include this field; images without a saved point return the center (`0.5`, `0.5`). Updating the point preserves other media metadata and does not change the image file.
+
 **Response:** Updated media file object (200 OK)
 
 ### Delete Media File

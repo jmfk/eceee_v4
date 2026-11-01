@@ -11,6 +11,7 @@ import ClassificationPicker from '../classification/ClassificationPicker'
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import {
     Search,
     Plus,
@@ -53,6 +54,10 @@ import { mediaCollectionsApi, mediaTagsApi, mediaApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 import MediaSearchWidget from './MediaSearchWidget';
 import MediaBrowser from './MediaBrowser';
+import MediaEditForm from './MediaEditForm';
+import OptimizedImage from './OptimizedImage';
+import ImageVersionContextMenu from './ImageVersionContextMenu';
+import ImageVersionUploadDialog from './ImageVersionUploadDialog';
 import { extractErrorMessage } from '../../utils/errorHandling';
 import { fetchPaginatedResults } from '../../utils/fetchPaginatedResults';
 
@@ -76,6 +81,12 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
     const [existingLoading, setExistingLoading] = useState(true);
     const [existingError, setExistingError] = useState(null);
     const [viewMode, setViewMode] = useState('grid');
+    const [pickerTarget, setPickerTarget] = useState(null);
+    const [editingFile, setEditingFile] = useState(null);
+    const [versionMenu, setVersionMenu] = useState(null);
+    const [versionUploadFile, setVersionUploadFile] = useState(null);
+    const [editLoadingId, setEditLoadingId] = useState(null);
+    const addingFilesRef = useRef(false);
 
     const { addNotification } = useGlobalNotifications();
 
@@ -163,15 +174,47 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
         }
     };
 
-    const handleAddFile = async (file) => {
-        if (existingFiles.some(item => item.id === file.id)) return;
+    const handleAddFiles = async (fileIds) => {
+        const existingIds = new Set(existingFiles.map(file => String(file.id)));
+        const newIds = [...new Set(fileIds.filter(Boolean).map(String))].filter(id => !existingIds.has(id));
+        if (addingFilesRef.current || newIds.length === 0) return;
+        addingFilesRef.current = true;
         try {
-            await mediaCollectionsApi.addFiles(collection.id, [file.id])();
-            addNotification('File added to collection', 'success');
+            await mediaCollectionsApi.addFiles(collection.id, newIds)();
             await loadExistingFiles();
+            addNotification(`${newIds.length} image${newIds.length === 1 ? '' : 's'} added to collection`, 'success');
+            setPickerTarget(null);
         } catch (error) {
             console.error('Failed to add file to collection:', error);
             addNotification(extractErrorMessage(error), 'error');
+        } finally {
+            addingFilesRef.current = false;
+        }
+    };
+
+    const handleSelectedFile = (file) => handleAddFiles([file.id]);
+
+    const handleApprovedFiles = (results) => {
+        const ids = (results || []).filter(result => result.status !== 'error')
+            .map(result => result.mediaFileId || result.media_file_id || result.mediaFile?.id || result.media_file?.id);
+        return handleAddFiles(ids);
+    };
+
+    const handleImageContextMenu = (file, event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setVersionMenu({ file, x: event.clientX, y: event.clientY });
+    };
+
+    const handleEditFile = async (file) => {
+        setEditLoadingId(file.id);
+        try {
+            const details = await mediaApi.files.get(file.id)();
+            setEditingFile(details);
+        } catch (error) {
+            addNotification(extractErrorMessage(error), 'error');
+        } finally {
+            setEditLoadingId(null);
         }
     };
 
@@ -198,15 +241,22 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
     // Render file card
     const renderFileCard = (file) => {
         const FileIcon = getFileTypeIcon(file.fileType);
+        const imageSource = file.imgproxyBaseUrl || file.fileUrl;
         
         return (
             <div key={file.id} className="relative bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow group">
-                {file.fileType === 'image' && file.thumbnailUrl ? (
-                    <div className="aspect-square bg-gray-100 overflow-hidden">
-                        <img 
-                            src={file.thumbnailUrl} 
+                {file.fileType === 'image' && imageSource ? (
+                    <div className="aspect-square bg-gray-100 overflow-hidden" onContextMenu={event => handleImageContextMenu(file, event)}>
+                        <OptimizedImage
+                            src={imageSource}
                             alt={file.title}
-                            className="max-w-full max-h-full object-cover"
+                            width={540}
+                            height={540}
+                            actualWidth={file.width}
+                            actualHeight={file.height}
+                            resizeType="fit"
+                            className="flex h-full w-full items-center justify-center object-contain"
+                            fallback={<div className="flex h-full items-center justify-center"><FileIcon className="h-12 w-12 text-gray-400" /></div>}
                         />
                     </div>
                 ) : (
@@ -227,15 +277,54 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
                         {formatFileSize(file.fileSize)}
                     </div>
                 </div>
-                <button
-                    onClick={() => handleRemoveFile(file.id)}
-                    className="absolute top-2 right-2 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700"
-                    title="Remove from collection"
-                >
-                    <X className="w-4 h-4" />
-                </button>
+                <div className="flex flex-wrap gap-x-3 gap-y-2 border-t border-gray-100 px-3 py-2 text-xs">
+                    <button type="button" onClick={() => handleEditFile(file)} disabled={editLoadingId === file.id}
+                        className="font-medium text-blue-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-50"
+                        aria-label={`Edit ${file.title}`}>
+                        {editLoadingId === file.id ? 'Loading…' : 'Edit'}
+                    </button>
+                    <button type="button" onClick={() => handleRemoveFile(file.id)}
+                        className="font-medium text-red-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-600"
+                        aria-label={`Remove ${file.title} from collection`}>
+                        Remove
+                    </button>
+                </div>
             </div>
         );
+    };
+
+    const renderFileListItem = (file) => {
+        const FileIcon = getFileTypeIcon(file.fileType);
+        const imageSource = file.imgproxyBaseUrl || file.fileUrl;
+
+        return <div key={file.id} className="grid min-w-[700px] grid-cols-12 items-center gap-4 border-b border-gray-100 px-4 py-1 hover:bg-gray-50">
+            <div className="col-span-2">
+                <button type="button" onClick={() => handleEditFile(file)} disabled={editLoadingId === file.id}
+                    onContextMenu={file.fileType === 'image' ? event => handleImageContextMenu(file, event) : undefined}
+                    aria-label={`Edit ${file.title}`} className="flex h-20 w-24 items-center justify-center overflow-hidden bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-50">
+                    {file.fileType === 'image' && imageSource ? <OptimizedImage
+                        src={imageSource} alt={file.title} width={192} height={160}
+                        actualWidth={file.width} actualHeight={file.height} resizeType="fit"
+                        className="flex h-full w-full items-center justify-center object-contain"
+                        fallback={<FileIcon className="h-8 w-8 text-gray-400" />}
+                    /> : <FileIcon className="h-8 w-8 text-gray-400" />}
+                </button>
+            </div>
+            <div className="col-span-4 min-w-0">
+                <div className="truncate text-sm font-medium text-gray-900" title={file.title}>{file.title}</div>
+                {file.annotation && <div className="truncate text-xs text-gray-500" title={file.annotation}>{file.annotation}</div>}
+            </div>
+            <div className="col-span-2 text-sm capitalize text-gray-600">{file.fileType}</div>
+            <div className="col-span-2 text-sm text-gray-600">{formatFileSize(file.fileSize)}</div>
+            <div className="col-span-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <button type="button" onClick={() => handleEditFile(file)} disabled={editLoadingId === file.id}
+                    className="font-medium text-blue-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-50"
+                    aria-label={`Edit ${file.title} details`}>{editLoadingId === file.id ? 'Loading…' : 'Edit'}</button>
+                <button type="button" onClick={() => handleRemoveFile(file.id)}
+                    className="font-medium text-red-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-600"
+                    aria-label={`Remove ${file.title} from collection`}>Remove</button>
+            </div>
+        </div>;
     };
 
     return (
@@ -330,21 +419,6 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
                         )}
                     </div>
 
-                    <div className="bg-white rounded border border-gray-200 p-4">
-                        <div className="text-lg font-semibold text-gray-900 mb-1" role="heading" aria-level="3">Add images</div>
-                        <p className="text-sm text-gray-600 mb-3">Select an existing image or upload and tag a new one. Pending uploads can be approved here.</p>
-                        <MediaBrowser
-                            namespace={namespace}
-                            fileTypes={['image']}
-                            selectionMode="single"
-                            onFileSelect={handleAddFile}
-                            showUploader
-                            hideShowDeleted
-                            hideTypeFilter
-                            compact
-                        />
-                    </div>
-
                     {/* Collection Files Section */}
                     <div className="bg-white rounded-lg border border-gray-200">
                         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
@@ -354,12 +428,26 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
                             </div>
                             <div className="flex items-center gap-2">
                                 <button
+                                    type="button"
+                                    onClick={() => setPickerTarget({ file: null })}
+                                    className="flex items-center gap-2 rounded bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    Add images
+                                </button>
+                                <button
+                                    type="button"
+                                    aria-label="Grid"
+                                    aria-pressed={viewMode === 'grid'}
                                     onClick={() => setViewMode('grid')}
                                     className={`p-2 rounded ${viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100'}`}
                                 >
                                     <Grid3X3 className="w-4 h-4" />
                                 </button>
                                 <button
+                                    type="button"
+                                    aria-label="List"
+                                    aria-pressed={viewMode === 'list'}
                                     onClick={() => setViewMode('list')}
                                     className={`p-2 rounded ${viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100'}`}
                                 >
@@ -386,18 +474,75 @@ const CollectionEditorView = ({ collection, namespace, onBack, onSave }) => {
                                     <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                                     <div className="text-sm font-medium text-gray-900 mb-1" role="heading" aria-level="4">No files in collection</div>
                                     <div className="text-sm text-gray-600">
-                                        Add files from available files on the right.
+                                        Add images to get started.
                                     </div>
                                 </div>
                             ) : (
-                                <div className={viewMode === 'grid' ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4' : 'space-y-2'}>
-                                    {existingFiles.map(file => renderFileCard(file))}
-                                </div>
+                                viewMode === 'grid'
+                                    ? <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">{existingFiles.map(renderFileCard)}</div>
+                                    : <div className="overflow-x-auto">
+                                        <div className="grid min-w-[700px] grid-cols-12 gap-4 border-b border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700">
+                                            <div className="col-span-2">Preview</div>
+                                            <div className="col-span-4">Title</div>
+                                            <div className="col-span-2">Type</div>
+                                            <div className="col-span-2">Size</div>
+                                            <div className="col-span-2">Actions</div>
+                                        </div>
+                                        {existingFiles.map(renderFileListItem)}
+                                    </div>
                             )}
                         </div>
                     </div>
                 </div>
             </div>
+            <Dialog open={Boolean(pickerTarget)} onClose={() => setPickerTarget(null)} className="relative z-50">
+                <div className="fixed inset-0 bg-black/40" aria-hidden="true" />
+                <div className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
+                    <DialogPanel className="flex h-[min(90dvh,900px)] w-full max-w-6xl flex-col overflow-hidden rounded border border-gray-200 bg-white shadow-xl">
+                        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-gray-200 px-5 py-4">
+                            <div>
+                            <DialogTitle className="text-lg font-semibold text-gray-900">Add images</DialogTitle>
+                            <p className="mt-1 text-sm text-gray-600">Select an existing image or upload and tag a new one. Pending uploads can be approved here.</p>
+                            </div>
+                            <button type="button" onClick={() => setPickerTarget(null)} aria-label="Close image picker dialog"
+                                className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <div className="min-h-0 flex-1 overflow-y-auto">
+                            {pickerTarget && <MediaBrowser
+                                namespace={namespace}
+                                fileTypes={['image']}
+                                selectionMode="single"
+                                onFileSelect={handleSelectedFile}
+                                onApprovedFiles={handleApprovedFiles}
+                                showUploader
+                                hideShowDeleted
+                                hideTypeFilter
+                                compact
+                            />}
+                        </div>
+                    </DialogPanel>
+                </div>
+            </Dialog>
+            <Dialog open={Boolean(editingFile)} onClose={() => setEditingFile(null)} className="relative z-50">
+                <div className="fixed inset-0 bg-black/40" aria-hidden="true" />
+                <div className="fixed inset-0 flex items-center justify-center p-4">
+                    <DialogPanel className="flex h-[min(85dvh,800px)] w-full max-w-3xl flex-col overflow-hidden rounded border border-gray-200 bg-white p-5 shadow-xl">
+                        <DialogTitle className="mb-3 shrink-0 text-lg font-semibold text-gray-900">Edit {editingFile?.title}</DialogTitle>
+                        <div className="min-h-0 flex-1 overflow-y-auto">
+                            {editingFile && <MediaEditForm file={editingFile} namespace={namespace} mode="edit" showHeader={false}
+                                onCancel={() => setEditingFile(null)}
+                                onMediaUpdated={loadExistingFiles}
+                                onSave={() => { setEditingFile(null); loadExistingFiles(); }} />}
+                        </div>
+                    </DialogPanel>
+                </div>
+            </Dialog>
+            <ImageVersionContextMenu position={versionMenu} onClose={() => setVersionMenu(null)}
+                onUpload={() => { setVersionUploadFile(versionMenu.file); setVersionMenu(null) }} />
+            {versionUploadFile && <ImageVersionUploadDialog file={versionUploadFile} namespace={namespace}
+                onClose={() => setVersionUploadFile(null)} onUploaded={loadExistingFiles} />}
         </div>
     );
 };
@@ -1215,6 +1360,8 @@ const EditCollectionView = ({ collection, namespace, onBack, onSave }) => {
 
 const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, onCollectionClose }) => {
     const [collections, setCollections] = useState([]);
+    const [versionMenu, setVersionMenu] = useState(null);
+    const [versionUploadFile, setVersionUploadFile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -1717,15 +1864,23 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                     }}
                 >
                     {filledImages.map((file, index) => (
-                        <div key={`${file.id}-${index}`} className="relative overflow-hidden bg-gray-200">
-                            <img
-                                src={file.thumbnailUrl || file.thumbnail_url || file.imgproxyBaseUrl}
+                        <div key={`${file.id}-${index}`} className="relative overflow-hidden bg-gray-200"
+                            onContextMenu={event => {
+                                if (showTrash) return;
+                                event.preventDefault();
+                                event.stopPropagation();
+                                setVersionMenu({ file, x: event.clientX, y: event.clientY });
+                            }}>
+                            <OptimizedImage
+                                src={file.imgproxyBaseUrl || file.imgproxy_base_url || file.thumbnailUrl || file.thumbnail_url}
                                 alt=""
-                                className="max-w-full max-h-full object-cover"
-                                style={{ display: 'block' }}
-                                onError={(e) => {
-                                    e.target.style.display = 'none';
-                                }}
+                                width={136}
+                                height={84}
+                                resizeType="fit"
+                                fillContainer
+                                focalPoint={file.focalPoint || file.focal_point || { x: 0.5, y: 0.5 }}
+                                className="h-full w-full object-cover"
+                                fallback={<div className="h-full w-full bg-gray-200" />}
                             />
                         </div>
                     ))}
@@ -2202,7 +2357,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
             {/* Edit Modal */}
             {showEditModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-hidden shadow-2xl">
+                    <div className="flex h-[min(85dvh,760px)] w-full max-w-lg flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
                         {/* Modal Header */}
                         <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
                             <div className="flex items-center justify-between">
@@ -2222,7 +2377,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                         </div>
 
                         {/* Modal Content */}
-                        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+                        <div className="min-h-0 flex-1 overflow-y-auto p-6">
                             <form onSubmit={(e) => {
                                 e.preventDefault();
                                 handleSubmit(true);
@@ -2345,6 +2500,11 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect, collectionId, o
                     </div>
                 </div>
             )}
+
+            <ImageVersionContextMenu position={versionMenu} onClose={() => setVersionMenu(null)}
+                onUpload={() => { setVersionUploadFile(versionMenu.file); setVersionMenu(null) }} />
+            {versionUploadFile && <ImageVersionUploadDialog file={versionUploadFile} namespace={namespace}
+                onClose={() => setVersionUploadFile(null)} onUploaded={loadCollections} />}
 
 
         </div>

@@ -5,7 +5,7 @@
  * Used for both pending files and approved files.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useId, useRef } from 'react';
 import {
     Save,
     X,
@@ -22,12 +22,16 @@ import OptimizedImage from './OptimizedImage';
 import MediaTagWidget from './MediaTagWidget';
 import MediaReferencesDisplay from './MediaReferencesDisplay';
 import ImageVersionHistory from './ImageVersionHistory';
+import ImageVersionContextMenu from './ImageVersionContextMenu';
+import ImageVersionUploadDialog from './ImageVersionUploadDialog';
+import ImageFocalPointDialog from './ImageFocalPointDialog';
 
 const MediaEditForm = ({
     file,
     namespace,
     onSave,
     onCancel,
+    onMediaUpdated,
     mode = 'edit', // 'edit' for approved files, 'approve' for pending files
     showHeader = true // Whether to show the header with title and close button
 }) => {
@@ -42,21 +46,40 @@ const MediaEditForm = ({
     const [validationErrors, setValidationErrors] = useState({});
     const [saving, setSaving] = useState(false);
     const [availableTags, setAvailableTags] = useState([]);
-    const [replacingFile, setReplacingFile] = useState(false);
+    const [versionUploadOpen, setVersionUploadOpen] = useState(false);
+    const [focalPointOpen, setFocalPointOpen] = useState(false);
+    const [versionMenu, setVersionMenu] = useState(null);
+    const [activeTab, setActiveTab] = useState('details');
+    const tabId = useId();
+    const detailsTabRef = useRef(null);
+    const versionsTabRef = useRef(null);
 
     // Local file state (to avoid triggering onSave/exit)
     const [localFile, setLocalFile] = useState(file);
 
     const { addNotification } = useGlobalNotifications();
     
-    // Ref for file input
-    const fileInputRef = useRef(null);
+    const handleTabKeyDown = (event) => {
+        let nextTab;
+        if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+            nextTab = activeTab === 'details' ? 'versions' : 'details';
+        } else if (event.key === 'Home') {
+            nextTab = 'details';
+        } else if (event.key === 'End') {
+            nextTab = 'versions';
+        }
+        if (!nextTab) return;
+        event.preventDefault();
+        setActiveTab(nextTab);
+        (nextTab === 'details' ? detailsTabRef : versionsTabRef).current?.focus();
+    };
 
 
 
     // Initialize form data and local file state
     useEffect(() => {
         if (file) {
+            setActiveTab('details');
             // Update local file state
             setLocalFile(file);
             // Convert tags to array of tag OBJECTS for MediaTagWidget
@@ -193,53 +216,6 @@ const MediaEditForm = ({
         updateFormData('classificationIds', newTags.map(tag => tag.classificationId || tag.id));
     };
 
-    // Handle replace file button click
-    const handleReplaceFileClick = () => {
-        if (fileInputRef.current) {
-            fileInputRef.current.click();
-        }
-    };
-
-    // Handle file input change
-    const handleFileInputChange = async (event) => {
-        const selectedFile = event.target.files?.[0];
-        if (!selectedFile) return;
-
-        // Confirm replacement
-        if (!window.confirm(`Replace "${file.originalFilename}" with "${selectedFile.name}"? The previous image will remain in version history.`)) {
-            // Reset file input
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-            return;
-        }
-
-        setReplacingFile(true);
-        try {
-            const result = await mediaApi.files.replaceFile(file.id, selectedFile);
-            
-            addNotification('File replaced successfully', 'success');
-            
-            // Update local file state with the new file data
-            setLocalFile(result);
-            
-            // Call onSave to update parent component
-            onSave(result);
-        } catch (error) {
-            console.error('Failed to replace file:', error);
-            addNotification(
-                error?.context?.data?.error || 'Failed to replace file',
-                'error'
-            );
-        } finally {
-            setReplacingFile(false);
-            // Reset file input
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-        }
-    };
-
     // Save form data
     const handleSave = async () => {
         // Validate all fields
@@ -305,6 +281,7 @@ const MediaEditForm = ({
     };
 
     if (!file) return null;
+    const isVersionedImage = mode === 'edit' && (file.fileType === 'image' || file.file_type === 'image');
 
     return (
         <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 mb-6">
@@ -325,7 +302,11 @@ const MediaEditForm = ({
             {/* File Preview */}
             <div className="mb-6">
                 <div className="flex flex-col items-center">
-                    <div className="w-full max-w-2xl bg-gray-100 rounded-lg overflow-hidden border border-gray-300 flex items-center justify-center">
+                    <div className="w-full max-w-2xl bg-gray-100 rounded-lg overflow-hidden border border-gray-300 flex items-center justify-center"
+                        onContextMenu={mode === 'edit' && (file.fileType === 'image' || file.file_type === 'image') ? event => {
+                            event.preventDefault();
+                            setVersionMenu({ x: event.clientX, y: event.clientY });
+                        } : undefined}>
                         {(file.fileType === 'image' || file.file_type === 'image') ? (
                             <OptimizedImage
                                 src={mode === 'approve'
@@ -353,43 +334,38 @@ const MediaEditForm = ({
                         <div className="text-gray-500">{formatFileSize(file.fileSize)}</div>
                     </div>
                     
-                    {/* Replace File Button - Only show in edit mode */}
-                    {mode === 'edit' && (
-                        <>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                onChange={handleFileInputChange}
-                                className="hidden"
-                                accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,video/mp4,video/webm,audio/mpeg,audio/wav"
-                            />
-                            <button
-                                onClick={handleReplaceFileClick}
-                                disabled={replacingFile}
-                                className="mt-3 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
-                            >
-                                {replacingFile ? (
-                                    <>
-                                        <RefreshCw className="w-4 h-4 animate-spin" />
-                                        Replacing...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Upload className="w-4 h-4" />
-                                        Replace File
-                                    </>
-                                )}
-                            </button>
-                        </>
-                    )}
+                    {isVersionedImage && <div className="mt-3 flex flex-wrap justify-center gap-2">
+                        <button type="button" onClick={() => setFocalPointOpen(true)}
+                            className="flex items-center justify-center rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            Choose focus point
+                        </button>
+                        <button type="button" onClick={() => setVersionUploadOpen(true)}
+                            className="flex items-center justify-center gap-2 rounded border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-700 hover:bg-blue-100">
+                            <Upload className="h-4 w-4" />Upload new version
+                        </button>
+                    </div>}
                 </div>
             </div>
 
+            {isVersionedImage && <div className="mb-4 flex gap-4 border-b border-gray-200" role="tablist" aria-label="Image editor sections" onKeyDown={handleTabKeyDown}>
+                <button ref={detailsTabRef} id={`${tabId}-details-tab`} type="button" role="tab"
+                    aria-controls={`${tabId}-details-panel`} aria-selected={activeTab === 'details'} tabIndex={activeTab === 'details' ? 0 : -1}
+                    onClick={() => setActiveTab('details')}
+                    className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 ${activeTab === 'details' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-600 hover:text-gray-900'}`}>
+                    Details
+                </button>
+                <button ref={versionsTabRef} id={`${tabId}-versions-tab`} type="button" role="tab"
+                    aria-controls={`${tabId}-versions-panel`} aria-selected={activeTab === 'versions'} tabIndex={activeTab === 'versions' ? 0 : -1}
+                    onClick={() => setActiveTab('versions')}
+                    className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 ${activeTab === 'versions' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-600 hover:text-gray-900'}`}>
+                    Image versions
+                </button>
+            </div>}
+
             {/* Form Fields */}
-            {mode === 'edit' && (file.fileType === 'image' || file.file_type === 'image') && (
-                <ImageVersionHistory file={localFile} onRestored={(restored) => { setLocalFile(restored); onSave(restored) }} />
-            )}
-            <div className="space-y-4">
+            <div id={isVersionedImage ? `${tabId}-details-panel` : undefined} role={isVersionedImage ? 'tabpanel' : undefined}
+                aria-labelledby={isVersionedImage ? `${tabId}-details-tab` : undefined}
+                hidden={isVersionedImage && activeTab !== 'details'} className="space-y-4">
                     {/* Title */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -550,6 +526,20 @@ const MediaEditForm = ({
                     </button>
                 </div>
             </div>
+            {isVersionedImage && <div id={`${tabId}-versions-panel`} role="tabpanel" aria-labelledby={`${tabId}-versions-tab`} hidden={activeTab !== 'versions'}>
+                {activeTab === 'versions' && <ImageVersionHistory file={localFile} onRestored={(restored) => { setLocalFile(restored); onSave(restored) }}
+                    onImageContextMenu={event => { event.preventDefault(); setVersionMenu({ x: event.clientX, y: event.clientY }) }} />}
+            </div>}
+            <ImageVersionContextMenu position={versionMenu} onClose={() => setVersionMenu(null)}
+                onUpload={() => { setVersionMenu(null); setVersionUploadOpen(true) }} />
+            {versionUploadOpen && <ImageVersionUploadDialog file={localFile} namespace={namespace}
+                onClose={() => setVersionUploadOpen(false)} onUploaded={(updated) => { setLocalFile(updated); onSave(updated) }} />}
+            {focalPointOpen && <ImageFocalPointDialog file={localFile}
+                onClose={() => setFocalPointOpen(false)} onSaved={(updated) => {
+                    setLocalFile(updated);
+                    onMediaUpdated?.(updated);
+                    addNotification('Image focus saved', 'success');
+                }} />}
         </div>
     );
 };

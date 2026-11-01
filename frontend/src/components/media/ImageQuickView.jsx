@@ -7,7 +7,7 @@
 import React, { useEffect } from 'react';
 import OptimizedImage from './OptimizedImage';
 
-const ImageQuickView = ({ image, onClose }) => {
+const ImageQuickView = ({ image, onClose, onImageContextMenu }) => {
     // Handle ESC key to close
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -44,6 +44,7 @@ const ImageQuickView = ({ image, onClose }) => {
                 height={1080}
                 resizeType="fit"
                 className="max-w-full max-h-full object-contain"
+                onContextMenu={onImageContextMenu}
             />
         </div>
     );

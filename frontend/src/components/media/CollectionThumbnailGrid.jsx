@@ -6,7 +6,7 @@
 import React from 'react';
 import { FolderOpen } from 'lucide-react';
 import OptimizedImage from './OptimizedImage';
-import { getImageAspectRatio, getGridSpan, getGridStyle, getObjectFitClass } from '../../utils/imageGridLayout';
+import { getGridStyle } from '../../utils/imageGridLayout';
 
 const CollectionThumbnailGrid = ({ collection, className = '', compact = false }) => {
     // Helper function to determine grid layout based on file count
@@ -65,7 +65,6 @@ const CollectionThumbnailGrid = ({ collection, className = '', compact = false }
             >
                 {filledImages.map((file, index) => {
                     const gridStyle = getGridStyle(file);
-                    const objectFitClass = getObjectFitClass(file);
                     
                     return (
                         <div 
@@ -78,8 +77,10 @@ const CollectionThumbnailGrid = ({ collection, className = '', compact = false }
                                 alt=""
                                 width={100}
                                 height={100}
-                                resizeType="fill"
-                                className={`w-full h-full ${objectFitClass}`}
+                                resizeType="fit"
+                                fillContainer
+                                focalPoint={file.focalPoint || file.focal_point || { x: 0.5, y: 0.5 }}
+                                className="w-full h-full object-cover"
                                 fallback={
                                     <div className="w-full h-full bg-gray-200" />
                                 }

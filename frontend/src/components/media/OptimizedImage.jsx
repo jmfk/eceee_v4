@@ -5,8 +5,9 @@
  * Uses secure backend API for imgproxy URL signing.
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { getImgproxyUrl, getResponsiveImgproxyUrls } from '../../utils/imgproxySecure';
+import { getFocalCropStyle } from './focalCrop';
 
 const OptimizedImage = ({
     src,
@@ -17,6 +18,9 @@ const OptimizedImage = ({
     actualHeight,
     className = '',
     style = {},
+    objectPosition = '50% 50%',
+    fillContainer = false,
+    focalPoint,
     quality = 85,
     format,
     resizeType = 'fit',
@@ -42,6 +46,26 @@ const OptimizedImage = ({
     const [srcSet, setSrcSet] = useState('');
     const [sizesAttr, setSizesAttr] = useState('');
     const [placeholderSrc, setPlaceholderSrc] = useState('');
+    const [frameSize, setFrameSize] = useState({ width: 0, height: 0 });
+    const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+    const wrapperRef = useRef(null);
+    const focalCrop = Boolean(focalPoint && fillContainer);
+
+    useEffect(() => {
+        if (!focalCrop || !wrapperRef.current) return;
+        const element = wrapperRef.current;
+        const measure = () => setFrameSize({ width: element.clientWidth, height: element.clientHeight });
+        measure();
+        if (typeof ResizeObserver !== 'undefined') {
+            const observer = new ResizeObserver(measure);
+            observer.observe(element);
+            return () => observer.disconnect();
+        }
+        window.addEventListener('resize', measure);
+        return () => window.removeEventListener('resize', measure);
+    }, [focalCrop]);
+
+    const cropStyle = focalCrop ? getFocalCropStyle(imageSize, frameSize, focalPoint, 0) : null;
 
     // Load optimized image URL(s)
     useEffect(() => {
@@ -140,8 +164,9 @@ const OptimizedImage = ({
     const handleLoad = useCallback((event) => {
         setImageLoaded(true);
         setShowPlaceholder(false);
+        if (focalCrop) setImageSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight });
         onLoad?.(event);
-    }, [onLoad]);
+    }, [focalCrop, onLoad]);
 
     const handleError = useCallback((event) => {
         setImageError(true);
@@ -172,7 +197,7 @@ const OptimizedImage = ({
     const wrapperClassName = className.replace(/object-(cover|contain|fill|none|scale-down)/, '').trim();
 
     return (
-        <div className={`relative overflow-hidden ${wrapperClassName}`} style={style}>
+        <div ref={wrapperRef} className={`relative overflow-hidden ${wrapperClassName}`} style={style}>
             {/* Placeholder image */}
             {showPlaceholder && placeholderSrc && (
                 <img
@@ -181,6 +206,7 @@ const OptimizedImage = ({
                     className={`absolute inset-0 w-full h-full ${objectFitClass} filter blur-sm scale-110 transition-opacity duration-300`}
                     style={{
                         opacity: imageLoaded ? 0 : 1,
+                        objectPosition,
                     }}
                 />
             )}
@@ -198,8 +224,10 @@ const OptimizedImage = ({
                     className={`w-full h-full ${objectFitClass} transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'
                         }`}
                     style={{
-                        maxWidth: actualWidth ? `${actualWidth}px` : (width ? `${width}px` : '100%'),
-                        maxHeight: actualHeight ? `${actualHeight}px` : (height ? `${height}px` : '100%')
+                        maxWidth: cropStyle ? 'none' : fillContainer ? '100%' : actualWidth ? `${actualWidth}px` : (width ? `${width}px` : '100%'),
+                        maxHeight: cropStyle ? 'none' : fillContainer ? '100%' : actualHeight ? `${actualHeight}px` : (height ? `${height}px` : '100%'),
+                        objectPosition,
+                        ...(cropStyle ? { position: 'absolute', ...cropStyle } : {}),
                     }}
                     onLoad={handleLoad}
                     onError={handleError}

@@ -1,5 +1,5 @@
 @media (max-width: 767px) {
-    .media-browser-grid-preview img {
+    .media-browser-grid-preview:not(.media-browser-grid-preview--compact) img {
         object-fit: contain;
     }
 }
