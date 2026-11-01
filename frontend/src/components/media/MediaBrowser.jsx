@@ -822,7 +822,7 @@ const MediaBrowser = ({
                         <PreviewTag type={canEditPreview ? 'button' : undefined}
                             aria-label={canEditPreview ? `Edit image: ${file.title}` : undefined}
                             onClick={canEditPreview ? (e) => handleEditClick(file, e) : undefined}
-                            onContextMenu={isImage ? (e) => handleImageContextMenu(file, e) : undefined}
+                            onContextMenu={!hideActions && isImage ? (e) => handleImageContextMenu(file, e) : undefined}
                             className={`media-browser-grid-preview ${compact ? 'media-browser-grid-preview--compact' : ''} w-full flex-1 flex items-center justify-center bg-gray-50 ${canEditPreview ? 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600' : ''} ${compact ? 'h-[120px] max-h-[120px]' : `p-2 ${isTall ? 'h-[300px] max-h-[300px]' : 'min-h-[300px]'}`}`}>
                             {renderThumbnail(file, requestedWidth, requestedHeight, objectFit)}
                         </PreviewTag>
@@ -892,7 +892,7 @@ const MediaBrowser = ({
                         <PreviewTag type={canEditPreview ? 'button' : undefined}
                             aria-label={canEditPreview ? `Edit image: ${file.title}` : undefined}
                             onClick={canEditPreview ? (e) => handleEditClick(file, e) : undefined}
-                            onContextMenu={file.fileType === 'image' || file.file_type === 'image' ? (e) => handleImageContextMenu(file, e) : undefined}
+                            onContextMenu={!hideActions && (file.fileType === 'image' || file.file_type === 'image') ? (e) => handleImageContextMenu(file, e) : undefined}
                             className={`flex w-24 h-20 items-center justify-center ${canEditPreview ? 'cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600' : ''}`}>
                             {renderThumbnail(file, 192, 160, 'contain')}
                         </PreviewTag>
@@ -1252,7 +1252,7 @@ const MediaBrowser = ({
                 <ImageQuickView
                     image={quickViewImage}
                     onClose={() => setQuickViewImage(null)}
-                    onImageContextMenu={(event) => handleImageContextMenu(quickViewImage, event)}
+                    onImageContextMenu={hideActions ? undefined : (event) => handleImageContextMenu(quickViewImage, event)}
                 />
             )}
 

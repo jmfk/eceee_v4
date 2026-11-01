@@ -524,6 +524,17 @@ describe('MediaBrowser', () => {
         expect(mediaApi.files.get).not.toHaveBeenCalled()
     })
 
+    it.each(['list', 'grid'])('keeps the %s library view read-only when actions are hidden', async (viewMode) => {
+        renderBrowser({ defaultViewMode: viewMode, selectionMode: 'none', showUploader: false, hideActions: true })
+
+        await user.pointer({ target: await screen.findByAltText('Test Image 1'), keys: '[MouseRight]' })
+
+        expect(screen.queryByRole('menuitem', { name: 'Upload new version' })).not.toBeInTheDocument()
+        expect(screen.queryByTitle('Edit file')).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Edit image: Test Image 1' })).not.toBeInTheDocument()
+        expect(mediaApi.files.get).not.toHaveBeenCalled()
+    })
+
     it('restores deleted files without offering permanent deletion', async () => {
         renderBrowser()
 

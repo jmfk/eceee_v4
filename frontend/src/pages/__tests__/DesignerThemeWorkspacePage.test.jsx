@@ -14,10 +14,11 @@ const mocks = vi.hoisted(() => ({
 }))
 
 // The embedded import panel consumes the authenticated principal just as it does in the app.
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 1 } }) }))
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 1, permissions: ['page.write', 'object.write'] } }) }))
 vi.mock('../../api/designerThemes', () => ({ designerThemesApi: mocks }))
 vi.mock('../../rendering/directRender', () => ({ buildResolvedRenderModel: mocks.buildResolvedRenderModel }))
 vi.mock('../../components/DesignerNavbar', () => ({ default: () => <div>Designer navigation</div> }))
+vi.mock('../../components/designer/DesignerMediaLibraryDialog', () => ({ default: ({ namespace, onClose }) => <div role="dialog" aria-label="Media library" data-namespace={namespace}><button type="button" onClick={onClose}>Close media library</button></div> }))
 vi.mock('../../components/StatusBar', () => ({ default: ({ customStatusContent }) => <div>{customStatusContent}</div> }))
 vi.mock('../../components/media/MediaSelectModal', () => ({
     default: ({ isOpen, onSelect, namespace, requireTags }) => isOpen ? <div role="dialog" aria-label="Tagged media selector" data-namespace={namespace} data-require-tags={String(requireTags)}><button type="button" onClick={() => onSelect([{ id: 'media-1', title: 'Tagged replacement' }])}>Use tagged replacement</button></div> : null,
@@ -547,8 +548,25 @@ describe('DesignerThemeWorkspacePage', () => {
             rawInheritance: { slots: {} },
         })
         expect(screen.getByRole('button', { name: 'Programme' })).toBeInTheDocument()
-        expect(await screen.findByText('The selected content is read-only until it is imported as a theme example.')).toBeInTheDocument()
+        expect(await screen.findByText('This preview shows saved site content.')).toBeInTheDocument()
+        expect(screen.getByRole('link', { name: 'Edit page images in CMS ↗' })).toHaveAttribute('href', '/pages/42/edit/content')
         expect(screen.getByRole('button', { name: 'Import as theme example' })).toBeEnabled()
+    })
+
+    it('opens the tenant media library and refreshes a site preview after editing', async () => {
+        const user = userEvent.setup()
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        expect(screen.queryByRole('button', { name: 'Import from Kanban' })).not.toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Media library' }))
+        expect(screen.getByRole('dialog', { name: 'Media library' })).toHaveAttribute('data-namespace', 'theme-tenant')
+        await user.click(screen.getByRole('button', { name: 'Close media library' }))
+        expect(screen.queryByRole('dialog', { name: 'Media library' })).not.toBeInTheDocument()
+
+        await user.click(screen.getByRole('tab', { name: 'Your sites' }))
+        await waitFor(() => expect(mocks.loadPreviewPage).toHaveBeenCalledTimes(1))
+        await user.click(screen.getByRole('button', { name: 'Refresh preview' }))
+        await waitFor(() => expect(mocks.loadPreviewPage).toHaveBeenCalledTimes(2))
     })
 
     it('imports a selected site page as an editable theme example', async () => {
