@@ -4,6 +4,7 @@ import { Bold, Box, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, FileTex
 import RenderFrame from '../../rendering/RenderFrame'
 import { createDesignerRenderModel, designerPreviewImageReferences } from '../../rendering/adapters'
 import MediaSelectModal from '../media/MediaSelectModal'
+import { useAuth } from '../../contexts/AuthContext'
 import { getBreakpoints, mapBreakpointName } from '../../utils/themeUtils'
 import { resolvePagePreviewModel } from '../resolvePagePreviewModel'
 import { designerPreviewWidth, themeBreakpointDefinition } from '../theme/breakpointConfig'
@@ -662,6 +663,7 @@ const SemanticThemeWorkspace = ({
     previewTextResetVersion, disabled, mobilePane, onPublishOutlines,
     onAssetVersionRestored, versionControlsDisabled,
 }) => {
+    const { user } = useAuth()
     const initialViews = workspace.previewContent?.views || workspace.catalog.previewViews || []
     const initialExternalContent = [
         ...(workspace.contentPages || []).filter((source) => source.versionId),
@@ -697,6 +699,7 @@ const SemanticThemeWorkspace = ({
     const [sourceContentId, setSourceContentId] = useState('')
     const [sourceContentModel, setSourceContentModel] = useState(null)
     const [loadingContent, setLoadingContent] = useState(false)
+    const [contentRefreshVersion, setContentRefreshVersion] = useState(0)
     const [guidesEnabled, setGuidesEnabled] = useState(true)
     const [guideVisibility, setGuideVisibility] = useState({ size: false, margin: true, padding: true, gap: true })
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -930,7 +933,7 @@ const SemanticThemeWorkspace = ({
             .catch(() => { if (current) setSourceContentModel(null) })
             .finally(() => { if (current) setLoadingContent(false) })
         return () => { current = false }
-    }, [contentMode, externalContentOptions, loadObjectContent, loadPageContent, sourceContentId])
+    }, [contentMode, contentRefreshVersion, externalContentOptions, loadObjectContent, loadPageContent, sourceContentId])
 
     useEffect(() => {
         if (!previewFrameRef.current || typeof ResizeObserver === 'undefined') return undefined
@@ -1189,7 +1192,7 @@ const SemanticThemeWorkspace = ({
                 setSelectedTarget(target)
                 setSelectionExpanded(true)
                 setWorkspaceView('preview')
-                if (event.data.command === 'replaceImage' && target.kind === 'previewImage' && viewId && target.sourceUrl && workspace.mediaNamespace) {
+                if (contentMode === 'demo' && event.data.command === 'replaceImage' && target.kind === 'previewImage' && viewId && target.sourceUrl && workspace.mediaNamespace) {
                     setReplacementImage(target)
                 }
                 return
@@ -1244,6 +1247,10 @@ const SemanticThemeWorkspace = ({
     const selectedView = previewContent.views.find((view) => view.id === viewId) || previewContent.views[0] || null
     const selectedViewImages = useMemo(() => designerPreviewImageReferences(selectedView), [selectedView])
     const selectedSourceContent = externalContentOptions.find((source) => source.value === sourceContentId) || null
+    const canEditSourceContent = selectedSourceContent && !user?.isDesignerOnly && (
+        user?.isSuperuser || user?.permissions?.includes('tenant.admin')
+        || user?.permissions?.includes(selectedSourceContent.kind === 'page' ? 'page.write' : 'object.write')
+    )
     const imageAspects = useMemo(() => imageAspectsFor(workspace), [workspace])
     const assetsByTargetId = useMemo(() => new Map(
         workspace.assets.map((asset) => [`asset:${asset.assetKey}`, asset]),
@@ -2044,7 +2051,11 @@ const SemanticThemeWorkspace = ({
                 {contentMode === 'demo' && <div id="preview-source-demo" role="tabpanel"><ContentSourceBrowser sourceMode="demo" options={demoOptions} value={String(viewId)} onChange={(value) => { setViewId(value); setSelectedTarget(null) }} onDelete={deleteExample} disabled={disabled} /></div>}
                 {contentMode === 'content' && <div id="preview-source-content" role="tabpanel"><ContentSourceBrowser sourceMode="content" options={externalContentOptions} value={sourceContentId} onChange={(value) => { setSourceContentId(value); setSelectedTarget(null) }} disabled={disabled} loading={loadingContent} /></div>}
                 {contentMode === 'content' && <div className="space-y-2">
-                    <p className="flex items-center gap-2 text-xs text-gray-500">{loadingContent && <Loader2 className="h-3.5 w-3.5 animate-spin" />}{loadingContent ? 'Loading the selected content…' : 'The selected content is read-only until it is imported as a theme example.'}</p>
+                    <p className="flex items-center gap-2 text-xs text-gray-500">{loadingContent && <Loader2 className="h-3.5 w-3.5 animate-spin" />}{loadingContent ? 'Loading the selected content…' : 'This preview shows saved site content.'}</p>
+                    {selectedSourceContent && <div className="flex flex-wrap items-center gap-2">
+                        {canEditSourceContent && <a href={selectedSourceContent.kind === 'page' ? `/pages/${selectedSourceContent.pageId || selectedSourceContent.id}/edit/content` : `/objects/${selectedSourceContent.objectId || selectedSourceContent.id}/edit/content`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 items-center rounded border border-blue-600 bg-white px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50">Edit {selectedSourceContent.kind === 'page' ? 'page' : 'object'} images in CMS ↗</a>}
+                        <button type="button" onClick={() => setContentRefreshVersion((current) => current + 1)} disabled={loadingContent} className="inline-flex min-h-8 items-center rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40">Refresh preview</button>
+                    </div>}
                     <button type="button" onClick={importSelectedSource} disabled={disabled || loadingContent || !selectedSourceContent || !sourceContentModel} className="w-full rounded-md border border-blue-600 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">Import as theme example</button>
                 </div>}
                 {contentMode === 'none' && <p className="rounded-md border border-dashed border-gray-300 p-3 text-sm text-gray-500">There is no page or object to preview.</p>}
