@@ -81,7 +81,7 @@ vi.mock('../media/SimplifiedApprovalForm', () => ({
     default: ({ pendingFiles, onComplete }) => (
         <div>
             Pending approval: {pendingFiles.length}
-            <button type="button" onClick={() => onComplete(pendingFiles)}>Approve pending</button>
+            <button type="button" onClick={() => onComplete([{ mediaFile: { id: 'approved-1' } }])}>Approve pending</button>
         </div>
     ),
 }))
@@ -93,6 +93,9 @@ vi.mock('../media/ImageQuickView', () => ({
             <button type="button" onClick={onClose}>Close quick view</button>
         </div>
     ),
+}))
+vi.mock('../media/ImageVersionUploadDialog', () => ({
+    default: ({ file }) => <div role="dialog" aria-label={`Upload new version of ${file.title}`} />,
 }))
 
 const mockMediaFiles = [
@@ -491,6 +494,36 @@ describe('MediaBrowser', () => {
         expect(await screen.findByText('Test Image 1')).toBeInTheDocument()
     })
 
+    it.each(['list', 'grid'])('opens image editing from the %s preview in the media manager', async (viewMode) => {
+        const onFileSelect = vi.fn()
+        renderBrowser({ defaultViewMode: viewMode, previewOpensEditor: true, onFileSelect })
+
+        await user.click(await screen.findByRole('button', { name: 'Edit image: Test Image 1' }))
+
+        expect(await screen.findByText('Edit form for Test Image 1')).toBeInTheDocument()
+        expect(mediaApi.files.get).toHaveBeenCalledWith('1')
+        expect(onFileSelect).not.toHaveBeenCalled()
+    })
+
+    it('keeps preview clicks as selection in media pickers', async () => {
+        const onFileSelect = vi.fn()
+        renderBrowser({ defaultViewMode: 'list', onFileSelect })
+
+        await user.click(await screen.findByAltText('Test Image 1'))
+
+        expect(onFileSelect).toHaveBeenCalledWith(mockMediaFiles[0])
+        expect(mediaApi.files.get).not.toHaveBeenCalled()
+    })
+
+    it('offers uploading a version when right-clicking an image preview', async () => {
+        renderBrowser({ defaultViewMode: 'list' })
+        await user.pointer({ target: await screen.findByAltText('Test Image 1'), keys: '[MouseRight]' })
+        await user.click(screen.getByRole('menuitem', { name: 'Upload new version' }))
+
+        expect(screen.getByRole('dialog', { name: 'Upload new version of Test Image 1' })).toBeInTheDocument()
+        expect(mediaApi.files.get).not.toHaveBeenCalled()
+    })
+
     it('restores deleted files without offering permanent deletion', async () => {
         renderBrowser()
 
@@ -516,6 +549,31 @@ describe('MediaBrowser', () => {
             })
         })
         expect(await screen.findByText('Pending approval: 1')).toBeInTheDocument()
+    })
+
+    it('passes approved uploads to a collection picker', async () => {
+        const onApprovedFiles = vi.fn()
+        renderBrowser({ onApprovedFiles })
+        const file = new File(['hello'], 'hello.jpg', { type: 'image/jpeg' })
+
+        fireEvent.change(document.getElementById('file-input'), { target: { files: [file] } })
+        await user.click(await screen.findByRole('button', { name: 'Approve pending' }))
+
+        await waitFor(() => expect(onApprovedFiles).toHaveBeenCalledWith([{ mediaFile: { id: 'approved-1' } }]))
+    })
+
+    it('allows only one upload when replacing a collection image', async () => {
+        renderBrowser({ singleUpload: true })
+        await screen.findByText('Test Image 1')
+        const fileInput = document.getElementById('file-input')
+        expect(fileInput).not.toHaveAttribute('multiple')
+
+        fireEvent.change(fileInput, { target: { files: [
+            new File(['one'], 'one.jpg', { type: 'image/jpeg' }),
+            new File(['two'], 'two.jpg', { type: 'image/jpeg' }),
+        ] } })
+
+        expect(mediaApi.upload.upload).not.toHaveBeenCalled()
     })
 
     it('opens duplicate resolution when upload reports actionable duplicates', async () => {

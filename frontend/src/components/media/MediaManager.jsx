@@ -175,6 +175,7 @@ const MediaManager = ({
                         refreshTrigger={refreshTrigger} // Trigger refresh when files are processed
                         onPendingFilesCreated={handlePendingFilesCreated} // Switch to pending tab on upload
                         defaultViewMode="list"
+                        previewOpensEditor
                         hideShowDeleted={false}
                     />
                 )}

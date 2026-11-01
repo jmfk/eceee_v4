@@ -5,6 +5,8 @@ Provides serialization for media files, tags, collections, and related models
 following the existing API patterns and camelCase conversion.
 """
 
+import math
+
 from django.conf import settings
 from django.db import transaction
 from rest_framework import serializers
@@ -15,6 +17,41 @@ from utils.serializers import UserSerializer
 
 from .models import MediaCollection, MediaFile, MediaTag, MediaUsage, PendingMediaFile
 from .security import get_pending_preview_url
+
+
+def media_focal_point(media_file):
+    point = (media_file.metadata or {}).get("focal_point")
+    if isinstance(point, dict) and all(
+        isinstance(point.get(axis), (int, float))
+        and not isinstance(point.get(axis), bool)
+        and math.isfinite(point[axis])
+        and 0 <= point[axis] <= 1
+        for axis in ("x", "y")
+    ):
+        return {"x": point["x"], "y": point["y"]}
+    return {"x": 0.5, "y": 0.5}
+
+
+class FocalPointField(serializers.Field):
+    """Expose a normalized image focus without exposing other media metadata."""
+
+    def to_representation(self, media_file):
+        return media_focal_point(media_file)
+
+    def to_internal_value(self, data):
+        if (
+            not isinstance(data, dict)
+            or set(data) != {"x", "y"}
+            or any(
+                isinstance(data[axis], bool)
+                or not isinstance(data[axis], (int, float))
+                or not math.isfinite(data[axis])
+                or not 0 <= data[axis] <= 1
+                for axis in ("x", "y")
+            )
+        ):
+            raise serializers.ValidationError("Choose a focus point between 0 and 1 on both axes.")
+        return {"focal_point": {axis: round(float(data[axis]), 4) for axis in ("x", "y")}}
 
 
 @transaction.atomic
@@ -272,6 +309,7 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
                         "id": str(file.id),
                         "imgproxy_base_url": imgproxy_url,
                         "title": file.title or file.original_filename,
+                        "focal_point": media_focal_point(file),
                     }
                 )
 
@@ -380,6 +418,7 @@ class MediaFileListSerializer(serializers.ModelSerializer):
     stable_url = serializers.SerializerMethodField()
     download_url = serializers.SerializerMethodField()
     annotation = serializers.SerializerMethodField()
+    focal_point = FocalPointField(source="*", read_only=True)
     replaced_by = serializers.UUIDField(source="replaced_by_id", read_only=True)
 
     class Meta:
@@ -406,6 +445,7 @@ class MediaFileListSerializer(serializers.ModelSerializer):
             "stable_url",
             "download_url",
             "annotation",
+            "focal_point",
             "replaced_by",
             "version_number",
             "protected_from_cleanup",
@@ -491,6 +531,7 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
     imgproxy_base_url = serializers.SerializerMethodField()
     thumbnail_url = serializers.SerializerMethodField()
     annotation = serializers.CharField(required=False, allow_blank=True)
+    focal_point = FocalPointField(source="*", required=False)
     replaced_by = serializers.UUIDField(source="replaced_by_id", read_only=True)
 
     classification_ids = ClassificationIdsField(required=False)
@@ -531,6 +572,7 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
             "imgproxy_base_url",
             "thumbnail_url",
             "annotation",
+            "focal_point",
             "replaced_by",
             "version_number",
             "protected_from_cleanup",
@@ -630,6 +672,11 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
 
         return cleaned_slug
 
+    def validate_focal_point(self, value):
+        if self.instance and not self.instance.is_image:
+            raise serializers.ValidationError("Only images can have a focus point.")
+        return value
+
     @transaction.atomic
     def update(self, instance, validated_data):
         """Update media file with tags and collections."""
@@ -638,13 +685,16 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
         tag_ids = validated_data.pop("tag_ids", None)
         collection_ids = validated_data.pop("collection_ids", None)
         annotation = validated_data.pop("annotation", None)
+        focal_point = validated_data.pop("focal_point", None)
         validated_data["last_modified_by"] = self.context["request"].user
 
-        # Handle annotation in metadata
-        if annotation is not None and hasattr(instance, "metadata"):
-            if not instance.metadata:
-                instance.metadata = {}
-            instance.metadata["annotation"] = annotation
+        # Keep unrelated metadata while updating the requested image presentation.
+        if annotation is not None or focal_point is not None:
+            instance.metadata = dict(instance.metadata or {})
+            if annotation is not None:
+                instance.metadata["annotation"] = annotation
+            if focal_point is not None:
+                instance.metadata["focal_point"] = focal_point
             instance.save(update_fields=["metadata"])
 
         media_file = super().update(instance, validated_data)

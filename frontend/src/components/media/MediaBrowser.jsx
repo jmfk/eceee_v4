@@ -41,6 +41,8 @@ import MediaSearchWidget from './MediaSearchWidget';
 import DuplicateResolveDialog from './DuplicateResolveDialog';
 import SimplifiedApprovalForm from './SimplifiedApprovalForm';
 import ImageQuickView from './ImageQuickView';
+import ImageVersionContextMenu from './ImageVersionContextMenu';
+import ImageVersionUploadDialog from './ImageVersionUploadDialog';
 import { extractErrorMessage } from '../../utils/errorHandling';
 import { getImageAspectRatio, getGridSpan, isExtendedImage } from '../../utils/imageGridLayout';
 import './MediaBrowser.css';
@@ -53,6 +55,7 @@ const MediaBrowser = ({
     requireTags = false, // Only show files with at least one tag
     namespace,
     showUploader = true,
+    singleUpload = false,
     refreshTrigger = 0, // External trigger to force refresh
     prefilterTags = [], // Initial tag filter (array of tag IDs)
     hideShowDeleted = true, // Only management surfaces expose the Trash view
@@ -60,8 +63,10 @@ const MediaBrowser = ({
     onPendingApprovalChange, // Callback when pending approval state changes
     hideInlineApprovalForm = false, // Hide the inline approval form (when using external pending tab)
     onPendingFilesCreated, // Callback when files are uploaded to pending state
+    onApprovedFiles, // Callback to use newly approved uploads in the parent context
     hideActions = false, // Hide the actions column/buttons
     compact = false, // Compact view for modals
+    previewOpensEditor = false, // Only enabled in the media manager, not media pickers
     defaultViewMode = 'grid' // grid or list
 }) => {
     const [files, setFiles] = useState([]);
@@ -92,6 +97,8 @@ const MediaBrowser = ({
     const [editingFile, setEditingFile] = useState(null);
     const [currentView, setCurrentView] = useState('library'); // 'library' | 'edit'
     const [quickViewImage, setQuickViewImage] = useState(null);
+    const [versionMenu, setVersionMenu] = useState(null);
+    const [versionUploadFile, setVersionUploadFile] = useState(null);
 
     // Ref for approval form to scroll into view
     const approvalFormRef = useRef(null);
@@ -281,6 +288,14 @@ const MediaBrowser = ({
         }
     };
 
+    const handleImageContextMenu = (file, event) => {
+        if (file.isDeleted) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setQuickViewImage(null);
+        setVersionMenu({ file, x: event.clientX, y: event.clientY });
+    };
+
     // Handle edit form save
     const handleEditSave = (updatedFile) => {
         setEditingFile(null);
@@ -372,6 +387,10 @@ const MediaBrowser = ({
     };
 
     const handleUpload = async (files, replaceDecisions = null) => {
+        if (singleUpload && files.length > 1) {
+            addNotification('Choose one image to replace the collection image', 'error');
+            return;
+        }
         if (imageOnly && files.some(file => !file.type.startsWith('image/'))) {
             addNotification('Only image files can be uploaded here', 'error');
             return;
@@ -631,13 +650,16 @@ const MediaBrowser = ({
 
         // Refresh the file list to show newly approved files
         await loadFiles(true);
+        if (onApprovedFiles) {
+            await onApprovedFiles(approvedFiles);
+        }
 
         const count = approvedFiles?.length || 0;
         addNotification(
             `${count} file${count !== 1 ? 's' : ''} approved and ready to use`,
             'success'
         );
-    }, [loadFiles, addNotification]);
+    }, [loadFiles, addNotification, onApprovedFiles]);
 
     // Handle approval cancellation
     const handleApprovalCancel = useCallback(() => {
@@ -677,6 +699,8 @@ const MediaBrowser = ({
                     actualHeight={file.height}
                     quality={90}
                     resizeType="fit"
+                    fillContainer={objectFit === 'cover'}
+                    objectPosition={`${(file.focalPoint?.x ?? file.focal_point?.x ?? 0.5) * 100}% ${(file.focalPoint?.y ?? file.focal_point?.y ?? 0.5) * 100}%`}
                     className={`w-full h-full object-${objectFit}`}
                     loading="lazy"
                     fallback={
@@ -720,6 +744,8 @@ const MediaBrowser = ({
                 const isExtended = isExtendedImage(aspectRatio);
                 const isImage = file.fileType === 'image' || file.file_type === 'image';
                 const isTall = aspectRatio && aspectRatio < 0.7; // Tall images have aspect ratio < 0.7
+                const canEditPreview = previewOpensEditor && isImage && !file.isDeleted;
+                const PreviewTag = canEditPreview ? 'button' : 'div';
 
                 // Use dynamic column span from getGridSpan, or auto for compact mode
                 const gridStyle = {
@@ -729,11 +755,12 @@ const MediaBrowser = ({
                 // Match the requested image to the card's visible proportions at 2x density.
                 const imageWidth = compact ? 400 : Math.floor((colSpan / 4) * 800);
                 const imageHeight = compact ? 240 : 600;
-                // Preserve the full image when its shape is unknown or cropping would hide much of it.
-                const objectFit = compact || aspectRatio == null || aspectRatio < 1 || aspectRatio > 2.5 ? 'contain' : 'cover';
+                // Picker thumbnails keep the whole image visible; collection mosaics apply the saved focus when cropping.
+                const objectFit = compact ? 'contain' : aspectRatio == null || aspectRatio < 1 || aspectRatio > 2.5 ? 'contain' : 'cover';
                 // Keep enough pixels for the visible area without cropping on the server.
-                const requestedWidth = objectFit === 'cover' ? Math.ceil(Math.max(imageWidth, imageHeight * aspectRatio)) : imageWidth;
-                const requestedHeight = objectFit === 'cover' ? Math.ceil(Math.max(imageHeight, imageWidth / aspectRatio)) : imageHeight;
+                const safeAspectRatio = aspectRatio || 1;
+                const requestedWidth = objectFit === 'cover' ? Math.ceil(Math.max(imageWidth, imageHeight * safeAspectRatio)) : imageWidth;
+                const requestedHeight = objectFit === 'cover' ? Math.ceil(Math.max(imageHeight, imageWidth / safeAspectRatio)) : imageHeight;
 
                 return (
                     <div
@@ -792,9 +819,13 @@ const MediaBrowser = ({
                             </div>
                         )}
 
-                        <div className={`media-browser-grid-preview w-full flex-1 flex items-center justify-center bg-gray-50 ${compact ? 'p-1 h-[120px] max-h-[120px]' : `p-2 ${isTall ? 'h-[300px] max-h-[300px]' : 'min-h-[300px]'}`}`}>
+                        <PreviewTag type={canEditPreview ? 'button' : undefined}
+                            aria-label={canEditPreview ? `Edit image: ${file.title}` : undefined}
+                            onClick={canEditPreview ? (e) => handleEditClick(file, e) : undefined}
+                            onContextMenu={isImage ? (e) => handleImageContextMenu(file, e) : undefined}
+                            className={`media-browser-grid-preview ${compact ? 'media-browser-grid-preview--compact' : ''} w-full flex-1 flex items-center justify-center bg-gray-50 ${canEditPreview ? 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600' : ''} ${compact ? 'h-[120px] max-h-[120px]' : `p-2 ${isTall ? 'h-[300px] max-h-[300px]' : 'min-h-[300px]'}`}`}>
                             {renderThumbnail(file, requestedWidth, requestedHeight, objectFit)}
-                        </div>
+                        </PreviewTag>
                         <div className={`${compact ? 'p-1.5' : 'p-3'} border-t border-gray-100 flex-shrink-0`}>
                             <div
                                 className={`${compact ? 'text-xs' : 'text-sm'} font-medium text-gray-900 truncate mb-0.5`}
@@ -837,33 +868,39 @@ const MediaBrowser = ({
 
     // Render list view
     const renderListView = () => (
-        <div className="overflow-hidden">
-            <div className={`grid ${hideActions || compact ? 'grid-cols-11' : 'grid-cols-12'} gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700`}>
-                <div className="col-span-1">Preview</div>
+        <div className="overflow-x-auto">
+            <div className={`grid min-w-[850px] ${hideActions || compact ? 'grid-cols-11' : 'grid-cols-12'} gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700`}>
+                <div className="col-span-2">Preview</div>
                 <div className="col-span-3">Title</div>
                 <div className="col-span-2">Type</div>
-                <div className="col-span-2">Size</div>
+                <div className="col-span-1">Size</div>
                 <div className="col-span-3">Created</div>
                 {!(hideActions || compact) && <div className="col-span-1">Actions</div>}
             </div>
-            {files.map((file) => (
-                <div
+            {files.map((file) => {
+                const canEditPreview = previewOpensEditor && (file.fileType === 'image' || file.file_type === 'image') && !file.isDeleted;
+                const PreviewTag = canEditPreview ? 'button' : 'div';
+                return <div
                     key={file.id}
                     className={`
-                        group grid ${hideActions || compact ? 'grid-cols-11' : 'grid-cols-12'} gap-4 p-4 border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50 items-center
+                        group grid min-w-[850px] ${hideActions || compact ? 'grid-cols-11' : 'grid-cols-12'} gap-4 px-4 py-1 border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50 items-center
                         ${isFileSelected(file) ? 'bg-blue-50 border-blue-200' : ''}
                     `}
                     onClick={() => handleFileClick(file)}
                 >
-                    <div className="col-span-1">
-                        <div className="w-12 h-12">
-                            {renderThumbnail(file, 96, 96, 'contain')}
-                        </div>
+                    <div className="col-span-2">
+                        <PreviewTag type={canEditPreview ? 'button' : undefined}
+                            aria-label={canEditPreview ? `Edit image: ${file.title}` : undefined}
+                            onClick={canEditPreview ? (e) => handleEditClick(file, e) : undefined}
+                            onContextMenu={file.fileType === 'image' || file.file_type === 'image' ? (e) => handleImageContextMenu(file, e) : undefined}
+                            className={`flex w-24 h-20 items-center justify-center ${canEditPreview ? 'cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600' : ''}`}>
+                            {renderThumbnail(file, 192, 160, 'contain')}
+                        </PreviewTag>
                     </div>
                     <div className="col-span-3">
                         <div className="flex flex-col justify-center">
-                            <span className="font-medium text-gray-900 truncate">{file.title}</span>
-                            <span className="text-sm text-gray-500 truncate">{file.originalFilename || file.original_filename}</span>
+                            <span className="text-sm font-medium text-gray-900 truncate">{file.title}</span>
+                            <span className="text-xs text-gray-500 truncate">{file.originalFilename || file.original_filename}</span>
                             {/* Tags */}
                             {file.tags && file.tags.length > 0 && (
                                 <div className="flex gap-1 mt-1 flex-wrap">
@@ -885,7 +922,7 @@ const MediaBrowser = ({
                         </div>
                     </div>
                     <div className="col-span-2 text-sm text-gray-600 capitalize flex items-center">{file.fileType || file.file_type}</div>
-                    <div className="col-span-2 text-sm text-gray-600 flex items-center">{formatFileSize(file.fileSize || file.file_size)}</div>
+                    <div className="col-span-1 text-sm text-gray-600 flex items-center">{formatFileSize(file.fileSize || file.file_size)}</div>
                     <div className="col-span-3 text-sm text-gray-600 flex items-center">{formatDate(file.createdAt || file.created_at)}</div>
                     {!(hideActions || compact) && (
                         <div className="col-span-1 flex justify-center items-center gap-1">
@@ -916,7 +953,7 @@ const MediaBrowser = ({
                         </div>
                     )}
                 </div>
-            ))}
+            })}
         </div>
     );
 
@@ -951,6 +988,7 @@ const MediaBrowser = ({
                             namespace={namespace}
                             onSave={onSave}
                             onCancel={onBack}
+                            onMediaUpdated={() => loadFiles(true)}
                             mode="edit"
                             showHeader={false}
                         />
@@ -1110,7 +1148,7 @@ const MediaBrowser = ({
                         <input
                             id="file-input"
                             type="file"
-                            multiple
+                            multiple={!singleUpload}
                             accept={imageOnly ? 'image/*' : 'image/*,application/pdf,.doc,.docx,video/*,audio/*,.zip,application/zip'}
                             onChange={handleFileInputChange}
                             className="hidden"
@@ -1214,8 +1252,14 @@ const MediaBrowser = ({
                 <ImageQuickView
                     image={quickViewImage}
                     onClose={() => setQuickViewImage(null)}
+                    onImageContextMenu={(event) => handleImageContextMenu(quickViewImage, event)}
                 />
             )}
+
+            <ImageVersionContextMenu position={versionMenu} onClose={() => setVersionMenu(null)}
+                onUpload={() => { setVersionUploadFile(versionMenu.file); setVersionMenu(null) }} />
+            {versionUploadFile && <ImageVersionUploadDialog file={versionUploadFile} namespace={namespace}
+                onClose={() => setVersionUploadFile(null)} onUploaded={() => loadFiles(false)} />}
 
         </div>
     );

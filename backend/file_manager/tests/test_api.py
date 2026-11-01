@@ -54,6 +54,28 @@ class MediaFileAPITest(APITestCase):
             content_type="image/jpeg",
         )
 
+    def test_focal_point_defaults_to_center_and_preserves_other_metadata(self):
+        url = reverse("api:file_manager:mediafile-detail", args=[self.media_file.pk])
+        self.assertEqual(self.client.get(url).data["focal_point"], {"x": 0.5, "y": 0.5})
+
+        self.media_file.metadata = {"annotation": "Keep this"}
+        self.media_file.save(update_fields=["metadata"])
+        response = self.client.patch(url, {"focal_point": {"x": 0.2, "y": 0.8}}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["focal_point"], {"x": 0.2, "y": 0.8})
+        self.media_file.refresh_from_db()
+        self.assertEqual(self.media_file.metadata["annotation"], "Keep this")
+        self.assertEqual(self.media_file.metadata["focal_point"], {"x": 0.2, "y": 0.8})
+
+    def test_focal_point_rejects_out_of_range_values(self):
+        url = reverse("api:file_manager:mediafile-detail", args=[self.media_file.pk])
+        for point in ({"x": -0.1, "y": 0.5}, {"x": True, "y": 0.5}, {"x": 0.5, "y": 1.1}):
+            response = self.client.patch(url, {"focal_point": point}, format="json")
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.media_file.refresh_from_db()
+        self.assertNotIn("focal_point", self.media_file.metadata)
+
     def test_list_media_files(self):
         """Test listing media files"""
         url = reverse("api:file_manager:mediafile-list")
