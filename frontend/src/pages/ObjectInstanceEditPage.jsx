@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
 import { useParams, useNavigate, Link, Navigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -14,6 +15,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import Breadcrumbs from '../components/common/Breadcrumbs'
 import ContextualHelpLink from '../components/help/ContextualHelpLink'
 import GlobalWysiwygToolbar from '../components/wysiwyg/GlobalWysiwygToolbar'
+import { extractErrorMessage } from '../utils/errorHandling'
 
 // Import individual tab components
 import ObjectContentView from '../components/objectEdit/ObjectContentView'
@@ -40,6 +42,8 @@ const ObjectInstanceEditPage = () => {
     const [isSaving, setIsSaving] = useState(false)
     const [isFeatured, setIsFeatured] = useState(false)
     const [navigationError, setNavigationError] = useState(null)
+    const [publicationError, setPublicationError] = useState(null)
+    useEffect(() => { setPublicationError(null) }, [instanceId])
     
     const contentTabRef = useRef(null)
     const initializedObjectId = useRef(null)
@@ -237,15 +241,43 @@ const ObjectInstanceEditPage = () => {
         }
     }, [instanceId, instance, getState, setIsDirty, queryClient, addNotification, publishUpdate, componentId, navigate])
 
+    const handlePublicationError = async (error) => {
+        const failedInstanceId = instanceId
+        const message = extractErrorMessage(error, 'Publishing failed. Please try again.')
+        const authorsError = error.response?.data?.authors
+        const authorIds = getState().objects[String(instanceId)]?.data?.authors || instance?.data?.authors || []
+        let dependencies = []
+        if (authorsError && Array.isArray(authorIds) && authorIds.length) {
+            const results = await Promise.allSettled(authorIds.map(async id => await objectInstancesApi.get(id)))
+            dependencies = results.map((result, index) => {
+                const author = result.status === 'fulfilled' ? result.value.data : null
+                return { id: authorIds[index], title: author?.title || `Object ${authorIds[index]}`, isPublished: author?.isPublished === true }
+            }).filter(author => !author.isPublished)
+        }
+        if (activeInstanceId.current === failedInstanceId) setPublicationError({ message, dependencies })
+    }
+
     const handlePublish = async () => {
+        let version = { id: instance.versionId, editRevision: instance.editRevision }
+        if (hasUnsavedChanges) {
+            try {
+                version = await handleSave()
+            } catch {
+                return // handleSave already reports why saving failed.
+            }
+        }
         try {
-            const version = hasUnsavedChanges ? await handleSave() : { id: instance.versionId, editRevision: instance.editRevision }
             await objectVersionsApi.publish(version.id, version.editRevision)
+        } catch (error) {
+            await handlePublicationError(error)
+            return
+        }
+        addNotification('Changes published', 'success')
+        try {
             await refreshObject()
             await queryClient.invalidateQueries({ queryKey: ['objectInstances'] })
-            addNotification('Changes published', 'success')
         } catch (error) {
-            addNotification(error.response?.data?.detail || error.message || 'Publishing failed.', 'error')
+            addNotification(`Published, but the editor could not refresh: ${extractErrorMessage(error)}`, 'error')
         }
     }
 
@@ -537,7 +569,7 @@ const ObjectInstanceEditPage = () => {
                 )}
                 {tab === 'content' && <ObjectContentView key={instanceId || objectTypeId} ref={contentTabRef} {...commonTabProps} />}
                 {tab === 'settings' && <ObjectSettingsView {...commonTabProps} />}
-                {tab === 'publishing' && <ObjectPublishingView {...commonTabProps} isDirty={hasUnsavedChanges} showHistory={urlParams.get('panel') === 'history'} onWorkflowChange={refreshObject} onRestored={handleRestored}
+                {tab === 'publishing' && <ObjectPublishingView {...commonTabProps} isDirty={hasUnsavedChanges} showHistory={urlParams.get('panel') === 'history'} onWorkflowChange={refreshObject} onRestored={handleRestored} onPublicationError={handlePublicationError}
                     onViewVersion={versionId => navigate(`/objects/${instanceId}/edit/content?historyVersion=${encodeURIComponent(versionId)}`)}
                     isFeatured={isFeatured} onFeaturedChange={value => {
                         setIsFeatured(value)
@@ -566,6 +598,26 @@ const ObjectInstanceEditPage = () => {
                     isLoading={createNewObjectMutation.isPending}
                 />
             )}
+            <Dialog open={Boolean(publicationError)} onClose={() => setPublicationError(null)} className="relative z-[70]">
+                <div className="fixed inset-0 bg-black/40" aria-hidden="true" />
+                <div className="fixed inset-0 flex items-center justify-center p-4">
+                    <DialogPanel className="w-full max-w-md rounded border border-gray-200 bg-white p-5 shadow-xl">
+                        <DialogTitle className="text-lg font-semibold text-gray-900">Could not publish this object</DialogTitle>
+                        <p className="mt-2 text-sm text-gray-700">{publicationError?.message}</p>
+                        {publicationError?.dependencies.length > 0 && <div className="mt-4">
+                            <p className="text-sm font-medium text-gray-900">Publish these linked objects first:</p>
+                            <ul className="mt-2 space-y-2">
+                                {publicationError.dependencies.map(author => <li key={author.id}>
+                                    <Link to={`/objects/${author.id}/edit/publishing`} onClick={() => setPublicationError(null)} className="text-sm text-blue-700 underline hover:text-blue-800">{author.title}</Link>
+                                </li>)}
+                            </ul>
+                        </div>}
+                        <div className="mt-5 flex justify-end">
+                            <button type="button" onClick={() => setPublicationError(null)} className="rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Close</button>
+                        </div>
+                    </DialogPanel>
+                </div>
+            </Dialog>
         </div>
     )
 }

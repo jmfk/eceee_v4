@@ -176,4 +176,69 @@ describe('Object editor working-copy integration', () => {
         await waitFor(() => expect(mocks.publish).toHaveBeenCalledOnce())
         await waitFor(() => expect(screen.queryByText('Live · unpublished changes')).not.toBeInTheDocument())
     })
+
+    it.each(['content', 'publishing'])('explains unpublished author dependencies when publishing from %s', async tab => {
+        mocks.get.mockImplementation(async id => ({ data: id === '1'
+            ? { ...object(id), data: { authors: [2, 3] } }
+            : { ...object(id), title: id === 2 ? 'Nils Borg' : 'Live Author', isPublished: id === 3 } }))
+        mocks.publish.mockRejectedValue({ response: { status: 400, data: { authors: 'Publish every referenced columnist before this column.' } } })
+        mount(tab)
+        await screen.findByDisplayValue('Object 1')
+        fireEvent.click(screen.getByRole('button', { name: tab === 'content' ? 'Footer publish' : 'Publish changes' }))
+        const dialog = await screen.findByRole('dialog', { name: 'Could not publish this object' })
+        expect(dialog).toHaveTextContent('Publish every referenced columnist before this column.')
+        expect(screen.getByRole('link', { name: 'Nils Borg' })).toHaveAttribute('href', '/objects/2/edit/publishing')
+        expect(dialog).not.toHaveTextContent('Live Author')
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Close' })) })
+        await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Could not publish this object' })).not.toBeInTheDocument())
+    })
+
+    it('shows other publication errors in the same dialog', async () => {
+        mocks.publish.mockRejectedValue({ response: { status: 400, data: { classificationIds: 'Choose exactly one approved article kind.' } } })
+        mount()
+        await screen.findByDisplayValue('Object 1')
+        fireEvent.click(screen.getByRole('button', { name: 'Footer publish' }))
+        expect(await screen.findByRole('dialog', { name: 'Could not publish this object' })).toHaveTextContent('Choose exactly one approved article kind.')
+    })
+
+    it('does not show a previous object’s publication error after navigation', async () => {
+        let finishAuthorLookup
+        mocks.get.mockImplementation(async id => id === 2
+            ? await new Promise(resolve => { finishAuthorLookup = resolve })
+            : { data: { ...object(id), data: id === '1' ? { authors: [2] } : {} } })
+        mocks.publish.mockRejectedValue({ response: { status: 400, data: { authors: 'Publish the linked columnist first.' } } })
+        mount()
+        await screen.findByDisplayValue('Object 1')
+        fireEvent.click(screen.getByRole('button', { name: 'Footer publish' }))
+        await waitFor(() => expect(finishAuthorLookup).toBeTypeOf('function'))
+        fireEvent.click(screen.getByRole('button', { name: 'Open second object' }))
+        await screen.findByDisplayValue('Object 2')
+        await act(async () => { finishAuthorLookup({ data: { ...object(2), isPublished: false } }) })
+        expect(screen.queryByRole('dialog', { name: 'Could not publish this object' })).not.toBeInTheDocument()
+    })
+
+    it('does not describe a successful publish as failed when refresh fails', async () => {
+        let reads = 0
+        mocks.get.mockImplementation(async id => {
+            if (++reads > 1) throw new Error('Refresh unavailable')
+            return { data: object(id) }
+        })
+        mount()
+        await screen.findByDisplayValue('Object 1')
+        fireEvent.click(screen.getByRole('button', { name: 'Footer publish' }))
+        await waitFor(() => expect(mocks.publish).toHaveBeenCalledOnce())
+        expect(screen.queryByRole('dialog', { name: 'Could not publish this object' })).not.toBeInTheDocument()
+    })
+
+    it.each(['content', 'publishing'])('does not show a publication error when saving fails from %s', async tab => {
+        mocks.save.mockRejectedValue(new Error('Save unavailable'))
+        mount(tab)
+        await screen.findByDisplayValue('Object 1')
+        editTitle('Unsaved edit')
+        await waitFor(() => expect(screen.getByTestId('editor-dirty')).toHaveTextContent('true'))
+        fireEvent.click(screen.getByRole('button', { name: tab === 'content' ? 'Footer publish' : 'Publish changes' }))
+        await waitFor(() => expect(mocks.save).toHaveBeenCalledOnce())
+        expect(mocks.publish).not.toHaveBeenCalled()
+        expect(screen.queryByRole('dialog', { name: 'Could not publish this object' })).not.toBeInTheDocument()
+    })
 })

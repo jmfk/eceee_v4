@@ -14,7 +14,7 @@ const stateLabels = {
 
 const actionClass = 'rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50'
 
-const ObjectPublishingView = ({ instance, isNewInstance, isDirty = false, onSave, onWorkflowChange, onRestored, onViewVersion, isFeatured = false, onFeaturedChange, showHistory = false }) => {
+const ObjectPublishingView = ({ instance, isNewInstance, isDirty = false, onSave, onWorkflowChange, onRestored, onViewVersion, onPublicationError, isFeatured = false, onFeaturedChange, showHistory = false }) => {
     const queryClient = useQueryClient()
     const { showConfirm } = useNotificationContext()
     const [scheduleDate, setScheduleDate] = useState('')
@@ -48,17 +48,26 @@ const ObjectPublishingView = ({ instance, isNewInstance, isDirty = false, onSave
         ])
     }
 
-    const run = async (action, success, shouldRefresh = true) => {
+    const run = async (action, success, shouldRefresh = true, onFailure) => {
         setBusy(true); setError(''); setNotice('')
         try {
             await action()
             setNotice(success)
+        } catch (failure) {
+            if (onFailure) await onFailure(failure)
+            else {
+                const serverError = failure.response?.data
+                const detail = serverError?.message || serverError?.detail || (serverError && JSON.stringify(serverError)) || failure.message
+                setError(typeof detail === 'string' ? detail : JSON.stringify(detail))
+            }
+            await Promise.allSettled([workflowQuery.refetch(), historyQuery.refetch()])
+            setBusy(false)
+            return
+        }
+        try {
             if (shouldRefresh) await refresh()
         } catch (failure) {
-            const serverError = failure.response?.data
-            const detail = serverError?.message || serverError?.detail || (serverError && JSON.stringify(serverError)) || failure.message
-            setError(typeof detail === 'string' ? detail : JSON.stringify(detail))
-            await Promise.allSettled([workflowQuery.refetch(), historyQuery.refetch()])
+            setError(`Action completed, but the view could not refresh: ${failure.message || 'Reload the page.'}`)
         } finally { setBusy(false) }
     }
 
@@ -72,10 +81,16 @@ const ObjectPublishingView = ({ instance, isNewInstance, isDirty = false, onSave
         return workflow.editableVersion
     }
 
-    const publish = () => run(async () => {
-        const version = await workingVersion()
-        await objectVersionsApi.publish(version.id, version.editRevision)
-    }, 'Changes published.')
+    const publish = async () => {
+        let version
+        try {
+            version = await workingVersion()
+        } catch (failure) {
+            setError(failure.message || 'Save changes before publishing.')
+            return
+        }
+        return run(async () => await objectVersionsApi.publish(version.id, version.editRevision), 'Changes published.', true, onPublicationError)
+    }
 
     const schedule = () => run(async () => {
         const effectiveDate = new Date(scheduleDate)

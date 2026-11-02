@@ -2,6 +2,12 @@ import { describe, it, expect } from 'vitest'
 import { extractErrorMessage } from '../errorHandling'
 
 describe('extractErrorMessage', () => {
+    it('shows a string field validation error from a failed publish', () => {
+        expect(extractErrorMessage({
+            response: { data: { authors: 'Publish every referenced columnist before this column.' } },
+            message: 'Request failed with status code 400',
+        })).toBe('authors: Publish every referenced columnist before this column.')
+    })
     it('should extract detail from API response', () => {
         const error = {
             response: {
@@ -121,4 +127,4 @@ describe('extractErrorMessage', () => {
         const message = extractErrorMessage(error, 'Default error')
         expect(message).toBe('Direct detail field')
     })
-}) 
+})

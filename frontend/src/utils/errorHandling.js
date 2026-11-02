@@ -51,6 +51,9 @@ export const extractErrorMessage = (error, defaultMessage = 'An error occurred')
                 if (Array.isArray(messages) && messages.length > 0) {
                     return `${field}: ${messages[0]}`
                 }
+                if (!['message', 'error'].includes(field) && typeof messages === 'string' && messages.trim()) {
+                    return `${field}: ${messages}`
+                }
             }
         }
 
@@ -91,4 +94,4 @@ export const createErrorHandler = (notificationHandler, defaultMessage = 'An err
         const message = extractErrorMessage(error, defaultMessage)
         notificationHandler(message, 'error', category)
     }
-} 
+}
