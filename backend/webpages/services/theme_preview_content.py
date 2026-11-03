@@ -20,6 +20,7 @@ from file_manager.models import MediaCollection, MediaFile
 from file_manager.storage import system_storage
 from object_storage.models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
 from webpages.layout_autodiscovery import autodiscover_layouts
+from webpages.layout_key_names import canonical_layout_key
 from webpages.layout_registry import layout_registry
 from webpages.models import PageTheme, WebPage
 
@@ -134,7 +135,7 @@ def list_theme_preview_sources(theme):
     autodiscover_layouts()
     layouts = [
         {
-            "key": layout.name,
+            "key": canonical_layout_key(layout.name),
             "label": layout.name.replace("_", " ").title(),
             "description": layout.description,
         }

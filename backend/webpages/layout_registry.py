@@ -14,6 +14,8 @@ from django.template.loader import get_template
 
 logger = logging.getLogger(__name__)
 
+LEGACY_CODE_LAYOUT_KEYS = {"mainLayout": "main_layout", "landingPage": "landing_page", "errorLayout": "error_layout"}
+
 
 class BaseLayout(ABC):
     """
@@ -169,15 +171,15 @@ class LayoutRegistry:
 
     def get_layout(self, name: str) -> Optional[BaseLayout]:
         """Get a layout instance by name."""
-        return self._instances.get(name)
+        return self._instances.get(name) or self._instances.get(LEGACY_CODE_LAYOUT_KEYS.get(name))
 
     def get_layout_class(self, name: str) -> Optional[Type[BaseLayout]]:
         """Get a layout class by name."""
-        return self._layouts.get(name)
+        return self._layouts.get(name) or self._layouts.get(LEGACY_CODE_LAYOUT_KEYS.get(name))
 
     def is_registered(self, name: str) -> bool:
         """Check if a layout is registered by name."""
-        return name in self._layouts
+        return name in self._layouts or LEGACY_CODE_LAYOUT_KEYS.get(name) in self._layouts
 
     def list_layouts(self, active_only: bool = True) -> List[BaseLayout]:
         """Get all registered layouts."""
