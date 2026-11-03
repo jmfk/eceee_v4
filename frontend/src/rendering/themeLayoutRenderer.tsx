@@ -45,6 +45,16 @@ const camelToSnake = (value: string) => value.replace(/([a-z0-9])([A-Z])/g, '$1_
 
 export const normalizeLayoutDefinition = (layout: any): ThemeLayoutDefinition | null => {
     if (!layout || typeof layout !== 'object') return null
+    // Older theme-version snapshots declare landingPage while their layout tree
+    // references landing_page. Keep the stored snapshot intact and resolve the
+    // known alias at the render boundary.
+    const usesLandingPageSlot = (node: any): boolean =>
+        (node?.type === 'slot' && (node.slot_key || node.slotKey) === 'landing_page')
+        || (Array.isArray(node?.children) && node.children.some(usesLandingPageSlot))
+    const legacyLandingSlot = layout.key === 'landing_page'
+        && layout.slots?.landingPage
+        && !layout.slots?.landing_page
+        && usesLandingPageSlot(layout.root)
     const normalizeNode = (node: any): ThemeLayoutNode => ({
         id: String(node?.id || ''),
         type: node?.type,
@@ -60,7 +70,7 @@ export const normalizeLayoutDefinition = (layout: any): ThemeLayoutDefinition | 
         slot_key: node?.slot_key || node?.slotKey,
         editable_parameters: node?.editable_parameters || node?.editableParameters || [],
     })
-    const slots = Object.fromEntries(Object.entries(layout.slots || {}).map(([key, value]: [string, any]) => [key, {
+    const slots = Object.fromEntries(Object.entries(layout.slots || {}).map(([key, value]: [string, any]) => [legacyLandingSlot && key === 'landingPage' ? 'landing_page' : key, {
         ...value,
         max_widgets: value?.max_widgets ?? value?.maxWidgets,
         allowed_widget_types: value?.allowed_widget_types || value?.allowedWidgetTypes,

@@ -13,6 +13,7 @@ import { getAllSlotNames, categorizeSlots, formatSlotName, getSlotMetadata, getS
 import WidgetSlot from '../layouts/easy-layouts/WidgetSlot';
 import PageWidgetSelectionModal from '../editors/page-editor/PageWidgetSelectionModal';
 import { generateWidgetId } from '../utils/widgetIdentity';
+import { normalizeLayoutDefinition } from '../rendering/themeLayoutRenderer';
 
 const AllSlotsEditor = ({
     widgets = {},
@@ -60,7 +61,9 @@ const AllSlotsEditor = ({
     const effectiveTheme = pageVersionData?.effectiveTheme || currentVersion?.effectiveTheme || webpageData?.effectiveTheme;
     const themeLayout = useMemo(() => {
         const layouts = effectiveTheme?.layouts?.items || [];
-        return layouts.find((item) => item.key === (pageVersionData?.layoutKey || currentLayoutName)) || null;
+        return normalizeLayoutDefinition(
+            layouts.find((item) => item.key === (currentLayoutName || pageVersionData?.layoutKey)) || null
+        );
     }, [effectiveTheme, pageVersionData?.layoutKey, currentLayoutName]);
 
     // Fetch current layout to get its slots
