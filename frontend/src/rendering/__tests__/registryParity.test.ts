@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { EASY_WIDGET_REGISTRY } from '../../widgets/easy-widgets'
 import { RENDER_WIDGET_FIXTURES } from '../fixtures'
-import { getRenderLayoutTypes, getRenderWidgetTypes } from '../registry'
+import { getRenderLayout, getRenderLayoutTypes, getRenderWidgetTypes } from '../registry'
 
 describe('render registry parity', () => {
     it('covers every editable widget with a renderer and deterministic fixture', () => {
@@ -12,6 +12,8 @@ describe('render registry parity', () => {
     })
 
     it('covers both production layouts', () => {
-        expect(getRenderLayoutTypes().sort()).toEqual(['landing_page', 'main_layout'])
+        expect(getRenderLayoutTypes().sort()).toEqual(['landingPage', 'mainLayout'])
+        expect(getRenderLayout('landing_page')).toBe(getRenderLayout('landingPage'))
+        expect(getRenderLayout('main_layout')).toBe(getRenderLayout('mainLayout'))
     })
 })
