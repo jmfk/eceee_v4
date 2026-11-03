@@ -217,7 +217,7 @@ class Command(BaseCommand):
             and latest.widgets == widgets
             and latest.page_data == page_data
             and latest.theme_id == theme.id
-            and latest.code_layout == "main_layout"
+            and latest.code_layout == "mainLayout"
         ):
             return latest
 
@@ -227,7 +227,7 @@ class Command(BaseCommand):
             version_title="Publisher supertest fixture",
             meta_title=page.title,
             meta_description=page.description,
-            code_layout="main_layout",
+            code_layout="mainLayout",
             page_data=page_data,
             widgets=widgets,
             theme=theme,

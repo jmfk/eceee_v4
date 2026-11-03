@@ -120,7 +120,7 @@ class Command(BaseCommand):
             "version_title": "Playwright public regression fixture",
             "meta_title": title,
             "meta_description": description,
-            "code_layout": "main_layout",
+            "code_layout": "mainLayout",
             "page_data": {
                 "metaTitle": title,
                 "metaDescription": description,

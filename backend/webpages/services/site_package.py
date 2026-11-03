@@ -33,6 +33,7 @@ from taxonomy.context import import_actor
 from taxonomy.models import Tag as TaxonomyTag
 from taxonomy.transfer import export_assignments, export_term, import_assignments, import_term
 from webpages.models import PageTheme, PageVersion, RemoteSiteBinding, SitePackageJob, WebPage
+from webpages.layout_key_names import canonical_layout_document, canonical_layout_key, canonical_preview
 from webpages.services.theme_preview_content import (
     EMBEDDED_IMAGE_PATTERN,
     normalize_theme_preview_namespaces,
@@ -65,6 +66,10 @@ def _canonical_imported_layout(layout_key, widgets):
     """Normalize legacy layout references before they enter the new layout contract."""
     key = layout_key or ""
     if key not in LEGACY_ERROR_LAYOUT_KEYS:
+        key = canonical_layout_key(key)
+        if key == "landingPage" and isinstance(widgets, dict) and "landing_page" in widgets:
+            widgets = {**widgets, "landingPage": [*widgets["landing_page"], *(widgets.get("landingPage") or [])]}
+            widgets.pop("landing_page")
         return key, widgets
     normalized = dict(widgets) if isinstance(widgets, dict) else widgets
     if isinstance(normalized, dict):
@@ -76,7 +81,7 @@ def _canonical_imported_layout(layout_key, widgets):
             values = normalized.pop(old_key, None)
             if values:
                 normalized[new_key] = [*(normalized.get(new_key) or []), *values]
-    return "error_layout", normalized
+    return "errorLayout", normalized
 
 
 def _package_layout_references(pages_payload):
@@ -143,7 +148,7 @@ def _package_layout_references(pages_payload):
 
 def _with_compatibility_layouts(layouts, layout_references):
     """Add observed legacy layouts without replacing a theme's native definitions."""
-    document = layouts or default_theme_layouts()
+    document = canonical_layout_document(layouts) if layouts else default_theme_layouts()
     items = list(document.get("items", []))
     existing = {item.get("key"): index for index, item in enumerate(items) if isinstance(item, dict)}
     for key, slots in sorted((layout_references or {}).items()):
@@ -1550,7 +1555,7 @@ class SitePackageImporter:
     def _validate_imported_version_layout(version):
         """Apply the normal page/widget layout invariant to imported versions."""
         theme = version.theme
-        layout_key = version.layout_key or version.code_layout
+        layout_key = canonical_layout_key(version.layout_key or version.code_layout)
         current = version.page.parent
         while current and (theme is None or not layout_key):
             parent_version = (
@@ -1558,7 +1563,7 @@ class SitePackageImporter:
             )
             if parent_version:
                 theme = theme or parent_version.theme
-                layout_key = layout_key or parent_version.layout_key or parent_version.code_layout
+                layout_key = layout_key or canonical_layout_key(parent_version.layout_key or parent_version.code_layout)
             current = current.parent
         if theme is None:
             theme = (
@@ -1566,9 +1571,9 @@ class SitePackageImporter:
                 or PageTheme.objects.filter(tenant=version.page.tenant, is_active=True).order_by("id").first()
             )
         if not layout_key and theme:
-            layout_key = (theme.layouts or {}).get("default_layout_key")
+            layout_key = canonical_layout_key((theme.layouts or {}).get("default_layout_key"))
         if theme and layout_key:
-            available = {item.get("key") for item in (theme.layouts or {}).get("items", [])}
+            available = {canonical_layout_key(item.get("key")) for item in (theme.layouts or {}).get("items", [])}
             if layout_key not in available:
                 raise ValueError(f"Layout '{layout_key}' is not defined by the effective imported theme.")
         # A package is a snapshot of already persisted content. Preserve its legacy
@@ -2272,7 +2277,7 @@ class SitePackageImporter:
             "design_groups": data.get("design_groups", {}),
             "component_styles": data.get("component_styles", {}),
             "designer_preview": normalize_theme_preview_namespaces(
-                data.get("designer_preview", {}), destination_tenant
+                canonical_preview(data.get("designer_preview", {})), destination_tenant
             ),
             "layouts": layouts,
             "widget_types": data.get("widget_types", {"version": 1, "items": []}),
@@ -2308,7 +2313,7 @@ class SitePackageImporter:
             "design_groups": data.get("design_groups", {}),
             "component_styles": data.get("component_styles", {}),
             "designer_preview": normalize_theme_preview_namespaces(
-                data.get("designer_preview", {}), self._destination_tenant()
+                canonical_preview(data.get("designer_preview", {})), self._destination_tenant()
             ),
             "layouts": _with_compatibility_layouts(data.get("layouts"), layout_references),
             "widget_types": data.get("widget_types", {"version": 1, "items": []}),

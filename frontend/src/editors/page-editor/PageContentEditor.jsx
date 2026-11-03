@@ -42,7 +42,7 @@ const PageContentEditor = forwardRef(({
     ...otherProps
 }, ref) => {
     // State for default layout fetched from backend
-    const [defaultLayoutName, setDefaultLayoutName] = useState('main_layout');
+    const [defaultLayoutName, setDefaultLayoutName] = useState('mainLayout');
 
     // Fetch default layout from backend on mount
     useEffect(() => {

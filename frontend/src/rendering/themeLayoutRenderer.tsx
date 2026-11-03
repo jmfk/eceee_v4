@@ -1,6 +1,7 @@
 import React from 'react'
 
 import type { LayoutRenderProps, ThemeLayoutDefinition, ThemeLayoutNode } from './types'
+import { canonicalLayoutKey } from './layoutKeys'
 
 const allowedTypes = new Set(['container', 'section', 'grid', 'row', 'column', 'semantic', 'slot'])
 const semanticTags = new Set(['div', 'header', 'nav', 'main', 'aside', 'section', 'footer'])
@@ -15,7 +16,7 @@ const propertyMap: Record<string, string> = {
     font_family: 'font-family', border: 'border', border_radius: 'border-radius',
 }
 const allowedBreakpoints = new Set(['base', 'xs', 'sm', 'md', 'lg', 'xl'])
-const keyPattern = /^[a-z][a-z0-9_]{0,63}$/
+const keyPattern = /^[a-z][A-Za-z0-9_]{0,63}$/
 const slotKeyPattern = /^[a-z][A-Za-z0-9_]{0,63}$/
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const presentationColorPattern = /^#[0-9a-f]{6}$/i
@@ -46,9 +47,8 @@ const camelToSnake = (value: string) => value.replace(/([a-z0-9])([A-Z])/g, '$1_
 
 export const normalizeLayoutDefinition = (layout: any): ThemeLayoutDefinition | null => {
     if (!layout || typeof layout !== 'object') return null
-    // The persisted layout identifier is landing_page. Its slot is landingPage
-    // in TypeScript; normalize older Python-owned slot keys at this boundary.
-    const normalizeSlotKey = (key: string) => layout.key === 'landing_page' && key === 'landing_page' ? 'landingPage' : key
+    // Historical theme snapshots may still use the old landing slot identifier.
+    const normalizeSlotKey = (key: string) => ['landingPage', 'landing_page'].includes(layout.key) && key === 'landing_page' ? 'landingPage' : key
     const normalizeNode = (node: any): ThemeLayoutNode => ({
         id: String(node?.id || ''),
         type: node?.type,
@@ -76,7 +76,7 @@ export const normalizeLayoutDefinition = (layout: any): ThemeLayoutDefinition | 
         default_widgets: value?.default_widgets || value?.defaultWidgets,
     }]))
     return {
-        id: String(layout.id || ''), key: String(layout.key || ''), label: String(layout.label || layout.key || ''),
+        id: String(layout.id || ''), key: canonicalLayoutKey(String(layout.key || '')), label: String(layout.label || layout.key || ''),
         description: String(layout.description || ''), status: layout.status || 'active', root: normalizeNode(layout.root), slots,
     }
 }
@@ -157,7 +157,7 @@ export const layoutDefinitionCss = (layout: ThemeLayoutDefinition, breakpoints: 
 const LayoutNode = ({ node, slots, renderSlot, designer, layoutCanvas, layoutKey }: { node: ThemeLayoutNode, slots: ThemeLayoutDefinition['slots'], renderSlot: LayoutRenderProps['renderSlot'], designer: boolean, layoutCanvas: boolean, layoutKey: string }) => {
     const className = (node.class_names || []).join(' ') || undefined
     const label = node.label || (node.type === 'slot' ? String(slots[node.slot_key || '']?.label || node.slot_key || 'Slot') : node.type)
-    const persistedSlotKey = layoutKey === 'landing_page' && node.slot_key === 'landingPage' ? 'landing_page' : node.slot_key
+    const persistedSlotKey = node.slot_key
     const target = JSON.stringify([{ id: `layout-node:${node.id}`, layoutNodeId: node.id, kind: node.type === 'slot' ? 'slot' : 'element', label, editableParameters: node.editable_parameters || [] }])
     const presentationProps = layoutCanvas && node.presentation_color ? {
         'data-layout-presentation-color': node.presentation_color,

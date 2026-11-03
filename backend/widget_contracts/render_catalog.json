@@ -7,7 +7,7 @@
       "key": "error_403",
       "kind": "error",
       "label": "403 — Access denied",
-      "layout_key": "error_layout",
+      "layout_key": "errorLayout",
       "route": "",
       "status_code": 403,
       "widgets": {
@@ -72,7 +72,7 @@
       "key": "error_404",
       "kind": "error",
       "label": "404 — Page not found",
-      "layout_key": "error_layout",
+      "layout_key": "errorLayout",
       "route": "",
       "status_code": 404,
       "widgets": {
@@ -137,7 +137,7 @@
       "key": "error_500",
       "kind": "error",
       "label": "500 — Something went wrong",
-      "layout_key": "error_layout",
+      "layout_key": "errorLayout",
       "route": "",
       "status_code": 500,
       "widgets": {
@@ -202,7 +202,7 @@
       "key": "error_503",
       "kind": "error",
       "label": "503 — Temporarily unavailable",
-      "layout_key": "error_layout",
+      "layout_key": "errorLayout",
       "route": "",
       "status_code": 503,
       "widgets": {

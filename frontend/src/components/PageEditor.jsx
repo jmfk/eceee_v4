@@ -886,7 +886,7 @@ const PageEditor = () => {
                     isUsingFallback = true;
                 } catch (error) {
                     console.error('Failed to fetch default layout:', error);
-                    layoutToLoad = 'main_layout'; // Hard fallback
+                    layoutToLoad = 'mainLayout'; // Hard fallback
                     isUsingFallback = true;
                 }
             }
@@ -2159,7 +2159,7 @@ const PageEditor = () => {
                                                     </div>
                                                     <div className="ml-3">
                                                         <div className="text-sm text-amber-700">
-                                                            <span className="font-bold">No layout specified for this version.</span> Using default layout "{activeLayoutName || 'main_layout'}" for preview.
+                                                            <span className="font-bold">No layout specified for this version.</span> Using default layout "{activeLayoutName || 'mainLayout'}" for preview.
                                                         </div>
                                                     </div>
                                                 </div>

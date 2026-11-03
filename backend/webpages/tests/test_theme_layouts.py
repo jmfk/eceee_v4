@@ -88,16 +88,16 @@ class ThemeLayoutValidationTests(SimpleTestCase):
 
         self.assertIs(validate_theme_layouts(document), document)
 
-        self.assertEqual(document["default_layout_key"], "main_layout")
+        self.assertEqual(document["default_layout_key"], "mainLayout")
         self.assertEqual(
             {item["key"] for item in document["items"]},
-            {"main_layout", "landing_page", "error_layout"},
+            {"mainLayout", "landingPage", "errorLayout"},
         )
 
     def test_default_page_layouts_use_descriptive_structure_and_plain_footer_wrappers(self):
         layouts = {layout["key"]: layout for layout in default_theme_layouts()["items"]}
 
-        for key in ("main_layout", "landing_page"):
+        for key in ("mainLayout", "landingPage"):
             root = layouts[key]["root"]
             self.assertEqual(root["label"], "Viewport background")
             self.assertEqual(root["children"][0]["label"], "Page surface")
@@ -107,12 +107,12 @@ class ThemeLayoutValidationTests(SimpleTestCase):
 
     def test_default_page_layouts_own_the_structural_rules_previously_supplied_by_legacy_css(self):
         layouts = {layout["key"]: layout for layout in default_theme_layouts()["items"]}
-        main_nodes = list(self._walk_nodes(layouts["main_layout"]["root"]))
+        main_nodes = list(self._walk_nodes(layouts["mainLayout"]["root"]))
         main = next(node for node in main_nodes if "main-layout-main" in node.get("class_names", []))
 
         self.assertEqual(main["styles"]["base"]["min_width"], "0")
         self.assertEqual(main["styles"]["base"]["padding"], "0")
-        for layout in (layouts["main_layout"], layouts["landing_page"]):
+        for layout in (layouts["mainLayout"], layouts["landingPage"]):
             footer = next(
                 node for node in self._walk_nodes(layout["root"]) if "slot-footer" in node.get("class_names", [])
             )
@@ -141,13 +141,13 @@ class ThemeLayoutValidationTests(SimpleTestCase):
 
     def test_required_layouts_cannot_be_removed(self):
         document = default_theme_layouts()
-        document["items"] = [item for item in document["items"] if item["key"] != "landing_page"]
+        document["items"] = [item for item in document["items"] if item["key"] != "landingPage"]
 
-        with self.assertRaisesMessage(ValidationError, "Required layouts cannot be removed: landing_page"):
+        with self.assertRaisesMessage(ValidationError, "Required layouts cannot be removed: landingPage"):
             validate_theme_layouts(document)
 
     def test_error_layout_has_visual_message_and_action_slots(self):
-        layout = next(item for item in default_theme_layouts()["items"] if item["key"] == "error_layout")
+        layout = next(item for item in default_theme_layouts()["items"] if item["key"] == "errorLayout")
 
         self.assertEqual(set(layout["slots"]), {"visual", "message", "actions"})
         self.assertEqual(layout["root"]["tag"], "main")
@@ -157,7 +157,7 @@ class ThemeLayoutValidationTests(SimpleTestCase):
         error_pages = {page["status_code"]: page for page in document["special_pages"]}
 
         self.assertEqual(set(error_pages), {403, 404, 500, 503})
-        self.assertEqual(error_pages[404]["layout_key"], "error_layout")
+        self.assertEqual(error_pages[404]["layout_key"], "errorLayout")
         self.assertEqual(error_pages[404]["widgets"]["message"][0]["type"], "easy_widgets.HeadlineWidget")
 
     def test_special_route_pages_validate_layout_slots_and_widget_limits(self):
@@ -169,7 +169,7 @@ class ThemeLayoutValidationTests(SimpleTestCase):
                 "label": "Log in",
                 "kind": "route",
                 "route": "login",
-                "layout_key": "main_layout",
+                "layout_key": "mainLayout",
                 "widgets": {
                     "main": [
                         {
@@ -198,7 +198,7 @@ class ThemeLayoutValidationTests(SimpleTestCase):
                     "label": "Reserved",
                     "kind": "route",
                     "route": route,
-                    "layout_key": "main_layout",
+                    "layout_key": "mainLayout",
                     "widgets": {},
                 }
             )
@@ -216,7 +216,7 @@ class ThemeLayoutValidationTests(SimpleTestCase):
                     "label": "Ambiguous",
                     "kind": "route",
                     "route": route,
-                    "layout_key": "main_layout",
+                    "layout_key": "mainLayout",
                     "widgets": {},
                 }
             )
@@ -234,7 +234,7 @@ class ThemeLayoutValidationTests(SimpleTestCase):
                     "label": "System route",
                     "kind": "route",
                     "route": route,
-                    "layout_key": "main_layout",
+                    "layout_key": "mainLayout",
                     "widgets": {},
                 }
             )
@@ -258,7 +258,7 @@ class ThemeLayoutValidationTests(SimpleTestCase):
                 "label": "Log in",
                 "kind": "route",
                 "route": "account/login",
-                "layout_key": "main_layout",
+                "layout_key": "mainLayout",
                 "widgets": {},
             }
         )
@@ -274,8 +274,8 @@ class ThemeLayoutValidationTests(SimpleTestCase):
     def test_public_renderer_resolves_theme_layout_without_injecting_python_layout_css(self):
         document = default_theme_layouts()
         theme = SimpleNamespace(layouts=document)
-        page_version = SimpleNamespace(code_layout="main_layout", page_custom_css="", page_css_variables={})
-        python_layout = SimpleNamespace(name="main_layout", css_content=".legacy-python-layout{height:310px}")
+        page_version = SimpleNamespace(code_layout="mainLayout", page_custom_css="", page_css_variables={})
+        python_layout = SimpleNamespace(name="mainLayout", css_content=".legacy-python-layout{height:310px}")
         renderer = WebPageRenderer()
 
         resolved = renderer._theme_layout_definition(theme, page_version, python_layout)
@@ -288,13 +288,13 @@ class ThemeLayoutValidationTests(SimpleTestCase):
             include_legacy_layout_css=False,
         )
 
-        self.assertEqual(resolved["key"], "main_layout")
+        self.assertEqual(resolved["key"], "mainLayout")
         self.assertNotIn("legacy-python-layout", css)
 
     def test_public_renderer_keeps_python_layout_css_disabled_even_if_requested(self):
-        theme = SimpleNamespace(layouts={"default_layout_key": "main_layout", "items": []})
-        page_version = SimpleNamespace(code_layout="main_layout", page_custom_css="", page_css_variables={})
-        python_layout = SimpleNamespace(name="main_layout", css_content=".legacy-python-layout{display:grid}")
+        theme = SimpleNamespace(layouts={"default_layout_key": "mainLayout", "items": []})
+        page_version = SimpleNamespace(code_layout="mainLayout", page_custom_css="", page_css_variables={})
+        python_layout = SimpleNamespace(name="mainLayout", css_content=".legacy-python-layout{display:grid}")
         renderer = WebPageRenderer()
 
         self.assertIsNone(renderer._theme_layout_definition(theme, page_version, python_layout))
@@ -364,7 +364,8 @@ class ThemeLayoutValidationTests(SimpleTestCase):
     def test_legacy_layout_style_transfer_preserves_content_growth(self):
         migration = import_module("webpages.migrations.0085_transfer_legacy_layout_styles")
         document = default_theme_layouts()
-        layout = next(item for item in document["items"] if item["key"] == "main_layout")
+        layout = next(item for item in document["items"] if item["key"] == "mainLayout")
+        layout["key"] = "main_layout"  # This historical migration only saw pre-0092 documents.
         main_slot = next(
             node for node in self._walk_nodes(layout["root"]) if "slot-main" in node.get("class_names", [])
         )
@@ -489,44 +490,44 @@ class ThemeLayoutValidationTests(SimpleTestCase):
         with self.assertRaisesMessage(ValidationError, "not allowed"):
             validate_layout_widgets(
                 theme,
-                "main_layout",
+                "mainLayout",
                 {"main": [{"type": "easy_widgets.HeaderWidget"}]},
             )
         with self.assertRaisesMessage(ValidationError, "at most 1"):
             validate_layout_widgets(
                 theme,
-                "main_layout",
+                "mainLayout",
                 {"header": [{"type": "easy_widgets.HeaderWidget"}, {"type": "easy_widgets.HeaderWidget"}]},
             )
 
         widgets = {"main": [{"type": "easy_widgets.ContentWidget"}] * 21}
-        self.assertEqual(len(validate_layout_widgets(theme, "main_layout", widgets)["main"]), 21)
+        self.assertEqual(len(validate_layout_widgets(theme, "mainLayout", widgets)["main"]), 21)
 
     def test_widget_policies_reject_malformed_slot_and_widget_shapes(self):
         theme = SimpleNamespace(layouts=default_theme_layouts())
 
         with self.assertRaisesMessage(ValidationError, "must be a list"):
-            validate_layout_widgets(theme, "main_layout", {"main": {}})
+            validate_layout_widgets(theme, "mainLayout", {"main": {}})
         with self.assertRaisesMessage(ValidationError, "must have a type"):
-            validate_layout_widgets(theme, "main_layout", {"main": [{"config": {}}]})
+            validate_layout_widgets(theme, "mainLayout", {"main": [{"config": {}}]})
         warnings = []
         with self.assertRaisesMessage(ValidationError, "must have a type"):
-            validate_layout_widgets(theme, "main_layout", {"unused": [42]}, warnings=warnings)
+            validate_layout_widgets(theme, "mainLayout", {"unused": [42]}, warnings=warnings)
 
     def test_existing_disallowed_widget_is_grandfathered_only_in_its_original_slot(self):
         theme = SimpleNamespace(layouts=default_theme_layouts())
         legacy = {"main": [{"id": "legacy", "type": "easy_widgets.HeaderWidget", "config": {}}]}
 
         edited = {"main": [{**legacy["main"][0], "config": {"label": "Edited"}}]}
-        self.assertEqual(validate_layout_widgets(theme, "main_layout", edited, previous_widgets=legacy), edited)
+        self.assertEqual(validate_layout_widgets(theme, "mainLayout", edited, previous_widgets=legacy), edited)
 
         added = {"main": [*legacy["main"], {"id": "new", "type": "easy_widgets.HeaderWidget"}]}
         with self.assertRaisesMessage(ValidationError, "not allowed"):
-            validate_layout_widgets(theme, "main_layout", added, previous_widgets=legacy)
+            validate_layout_widgets(theme, "mainLayout", added, previous_widgets=legacy)
 
         moved = {"footer": legacy["main"]}
         with self.assertRaisesMessage(ValidationError, "not allowed"):
-            validate_layout_widgets(theme, "main_layout", moved, previous_widgets=legacy)
+            validate_layout_widgets(theme, "mainLayout", moved, previous_widgets=legacy)
 
     def test_legacy_over_limit_slot_can_be_saved_but_not_expanded(self):
         theme = SimpleNamespace(layouts=default_theme_layouts())
@@ -536,11 +537,11 @@ class ThemeLayoutValidationTests(SimpleTestCase):
                 {"id": "old-2", "type": "easy_widgets.HeaderWidget"},
             ]
         }
-        self.assertEqual(validate_layout_widgets(theme, "main_layout", legacy, previous_widgets=legacy), legacy)
+        self.assertEqual(validate_layout_widgets(theme, "mainLayout", legacy, previous_widgets=legacy), legacy)
         with self.assertRaisesMessage(ValidationError, "at most 1"):
             validate_layout_widgets(
                 theme,
-                "main_layout",
+                "mainLayout",
                 {"header": [*legacy["header"], {"id": "new", "type": "easy_widgets.HeaderWidget"}]},
                 previous_widgets=legacy,
             )
@@ -549,13 +550,13 @@ class ThemeLayoutValidationTests(SimpleTestCase):
     def test_version_serializer_keeps_legacy_widget_when_other_version_data_changes(self, resolve_theme):
         theme = SimpleNamespace(pk=1, id=1, layouts=default_theme_layouts())
         resolve_theme.return_value = theme
-        existing = {"landing_page": [{"id": str(uuid.uuid4()), "type": "easy_widgets.ContentWidget", "config": {}}]}
+        existing = {"landingPage": [{"id": str(uuid.uuid4()), "type": "easy_widgets.ContentWidget", "config": {}}]}
         version = SimpleNamespace(
             theme=theme,
             theme_id=1,
             page=SimpleNamespace(parent=None),
-            layout_key="landing_page",
-            code_layout="landing_page",
+            layout_key="landingPage",
+            code_layout="landingPage",
             effective_date=None,
             widgets=existing,
         )
@@ -573,22 +574,22 @@ class ThemeLayoutValidationTests(SimpleTestCase):
         self.assertIn("contentWarnings", reviewed_existing.errors)
 
         changed_layout = PageVersionSerializer(
-            version, data={"layout_key": "main_layout", "widgets": existing}, partial=True
+            version, data={"layout_key": "mainLayout", "widgets": existing}, partial=True
         )
         self.assertTrue(changed_layout.is_valid(), changed_layout.errors)
 
         added_to_inactive_slot = {
-            "landing_page": [*existing["landing_page"], {"id": str(uuid.uuid4()), "type": "easy_widgets.ContentWidget"}]
+            "landingPage": [*existing["landingPage"], {"id": str(uuid.uuid4()), "type": "easy_widgets.ContentWidget"}]
         }
         added = PageVersionSerializer(
-            version, data={"layout_key": "main_layout", "widgets": added_to_inactive_slot}, partial=True
+            version, data={"layout_key": "mainLayout", "widgets": added_to_inactive_slot}, partial=True
         )
         self.assertFalse(added.is_valid())
         self.assertIn("widgets", added.errors)
 
         new_widget = {
-            "landing_page": [
-                *existing["landing_page"],
+            "landingPage": [
+                *existing["landingPage"],
                 {"id": str(uuid.uuid4()), "type": "easy_widgets.ContentWidget", "config": {}},
             ]
         }
@@ -681,12 +682,12 @@ class ThemeLayoutUsageTests(TestCase):
         )
         parent_version = parent.create_version(user, "Parent draft")
         parent_version.theme = inherited
-        parent_version.layout_key = "main_layout"
+        parent_version.layout_key = "mainLayout"
         parent_version.save(update_fields=["theme", "layout_key"])
         child.create_version(user, "Child draft")
 
-        self.assertNotIn("main_layout", theme_layout_usage(unrelated))
-        self.assertIn(str(child.id), theme_layout_usage(inherited)["main_layout"]["page_ids"])
+        self.assertNotIn("mainLayout", theme_layout_usage(unrelated))
+        self.assertIn(str(child.id), theme_layout_usage(inherited)["mainLayout"]["page_ids"])
 
     def test_page_version_serializer_enforces_database_layout_widget_policy(self):
         user = User.objects.create_user("layout-policy", password="test")
@@ -697,7 +698,7 @@ class ThemeLayoutUsageTests(TestCase):
         )
         version = page.create_version(user, "Policy draft")
         version.theme = theme
-        version.layout_key = "main_layout"
+        version.layout_key = "mainLayout"
         version.save(update_fields=["theme", "layout_key"])
 
         serializer = PageVersionSerializer(
@@ -718,11 +719,11 @@ class ThemeLayoutUsageTests(TestCase):
         )
         version = page.create_version(user, "Policy draft")
         version.theme = theme
-        version.layout_key = "error_layout"
+        version.layout_key = "errorLayout"
         version.widgets = {"visual": [{"type": "easy_widgets.ImageWidget", "config": {}}]}
         version.save(update_fields=["theme", "layout_key", "widgets"])
 
-        payload = CamelCaseJSONParser().parse(io.BytesIO(json.dumps({"layoutKey": "main_layout"}).encode()))
+        payload = CamelCaseJSONParser().parse(io.BytesIO(json.dumps({"layoutKey": "mainLayout"}).encode()))
         serializer = PageVersionSerializer(version, data=payload, partial=True)
 
         self.assertTrue(serializer.is_valid(), serializer.errors)
@@ -745,7 +746,7 @@ class ThemeLayoutUsageTests(TestCase):
                 json.dumps(
                     {
                         "scope": "layout",
-                        "layoutKey": "landing_page",
+                        "layoutKey": "landingPage",
                         "schema": {"type": "object", "properties": {}},
                     }
                 ).encode()
@@ -754,7 +755,7 @@ class ThemeLayoutUsageTests(TestCase):
         serializer = PageDataSchemaSerializer(data=payload)
 
         self.assertTrue(serializer.is_valid(), serializer.errors)
-        self.assertEqual(serializer.validated_data["layout_key"], "landing_page")
+        self.assertEqual(serializer.validated_data["layout_key"], "landingPage")
 
     def test_layout_policy_cannot_invalidate_widgets_already_in_use(self):
         user = User.objects.create_user("layout-policy-change", password="test")
@@ -765,7 +766,7 @@ class ThemeLayoutUsageTests(TestCase):
         )
         version = page.create_version(user, "Policy draft")
         version.theme = theme
-        version.layout_key = "main_layout"
+        version.layout_key = "mainLayout"
         version.widgets = {
             "main": [
                 {"type": "easy_widgets.ContentWidget", "config": {}},

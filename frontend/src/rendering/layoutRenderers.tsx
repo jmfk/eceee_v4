@@ -21,13 +21,15 @@ const LandingPageRender: LayoutRenderComponent = ({ renderSlot }) => (
             <div className="layout-slot slot-header" data-slot-name="header">{renderSlot('header')}</div>
             <div className="layout-slot slot-navbar" data-slot-name="navbar">{renderSlot('navbar')}</div>
             <div className="layout-slot slot-hero" data-slot-name="hero">{renderSlot('hero')}</div>
-            <main className="landing-page-main"><div className="layout-slot slot-landing-page slot-landingPage" data-slot-name="landing_page">{renderSlot('landingPage')}</div></main>
+            <main className="landing-page-main"><div className="layout-slot slot-landing-page slot-landingPage" data-slot-name="landingPage">{renderSlot('landingPage')}</div></main>
             <div className="landing-page-footer"><div className="layout-slot slot-footer" data-slot-name="footer">{renderSlot('footer')}</div></div>
         </div>
     </div>
 )
 
 export const RENDER_LAYOUT_COMPONENTS: Record<string, LayoutRenderComponent> = {
+    mainLayout: MainLayoutRender,
+    landingPage: LandingPageRender,
     main_layout: MainLayoutRender,
     landing_page: LandingPageRender,
 }

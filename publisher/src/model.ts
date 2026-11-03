@@ -4,6 +4,12 @@ import type { ThemeLayoutDefinition, ThemeLayoutDocument, ThemeLayoutSlot, Theme
 
 export type DbId = string;
 
+const canonicalLayoutKey = (key: string): string => ({
+  main_layout: 'mainLayout',
+  landing_page: 'landingPage',
+  error_layout: 'errorLayout',
+} as Record<string, string>)[key] || key;
+
 export interface Page {
   id: DbId;
   tenant_id: DbId;
@@ -911,8 +917,8 @@ async function buildSpecialPageModel(
   at: Date,
 ): Promise<PublishedPageModel | null> {
   const { root, rootVersion, theme } = context;
-  const layoutKey = specialPage.layout_key || theme?.layouts?.default_layout_key || 'main_layout';
-  const layoutDefinition = theme?.layouts?.items?.find(item => item.key === layoutKey) || null;
+  const layoutKey = canonicalLayoutKey(specialPage.layout_key || theme?.layouts?.default_layout_key || 'mainLayout');
+  const layoutDefinition = theme?.layouts?.items?.find(item => canonicalLayoutKey(item.key) === layoutKey) || null;
   if (!layoutDefinition) return null;
   const slotNames = new Set([
     ...Object.keys(layoutDefinition.slots || {}),
@@ -1038,8 +1044,8 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
         : await reader.theme(explicitThemeId, root.tenant_id)
       : rootTheme ?? await reader.defaultTheme(root.tenant_id);
     const layout = [...chain].reverse().find(item => item.version.layout_key || item.version.code_layout)?.version;
-    const layoutKey = layout?.layout_key || layout?.code_layout || theme?.layouts?.default_layout_key || 'main_layout';
-    const layoutDefinition = theme?.layouts?.items?.find(item => item.key === layoutKey) || null;
+    const layoutKey = canonicalLayoutKey(layout?.layout_key || layout?.code_layout || theme?.layouts?.default_layout_key || 'mainLayout');
+    const layoutDefinition = theme?.layouts?.items?.find(item => canonicalLayoutKey(item.key) === layoutKey) || null;
     const slotNames = new Set([
       ...Object.keys(layoutDefinition?.slots || {}),
       ...chain.flatMap(item => Object.keys(object(item.version.widgets))),

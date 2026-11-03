@@ -1,5 +1,6 @@
 import { getSlotWidgetsForMode } from '../utils/widgetMerging'
 import { getRenderFixture } from './fixtures'
+import { canonicalLayoutKey } from './layoutKeys'
 import type { DesignerPreviewImageReference, RenderPageModel, RenderWidgetModel, ThemeLayoutDefinition, ThemeLayoutNode } from './types'
 
 const previewImagePattern = /(?:https?:\/\/[^\s"'()<>]+|s3:\/\/[^\s"'()<>]+|\/(?:theme_images|uploads|media|files|site-package)\/[^\s"'()<>]+)\.(?:avif|gif|jpe?g|png|svg|webp)(?:\?[^\s"'()<>]*)?/gi
@@ -151,8 +152,8 @@ export const normalizeWidget = (widget: any, fallbackId: string, referencesByObj
 }
 
 const layoutSlots: Record<string, string[]> = {
-    main_layout: ['header', 'navbar', 'hero', 'main', 'sidebar', 'footer'],
-    landing_page: ['header', 'navbar', 'hero', 'landingPage', 'footer'],
+    mainLayout: ['header', 'navbar', 'hero', 'main', 'sidebar', 'footer'],
+    landingPage: ['header', 'navbar', 'hero', 'landingPage', 'footer'],
 }
 
 const objectWidgetsForPreview = (widgets: Record<string, any[]> = {}, objectType: any = {}) => {
@@ -165,8 +166,9 @@ const objectWidgetsForPreview = (widgets: Record<string, any[]> = {}, objectType
 }
 
 export const createPageRenderModel = ({
-    layout = 'main_layout', layoutDefinition = null, layoutDefinitionRequired = false, layoutBreakpoints = undefined, widgets = {}, inheritedWidgets = {}, slotInheritanceRules = {}, context = {}, themeCss = '', fontUrl = '',
+    layout = 'mainLayout', layoutDefinition = null, layoutDefinitionRequired = false, layoutBreakpoints = undefined, widgets = {}, inheritedWidgets = {}, slotInheritanceRules = {}, context = {}, themeCss = '', fontUrl = '',
 }: any): RenderPageModel => {
+    layout = canonicalLayoutKey(layout)
     const slots: Record<string, RenderWidgetModel[]> = {}
     const names = [...new Set([...(layoutDefinition ? Object.keys(layoutDefinition.slots || {}) : layoutSlots[layout] || []), ...Object.keys(widgets || {}), ...Object.keys(inheritedWidgets || {})])]
     names.forEach((name) => {
@@ -178,7 +180,7 @@ export const createPageRenderModel = ({
         }
         slots[name] = (Array.isArray(merged) ? merged : []).map((item, index) => normalizeWidget(item, `${name}-${index}`))
     })
-    if (layout === 'landing_page' && !slots.landingPage?.length && slots.landing_page?.length) {
+    if (layout === 'landingPage' && !slots.landingPage?.length && slots.landing_page?.length) {
         slots.landingPage = slots.landing_page
     }
     return { layout, layoutDefinition, layoutDefinitionRequired, layoutBreakpoints, slots, context: { ...context, preview: true }, themeCss, fontUrl }
@@ -247,10 +249,10 @@ export const createDesignerRenderModel = ({
     const imageReferenceCollection = collectDesignerPreviewImageReferences(view)
     const document = view.content && typeof view.content === 'object' ? view.content : null
     const documentWidgets = document?.widgets && typeof document.widgets === 'object' ? document.widgets : null
-    const layout = sourceModel?.layout || document?.codeLayout || view.layout || 'main_layout'
-    const layoutDefinition = workspace?.layouts?.items?.find((candidate: any) => candidate.key === layout) || null
+    const layout = canonicalLayoutKey(sourceModel?.layout || document?.codeLayout || view.layout || 'mainLayout')
+    const layoutDefinition = workspace?.layouts?.items?.find((candidate: any) => canonicalLayoutKey(candidate.key) === layout) || null
     const slots: Record<string, RenderWidgetModel[]> = {}
-    const catalogLayout = workspace?.catalog?.layouts?.find((candidate: any) => candidate.key === layout)
+    const catalogLayout = workspace?.catalog?.layouts?.find((candidate: any) => canonicalLayoutKey(candidate.key) === layout)
     const rawSlots = sourceModel?.slots || documentWidgets || {}
     const isObjectPreview = Boolean(sourceModel?.context?.objectId || view.kind === 'object')
     const previewSlots = isObjectPreview
@@ -328,7 +330,7 @@ export const createDesignerRenderModel = ({
         }, `${slot}-preview-image-${index}`))
     })
 
-    if (layout === 'landing_page' && !slots.landingPage?.length && slots.landing_page?.length) {
+    if (layout === 'landingPage' && !slots.landingPage?.length && slots.landing_page?.length) {
         slots.landingPage = slots.landing_page
     }
 

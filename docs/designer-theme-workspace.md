@@ -10,6 +10,10 @@ Preview copy is generated locally from the configured font families, variants, a
 
 The draft is shared by all assigned designers for the theme. If another designer changes the draft, or an administrator changes the live theme after the draft starts, stale requests are rejected instead of overwriting newer work. Unused library assets are read-only in the draft workflow because replacing their fixed object keys cannot share the database transaction boundary.
 
+## Layout identifiers
+
+The built-in theme layouts use the keys `mainLayout`, `landingPage`, and `errorLayout`. The landing content slot is `landingPage`. Migration `0092_camel_case_layout_keys` renames these keys in live themes, Designer drafts, page versions, and layout schemas while retaining layout and widget IDs. Imported packages with the former keys are translated at import. Historical theme versions and Designer revisions keep their original snapshots; their layout keys are translated when restored.
+
 ## Image sizing and placeholders
 
 Upload the original full-resolution image. The stored pixel dimensions and the configured DPR determine which 1× and 2× renditions can be delivered. Imgproxy downsizes originals; it does not make an undersized source suitable for a larger rendition.

@@ -32,9 +32,9 @@ vi.mock('../../WidgetEditorPanel', () => ({ default: () => null }))
 const workspace = {
     layouts: {
         schema_version: 1,
-        default_layout_key: 'main_layout',
-        items: [{ id: 'layout-1', key: 'main_layout', label: 'Main', status: 'active' }],
-        special_pages: [{ id: 'error-404', key: 'error_404', label: '404 — Page not found', kind: 'error', status_code: 404, route: '', layout_key: 'main_layout', widgets: {} }],
+        default_layout_key: 'mainLayout',
+        items: [{ id: 'layout-1', key: 'mainLayout', label: 'Main', status: 'active' }],
+        special_pages: [{ id: 'error-404', key: 'error_404', label: '404 — Page not found', kind: 'error', status_code: 404, route: '', layout_key: 'mainLayout', widgets: {} }],
     },
     themeConfig: {},
 }
@@ -44,7 +44,7 @@ const workspaceWithLayouts = {
     layouts: {
         ...workspace.layouts,
         items: [
-            { id: 'layout-1', key: 'main_layout', label: 'Main', status: 'active', slots: { main: {}, shared: {} } },
+            { id: 'layout-1', key: 'mainLayout', label: 'Main', status: 'active', slots: { main: {}, shared: {} } },
             { id: 'layout-2', key: 'compact_layout', label: 'Compact', status: 'active', slots: { shared: {}, compact: {} } },
         ],
         special_pages: [{
@@ -84,7 +84,7 @@ describe('SpecialPagesEditor', () => {
 
         expect(screen.getByTestId('special-page-preview')).toHaveTextContent('404 — Page not found preview')
         expect(mocks.renderFrame.mock.calls.at(-1)[0].model).toMatchObject({
-            layout: 'main_layout',
+            layout: 'mainLayout',
             layoutDefinitionRequired: true,
             slots: {
                 main: [expect.objectContaining({ id: 'main-widget' })],
@@ -147,7 +147,7 @@ describe('SpecialPagesEditor', () => {
         fireEvent.change(screen.getByLabelText('Layout'), { target: { value: 'compact_layout' } })
 
         expect(current.layouts.special_pages[0]).toMatchObject({
-            layout_key: 'main_layout',
+            layout_key: 'mainLayout',
             widgets: {
                 main: [{ id: 'main-widget' }],
                 shared: [{ id: 'shared-widget' }],

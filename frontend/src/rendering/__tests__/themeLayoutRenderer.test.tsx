@@ -299,7 +299,7 @@ describe('theme layout rendering', () => {
             context: { mode: 'public', preview: false },
         }} />)
         expect(screen.getByText('Legacy landing content')).toBeInTheDocument()
-        expect(screen.getByText('Legacy landing content').closest('[data-slot-name]')).toHaveAttribute('data-slot-name', 'landing_page')
+        expect(screen.getByText('Legacy landing content').closest('[data-slot-name]')).toHaveAttribute('data-slot-name', 'landingPage')
     })
 
     it('converts the current Python-owned landing_page declaration and tree to landingPage', () => {

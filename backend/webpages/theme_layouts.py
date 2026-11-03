@@ -12,7 +12,7 @@ from django.core.exceptions import ValidationError
 from webpages.error_page_defaults import ERROR_PAGE_CONTENT, LEGACY_ERROR_PAGE_SLUGS
 
 SCHEMA_VERSION = 1
-LAYOUT_KEY = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+LAYOUT_KEY = re.compile(r"^[a-z][A-Za-z0-9_]{0,63}$")
 WIDGET_ID = re.compile(
     r"^(?:widget-)?[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
     re.IGNORECASE,
@@ -55,7 +55,7 @@ MAX_NODES = 250
 MAX_DEPTH = 12
 MAX_SPECIAL_PAGES = 50
 MAX_SPECIAL_PAGE_WIDGETS = 100
-REQUIRED_LAYOUT_KEYS = {"main_layout", "landing_page", "error_layout"}
+REQUIRED_LAYOUT_KEYS = {"mainLayout", "landingPage", "errorLayout"}
 RESERVED_SPECIAL_ROUTE_PREFIXES = {
     "accounts",
     "admin",
@@ -306,7 +306,7 @@ def _main_layout():
     )
     return {
         "id": _stable_uuid("layout/main_layout"),
-        "key": "main_layout",
+        "key": "mainLayout",
         "label": "Main",
         "description": "Header, navigation, hero, main content, sidebar, and footer.",
         "status": "active",
@@ -331,7 +331,7 @@ def _main_layout():
 
 def _landing_layout():
     slots = copy.deepcopy(SHARED_SLOTS)
-    slots["landing_page"] = {
+    slots["landingPage"] = {
         "label": "Landing Page Main Content",
         "description": "Primary content area for articles and posts",
         "order": 40,
@@ -353,7 +353,7 @@ def _landing_layout():
         label="Main content",
         class_names=["landing-page-main"],
         styles={"base": {"padding": "30px", "min_height": "310px", "background_color": "#ffffff"}},
-        children=[_slot_node("landing", "landing_page", ["layout-slot", "slot-landing-page", "slot-landingPage"])],
+        children=[_slot_node("landing", "landingPage", ["layout-slot", "slot-landing-page", "slot-landingPage"])],
     )
     footer = _node(
         "landing/footer",
@@ -402,7 +402,7 @@ def _landing_layout():
     )
     return {
         "id": _stable_uuid("layout/landing_page"),
-        "key": "landing_page",
+        "key": "landingPage",
         "label": "Landing Page",
         "description": "Full-width landing page with hero and conversion content.",
         "status": "active",
@@ -502,7 +502,7 @@ def _error_layout():
     )
     return {
         "id": _stable_uuid("layout/error_layout"),
-        "key": "error_layout",
+        "key": "errorLayout",
         "label": "Error Page",
         "description": "A reusable, accessible layout for site-owned HTTP error pages.",
         "status": "active",
@@ -537,7 +537,7 @@ def default_theme_layouts():
     """Return a fresh default document suitable for JSONField defaults and migrations."""
     return {
         "schema_version": SCHEMA_VERSION,
-        "default_layout_key": "main_layout",
+        "default_layout_key": "mainLayout",
         "items": [_main_layout(), _landing_layout(), _error_layout()],
         "special_pages": default_special_pages(),
     }

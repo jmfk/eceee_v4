@@ -70,7 +70,7 @@ const PreviewViewsTab = ({ designerPreview, onChange, themeId }) => {
     const updateContent = (updates) => updateView({ content: { ...(selected?.content || {}), ...updates } })
 
     const addPage = () => {
-        const layout = sources.layouts?.[0]?.key || 'main_layout'
+        const layout = sources.layouts?.[0]?.key || 'mainLayout'
         const view = {
             id: newId('page'), label: 'New preview page', kind: 'page', layout,
             content: { title: 'New preview page', pageData: {}, widgets: {}, codeLayout: layout },
@@ -84,7 +84,7 @@ const PreviewViewsTab = ({ designerPreview, onChange, themeId }) => {
         if (!sourceType) return
         const objectType = { ...sourceType, id: `theme-preview-${sourceType.key}` }
         const view = {
-            id: newId('object'), label: `New ${sourceType.label}`, kind: 'object', layout: 'main_layout',
+            id: newId('object'), label: `New ${sourceType.label}`, kind: 'object', layout: 'mainLayout',
             objectType,
             content: { title: `New ${sourceType.label}`, data: {}, widgets: {} },
         }
@@ -119,7 +119,7 @@ const PreviewViewsTab = ({ designerPreview, onChange, themeId }) => {
     const pageVersion = selected?.kind === 'page' ? {
         id: selected.id,
         versionId: selected.id,
-        codeLayout: selected.content?.codeLayout || selected.layout || 'main_layout',
+        codeLayout: selected.content?.codeLayout || selected.layout || 'mainLayout',
         pageData: selected.content?.pageData || {},
         widgets: pageWidgets,
     } : null
@@ -157,7 +157,7 @@ const PreviewViewsTab = ({ designerPreview, onChange, themeId }) => {
             versionId,
             pageId,
             versionNumber: 1,
-            codeLayout: selected.content?.codeLayout || selected.layout || 'main_layout',
+            codeLayout: selected.content?.codeLayout || selected.layout || 'mainLayout',
             pageData: selected.content?.pageData || {},
             widgets: selected.content?.widgets || {},
         }

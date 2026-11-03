@@ -18,10 +18,10 @@ vi.mock('../../media/MediaSelectModal', () => ({
 
 const document = {
     schema_version: 1,
-    default_layout_key: 'main_layout',
+    default_layout_key: 'mainLayout',
     items: [{
         id: '8ac4db5a-492f-4977-bf00-d21b8d72f08e',
-        key: 'main_layout',
+        key: 'mainLayout',
         label: 'Main layout',
         description: '',
         status: 'active',
@@ -33,19 +33,19 @@ const document = {
         },
     }, {
         id: '978bc2e0-6326-4872-a079-e63e341c3b67',
-        key: 'landing_page',
+        key: 'landingPage',
         label: 'Landing Page',
         description: '',
         status: 'active',
-        slots: { landing_page: { label: 'Landing Page', max_widgets: null, collapse_behavior: 'never', default_widgets: [] } },
+        slots: { landingPage: { label: 'Landing Page', max_widgets: null, collapse_behavior: 'never', default_widgets: [] } },
         root: {
             id: 'ce275523-49d3-4cb5-935b-433c75b7e12a', type: 'container', children: [{
-                id: 'c050c19e-b8a8-40ee-a36c-721767cf32fd', type: 'slot', slot_key: 'landing_page', children: [], styles: {}, class_names: ['layout-slot'],
+                id: 'c050c19e-b8a8-40ee-a36c-721767cf32fd', type: 'slot', slot_key: 'landingPage', children: [], styles: {}, class_names: ['layout-slot'],
             }], styles: { base: { width: '100%' } }, class_names: ['landing-page'],
         },
     }, {
         id: 'e50362aa-1ee5-4ff6-9421-f738546248f4',
-        key: 'error_layout',
+        key: 'errorLayout',
         label: 'Error Page',
         description: '',
         status: 'active',
@@ -79,7 +79,7 @@ describe('LayoutDesignerWorkspace', () => {
         expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-layout-canvas', 'true')
         expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-empty-slots', 'true')
-        fireEvent.click(screen.getByRole('button', { name: /Main layout main_layout/ }))
+        fireEvent.click(screen.getByRole('button', { name: /Main layout mainLayout/ }))
         fireEvent.change(screen.getByLabelText('Layout label'), { target: { value: 'Article layout' } })
         expect(screen.getByRole('button', { name: 'Canvas · Article layout' })).toBeInTheDocument()
         expect(screen.getByText('Article layout')).toBeInTheDocument()
@@ -100,8 +100,8 @@ describe('LayoutDesignerWorkspace', () => {
 
     it('defaults layout previews to layout defaults even when matching pages contain content', () => {
         render(<Harness previewViews={[
-            { id: 'empty-page', label: 'Empty page', layout: 'main_layout', content: { codeLayout: 'main_layout', widgets: {} } },
-            { id: 'filled-page', label: 'Filled page', layout: 'main_layout', content: { codeLayout: 'main_layout', widgets: { main: [{ id: 'heading', type: 'easy_widgets.HeadlineWidget', config: { content: 'Hello' } }] } } },
+            { id: 'empty-page', label: 'Empty page', layout: 'mainLayout', content: { codeLayout: 'mainLayout', widgets: {} } },
+            { id: 'filled-page', label: 'Filled page', layout: 'mainLayout', content: { codeLayout: 'mainLayout', widgets: { main: [{ id: 'heading', type: 'easy_widgets.HeadlineWidget', config: { content: 'Hello' } }] } } },
         ]} />)
 
         fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
@@ -126,7 +126,7 @@ describe('LayoutDesignerWorkspace', () => {
         expect(screen.getByRole('heading', { name: 'Slot · main' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Slot · main' })).toHaveAttribute('aria-current', 'true')
 
-        fireEvent.click(screen.getByRole('button', { name: /Main layout main_layout/ }))
+        fireEvent.click(screen.getByRole('button', { name: /Main layout mainLayout/ }))
         expect(screen.getByRole('heading', { name: 'Layout inspector' })).toBeInTheDocument()
         expect(screen.getByLabelText('Layout label')).toHaveValue('Main layout')
     })
@@ -322,8 +322,8 @@ describe('LayoutDesignerWorkspace', () => {
         render(<Harness previewViews={[{
             id: 'preview-page',
             label: 'Preview page',
-            layout: 'main_layout',
-            content: { codeLayout: 'main_layout', widgets: { main: [{ type: 'easy_widgets.HeadlineWidget' }] } },
+            layout: 'mainLayout',
+            content: { codeLayout: 'mainLayout', widgets: { main: [{ type: 'easy_widgets.HeadlineWidget' }] } },
         }]} />)
 
         fireEvent.click(screen.getByRole('button', { name: 'Slot · main' }))
