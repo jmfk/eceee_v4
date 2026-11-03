@@ -310,6 +310,7 @@ class RemoteSiteSourceListView(RemoteSiteSourceMixin, APIView):
             media_ids = exporter._collect_media_ids(versions, pages, request.tenant, themes)
             results.append(
                 {
+                    "sourceRootId": root.id,
                     "stableKey": str(root.stable_key),
                     "title": root.title,
                     "hostnames": root.hostnames or [],

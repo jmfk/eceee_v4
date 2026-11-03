@@ -46,7 +46,7 @@ def validate_reserved_page_attributes(version, page_data):
         raise serializers.ValidationError({"page_attributes": details}) from error
 
 
-def validate_page_data_for_version(version, value, *, code_layout=None):
+def validate_page_data_for_version(version, value, *, code_layout=None, warnings=None):
     """Validate complete page data for every working-copy write path."""
     if not isinstance(value, dict):
         raise serializers.ValidationError("Page data must be a dictionary")
@@ -92,8 +92,13 @@ def validate_page_data_for_version(version, value, *, code_layout=None):
     try:
         Draft202012Validator.check_schema(validation_schema)
         Draft202012Validator(validation_schema).validate(filtered_data)
-    except (SchemaError, ValidationError) as error:
+    except SchemaError as error:
         raise serializers.ValidationError(f"Schema validation failed: {str(error)}") from error
+    except ValidationError as error:
+        message = f"Schema validation failed: {str(error)}"
+        if warnings is None:
+            raise serializers.ValidationError(message) from error
+        warnings.append(message)
 
     return filtered_data
 
@@ -276,6 +281,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
         return {"source": "default", "inherited_from": None}
 
     def validate(self, attrs):
+        content_warnings = [] if self.context.get("review_content_warnings") else None
         if "layout_key" in attrs:
             attrs["code_layout"] = attrs["layout_key"]
         elif "code_layout" in attrs:
@@ -317,14 +323,21 @@ class PageVersionSerializer(serializers.ModelSerializer):
                 from webpages.theme_layouts import validate_layout_widgets
 
                 try:
-                    validate_layout_widgets(effective_theme, effective_key, attrs.get("widgets", self.instance.widgets))
+                    previous_theme = version_widget_theme(self.instance)
+                    validate_layout_widgets(
+                        effective_theme,
+                        effective_key,
+                        attrs.get("widgets", self.instance.widgets),
+                        previous_widgets=self.instance.widgets,
+                        warnings=content_warnings,
+                    )
                     from webpages.theme_widgets import validate_instances
 
-                    previous_theme = version_widget_theme(self.instance)
                     validate_instances(
                         effective_theme,
                         attrs.get("widgets", self.instance.widgets),
                         previous_widgets=self.instance.widgets,
+                        warnings=content_warnings,
                         previous_theme=(
                             previous_theme
                             if previous_theme and previous_theme.pk != getattr(effective_theme, "pk", None)
@@ -338,7 +351,10 @@ class PageVersionSerializer(serializers.ModelSerializer):
                 self.instance,
                 attrs["page_data"],
                 code_layout=attrs.get("code_layout"),
+                warnings=content_warnings,
             )
+        if content_warnings and not self.context.get("acknowledge_content_warnings"):
+            raise serializers.ValidationError({"contentWarnings": content_warnings})
         return super().validate(attrs)
 
     def validate_widgets(self, value):

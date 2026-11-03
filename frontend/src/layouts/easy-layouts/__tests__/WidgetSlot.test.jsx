@@ -12,6 +12,19 @@ vi.mock('../../../editors/page-editor/PageWidgetFactory', () => ({
 }))
 
 describe('WidgetSlot preview defaults', () => {
+    it('keeps a disallowed widget editable and labels its public visibility', () => {
+        render(<WidgetSlot
+            name="main"
+            label="Main"
+            widgets={{ main: [{ id: 'legacy', type: 'easy_widgets.ContentWidget', config: {} }] }}
+            allowedWidgetTypes={['easy_widgets.HeadlineWidget']}
+            slotMode="edit"
+        />)
+
+        expect(screen.getByTestId('rendered-widget')).toHaveAttribute('data-mode', 'editor')
+        expect(screen.getByRole('note')).toHaveTextContent('will not appear on the public site')
+    })
+
     it('keeps edit controls out of the slot layout flow', () => {
         const { container } = render(
             <WidgetSlot

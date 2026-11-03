@@ -401,6 +401,10 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
                 updateOptions.clientUpdatedAt,
             ];
             if (options.expectedRevision != null) saveArgs.push(options.expectedRevision);
+            if (options.acknowledgeContentWarnings) {
+                if (options.expectedRevision == null) saveArgs.push(null);
+                saveArgs.push(true);
+            }
             results.versionResult = await versionsApi.savePageWorkingCopy(...saveArgs);
         }
 

@@ -621,17 +621,31 @@ class WebPageRenderer:
                 if not slot_name:
                     continue
 
+                from webpages.theme_layouts import _widget_type_matches
+
                 # Use tree to get merged widgets for display (much simpler!)
                 merged_widgets = helpers.get_merged_widgets(slot_name)
 
                 # Render each widget
                 rendered_widgets = []
                 for widget in merged_widgets:
+                    allowed = slot_config.get("allowed_widget_types") or slot_config.get("allowedWidgetTypes") or []
+                    disallowed = (
+                        slot_config.get("disallowed_widget_types") or slot_config.get("disallowedWidgetTypes") or []
+                    )
+                    if allowed and not _widget_type_matches(widget.type, allowed):
+                        continue
+                    if disallowed and _widget_type_matches(widget.type, disallowed):
+                        continue
+                    maximum = slot_config.get("max_widgets", slot_config.get("maxWidgets"))
+                    if maximum is not None and len(rendered_widgets) >= maximum:
+                        break
                     # Filter out hidden widgets (check both is_visible and isVisible)
                     is_visible = widget.config.get("is_visible")
                     if is_visible is None:
                         is_visible = widget.config.get("isVisible", True)
-                    if not is_visible:
+                    is_active = widget.config.get("is_active", widget.config.get("isActive", True))
+                    if not is_visible or not is_active:
                         continue  # Skip hidden widgets
 
                     # Get layout name (handle both dict and Layout object)

@@ -20,12 +20,13 @@ export const versionsApi = {
         return api.post(endpoints.versions.workingCopy(pageId))
     }, 'versions.getOrCreateWorkingCopy'),
 
-    savePageWorkingCopy: wrapApiCall(async (pageId, expectedVersionId, versionData, clientUpdatedAt, expectedRevision = null) => {
+    savePageWorkingCopy: wrapApiCall(async (pageId, expectedVersionId, versionData, clientUpdatedAt, expectedRevision = null, acknowledgeContentWarnings = false) => {
         const response = await api.patch(endpoints.versions.savePageWorkingCopy(pageId), {
             ...versionData,
             expectedVersionId,
             clientUpdatedAt,
             ...(expectedRevision ? { expectedRevision } : {}),
+            ...(acknowledgeContentWarnings ? { acknowledgeContentWarnings: true } : {}),
         })
         return response.data.version
     }, 'versions.savePageWorkingCopy'),

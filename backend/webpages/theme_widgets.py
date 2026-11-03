@@ -499,7 +499,7 @@ def iter_widgets(value):
                 yield from iter_widgets(child)
 
 
-def validate_instances(theme, widgets, *, previous_theme=None, previous_widgets=None):
+def validate_instances(theme, widgets, *, previous_theme=None, previous_widgets=None, warnings=None):
     errors = []
     previous_references = (
         None
@@ -535,7 +535,10 @@ def validate_instances(theme, widgets, *, previous_theme=None, previous_widgets=
         if field_errors:
             errors.append(f"Widget {label}: {json.dumps(field_errors)}")
     if errors:
-        raise ValidationError(errors)
+        if warnings is not None:
+            warnings.extend(errors)
+        else:
+            raise ValidationError(errors)
 
 
 def resolve_widget(theme, widget_type, version=None):

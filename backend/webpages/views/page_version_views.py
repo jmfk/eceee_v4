@@ -9,9 +9,11 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django_filters.rest_framework import DjangoFilterBackend
+from djangorestframework_camel_case.render import CamelCaseJSONRenderer
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.renderers import BrowsableAPIRenderer
 from rest_framework.response import Response
 
 from core.models import Tenant
@@ -30,6 +32,15 @@ from ..services.page_version_workflow import (
 )
 
 
+class PageVersionJSONRenderer(CamelCaseJSONRenderer):
+    """Keep widget slot identifiers intact while camel-casing the API envelope."""
+
+    json_underscoreize = {
+        **CamelCaseJSONRenderer.json_underscoreize,
+        "ignore_fields": (*CamelCaseJSONRenderer.json_underscoreize.get("ignore_fields", ()), "widgets"),
+    }
+
+
 class PageVersionViewSet(
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
@@ -41,6 +52,7 @@ class PageVersionViewSet(
 
     queryset = PageVersion.objects.select_related("page", "created_by", "last_edited_by").all()
     serializer_class = PageVersionSerializer
+    renderer_classes = [PageVersionJSONRenderer, BrowsableAPIRenderer]
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = PageVersionFilter
@@ -388,6 +400,9 @@ class PageVersionViewSet(
         expected_revision, client_timestamp, error_response = self._parse_review_token(request)
         if error_response:
             return error_response
+        acknowledge_warnings = request.data.get("acknowledge_content_warnings", False)
+        if not isinstance(acknowledge_warnings, bool):
+            return Response({"error": "invalid_acknowledgement"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             with transaction.atomic():
@@ -404,13 +419,19 @@ class PageVersionViewSet(
                 payload = request.data.copy()
                 payload.pop("client_updated_at", None)
                 payload.pop("expected_revision", None)
+                payload.pop("acknowledge_content_warnings", None)
                 payload.pop("effective_date", None)
                 payload.pop("expiry_date", None)
                 serializer = PageVersionSerializer(
                     locked,
                     data=payload,
                     partial=True,
-                    context={"request": request, "timestamp_conflict_checked": True},
+                    context={
+                        "request": request,
+                        "timestamp_conflict_checked": True,
+                        "review_content_warnings": True,
+                        "acknowledge_content_warnings": acknowledge_warnings,
+                    },
                 )
                 serializer.is_valid(raise_exception=True)
                 service.advance_revision(locked)
@@ -447,6 +468,9 @@ class PageVersionViewSet(
         expected_revision, client_timestamp, error_response = self._parse_review_token(request)
         if error_response:
             return error_response
+        acknowledge_warnings = request.data.get("acknowledge_content_warnings", False)
+        if not isinstance(acknowledge_warnings, bool):
+            return Response({"error": "invalid_acknowledgement"}, status=status.HTTP_400_BAD_REQUEST)
 
         page = get_object_or_404(self._page_queryset(), pk=page_id)
         try:
@@ -462,13 +486,19 @@ class PageVersionViewSet(
                 payload.pop("expected_version_id", None)
                 payload.pop("client_updated_at", None)
                 payload.pop("expected_revision", None)
+                payload.pop("acknowledge_content_warnings", None)
                 payload.pop("effective_date", None)
                 payload.pop("expiry_date", None)
                 serializer = PageVersionSerializer(
                     version,
                     data=payload,
                     partial=True,
-                    context={"request": request, "timestamp_conflict_checked": True},
+                    context={
+                        "request": request,
+                        "timestamp_conflict_checked": True,
+                        "review_content_warnings": True,
+                        "acknowledge_content_warnings": acknowledge_warnings,
+                    },
                 )
                 serializer.is_valid(raise_exception=True)
                 service.advance_revision(version)

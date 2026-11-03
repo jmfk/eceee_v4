@@ -1571,7 +1571,9 @@ class SitePackageImporter:
             available = {item.get("key") for item in (theme.layouts or {}).get("items", [])}
             if layout_key not in available:
                 raise ValueError(f"Layout '{layout_key}' is not defined by the effective imported theme.")
-        validate_layout_widgets(theme, layout_key, version.widgets)
+        # A package is a snapshot of already persisted content. Preserve its legacy
+        # placements; subsequent page edits still validate newly added/moved widgets.
+        validate_layout_widgets(theme, layout_key, version.widgets, previous_widgets=version.widgets)
 
     @transaction.atomic
     @import_actor

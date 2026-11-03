@@ -281,7 +281,7 @@ describe('TreePageManager', () => {
         expect(screen.getByText('Download a remote site or import a site package ZIP.')).toBeInTheDocument()
         expect(screen.getByRole('tab', { name: 'Remote site' })).toHaveAttribute('aria-selected', 'true')
         expect(screen.getByRole('tab', { name: 'ZIP file' })).toBeInTheDocument()
-        expect(await screen.findByText('No remote connections are configured. Add one in Settings → Remote Sites first.')).toBeInTheDocument()
+        expect(await screen.findByRole('link', { name: 'Set up remote sites' })).toHaveAttribute('href', '/settings/remote-sites')
     })
 
     it('assesses a ZIP before import and offers optional missing theme packages', async () => {
@@ -366,7 +366,7 @@ describe('TreePageManager', () => {
 
     it('assesses a remote site and updates a linked local copy', async () => {
         remoteMocks.remoteConnections.mockResolvedValueOnce({
-            results: [{ id: 'connection-1', name: 'Production', isDefault: true }],
+            results: [{ id: 'connection-1', name: 'Production', baseUrl: 'https://remote.example', isDefault: true }],
         })
         api.post.mockImplementation((url) => {
             if (url.includes('/site-packages/remote/sites/')) {
@@ -374,6 +374,7 @@ describe('TreePageManager', () => {
                     data: {
                         results: [{
                             stableKey: '9ad84b80-4f5f-4a7d-9a2f-a737f35d6ebc',
+                            sourceRootId: 42,
                             title: 'Remote Site',
                             hostnames: ['remote.example'],
                             pageCount: 4,
@@ -403,6 +404,8 @@ describe('TreePageManager', () => {
         fireEvent.click(await screen.findByRole('button', { name: 'Load sites' }))
 
         expect(await screen.findByText('Remote Site')).toBeInTheDocument()
+        expect(screen.getByRole('link', { name: 'Edit hostnames on source site' }))
+            .toHaveAttribute('href', 'https://remote.example/pages/42/edit/settings')
         fireEvent.click(screen.getByRole('button', { name: 'Select what to import' }))
         expect(await screen.findByRole('heading', { name: 'Select what to import' })).toBeInTheDocument()
         expect(screen.getByLabelText('Import mode')).toHaveValue('update')
@@ -472,6 +475,32 @@ describe('TreePageManager', () => {
             expect(screen.getByText('Export Home Page')).toBeInTheDocument()
             expect(screen.getByText('Queued')).toBeInTheDocument()
         })
+    })
+
+    it('keeps an import queued when status polling is throttled', async () => {
+        const queuedJob = {
+            id: '33333333-3333-4333-8333-333333333333',
+            kind: 'import',
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+        }
+        api.get.mockImplementation((url) => {
+            const endpoint = String(url)
+            if (endpoint.endsWith('/site-packages/imports/')) {
+                return Promise.resolve({ data: [queuedJob] })
+            }
+            if (endpoint.includes(`/site-packages/imports/${queuedJob.id}/`)) {
+                return Promise.reject({ response: { status: 429, headers: { 'retry-after': '4' }, data: { detail: 'Request was throttled.' } } })
+            }
+            return Promise.resolve({ data: [] })
+        })
+
+        renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
+
+        await waitFor(() => expect(api.get).toHaveBeenCalledWith(expect.stringContaining(`/site-packages/imports/${queuedJob.id}/`)))
+        await new Promise(resolve => setTimeout(resolve, 0))
+        expect(screen.getByText('Queued')).toBeInTheDocument()
+        expect(screen.queryByText(/Request was throttled/)).not.toBeInTheDocument()
     })
 
     it('does not restore dismissed completed site package exports after download URL recovery', async () => {

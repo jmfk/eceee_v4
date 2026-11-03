@@ -360,7 +360,7 @@ class SitePackageServiceTests(TestCase):
         self.assertEqual(key, "error_layout")
         self.assertEqual(set(widgets), {"visual", "message", "actions"})
 
-    def test_imported_versions_enforce_layout_widget_policies(self):
+    def test_imported_versions_preserve_legacy_layout_widgets(self):
         self.theme.layouts = default_theme_layouts()
         self.theme.save(update_fields=["layouts"])
         version = PageVersion.objects.create(
@@ -378,7 +378,15 @@ class SitePackageServiceTests(TestCase):
             created_by=self.user,
         )
 
-        with self.assertRaisesMessage(ValidationError, "allows at most 1 widgets"):
+        SitePackageImporter._validate_imported_version_layout(version)
+
+        version.layout_key = "landing_page"
+        version.code_layout = "landing_page"
+        version.widgets = {"landing_page": [{"type": "easy_widgets.ContentWidget"}]}
+        SitePackageImporter._validate_imported_version_layout(version)
+
+        version.widgets = {"landing_page": [{"config": {}}]}
+        with self.assertRaisesMessage(ValidationError, "must have a type"):
             SitePackageImporter._validate_imported_version_layout(version)
 
     def test_published_import_uses_the_published_parent_theme(self):
@@ -3099,6 +3107,7 @@ class SitePackageAPITests(APITestCase):
         allowed = self.client.get("/api/v1/webpages/site-packages/remote-source/sites/")
         self.assertEqual(allowed.status_code, 200)
         self.assertEqual(allowed.data["results"][0]["stableKey"], str(self.root.stable_key))
+        self.assertEqual(allowed.data["results"][0]["sourceRootId"], self.root.id)
 
     @patch("webpages.views.site_package_views.export_site_package.delay")
     def test_remote_export_job_is_owned_by_the_exact_access_key(self, delay):

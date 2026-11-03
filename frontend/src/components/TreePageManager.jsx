@@ -76,8 +76,8 @@ const useDebounce = (value, delay) => {
     return debouncedValue
 }
 
-const SITE_PACKAGE_POLL_INTERVAL_MS = 2000
-const SITE_PACKAGE_MAX_POLLS = 900
+const SITE_PACKAGE_POLL_INTERVAL_MS = 15000
+const SITE_PACKAGE_MAX_POLLS = 240
 const SITE_PACKAGE_DISMISSED_JOBS_KEY = 'sitePackageDismissedJobs'
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
@@ -689,7 +689,15 @@ const TreePageManager = () => {
                 return
             }
 
-            const job = await getJob(jobId)
+            let job
+            try {
+                job = await getJob(jobId)
+            } catch (error) {
+                if (error.originalError?.response?.status !== 429) throw error
+                const retryAfter = Number(error.originalError.response.headers?.['retry-after'])
+                await delay(Math.max(SITE_PACKAGE_POLL_INTERVAL_MS, Number.isFinite(retryAfter) ? retryAfter * 1000 : 0))
+                continue
+            }
             if (isSitePackageJobDismissed(jobId)) {
                 return
             }
@@ -1862,6 +1870,9 @@ const SitePackageJobsPanel = ({ jobs, onDismiss }) => {
             if (job.progress?.phase === 'importing') return 'Importing site'
             return 'Running'
         }
+        if (job.kind === 'import' && job.status === 'pending' && job.createdAt && Date.now() - new Date(job.createdAt).getTime() > 60_000) {
+            return 'Waiting for the import worker. Ask an administrator to check the worker if this continues.'
+        }
         return 'Queued'
     }
 
@@ -2025,6 +2036,15 @@ const formatImportAssessmentWarning = (warning) => {
     if (warning.code === 'theme_package_already_included') return `${filename} is already included in the site package.`
     if (warning.code === 'remote_assessment_unavailable') return 'The remote server did not provide theme and media details.'
     return warning.message || 'One dependency could not be included.'
+}
+
+const remoteRootSettingsUrl = (connection, sourceRootId) => {
+    if (!connection?.baseUrl || !Number.isSafeInteger(sourceRootId)) return null
+    try {
+        return new URL(`/pages/${sourceRootId}/edit/settings`, connection.baseUrl).href
+    } catch {
+        return null
+    }
 }
 
 const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) => {
@@ -2201,7 +2221,7 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="mx-4 h-[min(85dvh,760px)] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl">
                 <div>
                     <div className="flex items-center justify-between p-6 border-b border-gray-200">
                         <div>
@@ -2252,7 +2272,7 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
                                     <Loader2 className="h-4 w-4 animate-spin" /> Loading remote connections
                                 </p>
                             ) : connections.length === 0 ? (
-                                <p className="text-sm text-gray-600">No remote connections are configured. Add one in Settings → Remote Sites first.</p>
+                                <p className="text-sm text-gray-600">No remote connections are configured. <a href="/settings/remote-sites" className="font-medium text-blue-700 underline">Set up remote sites</a> first.</p>
                             ) : <div className="flex items-end gap-3">
                                 <label className="min-w-0 flex-1 text-sm font-medium text-gray-700">
                                     Remote connection
@@ -2283,11 +2303,21 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
                                 </p>
                             )}
                             {remoteSites.length > 0 && <div className="divide-y divide-gray-200">
-                                {remoteSites.map((site) => <div key={site.stableKey} className="py-4 first:pt-0">
+                                <p className="py-2 text-xs text-gray-600">Public hostnames come from each root page on the remote installation. Correct them there before importing if they are wrong.</p>
+                                {remoteSites.map((site) => {
+                                    const settingsUrl = remoteRootSettingsUrl(
+                                        connections.find((item) => item.id === connectionId), site.sourceRootId
+                                    )
+                                    return <div key={site.stableKey} className="py-4 first:pt-0">
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div className="min-w-0">
                                             <p className="font-medium text-gray-900">{site.title}</p>
                                             <p className="text-xs text-gray-500">{site.hostnames?.join(', ') || 'No hostname'} · {site.pageCount} pages</p>
+                                            {settingsUrl && (
+                                                <a href={settingsUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs font-medium text-blue-700 underline">
+                                                    Edit hostnames on source site
+                                                </a>
+                                            )}
                                             {site.updatedAt && <p className="mt-1 text-xs text-gray-500">Updated {new Date(site.updatedAt).toLocaleString()}</p>}
                                         </div>
                                         <button
@@ -2312,7 +2342,7 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
                                             Select what to import
                                         </button>
                                     </div>
-                                </div>)}
+                                </div>})}
                             </div>}
                         </> : <form id="site-package-zip-form" onSubmit={handleSubmit} className="space-y-4">
                         <label className="block">

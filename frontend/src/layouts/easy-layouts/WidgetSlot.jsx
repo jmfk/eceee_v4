@@ -10,6 +10,7 @@ import { Layout, Plus, Eye, EyeOff } from 'lucide-react';
 import PageWidgetFactory from '../../editors/page-editor/PageWidgetFactory';
 import PageSlotIconMenu from '../../editors/page-editor/PageSlotIconMenu';
 import { getSlotWidgetsForMode, shouldSlotDefaultToPreview, hasInheritedContent } from '../../utils/widgetMerging';
+import { isWidgetAllowedInSlot } from '../../utils/widgetSlotPolicy';
 
 // Normalize slot name for CSS class (matches backend logic)
 const normalizeForCSS = (value) => {
@@ -55,7 +56,8 @@ const WidgetSlot = ({
     parseWidgetPath, // (widgetPath) => object
     // Paste mode props
     pasteModeActive = false,
-    onPasteAtPosition
+    onPasteAtPosition,
+    publicVisibilityWarning = null
 }) => {
     // Build path for this slot: append slot name to parent path
     const slotPath = [...widgetPath, name];
@@ -310,6 +312,12 @@ const WidgetSlot = ({
 
         // Build full path for this widget: append widget ID to slot path
         const fullWidgetPath = [...slotPath, widget.id || `index-${index}`];
+        const visibilityWarning = publicVisibilityWarning || (
+            !isWidgetAllowedInSlot(widget.type, {
+                allowedWidgetTypes: finalAllowedWidgetTypes,
+                disallowedWidgetTypes: finalDisallowedWidgetTypes,
+            }) ? 'This widget type is not allowed in this slot.' : null
+        );
 
         // Determine allowed widget types for this slot (same logic as handleAddWidget)
         let allowedTypes = finalAllowedWidgetTypes;
@@ -333,6 +341,9 @@ const WidgetSlot = ({
         try {
             return (
                 <React.Fragment key={uniqueKey}>
+                    {visibilityWarning && <div role="note" className="mb-1 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-900">
+                        {visibilityWarning} This widget will not appear on the public site.
+                    </div>}
                     <PageWidgetFactory
                         widget={widget}
                         slotName={name}
