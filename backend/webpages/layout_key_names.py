@@ -2,7 +2,6 @@
 
 import copy
 
-
 LAYOUT_KEY_ALIASES = {"main_layout": "mainLayout", "landing_page": "landingPage", "error_layout": "errorLayout"}
 
 

@@ -21,6 +21,7 @@ from easy_widgets.widgets.content import ContentWidget
 from easy_widgets.widgets.navbar import NavbarWidget
 from easy_widgets.widgets.section import SectionWidget
 from file_manager.models import MediaFile, MediaTag
+from webpages.layout_key_names import canonical_preview
 from webpages.models import (
     PageTheme,
     PageVersion,
@@ -30,7 +31,6 @@ from webpages.models import (
     ThemeDesignerRevision,
     WebPage,
 )
-from webpages.layout_key_names import canonical_preview
 from webpages.renderers import WebPageRenderer
 from webpages.services.designer_export import ThemeDesignerExporter, cleanup_expired_designer_exports
 from webpages.services.designer_theme import (

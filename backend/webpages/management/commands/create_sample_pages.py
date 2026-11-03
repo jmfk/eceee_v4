@@ -3,22 +3,20 @@ Management command to create sample pages for testing drag and drop functionalit
 Enhanced version with better error handling and improved configurability
 """
 
-from django.core.management.base import BaseCommand
-from django.contrib.auth.models import User
-from django.utils import timezone
-from django.db import transaction
 import logging
-from typing import List, Dict, Any
 
-from webpages.models import WebPage, PageVersion
+from django.contrib.auth.models import User
+from django.core.management.base import BaseCommand
+from django.db import transaction
+from django.utils import timezone
+
+from webpages.models import PageVersion, WebPage
 
 logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = (
-        "Create sample pages with multiple hierarchy levels for testing drag and drop"
-    )
+    help = "Create sample pages with multiple hierarchy levels for testing drag and drop"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -49,9 +47,7 @@ class Command(BaseCommand):
         try:
             with transaction.atomic():
                 if dry_run:
-                    self.stdout.write(
-                        self.style.WARNING("DRY RUN MODE - No changes will be made")
-                    )
+                    self.stdout.write(self.style.WARNING("DRY RUN MODE - No changes will be made"))
 
                 # Get or create a superuser
                 user = self._get_or_create_superuser(dry_run)
@@ -64,22 +60,15 @@ class Command(BaseCommand):
 
                 if not dry_run:
                     total_pages = WebPage.objects.count()
-                    top_level_no_hostnames = WebPage.objects.filter(
-                        parent=None, hostnames__len=0
-                    ).count()
+                    top_level_no_hostnames = WebPage.objects.filter(parent=None, hostnames__len=0).count()
 
-                    self.stdout.write(
-                        self.style.SUCCESS(
-                            f"\nSuccessfully created {total_pages} sample pages!"
-                        )
-                    )
+                    self.stdout.write(self.style.SUCCESS(f"\nSuccessfully created {total_pages} sample pages!"))
 
                     if top_level_no_hostnames > 0:
-                        self.stdout.write(
-                            self.style.WARNING(
-                                f"Note: {top_level_no_hostnames} top-level pages have no hostnames and will show warnings."
-                            )
+                        warning = (
+                            f"Note: {top_level_no_hostnames} top-level pages have no hostnames and will show warnings."
                         )
+                        self.stdout.write(self.style.WARNING(warning))
 
                     self.stdout.write(
                         self.style.SUCCESS(
@@ -105,9 +94,7 @@ class Command(BaseCommand):
                     is_superuser=True,
                     is_staff=True,
                 )
-                self.stdout.write(
-                    self.style.SUCCESS(f"Created superuser: {user.username}")
-                )
+                self.stdout.write(self.style.SUCCESS(f"Created superuser: {user.username}"))
             else:
                 self.stdout.write("Would create superuser: admin")
                 user = None
@@ -271,9 +258,7 @@ class Command(BaseCommand):
                     if page_data.get("hostnames")
                     else " (no hostnames)"
                 )
-                self.stdout.write(
-                    f"{indent}Would create page: {page_data['title']}{hostname_info}"
-                )
+                self.stdout.write(f"{indent}Would create page: {page_data['title']}{hostname_info}")
 
                 # Process children in dry run
                 if "children" in page_data:
@@ -341,8 +326,4 @@ class Command(BaseCommand):
                 created_count += 1
 
         if not dry_run:
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"Created {created_count} top-level pages with their hierarchies"
-                )
-            )
+            self.stdout.write(self.style.SUCCESS(f"Created {created_count} top-level pages with their hierarchies"))

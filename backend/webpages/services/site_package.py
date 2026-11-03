@@ -32,8 +32,8 @@ from file_manager.storage import S3MediaStorage
 from taxonomy.context import import_actor
 from taxonomy.models import Tag as TaxonomyTag
 from taxonomy.transfer import export_assignments, export_term, import_assignments, import_term
-from webpages.models import PageTheme, PageVersion, RemoteSiteBinding, SitePackageJob, WebPage
 from webpages.layout_key_names import canonical_layout_document, canonical_layout_key, canonical_preview
+from webpages.models import PageTheme, PageVersion, RemoteSiteBinding, SitePackageJob, WebPage
 from webpages.services.theme_preview_content import (
     EMBEDDED_IMAGE_PATTERN,
     normalize_theme_preview_namespaces,

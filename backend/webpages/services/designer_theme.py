@@ -26,6 +26,7 @@ from file_manager.storage import system_storage
 from object_storage.models import ObjectInstance
 from utils.templatetags.security_filters import sanitize_html
 from webpages.error_page_defaults import exclude_legacy_error_subtrees
+from webpages.layout_key_names import canonical_layout_key, canonical_preview, canonical_theme_snapshot
 from webpages.models import (
     DesignerImageSeries,
     DesignerImageVersion,
@@ -36,7 +37,6 @@ from webpages.models import (
     ThemeDesignerRevision,
     WebPage,
 )
-from webpages.layout_key_names import canonical_layout_key, canonical_preview, canonical_theme_snapshot
 from webpages.serializers.theme import PageThemeSerializer
 from webpages.theme_layouts import (
     theme_layout_usage,
