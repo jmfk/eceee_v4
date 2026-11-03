@@ -14,6 +14,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from core.roles import is_tenant_admin
+from webpages.layout_key_names import canonical_layout_key
 
 from ..serializers import LayoutSerializer
 
@@ -41,9 +42,11 @@ class CodeLayoutViewSet(viewsets.ViewSet):
             if data.get("name") in cls.legacy_error_layout_names:
                 data = {
                     **data,
-                    "name": "error_layout",
+                    "name": "errorLayout",
                     "description": "Shared layout for site-owned 403, 404, 500, and 503 pages",
                 }
+            else:
+                data = {**data, "name": canonical_layout_key(data.get("name"))}
             if data.get("name") in seen:
                 continue
             seen.add(data.get("name"))
@@ -56,7 +59,7 @@ class CodeLayoutViewSet(viewsets.ViewSet):
         from ..layout_registry import layout_registry
 
         layout = layout_registry.get_layout(layout_name)
-        if layout or layout_name != "error_layout":
+        if layout or canonical_layout_key(layout_name) != "errorLayout":
             return layout
         for legacy_name in ("error_404", "error_403", "error_500", "error_503"):
             layout = layout_registry.get_layout(legacy_name)

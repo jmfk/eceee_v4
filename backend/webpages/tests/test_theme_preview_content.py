@@ -249,6 +249,10 @@ class ThemePreviewContentTests(TestCase):
         self.assertNotIn(self.other_page.id, [source["id"] for source in response.data["pages"]])
         self.assertEqual([source["id"] for source in response.data["objects"]], [self.object.id])
         self.assertTrue(response.data["layouts"])
+        layout_keys = {source["key"] for source in response.data["layouts"]}
+        self.assertIn("mainLayout", layout_keys)
+        self.assertIn("landingPage", layout_keys)
+        self.assertFalse({"main_layout", "landing_page", "error_layout"} & layout_keys)
         self.assertIn(self.object_type.name, [source["key"] for source in response.data["objectTypes"]])
         self.assertEqual(response.data["defaultNamespace"]["slug"], self.namespace.slug)
 

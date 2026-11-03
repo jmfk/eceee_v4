@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from django.test import SimpleTestCase, override_settings
@@ -5,6 +6,7 @@ from rest_framework.test import APIRequestFactory
 
 from webpages.layout_autodiscovery import reload_layouts
 from webpages.layout_registry import layout_registry
+from webpages.models import WebPage
 from webpages.views.code_layout_views import CodeLayoutViewSet
 
 
@@ -24,15 +26,18 @@ class CodeLayoutViewTests(SimpleTestCase):
         }
         return layout
 
-    def test_code_layout_api_collapses_status_layouts_into_one_error_layout(self):
+    def test_code_layout_api_returns_camel_case_keys_and_collapses_status_layouts(self):
         request = APIRequestFactory().get("/api/v1/webpages/layouts/", {"source": "code"})
 
         response = CodeLayoutViewSet.as_view({"get": "list"})(request)
         names = [item["name"] for item in response.data["results"]]
-        error_layout = next(item for item in response.data["results"] if item["name"] == "error_layout")
+        error_layout = next(item for item in response.data["results"] if item["name"] == "errorLayout")
         error_slots = [slot["name"] for slot in error_layout["slot_configuration"]["slots"]]
 
-        self.assertEqual(names.count("error_layout"), 1)
+        self.assertEqual(names.count("errorLayout"), 1)
+        self.assertIn("mainLayout", names)
+        self.assertIn("landingPage", names)
+        self.assertFalse({"main_layout", "landing_page", "error_layout"} & set(names))
         self.assertFalse({"error_403", "error_404", "error_500", "error_503"} & set(names))
         self.assertEqual(error_slots, ["visual", "message", "actions"])
 
@@ -72,25 +77,45 @@ class CodeLayoutViewTests(SimpleTestCase):
             "webpages.layout_registry.layout_registry.get_layout",
             side_effect=lambda name: legacy_layout if name == "error_404" else None,
         ) as get_layout:
-            layout = CodeLayoutViewSet._get_registry_layout("error_layout")
+            layout = CodeLayoutViewSet._get_registry_layout("errorLayout")
 
         self.assertIs(layout, legacy_layout)
-        self.assertEqual(get_layout.call_args_list[0].args, ("error_layout",))
+        self.assertEqual(get_layout.call_args_list[0].args, ("errorLayout",))
         self.assertEqual(get_layout.call_args_list[1].args, ("error_404",))
 
     def test_reload_repopulates_the_code_layout_registry(self):
         reload_layouts()
 
         self.assertTrue(layout_registry.list_layouts(active_only=False))
+        for current, legacy in (
+            ("mainLayout", "main_layout"),
+            ("landingPage", "landing_page"),
+            ("errorLayout", "error_layout"),
+        ):
+            self.assertIs(layout_registry.get_layout(current), layout_registry.get_layout(legacy))
+            self.assertIs(layout_registry.get_layout_class(current), layout_registry.get_layout_class(legacy))
+            self.assertTrue(layout_registry.is_registered(current))
+
+    def test_migrated_page_key_still_resolves_legacy_code_layout(self):
+        reload_layouts()
+        version = SimpleNamespace(code_layout="mainLayout")
+        page = SimpleNamespace(
+            get_current_published_version=lambda: version,
+            get_latest_version=lambda: version,
+            parent=None,
+        )
+
+        self.assertIs(WebPage.get_effective_layout(page), layout_registry.get_layout("main_layout"))
+        self.assertEqual(WebPage.get_layout_type(page), "code")
 
     def test_shared_error_layout_detail_keeps_the_canonical_name(self):
-        request = APIRequestFactory().get("/api/v1/webpages/layouts/error_layout/")
+        request = APIRequestFactory().get("/api/v1/webpages/layouts/errorLayout/")
         legacy_layout = self.legacy_layout("error_404")
 
         with patch.object(CodeLayoutViewSet, "_get_registry_layout", return_value=legacy_layout):
-            response = CodeLayoutViewSet.as_view({"get": "retrieve"})(request, pk="error_layout")
+            response = CodeLayoutViewSet.as_view({"get": "retrieve"})(request, pk="errorLayout")
 
-        self.assertEqual(response.data["name"], "error_layout")
+        self.assertEqual(response.data["name"], "errorLayout")
 
     def test_choices_collapse_legacy_error_layout_names(self):
         request = APIRequestFactory().get("/api/v1/webpages/layouts/choices/")
@@ -99,4 +124,4 @@ class CodeLayoutViewTests(SimpleTestCase):
         with patch("webpages.layout_registry.layout_registry.list_layouts", return_value=legacy_layouts):
             response = CodeLayoutViewSet.as_view({"get": "choices"})(request)
 
-        self.assertEqual(response.data, [("error_layout", "error_layout")])
+        self.assertEqual(response.data, [("errorLayout", "errorLayout")])
