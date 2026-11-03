@@ -153,7 +153,7 @@ export const EditorNavLinkMenu = ({
     return (
         <div
             ref={menuRef}
-            className="min-w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg ring-1 ring-black/5"
+            className="eceee-editor-ui min-w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg ring-1 ring-black/5"
             style={{ ...menuStyle, zIndex: 10050 }}
             role="menu"
         >
