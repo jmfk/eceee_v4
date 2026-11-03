@@ -254,7 +254,7 @@ class ErrorPageRenderingTests(TestCase):
 
     def test_theme_error_pages_render_without_page_or_version_rows(self):
         special_page = next(page for page in self.theme.layouts["special_pages"] if page["status_code"] == 404)
-        self.assertEqual(special_page["layout_key"], "error_layout")
+        self.assertEqual(special_page["layout_key"], "errorLayout")
         self.assertEqual(special_page["widgets"]["visual"][0]["type"], "easy_widgets.ImageWidget")
         self.assertEqual(special_page["widgets"]["message"][0]["type"], "easy_widgets.HeadlineWidget")
         self.assertFalse(WebPage.objects.filter(parent=self.root_page, slug="404").exists())
@@ -278,7 +278,7 @@ class ErrorPageRenderingTests(TestCase):
                 "label": "Log in",
                 "kind": "route",
                 "route": "login",
-                "layout_key": "main_layout",
+                "layout_key": "mainLayout",
                 "widgets": {},
             }
         )
