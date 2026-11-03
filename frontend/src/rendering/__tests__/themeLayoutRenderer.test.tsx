@@ -280,14 +280,15 @@ describe('theme layout rendering', () => {
         expect(validateLayoutDefinition(normalized)).toBe(true)
     })
 
-    it('renders a legacy landing-page snapshot whose slot declaration uses landingPage', () => {
+    it('renders a legacy landing-page snapshot using landingPage internally', () => {
         const legacy = structuredClone(layout) as any
         legacy.key = 'landing_page'
         legacy.slots = { landingPage: { label: 'Landing content' } }
         legacy.root.children[0].slot_key = 'landing_page'
 
         const normalized = normalizeLayoutDefinition(legacy)
-        expect(Object.keys(normalized?.slots || {})).toEqual(['landing_page'])
+        expect(Object.keys(normalized?.slots || {})).toEqual(['landingPage'])
+        expect(normalized?.root.children[0].slot_key).toBe('landingPage')
         expect(validateLayoutDefinition(normalized)).toBe(true)
 
         render(<PageRenderer model={{
@@ -298,5 +299,18 @@ describe('theme layout rendering', () => {
             context: { mode: 'public', preview: false },
         }} />)
         expect(screen.getByText('Legacy landing content')).toBeInTheDocument()
+        expect(screen.getByText('Legacy landing content').closest('[data-slot-name]')).toHaveAttribute('data-slot-name', 'landing_page')
+    })
+
+    it('converts the current Python-owned landing_page declaration and tree to landingPage', () => {
+        const current = structuredClone(layout) as any
+        current.key = 'landing_page'
+        current.slots = { landing_page: { label: 'Landing content' } }
+        current.root.children[0].slot_key = 'landing_page'
+
+        const normalized = normalizeLayoutDefinition(current)
+        expect(Object.keys(normalized?.slots || {})).toEqual(['landingPage'])
+        expect(normalized?.root.children[0].slot_key).toBe('landingPage')
+        expect(validateLayoutDefinition(normalized)).toBe(true)
     })
 })

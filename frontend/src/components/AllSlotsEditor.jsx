@@ -86,7 +86,11 @@ const AllSlotsEditor = ({
 
     // Get current layout slots
     const currentLayoutSlots = useMemo(() => {
-        if (themeLayout) return Object.keys(themeLayout.slots || {});
+        if (themeLayout) {
+            const names = Object.keys(themeLayout.slots || {});
+            // Page widget keys can still come from Python as landing_page.
+            return names.includes('landingPage') ? [...names, 'landing_page'] : names;
+        }
         if (!currentLayoutData) return [];
         const slots = getSlotsFromLayout(currentLayoutData);
         return slots;

@@ -16,6 +16,7 @@ const propertyMap: Record<string, string> = {
 }
 const allowedBreakpoints = new Set(['base', 'xs', 'sm', 'md', 'lg', 'xl'])
 const keyPattern = /^[a-z][a-z0-9_]{0,63}$/
+const slotKeyPattern = /^[a-z][A-Za-z0-9_]{0,63}$/
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const presentationColorPattern = /^#[0-9a-f]{6}$/i
 const defaultBreakpoints: Record<string, number> = { xs: 0, sm: 640, md: 768, lg: 1024, xl: 1280 }
@@ -45,16 +46,9 @@ const camelToSnake = (value: string) => value.replace(/([a-z0-9])([A-Z])/g, '$1_
 
 export const normalizeLayoutDefinition = (layout: any): ThemeLayoutDefinition | null => {
     if (!layout || typeof layout !== 'object') return null
-    // Older theme-version snapshots declare landingPage while their layout tree
-    // references landing_page. Keep the stored snapshot intact and resolve the
-    // known alias at the render boundary.
-    const usesLandingPageSlot = (node: any): boolean =>
-        (node?.type === 'slot' && (node.slot_key || node.slotKey) === 'landing_page')
-        || (Array.isArray(node?.children) && node.children.some(usesLandingPageSlot))
-    const legacyLandingSlot = layout.key === 'landing_page'
-        && layout.slots?.landingPage
-        && !layout.slots?.landing_page
-        && usesLandingPageSlot(layout.root)
+    // The persisted layout identifier is landing_page. Its slot is landingPage
+    // in TypeScript; normalize older Python-owned slot keys at this boundary.
+    const normalizeSlotKey = (key: string) => layout.key === 'landing_page' && key === 'landing_page' ? 'landingPage' : key
     const normalizeNode = (node: any): ThemeLayoutNode => ({
         id: String(node?.id || ''),
         type: node?.type,
@@ -67,10 +61,10 @@ export const normalizeLayoutDefinition = (layout: any): ThemeLayoutDefinition | 
         ])),
         class_names: node?.class_names || node?.classNames || [],
         tag: node?.tag,
-        slot_key: node?.slot_key || node?.slotKey,
+        slot_key: normalizeSlotKey(node?.slot_key || node?.slotKey),
         editable_parameters: node?.editable_parameters || node?.editableParameters || [],
     })
-    const slots = Object.fromEntries(Object.entries(layout.slots || {}).map(([key, value]: [string, any]) => [legacyLandingSlot && key === 'landingPage' ? 'landing_page' : key, {
+    const slots = Object.fromEntries(Object.entries(layout.slots || {}).map(([key, value]: [string, any]) => [normalizeSlotKey(key), {
         ...value,
         max_widgets: value?.max_widgets ?? value?.maxWidgets,
         allowed_widget_types: value?.allowed_widget_types || value?.allowedWidgetTypes,
@@ -93,7 +87,7 @@ export const validateLayoutDefinition = (layout: unknown): layout is ThemeLayout
     if (!uuidPattern.test(value.id) || !keyPattern.test(value.key) || !value.root || !value.slots || !Array.isArray(value.root.children)) return false
     if (value.status && !['active', 'archived'].includes(value.status)) return false
     if (Object.entries(value.slots).some(([key, slot]) => {
-        if (!keyPattern.test(key) || !slot || typeof slot !== 'object') return true
+        if (!slotKeyPattern.test(key) || !slot || typeof slot !== 'object') return true
         const policy = slot as Record<string, unknown>
         const maximum = policy.max_widgets
         const listFields = ['allowed_widget_types', 'disallowed_widget_types', 'inheritable_types']
@@ -160,20 +154,21 @@ export const layoutDefinitionCss = (layout: ThemeLayoutDefinition, breakpoints: 
     return `${base}${responsive}`
 }
 
-const LayoutNode = ({ node, slots, renderSlot, designer, layoutCanvas }: { node: ThemeLayoutNode, slots: ThemeLayoutDefinition['slots'], renderSlot: LayoutRenderProps['renderSlot'], designer: boolean, layoutCanvas: boolean }) => {
+const LayoutNode = ({ node, slots, renderSlot, designer, layoutCanvas, layoutKey }: { node: ThemeLayoutNode, slots: ThemeLayoutDefinition['slots'], renderSlot: LayoutRenderProps['renderSlot'], designer: boolean, layoutCanvas: boolean, layoutKey: string }) => {
     const className = (node.class_names || []).join(' ') || undefined
     const label = node.label || (node.type === 'slot' ? String(slots[node.slot_key || '']?.label || node.slot_key || 'Slot') : node.type)
+    const persistedSlotKey = layoutKey === 'landing_page' && node.slot_key === 'landingPage' ? 'landing_page' : node.slot_key
     const target = JSON.stringify([{ id: `layout-node:${node.id}`, layoutNodeId: node.id, kind: node.type === 'slot' ? 'slot' : 'element', label, editableParameters: node.editable_parameters || [] }])
     const presentationProps = layoutCanvas && node.presentation_color ? {
         'data-layout-presentation-color': node.presentation_color,
         style: { '--layout-presentation-color': node.presentation_color } as React.CSSProperties,
     } : {}
-    if (node.type === 'slot') return <div className={className || `layout-slot slot-${node.slot_key}`} data-layout-node-id={node.id} data-layout-node-type={node.type} data-layout-node-label={label} data-slot-name={node.slot_key} data-designer-target={designer ? 'true' : undefined} data-designer-targets={designer ? target : undefined} {...presentationProps}>
+    if (node.type === 'slot') return <div className={className || `layout-slot slot-${persistedSlotKey}`} data-layout-node-id={node.id} data-layout-node-type={node.type} data-layout-node-label={label} data-slot-name={persistedSlotKey} data-designer-target={designer ? 'true' : undefined} data-designer-targets={designer ? target : undefined} {...presentationProps}>
         {renderSlot(node.slot_key || '')}
     </div>
     const tag = node.type === 'semantic' ? (node.tag || 'div') : 'div'
     return React.createElement(tag, { className, 'data-layout-node-id': node.id, 'data-layout-node-type': node.type, 'data-layout-node-label': label, 'data-designer-target': designer ? 'true' : undefined, 'data-designer-targets': designer ? target : undefined, ...presentationProps },
-        node.children.map((child) => <LayoutNode key={child.id} node={child} slots={slots} renderSlot={renderSlot} designer={designer} layoutCanvas={layoutCanvas} />))
+        node.children.map((child) => <LayoutNode key={child.id} node={child} slots={slots} renderSlot={renderSlot} designer={designer} layoutCanvas={layoutCanvas} layoutKey={layoutKey} />))
 }
 
 export const ThemeLayoutRender = ({ model, renderSlot }: LayoutRenderProps) => {
@@ -181,6 +176,6 @@ export const ThemeLayoutRender = ({ model, renderSlot }: LayoutRenderProps) => {
     if (!layout || !validateLayoutDefinition(layout)) return null
     return <>
         <style data-theme-layout-css={layout.key}>{layoutDefinitionCss(layout, model.layoutBreakpoints)}</style>
-        <LayoutNode node={layout.root} slots={layout.slots} renderSlot={renderSlot} designer={Boolean(model.designer)} layoutCanvas={Boolean(model.designer?.layoutCanvas)} />
+        <LayoutNode node={layout.root} slots={layout.slots} renderSlot={renderSlot} designer={Boolean(model.designer)} layoutCanvas={Boolean(model.designer?.layoutCanvas)} layoutKey={layout.key} />
     </>
 }
