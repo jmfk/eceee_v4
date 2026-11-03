@@ -19,7 +19,6 @@ from webpages.public_views import HostnamePageView
 from webpages.renderers import WebPageRenderer
 from webpages.serializers import PageDataSchemaSerializer, PageVersionSerializer
 from webpages.serializers.version import validate_page_data_for_version
-from webpages.renderers import WebPageRenderer
 from webpages.theme_layout_renderer import render_theme_layout
 from webpages.theme_layouts import (
     default_theme_layouts,
@@ -710,7 +709,7 @@ class ThemeLayoutUsageTests(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn("widgets", serializer.errors)
 
-    def test_page_version_serializer_revalidates_existing_widgets_when_layout_changes(self):
+    def test_page_version_serializer_preserves_existing_widgets_when_layout_changes(self):
         user = User.objects.create_user("layout-change-policy", password="test")
         tenant = Tenant.objects.create(name="Layout change policy", identifier="layout-change-policy", created_by=user)
         theme = PageTheme.objects.create(tenant=tenant, name="Policy theme", is_default=True, created_by=user)
@@ -726,8 +725,19 @@ class ThemeLayoutUsageTests(TestCase):
         payload = CamelCaseJSONParser().parse(io.BytesIO(json.dumps({"layoutKey": "main_layout"}).encode()))
         serializer = PageVersionSerializer(version, data=payload, partial=True)
 
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("widgets", serializer.errors)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+        reviewed = PageVersionSerializer(version, data=payload, partial=True, context={"review_content_warnings": True})
+        self.assertFalse(reviewed.is_valid())
+        self.assertIn("contentWarnings", reviewed.errors)
+
+        acknowledged = PageVersionSerializer(
+            version,
+            data=payload,
+            partial=True,
+            context={"review_content_warnings": True, "acknowledge_content_warnings": True},
+        )
+        self.assertTrue(acknowledged.is_valid(), acknowledged.errors)
 
     def test_schema_serializer_accepts_layout_key_after_http_case_conversion(self):
         payload = CamelCaseJSONParser().parse(
