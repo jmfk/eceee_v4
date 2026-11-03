@@ -82,20 +82,6 @@ import { detectPageConflicts, applyConflictResolutions } from '../utils/conflict
 import { deriveTodoItemsFromError } from '../utils/pageEditorValidationErrors'
 import ConflictResolutionModal from './ConflictResolutionModal'
 
-// Helpers: error parsing and merging for To-Do items
-function mergeTodoItems(existing, incoming) {
-    const byId = new Map(existing.map(i => [i.id, i]))
-    incoming.forEach(item => {
-        if (byId.has(item.id)) {
-            const prev = byId.get(item.id)
-            byId.set(item.id, { ...prev, ...item, checked: prev.checked && item.checked })
-        } else {
-            byId.set(item.id, item)
-        }
-    })
-    return Array.from(byId.values())
-}
-
 function formatWorkflowState(state) {
     const labels = {
         notPublished: 'Not published',
@@ -375,6 +361,7 @@ const PageEditor = () => {
 
     // Fast local widget update function
     const updateLocalWidgets = useCallback((updatedWidgets, options = {}) => {
+        setErrorTodoItems([])
         // 1. Immediate local state update (fast UI)
         setLocalWidgets(updatedWidgets);
 
@@ -572,6 +559,7 @@ const PageEditor = () => {
 
     // Validation To-Do sidebar state
     const [errorTodoItems, setErrorTodoItems] = useState([])
+    const [acknowledgedWarnings, setAcknowledgedWarnings] = useState([])
     const [schemaValidationState, setSchemaValidationState] = useState({ isValid: true, hasErrors: false })
 
     // Namespace for media operations
@@ -1130,6 +1118,7 @@ const PageEditor = () => {
 
     // Handle page data updates - route to appropriate data structure
     const updatePageData = useCallback(async (updates) => {
+        setErrorTodoItems([])
         // Handle version changes from active React editor controls
         if (updates.versionChanged && updates.pageVersionData) {
             // This is a version switch from editor controls, use switchToVersion
@@ -1276,6 +1265,7 @@ const PageEditor = () => {
                     clientUpdatedAt,
                     expectedRevision,
                     pageId,
+                    acknowledgeContentWarnings: Boolean(saveOptions.acknowledgeContentWarnings),
                 }
             );
 
@@ -1393,6 +1383,7 @@ const PageEditor = () => {
 
             // Clear To-Do items on success
             setErrorTodoItems([])
+            setAcknowledgedWarnings([])
 
             // Show success notification with smart summary
             const actionDescription = saveResult.versionResult
@@ -1418,18 +1409,24 @@ const PageEditor = () => {
 
         } catch (error) {
             console.error('❌ SMART SAVE: Save failed', error);
-            addNotification(
-                `Save failed: ${error.message}`,
-                'error'
-            );
-            showError(`Save failed: ${error.message}`);
-
-            // Parse backend validation error and populate To-Do list
-            const backendError = error?.response?.data?.error || error?.response?.data?.detail || error?.message
-            if (backendError) {
-                const items = deriveTodoItemsFromError(backendError)
-                if (items && items.length > 0) {
-                    setErrorTodoItems(prev => mergeTodoItems(prev, items))
+            const errorData = error?.response?.data || error?.originalError?.response?.data
+            const contentWarnings = errorData?.contentWarnings || errorData?.content_warnings
+            if (Array.isArray(contentWarnings) && contentWarnings.length) {
+                addNotification('Review the content warnings to save this draft.', 'warning')
+                setErrorTodoItems(contentWarnings.map((warning, index) => ({
+                    id: `content-warning-${index}`,
+                    title: 'Content warning',
+                    detail: String(warning),
+                    warning: true,
+                })))
+                setAcknowledgedWarnings([])
+            } else {
+                addNotification(`Save failed: ${error.message}`, 'error')
+                showError(`Save failed: ${error.message}`)
+                const backendError = errorData?.error || errorData?.detail || error?.message
+                if (backendError) {
+                    const items = deriveTodoItemsFromError(backendError)
+                    if (items && items.length > 0) setErrorTodoItems(items)
                 }
             }
             throw error;
@@ -1439,28 +1436,6 @@ const PageEditor = () => {
 
     // Smart save - analyze changes first, then show modal only if needed
     const handleSaveFromStatusBar = useCallback(async () => {
-        const unresolved = errorTodoItems.filter(i => !i.checked).length
-        if (unresolved > 0) {
-            addNotification(
-                `Cannot save: resolve ${unresolved} issue${unresolved === 1 ? '' : 's'} in the To-Do sidebar`,
-                'error'
-            )
-            return
-        }
-
-        // Check for critical schema validation errors (allow warnings/non-critical errors)
-        const hasCriticalErrors = schemaValidationState.fieldResults &&
-            Object.values(schemaValidationState.fieldResults).some(result =>
-                result && result.severity === 'error' && result.errors && result.errors.length > 0
-            );
-        if (hasCriticalErrors) {
-            addNotification(
-                'Cannot save: please fix critical validation errors in the page data',
-                'error'
-            )
-            return
-        }
-
         try {
             // Collect all data from editors first (without saving)
             const collectedData = {};
@@ -1533,13 +1508,13 @@ const PageEditor = () => {
 
         } catch (error) {
             console.error('❌ Save analysis failed:', error);
-            addNotification(
-                `Save analysis failed: ${error.message}`,
-                'error'
-            );
+            const warningData = error?.response?.data || error?.originalError?.response?.data
+            if (!warningData?.contentWarnings && !warningData?.content_warnings) {
+                addNotification(`Save analysis failed: ${error.message}`, 'error')
+            }
             return { saved: false, error };
         }
-    }, [errorTodoItems, schemaValidationState, addNotification, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, contentEditorRef, settingsEditorRef, handleActualSave, publishUpdate, componentId, setIsDirty, currentVersion]);
+    }, [addNotification, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, contentEditorRef, settingsEditorRef, handleActualSave, publishUpdate, componentId, setIsDirty, currentVersion]);
 
     // Keep one save path for status-bar and pre-publish saves.
     const handleSave = useCallback(async () => {
@@ -1552,6 +1527,18 @@ const PageEditor = () => {
             setIsSaving(false);
         }
     }, [handleSaveFromStatusBar, currentVersion, pageVersionData]);
+
+    const handleSaveAcknowledgedWarnings = useCallback(async () => {
+        if (!errorTodoItems.length || errorTodoItems.some((item) => !item.warning || !acknowledgedWarnings.includes(item.id))) return
+        setIsSaving(true)
+        try {
+            await handleActualSave({ acknowledgeContentWarnings: true, description: 'Saved with reviewed content warnings' })
+        } catch {
+            // The save path reports the current server response in the sidebar.
+        } finally {
+            setIsSaving(false)
+        }
+    }, [acknowledgedWarnings, errorTodoItems, handleActualSave])
 
     const handleVersionRestored = useCallback(async (restoredVersion) => {
         const processed = processLoadedVersionData(restoredVersion);
@@ -1907,7 +1894,6 @@ const PageEditor = () => {
             // Check widget validation state
             const widgetState = widgetEditorRef.current
             const isValidating = widgetState?.isValidating || false
-            const isValid = widgetState?.isValid !== false
 
             // Block navigation if validating
             if (isValidating) {
@@ -1931,15 +1917,6 @@ const PageEditor = () => {
                     })
 
                     if (confirmed) {
-                        // Check if widget is valid before saving
-                        if (!isValid) {
-                            addNotification(
-                                'Cannot save: Please fix validation errors first',
-                                'error'
-                            )
-                            return
-                        }
-
                         // Save the widget changes using the panel's save method
                         if (widgetEditorRef.current) {
                             try {
@@ -2335,7 +2312,10 @@ const PageEditor = () => {
                     {errorTodoItems.length > 0 && (
                         <ErrorTodoSidebar
                             items={errorTodoItems}
-                            onToggle={(id, checked) => setErrorTodoItems(prev => prev.map(i => i.id === id ? { ...i, checked } : i))}
+                            acknowledgedWarnings={acknowledgedWarnings}
+                            onToggleWarning={(id) => setAcknowledgedWarnings((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])}
+                            onSaveAcknowledged={handleSaveAcknowledgedWarnings}
+                            isSaving={isSaving}
                             onNavigate={(item) => navigateToFix({ item, navigate, pageId, isNewPage, currentVersion, previousView })}
                         />
                     )}
@@ -2495,7 +2475,7 @@ const EssentialFieldsModal = ({ onSave, onCancel, isLoading = false }) => {
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10010]">
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="mx-4 h-[min(85dvh,760px)] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl">
                 <form onSubmit={handleSubmit}>
                     {/* Header */}
                     <div className="px-6 py-4 border-b border-gray-200">

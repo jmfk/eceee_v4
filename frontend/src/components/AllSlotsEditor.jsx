@@ -57,6 +57,11 @@ const AllSlotsEditor = ({
 
     // Get current layout name
     const currentLayoutName = pageVersionData?.codeLayout || webpageData?.codeLayout || null;
+    const effectiveTheme = pageVersionData?.effectiveTheme || currentVersion?.effectiveTheme || webpageData?.effectiveTheme;
+    const themeLayout = useMemo(() => {
+        const layouts = effectiveTheme?.layouts?.items || [];
+        return layouts.find((item) => item.key === (pageVersionData?.layoutKey || currentLayoutName)) || null;
+    }, [effectiveTheme, pageVersionData?.layoutKey, currentLayoutName]);
 
     // Fetch current layout to get its slots
     const { data: currentLayoutData } = useQuery({
@@ -78,10 +83,11 @@ const AllSlotsEditor = ({
 
     // Get current layout slots
     const currentLayoutSlots = useMemo(() => {
+        if (themeLayout) return Object.keys(themeLayout.slots || {});
         if (!currentLayoutData) return [];
         const slots = getSlotsFromLayout(currentLayoutData);
         return slots;
-    }, [currentLayoutData]);
+    }, [currentLayoutData, themeLayout]);
 
     // Accordion state - track which slots are expanded
     const [expandedSlots, setExpandedSlots] = useState(new Set());
@@ -103,8 +109,12 @@ const AllSlotsEditor = ({
             };
         }
 
+        const knownSlots = slotsData.slots || [];
+        const additionalSlots = Object.keys(widgets).filter((name) =>
+            Array.isArray(widgets[name]) && widgets[name].length && !knownSlots.some((slot) => slot.name === name)
+        ).map((name) => ({ name, metadata: {} }));
         return categorizeSlots(
-            slotsData.slots || [],
+            [...knownSlots, ...additionalSlots],
             currentLayoutSlots,
             widgets
         );
@@ -381,6 +391,7 @@ const AllSlotsEditor = ({
                                     slotInheritanceRules={slotInheritanceRules}
                                     currentLayoutSlots={currentLayoutSlots}
                                     isCurrent={slot.isCurrent}
+                                    layoutPolicy={themeLayout?.slots?.[slot.name] || null}
                                 />
                             ))}
                         </div>
@@ -438,6 +449,7 @@ const SlotAccordionItem = ({
     slotInheritanceRules,
     currentLayoutSlots = [],
     isCurrent = false,
+    layoutPolicy = null,
 }) => {
     const slotWidgets = widgets[slot.name] || [];
     const widgetCount = slotWidgets.length;
@@ -485,7 +497,7 @@ const SlotAccordionItem = ({
                                 </span>
                             ) : (
                                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-800">
-                                    Not Current
+                                    Not shown publicly
                                 </span>
                             )}
                         </div>
@@ -520,8 +532,10 @@ const SlotAccordionItem = ({
                         namespace={namespace}
                         onShowWidgetModal={onShowWidgetModal}
                         onClearSlot={onClearSlot}
-                        allowedWidgetTypes={slotMetadata.allowedWidgetTypes || ['*']}
-                        maxWidgets={slotMetadata.max_widgets || 20}
+                        allowedWidgetTypes={layoutPolicy?.allowed_widget_types || layoutPolicy?.allowedWidgetTypes || slotMetadata.allowedWidgetTypes || ['*']}
+                        disallowedWidgetTypes={layoutPolicy?.disallowed_widget_types || layoutPolicy?.disallowedWidgetTypes || null}
+                        publicVisibilityWarning={!isCurrent ? 'This slot is not used by the current layout.' : null}
+                        maxWidgets={layoutPolicy?.max_widgets ?? layoutPolicy?.maxWidgets ?? slotMetadata.max_widgets ?? 20}
                         slotType="content"
                         slotMode="edit"
                         widgetPath={[]}

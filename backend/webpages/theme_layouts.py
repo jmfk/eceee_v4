@@ -853,8 +853,8 @@ def _widget_type_matches(widget_type, patterns):
     )
 
 
-def validate_layout_widgets(theme, layout_key, widgets):
-    """Enforce persisted slot limits and widget allow/deny policies."""
+def validate_layout_widgets(theme, layout_key, widgets, *, previous_widgets=None, warnings=None):
+    """Enforce slot policies while grandfathering unchanged legacy placements."""
     if not theme or not layout_key or not isinstance(widgets, dict):
         return widgets
     layout = next(
@@ -872,24 +872,60 @@ def validate_layout_widgets(theme, layout_key, widgets):
             continue
         if not items:
             continue
-        policy = slots.get(slot_key)
-        if policy is None:
-            errors.append(f"Slot '{slot_key}' is not declared by layout '{layout_key}'.")
-            continue
-        maximum = policy.get("max_widgets")
-        if maximum is not None and len(items) > maximum:
-            errors.append(f"Slot '{slot_key}' allows at most {maximum} widgets.")
-        allowed = policy.get("allowed_widget_types")
-        disallowed = policy.get("disallowed_widget_types") or []
         for widget in items:
             widget_type = widget.get("type") if isinstance(widget, dict) else None
             if not isinstance(widget_type, str) or not widget_type.strip():
                 errors.append(f"Every widget in slot '{slot_key}' must have a type.")
+        # Consume matches so one persisted widget cannot authorize a second copy.
+        previous_items = list((previous_widgets or {}).get(slot_key, [])) if isinstance(previous_widgets, dict) else []
+
+        def existed_in_slot(widget):
+            for index, previous in enumerate(previous_items):
+                if not isinstance(widget, dict) or not isinstance(previous, dict):
+                    continue
+                same_identity = (
+                    widget.get("id") is not None
+                    and str(widget["id"]) == str(previous.get("id"))
+                    and widget.get("type") == previous.get("type")
+                )
+                if same_identity or widget == previous:
+                    previous_items.pop(index)
+                    return True
+            return False
+
+        existing = [existed_in_slot(widget) for widget in items]
+        policy = slots.get(slot_key)
+        if policy is None:
+            if warnings is not None:
+                warnings.append(
+                    f"Slot '{slot_key}' is not used by layout '{layout_key}' and its widgets will not appear publicly."
+                )
+            elif not all(existing):
+                errors.append(f"Slot '{slot_key}' is not declared by layout '{layout_key}'.")
+            continue
+        maximum = policy.get("max_widgets")
+        previous_count = len(previous_widgets.get(slot_key, [])) if isinstance(previous_widgets, dict) else 0
+        if maximum is not None and len(items) > maximum:
+            if warnings is not None:
+                warnings.append(f"Slot '{slot_key}' displays at most {maximum} widgets publicly.")
+            elif len(items) > previous_count or not all(existing):
+                errors.append(f"Slot '{slot_key}' allows at most {maximum} widgets.")
+        allowed = policy.get("allowed_widget_types")
+        disallowed = policy.get("disallowed_widget_types") or []
+        for widget, was_existing in zip(items, existing):
+            widget_type = widget.get("type") if isinstance(widget, dict) else None
+            if not isinstance(widget_type, str) or not widget_type.strip():
                 continue
-            if allowed and not _widget_type_matches(widget_type, allowed):
-                errors.append(f"Widget type '{widget_type}' is not allowed in slot '{slot_key}'.")
-            elif disallowed and _widget_type_matches(widget_type, disallowed):
-                errors.append(f"Widget type '{widget_type}' is not allowed in slot '{slot_key}'.")
+            violates_policy = (allowed and not _widget_type_matches(widget_type, allowed)) or (
+                disallowed and _widget_type_matches(widget_type, disallowed)
+            )
+            if violates_policy:
+                if warnings is not None:
+                    warnings.append(
+                        f"Widget type '{widget_type}' is not allowed in slot '{slot_key}' and will not appear publicly."
+                    )
+                elif not was_existing:
+                    errors.append(f"Widget type '{widget_type}' is not allowed in slot '{slot_key}'.")
     if errors:
         raise ValidationError(errors)
     return widgets

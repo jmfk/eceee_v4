@@ -1965,6 +1965,20 @@ class PageVersionWorkflowTest(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("contentWarnings", response.data)
+
+        acknowledged = self.client.patch(
+            reverse("api:pageversion-save-working-copy", kwargs={"pk": draft.pk}),
+            {
+                "clientUpdatedAt": draft.updated_at.isoformat(),
+                "pageData": {"headline": 42},
+                "acknowledgeContentWarnings": True,
+            },
+            format="json",
+        )
+        self.assertEqual(acknowledged.status_code, status.HTTP_200_OK)
+        draft.refresh_from_db()
+        self.assertEqual(draft.page_data["headline"], 42)
 
     def test_clearing_layout_does_not_validate_against_the_old_layout_schema(self):
         PageDataSchema.objects.create(

@@ -1,31 +1,32 @@
 import React from 'react'
-import { AlertTriangle, CheckCircle2, ArrowRight, ExternalLink } from 'lucide-react'
+import { AlertTriangle, ArrowRight, ExternalLink } from 'lucide-react'
 
 /**
  * ErrorTodoSidebar
  * A right-side sidebar listing validation/errors the user must resolve before saving.
  *
  * Props:
- * - items: Array<{ id: string, title: string, detail?: string, hint?: string, target?: { type: string, path?: string }, checked?: boolean }>
- * - onToggle: (id: string, checked: boolean) => void
+ * - items: Array<{ id: string, title: string, detail?: string, hint?: string, target?: { type: string, path?: string } }>
  * - onNavigate: (item) => void
  * - className?: string
  */
-export default function ErrorTodoSidebar({ items = [], onToggle, onNavigate, className = '' }) {
-    const unresolvedCount = (items || []).filter((i) => !i.checked).length
+export default function ErrorTodoSidebar({ items = [], onNavigate, acknowledgedWarnings = [], onToggleWarning, onSaveAcknowledged, isSaving = false, className = '' }) {
+    const unresolvedCount = items.length
+    const reviewable = items.length > 0 && items.every((item) => item.warning)
+    const allAcknowledged = reviewable && items.every((item) => acknowledgedWarnings.includes(item.id))
 
     if (!items || items.length === 0) {
         return null
     }
 
     return (
-        <aside className={`w-80 border-l border-gray-200 bg-white flex-shrink-0 h-full overflow-y-auto ${className}`} aria-label="Errors to resolve before saving">
+        <aside className={`w-80 border-l border-gray-200 bg-white flex-shrink-0 h-full overflow-y-auto ${className}`} aria-label="Save issues">
             <div className="p-4">
                 <div className="flex items-start space-x-2 mb-3">
                     <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
                     <div>
-                        <div className="text-sm font-semibold text-gray-900" role="heading" aria-level="3">Resolve before saving</div>
-                        <div className="text-xs text-gray-600">Fix the issues below, then check them off to enable saving again.</div>
+                        <div className="text-sm font-semibold text-gray-900" role="heading" aria-level="3">{reviewable ? 'Content warnings' : 'Save issues'}</div>
+                        <div className="text-xs text-gray-600">{reviewable ? 'Review each warning. You can save the draft with these warnings.' : 'Review these issues and try saving again after making changes.'}</div>
                     </div>
                 </div>
 
@@ -36,24 +37,20 @@ export default function ErrorTodoSidebar({ items = [], onToggle, onNavigate, cla
 
                 <div className="space-y-3" role="list">
                     {items.map((item) => (
-                        <div key={item.id} className={`rounded-md border ${item.checked ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'} p-3`}>
+                        <div key={item.id} className={`rounded border p-3 ${item.warning ? 'border-amber-200 bg-amber-50' : 'border-red-200 bg-red-50'}`}>
                             <div className="flex items-start">
-                                <input
-                                    id={`todo-${item.id}`}
+                                {item.warning && <input
                                     type="checkbox"
-                                    checked={!!item.checked}
-                                    onChange={(e) => onToggle && onToggle(item.id, e.target.checked)}
-                                    className="mt-1 mr-2 h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                                    aria-describedby={`todo-detail-${item.id}`}
-                                />
+                                    aria-label={`Acknowledge: ${item.detail || item.title}`}
+                                    checked={acknowledgedWarnings.includes(item.id)}
+                                    onChange={() => onToggleWarning?.(item.id)}
+                                    className="mr-2 mt-0.5"
+                                />}
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-start justify-between">
-                                        <label htmlFor={`todo-${item.id}`} className={`text-sm font-medium ${item.checked ? 'text-green-800' : 'text-red-800'}`}>
+                                        <span className={`text-sm font-medium ${item.warning ? 'text-amber-900' : 'text-red-800'}`}>
                                             {item.title}
-                                        </label>
-                                        {item.checked ? (
-                                            <CheckCircle2 className="w-4 h-4 text-green-600 ml-2" />
-                                        ) : null}
+                                        </span>
                                     </div>
                                     {item.detail && (
                                         <div id={`todo-detail-${item.id}`} className="mt-1 text-xs text-gray-700 break-words">
@@ -91,6 +88,12 @@ export default function ErrorTodoSidebar({ items = [], onToggle, onNavigate, cla
                         </div>
                     ))}
                 </div>
+                {reviewable && <button
+                    type="button"
+                    onClick={onSaveAcknowledged}
+                    disabled={!allAcknowledged || isSaving}
+                    className="mt-4 min-h-8 rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >{isSaving ? 'Saving…' : 'Save anyway'}</button>}
             </div>
         </aside>
     )

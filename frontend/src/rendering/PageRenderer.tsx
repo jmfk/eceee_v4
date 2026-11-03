@@ -9,6 +9,7 @@ import { getBannerRenderConfig } from '../utils/bannerConfig'
 import type { RenderPageModel, RenderWidgetModel } from './types'
 import type { ThemeWidgetDocument } from './themeWidgets'
 import { normalizeLayoutDefinition, ThemeLayoutRender, validateLayoutDefinition } from './themeLayoutRenderer'
+import { visibleSlotWidgets } from '../utils/widgetSlotPolicy'
 
 class RenderBoundary extends Component<{ children: ReactNode, type: string }, { failed: boolean }> {
     state = { failed: false }
@@ -61,7 +62,10 @@ export const PageRenderer = ({ model }: { model: RenderPageModel }) => {
 
     const renderSlot = (name: string) => {
         const camelName = name.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase())
-        return renderWidgets(model.slots[name] || model.slots[camelName] || [])
+        const widgets = model.slots[name] || model.slots[camelName] || []
+        return renderWidgets(layoutDefinition && !model.designer
+            ? visibleSlotWidgets(widgets, layoutDefinition.slots[name] || {})
+            : widgets)
     }
     if (layoutDefinition && validateLayoutDefinition(layoutDefinition)) {
         return <div className="site-renderer cms-content" data-render-layout={layoutDefinition.key}>
@@ -72,7 +76,7 @@ export const PageRenderer = ({ model }: { model: RenderPageModel }) => {
         console.error(`Layout definition '${model.layout}' is missing or invalid; rendering non-empty slots in safe order.`)
         return <div className="site-renderer cms-content" data-render-layout={model.layout}>
         {model.context.mode !== 'public' && <RenderFailure message={`Layout ${model.layout} is unavailable. Content is shown in slot order.`} />}
-        <main className="layout-safe-fallback">{Object.entries(model.slots).filter(([, widgets]) => widgets?.length).map(([name, widgets]) => <section key={name} data-slot-name={name}>{renderWidgets(widgets)}</section>)}</main>
+        {model.context.mode !== 'public' && <main className="layout-safe-fallback">{Object.entries(model.slots).filter(([, widgets]) => widgets?.length).map(([name, widgets]) => <section key={name} data-slot-name={name}>{renderWidgets(widgets)}</section>)}</main>}
     </div>
     }
     return <div className="site-renderer cms-content" data-render-layout={model.layout}>

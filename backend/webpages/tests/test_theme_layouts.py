@@ -1,5 +1,6 @@
 import io
 import json
+import uuid
 from copy import deepcopy
 from importlib import import_module
 from types import SimpleNamespace
@@ -17,6 +18,8 @@ from webpages.models import PageTheme, WebPage
 from webpages.public_views import HostnamePageView
 from webpages.renderers import WebPageRenderer
 from webpages.serializers import PageDataSchemaSerializer, PageVersionSerializer
+from webpages.serializers.version import validate_page_data_for_version
+from webpages.renderers import WebPageRenderer
 from webpages.theme_layout_renderer import render_theme_layout
 from webpages.theme_layouts import (
     default_theme_layouts,
@@ -26,9 +29,61 @@ from webpages.theme_layouts import (
     validate_layout_widgets,
     validate_theme_layouts,
 )
+from webpages.views.page_version_views import PageVersionJSONRenderer
 
 
 class ThemeLayoutValidationTests(SimpleTestCase):
+    @patch("webpages.serializers.version.PageDataSchema.get_effective_schema_for_layout")
+    def test_page_data_schema_mismatch_is_a_reviewable_content_warning(self, get_schema):
+        get_schema.return_value = {"groups": {"content": {"properties": {"headline": {"type": "string"}}}}}
+        version = SimpleNamespace(code_layout="main_layout")
+        warnings = []
+
+        value = validate_page_data_for_version(version, {"headline": 42}, warnings=warnings)
+
+        self.assertEqual(value, {"headline": 42})
+        self.assertIn("Schema validation failed", warnings[0])
+
+    @patch("webpages.renderers.InheritanceTreeHelpers")
+    @patch("webpages.renderers.InheritanceTreeBuilder")
+    def test_python_public_renderer_skips_disallowed_widgets(self, builder, helpers):
+        disallowed = SimpleNamespace(type="easy_widgets.ContentWidget", config={})
+        allowed = SimpleNamespace(
+            id="allowed",
+            type="easy_widgets.HeadlineWidget",
+            config={},
+            order=0,
+            is_local=True,
+            inheritance_behavior=SimpleNamespace(value="append"),
+        )
+        helpers.return_value.get_merged_widgets.return_value = [disallowed, allowed]
+        renderer = WebPageRenderer()
+        renderer.render_widget_json = lambda widget, context: widget["type"]
+        page = SimpleNamespace()
+        version = SimpleNamespace()
+        context = {
+            "theme_layout_definition": {"slots": {"main": {"allowed_widget_types": ["easy_widgets.HeadlineWidget"]}}}
+        }
+
+        result = renderer._render_widgets_by_slot(page, version, context)
+
+        self.assertEqual([item["widget_data"]["type"] for item in result["main"]], ["easy_widgets.HeadlineWidget"])
+        builder.return_value.build_tree.assert_called_once()
+
+    def test_page_version_wire_preserves_widget_slot_identifiers(self):
+        payload = {
+            "version": {
+                "version_number": 2,
+                "widgets": {"landing_page": [{"type": "easy_widgets.ContentWidget", "config": {"fontSize": 14}}]},
+            }
+        }
+
+        rendered = json.loads(PageVersionJSONRenderer().render(payload))
+
+        self.assertEqual(rendered["version"]["versionNumber"], 2)
+        self.assertEqual(list(rendered["version"]["widgets"]), ["landing_page"])
+        self.assertEqual(rendered["version"]["widgets"]["landing_page"][0]["config"]["fontSize"], 14)
+
     def test_default_layouts_are_valid_and_portable(self):
         document = default_theme_layouts()
 
@@ -455,6 +510,109 @@ class ThemeLayoutValidationTests(SimpleTestCase):
             validate_layout_widgets(theme, "main_layout", {"main": {}})
         with self.assertRaisesMessage(ValidationError, "must have a type"):
             validate_layout_widgets(theme, "main_layout", {"main": [{"config": {}}]})
+        warnings = []
+        with self.assertRaisesMessage(ValidationError, "must have a type"):
+            validate_layout_widgets(theme, "main_layout", {"unused": [42]}, warnings=warnings)
+
+    def test_existing_disallowed_widget_is_grandfathered_only_in_its_original_slot(self):
+        theme = SimpleNamespace(layouts=default_theme_layouts())
+        legacy = {"main": [{"id": "legacy", "type": "easy_widgets.HeaderWidget", "config": {}}]}
+
+        edited = {"main": [{**legacy["main"][0], "config": {"label": "Edited"}}]}
+        self.assertEqual(validate_layout_widgets(theme, "main_layout", edited, previous_widgets=legacy), edited)
+
+        added = {"main": [*legacy["main"], {"id": "new", "type": "easy_widgets.HeaderWidget"}]}
+        with self.assertRaisesMessage(ValidationError, "not allowed"):
+            validate_layout_widgets(theme, "main_layout", added, previous_widgets=legacy)
+
+        moved = {"footer": legacy["main"]}
+        with self.assertRaisesMessage(ValidationError, "not allowed"):
+            validate_layout_widgets(theme, "main_layout", moved, previous_widgets=legacy)
+
+    def test_legacy_over_limit_slot_can_be_saved_but_not_expanded(self):
+        theme = SimpleNamespace(layouts=default_theme_layouts())
+        legacy = {
+            "header": [
+                {"id": "old-1", "type": "easy_widgets.HeaderWidget"},
+                {"id": "old-2", "type": "easy_widgets.HeaderWidget"},
+            ]
+        }
+        self.assertEqual(validate_layout_widgets(theme, "main_layout", legacy, previous_widgets=legacy), legacy)
+        with self.assertRaisesMessage(ValidationError, "at most 1"):
+            validate_layout_widgets(
+                theme,
+                "main_layout",
+                {"header": [*legacy["header"], {"id": "new", "type": "easy_widgets.HeaderWidget"}]},
+                previous_widgets=legacy,
+            )
+
+    @patch("webpages.theme_widgets.version_widget_theme")
+    def test_version_serializer_keeps_legacy_widget_when_other_version_data_changes(self, resolve_theme):
+        theme = SimpleNamespace(pk=1, id=1, layouts=default_theme_layouts())
+        resolve_theme.return_value = theme
+        existing = {"landing_page": [{"id": str(uuid.uuid4()), "type": "easy_widgets.ContentWidget", "config": {}}]}
+        version = SimpleNamespace(
+            theme=theme,
+            theme_id=1,
+            page=SimpleNamespace(parent=None),
+            layout_key="landing_page",
+            code_layout="landing_page",
+            effective_date=None,
+            widgets=existing,
+        )
+
+        unchanged = PageVersionSerializer(version, data={"widgets": existing}, partial=True)
+        self.assertTrue(unchanged.is_valid(), unchanged.errors)
+
+        reviewed_existing = PageVersionSerializer(
+            version,
+            data={"widgets": existing},
+            partial=True,
+            context={"review_content_warnings": True},
+        )
+        self.assertFalse(reviewed_existing.is_valid())
+        self.assertIn("contentWarnings", reviewed_existing.errors)
+
+        changed_layout = PageVersionSerializer(
+            version, data={"layout_key": "main_layout", "widgets": existing}, partial=True
+        )
+        self.assertTrue(changed_layout.is_valid(), changed_layout.errors)
+
+        added_to_inactive_slot = {
+            "landing_page": [*existing["landing_page"], {"id": str(uuid.uuid4()), "type": "easy_widgets.ContentWidget"}]
+        }
+        added = PageVersionSerializer(
+            version, data={"layout_key": "main_layout", "widgets": added_to_inactive_slot}, partial=True
+        )
+        self.assertFalse(added.is_valid())
+        self.assertIn("widgets", added.errors)
+
+        new_widget = {
+            "landing_page": [
+                *existing["landing_page"],
+                {"id": str(uuid.uuid4()), "type": "easy_widgets.ContentWidget", "config": {}},
+            ]
+        }
+        added = PageVersionSerializer(version, data={"widgets": new_widget}, partial=True)
+        self.assertFalse(added.is_valid())
+        self.assertIn("widgets", added.errors)
+
+        reviewed = PageVersionSerializer(
+            version,
+            data={"widgets": new_widget},
+            partial=True,
+            context={"review_content_warnings": True},
+        )
+        self.assertFalse(reviewed.is_valid())
+        self.assertIn("contentWarnings", reviewed.errors)
+
+        acknowledged = PageVersionSerializer(
+            version,
+            data={"widgets": new_widget},
+            partial=True,
+            context={"review_content_warnings": True, "acknowledge_content_warnings": True},
+        )
+        self.assertTrue(acknowledged.is_valid(), acknowledged.errors)
 
     def test_error_schema_consolidation_rejects_distinct_active_contracts(self):
         migration = import_module("webpages.migrations.0082_consolidate_error_layouts")

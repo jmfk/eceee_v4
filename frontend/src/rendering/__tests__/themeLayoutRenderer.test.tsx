@@ -31,6 +31,46 @@ const layout: ThemeLayoutDefinition = {
 }
 
 describe('theme layout rendering', () => {
+    it('keeps disallowed widgets in editor data but omits them from public rendering', () => {
+        const restricted = structuredClone(layout)
+        restricted.slots.main.allowed_widget_types = ['easy_widgets.HeadlineWidget']
+        const model: RenderPageModel = {
+            layout: restricted.key,
+            layoutDefinition: restricted,
+            slots: { main: [
+                { id: 'hidden', type: 'easy_widgets.ContentWidget', config: { content: '<p>Hidden publicly</p>' } },
+                { id: 'visible', type: 'easy_widgets.HeadlineWidget', config: { content: 'Visible publicly' } },
+            ] },
+            context: { mode: 'public', preview: false },
+        }
+
+        const publicView = render(<PageRenderer model={model} />)
+        expect(publicView.container.querySelector('[data-widget-id="hidden"]')).toBeNull()
+        expect(publicView.container.querySelector('[data-widget-id="visible"]')).toBeTruthy()
+        publicView.unmount()
+
+        const editor = render(<PageRenderer model={{ ...model, designer: { catalog: {}, texts: {}, assets: [] } }} />)
+        expect(editor.container.querySelector('[data-widget-id="hidden"]')).toBeTruthy()
+    })
+
+    it('counts only visible permitted widgets toward a public slot limit', () => {
+        const restricted = structuredClone(layout)
+        restricted.slots.main.max_widgets = 1
+        const { container } = render(<PageRenderer model={{
+            layout: restricted.key,
+            layoutDefinition: restricted,
+            slots: { main: [
+                { id: 'hidden', type: 'easy_widgets.ContentWidget', config: { isVisible: false } },
+                { id: 'first', type: 'easy_widgets.ContentWidget', config: { content: '<p>First</p>' } },
+                { id: 'second', type: 'easy_widgets.ContentWidget', config: { content: '<p>Second</p>' } },
+            ] },
+            context: { mode: 'public', preview: false },
+        }} />)
+
+        expect(container.querySelector('[data-widget-id="first"]')).toBeTruthy()
+        expect(container.querySelector('[data-widget-id="second"]')).toBeNull()
+    })
+
     it('renders semantic nodes and slots from the database definition', () => {
         const namedLayout = structuredClone(layout)
         namedLayout.root.label = 'Article area'
