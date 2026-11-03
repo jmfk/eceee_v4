@@ -7,6 +7,7 @@ import { resolvePagePreviewModel } from '../components/resolvePagePreviewModel'
 import { createPageRenderModel } from './adapters'
 import { compileBrowserRenderStyles } from './browserThemeStyles'
 import { getCurrentTenantId } from '../utils/tenant'
+import { canonicalLayoutKey } from './layoutKeys'
 import type { RenderPageModel } from './types'
 
 export interface DirectRenderLocation {
@@ -80,12 +81,12 @@ export const buildResolvedRenderModel = async ({
         || page?.effectiveTheme
     const compiledStyles = await compileBrowserRenderStyles({ theme, page, version })
     const model = createPageRenderModel({
-        layout: version?.layoutKey || version?.codeLayout || page?.effectiveLayout?.name || 'main_layout',
+        layout: canonicalLayoutKey(version?.layoutKey || version?.codeLayout || page?.effectiveLayout?.name || 'mainLayout'),
         layoutDefinition: (() => {
             const theme = version?.effectiveTheme || page?.effectiveTheme
-            const key = version?.layoutKey || version?.codeLayout || page?.effectiveLayout?.name
-                || theme?.layouts?.default_layout_key || theme?.layouts?.defaultLayoutKey || 'main_layout'
-            return theme?.layouts?.items?.find((candidate: any) => candidate.key === key) || null
+            const key = canonicalLayoutKey(version?.layoutKey || version?.codeLayout || page?.effectiveLayout?.name
+                || theme?.layouts?.default_layout_key || theme?.layouts?.defaultLayoutKey || 'mainLayout')
+            return theme?.layouts?.items?.find((candidate: any) => canonicalLayoutKey(candidate.key) === key) || null
         })(),
         layoutDefinitionRequired: Boolean((version?.effectiveTheme || page?.effectiveTheme)?.layouts),
         layoutBreakpoints: version?.effectiveTheme?.breakpoints || page?.effectiveTheme?.breakpoints,

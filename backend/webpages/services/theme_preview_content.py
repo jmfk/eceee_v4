@@ -983,7 +983,7 @@ def import_theme_preview_document(theme, source_kind, source_id):
             "id": f"object-{uuid.uuid4().hex}",
             "label": instance.title or f"Object {instance.id}",
             "kind": "object",
-            "layout": "main_layout",
+            "layout": "mainLayout",
             "objectType": _object_type_snapshot(instance.object_type, theme, _default_namespace(theme)),
             "content": content,
         }, copied_images

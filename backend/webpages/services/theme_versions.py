@@ -7,6 +7,7 @@ from django.db import transaction
 from django.db.models import Max
 
 from core.models import Tenant
+from webpages.layout_key_names import canonical_theme_snapshot
 from webpages.theme_layouts import validate_layout_compatibility, validate_theme_layouts
 
 SNAPSHOT_FIELDS = (
@@ -98,16 +99,17 @@ def restore_theme_version(theme, version, *, user):
 
     PageTheme.objects.select_for_update().get(pk=theme.pk)
     theme.refresh_from_db()
-    restored_layouts = version.snapshot.get("layouts", theme.layouts)
+    restored_snapshot = canonical_theme_snapshot(version.snapshot)
+    restored_layouts = restored_snapshot.get("layouts", theme.layouts)
     validate_theme_layouts(restored_layouts)
     validate_layout_compatibility(theme, restored_layouts)
     from webpages.services.theme_preview_content import materialize_legacy_preview_collections
 
     for field in SNAPSHOT_FIELDS:
-        if field == "text_outline_styles" and field not in version.snapshot:
+        if field == "text_outline_styles" and field not in restored_snapshot:
             theme.text_outline_styles = {}
-        if field in version.snapshot:
-            value = version.snapshot[field]
+        if field in restored_snapshot:
+            value = restored_snapshot[field]
             if field == "widget_types":
                 from webpages.theme_widgets import retain_released_history
 

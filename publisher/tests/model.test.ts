@@ -73,7 +73,7 @@ describe('public resolution', () => {
   it('resolves layout, theme and a hierarchy to a serializable public model', async () => {
     const model = await buildPublishedPageModel(db, 'example.org:3000', '/news/story/', new Date('2026-06-01'));
     expect(model?.matchedPath).toBe('/news/story');
-    expect(model?.layout).toBe('main_layout');
+    expect(model?.layout).toBe('mainLayout');
     expect(model?.context).toMatchObject({ mode: 'public', preview: false, tenantId: '7', siteId: '1', pageId: '3', versionId: '10' });
     expect(model?.slots.main[0].config.content).toBe('<p>Hello</p>');
     expect(model?.themeCss).toContain('--primary: #123456');
@@ -158,7 +158,7 @@ describe('public resolution', () => {
     expect(childLookup).not.toHaveBeenCalled();
     expect(model).toMatchObject({
       title: 'Log in',
-      layout: 'main_layout',
+      layout: 'mainLayout',
       matchedPath: '/login',
       remainingPath: '',
       context: { pageId: root.id, versionId: versions[root.id].id, simulatedPath: '/login/' },
@@ -207,7 +207,7 @@ describe('public resolution', () => {
 
     expect(model).toMatchObject({
       title: '404 — Page not found',
-      layout: 'error_layout',
+      layout: 'errorLayout',
       matchedPath: '/404',
       context: { versionId: versions[root.id].id, simulatedPath: '/404/' },
     });
@@ -245,7 +245,7 @@ describe('public resolution', () => {
       new Date('2026-06-01'),
     );
 
-    expect(model).toMatchObject({ title: '404 — Page not found', layout: 'error_layout' });
+    expect(model).toMatchObject({ title: '404 — Page not found', layout: 'errorLayout' });
     expect(model?.slots.message.map(widget => widget.type)).toEqual([
       'easy_widgets.HeadlineWidget',
       'easy_widgets.ContentWidget',

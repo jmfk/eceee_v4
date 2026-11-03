@@ -357,7 +357,7 @@ class SitePackageServiceTests(TestCase):
             },
         )
 
-        self.assertEqual(key, "error_layout")
+        self.assertEqual(key, "errorLayout")
         self.assertEqual(set(widgets), {"visual", "message", "actions"})
 
     def test_imported_versions_preserve_legacy_layout_widgets(self):

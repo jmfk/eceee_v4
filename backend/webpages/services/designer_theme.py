@@ -36,6 +36,7 @@ from webpages.models import (
     ThemeDesignerRevision,
     WebPage,
 )
+from webpages.layout_key_names import canonical_layout_key, canonical_preview, canonical_theme_snapshot
 from webpages.serializers.theme import PageThemeSerializer
 from webpages.theme_layouts import (
     theme_layout_usage,
@@ -323,7 +324,7 @@ def normalized_designer_preview(theme, layouts=None):
 
         autodiscover_layouts()
         layouts = layout_registry.list_layouts(active_only=True)
-    available = {layout.name: layout for layout in layouts}
+    available = {canonical_layout_key(layout.name): layout for layout in layouts}
     preview_config = resolve_theme_preview_library_urls(
         theme,
         materialize_theme_preview_page_links(
@@ -334,7 +335,7 @@ def normalized_designer_preview(theme, layouts=None):
             ),
         ),
     )
-    configured = preview_config.get("views", [])
+    configured = canonical_preview(preview_config).get("views", [])
     views = []
     seen = set()
     for position, view in enumerate(configured):
@@ -492,7 +493,7 @@ def build_designer_catalog(theme, assets, include_reference_previews=True):
         layout_parts = _normalized_layout_parts(getattr(layout, "layout_parts", {}))
         layouts.append(
             {
-                "key": layout.name,
+                "key": canonical_layout_key(layout.name),
                 "label": _humanize_identifier(layout.name),
                 "description": layout.description,
                 "previewTemplate": _render_layout_preview_template(layout),
@@ -583,12 +584,12 @@ def designer_preview_layout(page, version=None, pages_by_id=None):
         visited.add(current.id)
         current_version = current_version or designer_preview_version(current)
         if current_version and current_version.code_layout:
-            return current_version.code_layout
+            return canonical_layout_key(current_version.code_layout)
         if not current.parent_id:
             break
         current = pages_by_id.get(current.parent_id) if pages_by_id else current.parent
         current_version = None
-    return "main_layout"
+    return "mainLayout"
 
 
 def designer_page_sources(theme):
@@ -721,7 +722,7 @@ def _designer_reference_previews(theme, views):
         version = page.current_published_version
         if not effective_theme or effective_theme.id != theme.id or not version.code_layout:
             continue
-        pages_by_layout.setdefault(version.code_layout, page)
+        pages_by_layout.setdefault(canonical_layout_key(version.code_layout), page)
 
     if not pages_by_layout:
         return views
@@ -800,7 +801,7 @@ def _preview_primary_slot(catalog, layout_name):
     layout = next((item for item in catalog["layouts"] if item["key"] == layout_name), None)
     slots = layout["slots"] if layout else []
     return next(
-        (slot["name"] for slot in slots if slot["name"] in {"main", "content", "body", "landing_page"}),
+        (slot["name"] for slot in slots if slot["name"] in {"main", "content", "body", "landingPage"}),
         slots[0]["name"] if slots else "main",
     )
 
@@ -858,7 +859,7 @@ def import_designer_preview_from_site(theme_id, tenant, user, source_site_id, dr
         if not preview["views"]:
             pages_by_layout = {}
             for page in pages:
-                layout = page.current_published_version.code_layout
+                layout = canonical_layout_key(page.current_published_version.code_layout)
                 if layout:
                     pages_by_layout.setdefault(layout, page)
             preview["views"] = [
@@ -874,7 +875,11 @@ def import_designer_preview_from_site(theme_id, tenant, user, source_site_id, dr
             ]
         for view in preview["views"]:
             page = next(
-                (candidate for candidate in pages if candidate.current_published_version.code_layout == view["layout"]),
+                (
+                    candidate
+                    for candidate in pages
+                    if canonical_layout_key(candidate.current_published_version.code_layout) == view["layout"]
+                ),
                 fallback_page,
             )
             version = page.current_published_version
@@ -1026,6 +1031,7 @@ def _cleanup_designer_assets_after_commit(theme_id, snapshots):
 
 
 def apply_designer_snapshot(theme, snapshot):
+    snapshot = canonical_theme_snapshot(snapshot)
     from webpages.services.theme_preview_content import (
         materialize_legacy_preview_collections,
         materialize_theme_preview_page_links,
@@ -2039,7 +2045,7 @@ def undo_designer_publish(theme_id, tenant, user, draft_version, live_sync_versi
             raise DesignerDraftConflict("There is no Designer revision to restore.")
 
         replaced_snapshot = theme_designer_snapshot(theme)
-        restored_layouts = revision.snapshot.get("layouts", theme.layouts)
+        restored_layouts = canonical_theme_snapshot(revision.snapshot).get("layouts", theme.layouts)
         validate_theme_layouts(restored_layouts)
         validate_layout_compatibility(theme, restored_layouts)
         from webpages.theme_widgets import retain_released_history

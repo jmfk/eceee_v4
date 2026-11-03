@@ -176,7 +176,7 @@ class ImportSinglePageView(APIView):
             "hostname": "example.com",  # Optional, for root pages
             "namespace": "default",
             "baseUrl": "https://example.com/section",  # Filter discovered links
-            "codeLayout": "main_layout",  # Optional code layout name
+            "codeLayout": "mainLayout",  # Optional code layout name
             "requestDelay": 2.0
         }
 

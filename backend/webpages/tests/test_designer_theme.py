@@ -30,6 +30,7 @@ from webpages.models import (
     ThemeDesignerRevision,
     WebPage,
 )
+from webpages.layout_key_names import canonical_preview
 from webpages.renderers import WebPageRenderer
 from webpages.services.designer_export import ThemeDesignerExporter, cleanup_expired_designer_exports
 from webpages.services.designer_theme import (
@@ -564,7 +565,7 @@ class DesignerThemeApiTests(TestCase):
         self.assertNotIn("selector", str(workspace["catalog"]).lower())
         self.assertEqual(workspace["catalog"]["componentStyles"][0]["label"], "Feature card")
         self.assertTrue(workspace["catalog"]["layouts"])
-        main_layout = next(layout for layout in workspace["catalog"]["layouts"] if layout["key"] == "main_layout")
+        main_layout = next(layout for layout in workspace["catalog"]["layouts"] if layout["key"] == "mainLayout")
         main_slot = next(slot for slot in main_layout["slots"] if slot["name"] == "main")
         self.assertEqual(main_slot["editableSpacingProperties"], ["gap"])
         two_columns = next(
@@ -1019,7 +1020,7 @@ class DesignerThemeApiTests(TestCase):
         empty_source = next(source for source in workspace["contentPages"] if source["id"] == empty_page.id)
         self.assertIsNone(empty_source["versionId"])
         self.assertEqual(empty_source["versionStatus"], "empty")
-        self.assertEqual(empty_source["layout"], "main_layout")
+        self.assertEqual(empty_source["layout"], "mainLayout")
         self.assertNotIn(foreign_page.id, {source["id"] for source in workspace["contentPages"]})
         self.assertEqual(workspace["previewContent"]["views"], [])
 
@@ -1040,7 +1041,7 @@ class DesignerThemeApiTests(TestCase):
         )
         self.assertEqual(empty_response.status_code, 200, empty_response.data)
         self.assertIsNone(empty_response.data["version"]["id"])
-        self.assertEqual(empty_response.data["version"]["code_layout"], "main_layout")
+        self.assertEqual(empty_response.data["version"]["code_layout"], "mainLayout")
         self.assertEqual(empty_response.data["version"]["widgets"], {})
 
         foreign_response = self.client.post(
@@ -1057,7 +1058,7 @@ class DesignerThemeApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200, response.data)
         views = response.data["previewContent"]["views"]
-        main_view = next(view for view in views if view["layout"] == "main_layout")
+        main_view = next(view for view in views if view["layout"] == "mainLayout")
         self.assertEqual(main_view["texts"]["group:0:element:h1"], "Conference site")
         self.assertEqual(main_view["sourceSiteId"], root.id)
         self.assertIn("https://media.example/conference.jpg", str(main_view["images"]))
@@ -2104,7 +2105,7 @@ class DesignerThemeApiTests(TestCase):
 
         self.assertEqual(restored.status_code, 200, restored.data)
         self.theme.refresh_from_db()
-        self.assertEqual(self.theme.designer_preview, original_preview)
+        self.assertEqual(self.theme.designer_preview, canonical_preview(original_preview))
         self.assertEqual(restored.data["previewContent"]["views"][0]["texts"], original_preview["views"][0]["texts"])
 
     @patch("webpages.services.designer_theme.system_storage.delete")

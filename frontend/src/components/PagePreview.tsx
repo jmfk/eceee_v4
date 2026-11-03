@@ -7,6 +7,7 @@ import PreviewSizeManager from './PreviewSizeManager';
 import { resolvePagePreviewModel } from './resolvePagePreviewModel';
 import RenderFrame from '../rendering/RenderFrame';
 import { createPageRenderModel } from '../rendering/adapters';
+import { canonicalLayoutKey } from '../rendering/layoutKeys';
 import { useBrowserRenderStyles } from '../rendering/useBrowserRenderStyles';
 import type { RenderPageModel } from '../rendering/types';
 
@@ -124,9 +125,9 @@ const PagePreview: React.FC<PagePreviewProps> = ({
     }), [effectiveTheme, webpageData, pageVersionData]);
     const compiledStyles = useBrowserRenderStyles(compiledStylesInput);
 
-    const layoutName = layoutData?.layout?.name || layoutData?.name || pageVersionData?.layoutKey || pageVersionData?.codeLayout
-        || effectiveTheme?.layouts?.default_layout_key || effectiveTheme?.layouts?.defaultLayoutKey || 'main_layout';
-    const layoutDefinition = effectiveTheme?.layouts?.items?.find((candidate: any) => candidate.key === layoutName) || null;
+    const layoutName = canonicalLayoutKey(layoutData?.layout?.name || layoutData?.name || pageVersionData?.layoutKey || pageVersionData?.codeLayout
+        || effectiveTheme?.layouts?.default_layout_key || effectiveTheme?.layouts?.defaultLayoutKey || 'mainLayout');
+    const layoutDefinition = effectiveTheme?.layouts?.items?.find((candidate: any) => canonicalLayoutKey(candidate.key) === layoutName) || null;
     const renderModel = useMemo(() => createPageRenderModel({
         layout: layoutName,
         layoutDefinition,

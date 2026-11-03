@@ -103,7 +103,7 @@ const documentError = (document) => {
     if (!document || document.schema_version !== 1 || !Array.isArray(document.items) || !document.items.length) return 'The document needs schema_version 1 and at least one layout.'
     const keys = document.items.map((item) => item.key)
     if (new Set(keys).size !== keys.length) return 'Layout keys must be unique.'
-    if (!keys.includes('main_layout') || !keys.includes('landing_page') || !keys.includes('error_layout')) return 'Main, Landing Page, and Error Page are required layouts and cannot be removed.'
+    if (!keys.includes('mainLayout') || !keys.includes('landingPage') || !keys.includes('errorLayout')) return 'Main, Landing Page, and Error Page are required layouts and cannot be removed.'
     if (!keys.includes(document.default_layout_key)) return 'The default layout key must reference a layout.'
     const invalid = document.items.find((item) => !validateLayoutDefinition(item))
     return invalid ? `Layout “${invalid.label || invalid.key || 'Untitled'}” has an invalid tree or slot definition.` : ''
@@ -405,8 +405,8 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
 
     const addLayout = () => {
         let index = layouts.items.length + 1
-        let key = `layout_${index}`
-        while (layouts.items.some((layout) => layout.key === key)) key = `layout_${++index}`
+        let key = `layout${index}`
+        while (layouts.items.some((layout) => layout.key === key)) key = `layout${++index}`
 
         const sourceSlot = (slotKey, fallback) => {
             for (const layout of layouts.items) {
@@ -530,7 +530,7 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
     }
 
     const archiveLayout = () => {
-        if (['main_layout', 'landing_page', 'error_layout'].includes(selectedLayout.key)) return setJsonError('Main, Landing Page, and Error Page must always remain active.')
+        if (['mainLayout', 'landingPage', 'errorLayout'].includes(selectedLayout.key)) return setJsonError('Main, Landing Page, and Error Page must always remain active.')
         const specialPageReferences = (layouts.special_pages || []).filter((page) => page.layout_key === selectedLayout.key)
         if (selectedLayout.status !== 'archived' && specialPageReferences.length) {
             return setJsonError(`This layout is used by ${specialPageReferences.length} special page${specialPageReferences.length === 1 ? '' : 's'} and cannot be archived.`)
@@ -541,7 +541,7 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
     const deleteLayout = () => {
         const references = Number(usage.versionCount || 0) + Number(usage.schemaCount || 0)
         const specialPageReferences = (layouts.special_pages || []).filter((page) => page.layout_key === selectedLayout.key)
-        if (['main_layout', 'landing_page', 'error_layout'].includes(selectedLayout.key)) return setJsonError('Main, Landing Page, and Error Page are required and cannot be deleted.')
+        if (['mainLayout', 'landingPage', 'errorLayout'].includes(selectedLayout.key)) return setJsonError('Main, Landing Page, and Error Page are required and cannot be deleted.')
         if (selectedLayout.key === layouts.default_layout_key) return setJsonError('The default layout cannot be deleted.')
         if (specialPageReferences.length) return setJsonError(`This layout is used by ${specialPageReferences.length} special page${specialPageReferences.length === 1 ? '' : 's'} and cannot be deleted.`)
         if (references) return setJsonError(`This layout has ${references} version or schema references and cannot be deleted.`)
@@ -721,8 +721,8 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
                 const copy = { ...clone(node), id: uuid(), children: node.children.map(copySubtree) }
                 if (copy.type === 'slot') {
                     let index = 2
-                    let key = `${node.slot_key}_copy`
-                    while (keys.has(key)) key = `${node.slot_key}_copy_${index++}`
+                    let key = `${node.slot_key}Copy`
+                    while (keys.has(key)) key = `${node.slot_key}Copy${index++}`
                     keys.add(key)
                     createdSlots[key] = { ...clone(layout.slots[node.slot_key]), label: `${layout.slots[node.slot_key]?.label || node.slot_key} copy` }
                     copy.slot_key = key
@@ -924,8 +924,8 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
                 <ul className="mt-2 space-y-1">{layouts.items.map((layout) => <li key={layout.id}><button type="button" onClick={() => inspectLayout(layout)} aria-current={layout.id === selectedLayout.id ? 'true' : undefined} className={`w-full rounded px-2 py-2 text-left text-sm ${layout.id === selectedLayout.id ? 'bg-blue-50 text-blue-800' : 'text-gray-700 hover:bg-gray-100'}`}><span className="block truncate font-medium">{layout.label}</span><span className="block text-[11px] opacity-65">{layout.key}{layout.key === layouts.default_layout_key ? ' · default' : ''}{layout.status === 'archived' ? ' · archived' : ''}</span></button></li>)}</ul>
                 <div className="mt-4 flex gap-1 border-t border-gray-200 pt-3">
                     <button type="button" onClick={duplicateLayout} disabled={disabled} className={iconButton} aria-label="Duplicate layout"><Copy className="h-4 w-4" /></button>
-                    <button type="button" onClick={archiveLayout} disabled={disabled || ['main_layout', 'landing_page', 'error_layout'].includes(selectedLayout.key)} className={iconButton} aria-label={selectedLayout.status === 'archived' ? 'Restore layout' : 'Archive layout'}><Archive className="h-4 w-4" /></button>
-                    <button type="button" onClick={deleteLayout} disabled={disabled || ['main_layout', 'landing_page', 'error_layout'].includes(selectedLayout.key)} className={iconButton} aria-label="Delete unused layout"><Trash2 className="h-4 w-4" /></button>
+                    <button type="button" onClick={archiveLayout} disabled={disabled || ['mainLayout', 'landingPage', 'errorLayout'].includes(selectedLayout.key)} className={iconButton} aria-label={selectedLayout.status === 'archived' ? 'Restore layout' : 'Archive layout'}><Archive className="h-4 w-4" /></button>
+                    <button type="button" onClick={deleteLayout} disabled={disabled || ['mainLayout', 'landingPage', 'errorLayout'].includes(selectedLayout.key)} className={iconButton} aria-label="Delete unused layout"><Trash2 className="h-4 w-4" /></button>
                 </div>
                 <div className="mt-5 flex items-center justify-between"><h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Structure</h3><select aria-label="Node to add" defaultValue="" onChange={(event) => { if (event.target.value) addNode(event.target.value); event.target.value = '' }} disabled={disabled} className="rounded border border-gray-300 bg-white px-2 py-1 text-xs"><option value="" disabled>Add…</option>{nodeTypes.map((type) => <option key={type} value={type}>{type}</option>)}</select></div>
                 <ul className="mt-2"><TreeNode node={selectedLayout.root} selectedId={selectedNodeId} onSelect={selectStructureNode} onDragStart={(event, nodeId) => event.dataTransfer.setData('text/layout-node', nodeId)} onDrop={(event, targetId) => { event.preventDefault(); reparentNode(event.dataTransfer.getData('text/layout-node'), targetId) }} disabled={disabled} /></ul>

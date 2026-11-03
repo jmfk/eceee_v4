@@ -19,7 +19,7 @@ import { generateWidgetId } from '../../utils/widgetIdentity'
 
 
 const TreeBasedLayoutRenderer = forwardRef(({
-    layoutName = 'main_layout',  // Default to main_layout (available layout)
+    layoutName = 'mainLayout',  // Default to main_layout (available layout)
     widgets = {},
     onWidgetChange,
     editable = true,

@@ -77,7 +77,7 @@ export interface DesignerRenderOptions {
 }
 
 export interface RenderPageModel {
-    layout: 'main_layout' | 'landing_page' | string
+    layout: 'mainLayout' | 'landingPage' | 'errorLayout' | string
     layoutDefinition?: ThemeLayoutDefinition | null
     layoutDefinitionRequired?: boolean
     layoutBreakpoints?: Record<string, number>

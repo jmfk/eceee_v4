@@ -85,7 +85,7 @@ const SpecialPagesEditor = ({ workspace, updateWorkspace, disabled }) => {
             label: 'New special page',
             kind: 'route',
             route: 'special-page',
-            layout_key: layouts.default_layout_key || layouts.items[0]?.key || 'main_layout',
+            layout_key: layouts.default_layout_key || layouts.items[0]?.key || 'mainLayout',
             widgets: {},
         }
         pendingSelectionRef.current = id

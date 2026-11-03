@@ -46,8 +46,8 @@ export async function getDefaultLayout() {
         } catch (error) {
             console.error('Failed to fetch default layout from backend:', error);
             // Fallback to main_layout if API call fails
-            defaultLayoutCache = 'main_layout';
-            return 'main_layout';
+            defaultLayoutCache = 'mainLayout';
+            return 'mainLayout';
         } finally {
             defaultLayoutPromise = null;
         }
@@ -71,7 +71,7 @@ export function clearDefaultLayoutCache() {
  * @param {string} fallback - Fallback layout name if cache is empty
  * @returns {string} The cached default layout or fallback
  */
-export function getDefaultLayoutSync(fallback = 'main_layout') {
+export function getDefaultLayoutSync(fallback = 'mainLayout') {
     return defaultLayoutCache || fallback;
 }
 

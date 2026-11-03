@@ -141,7 +141,7 @@ class ThemeVersionApiTests(TestCase):
     def test_restore_rejects_layout_policy_that_strands_page_widgets(self):
         original = self.left.versions.first()
         layouts = copy.deepcopy(self.left.layouts)
-        main_layout = next(item for item in layouts["items"] if item["key"] == "main_layout")
+        main_layout = next(item for item in layouts["items"] if item["key"] == "mainLayout")
         main_layout["slots"]["header"]["max_widgets"] = 2
         self.left.layouts = layouts
         self.left.save(version_created_by=self.user)
@@ -155,8 +155,8 @@ class ThemeVersionApiTests(TestCase):
         PageVersion.objects.create(
             page=page,
             version_number=1,
-            layout_key="main_layout",
-            code_layout="main_layout",
+            layout_key="mainLayout",
+            code_layout="mainLayout",
             theme=self.left,
             widgets={
                 "header": [

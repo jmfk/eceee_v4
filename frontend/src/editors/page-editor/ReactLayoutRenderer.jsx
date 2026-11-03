@@ -142,7 +142,7 @@ export const validateSlotWidgetAddition = (policy = {}, currentCount, addedWidge
 };
 
 const ReactLayoutRenderer = forwardRef(({
-    layoutName = 'main_layout',  // Default to main_layout (available layout)
+    layoutName = 'mainLayout',  // Default to main_layout (available layout)
     widgets = {},
     onWidgetChange,
     editable = true,

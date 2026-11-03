@@ -328,7 +328,7 @@ const DesignerThemeWorkspacePage = () => {
         try {
             const result = await designerThemesApi.loadPreviewObject(themeId, source.id)
             return {
-                layout: 'main_layout',
+                layout: 'mainLayout',
                 slots: result.version?.widgets || {},
                 context: {
                     objectId: result.object?.id,
