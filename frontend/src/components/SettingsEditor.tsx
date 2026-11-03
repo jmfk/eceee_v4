@@ -281,6 +281,7 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                             <LayoutSelector
                                 value={localValues.codeLayout}
                                 onChange={(layout) => handleVersionFieldChange('codeLayout', layout)}
+                                themeId={themeSettings?.selectedThemeId || themeSettings?.effectiveThemeId}
                                 label="Page Layout"
                                 description="Choose the layout template for this page"
                             />

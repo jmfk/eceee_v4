@@ -279,4 +279,24 @@ describe('theme layout rendering', () => {
         expect(normalized?.root.presentation_color).toBe('#14b8a6')
         expect(validateLayoutDefinition(normalized)).toBe(true)
     })
+
+    it('renders a legacy landing-page snapshot whose slot declaration uses landingPage', () => {
+        const legacy = structuredClone(layout) as any
+        legacy.key = 'landing_page'
+        legacy.slots = { landingPage: { label: 'Landing content' } }
+        legacy.root.children[0].slot_key = 'landing_page'
+
+        const normalized = normalizeLayoutDefinition(legacy)
+        expect(Object.keys(normalized?.slots || {})).toEqual(['landing_page'])
+        expect(validateLayoutDefinition(normalized)).toBe(true)
+
+        render(<PageRenderer model={{
+            layout: 'landing_page',
+            layoutDefinition: legacy,
+            layoutDefinitionRequired: true,
+            slots: { landing_page: [{ id: 'landing', type: 'easy_widgets.HeadlineWidget', config: { content: 'Legacy landing content' } }] },
+            context: { mode: 'public', preview: false },
+        }} />)
+        expect(screen.getByText('Legacy landing content')).toBeInTheDocument()
+    })
 })

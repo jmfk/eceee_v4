@@ -1,12 +1,12 @@
 /**
  * Layout Selector Component
  * 
- * A reusable component for selecting code-based layouts in forms.
+ * A reusable component for selecting layouts in forms.
  */
 
 import { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronDown, Code, Search, X } from 'lucide-react'
+import { ChevronDown, Code, PanelsTopLeft, Search, X } from 'lucide-react'
 import { layoutsApi } from '../api/layouts'
 
 const LayoutSelector = ({
@@ -20,7 +20,8 @@ const LayoutSelector = ({
     description = '',
     required = false,
     showDescription = true,
-    groupByType = true
+    groupByType = true,
+    themeId = null
 }) => {
     const [isOpen, setIsOpen] = useState(false)
     const [searchTerm, setSearchTerm] = useState('')
@@ -28,10 +29,10 @@ const LayoutSelector = ({
     const [dropdownPosition, setDropdownPosition] = useState({ openUpward: false, maxHeight: 384 })
     const containerRef = useRef(null)
 
-    // Fetch code layouts
+    // The page's effective theme owns its editable layouts.
     const { data: layoutsData, isLoading } = useQuery({
-        queryKey: ['layouts', 'code'],
-        queryFn: () => layoutsApi.codeLayouts.list()
+        queryKey: ['layouts', 'effective', themeId],
+        queryFn: () => layoutsApi.codeLayouts.list(true, 'effective', themeId)
     })
 
     // Get layout options
@@ -40,13 +41,12 @@ const LayoutSelector = ({
 
         const options = []
 
-        // Add code layouts
         layoutsData.results.forEach(layout => {
             options.push({
                 value: layout.name,
                 label: layout.name,
                 description: layout.description,
-                type: 'code',
+                type: layout.type === 'theme' ? 'theme' : 'code',
                 layout: layout
             })
         })
@@ -60,8 +60,10 @@ const LayoutSelector = ({
         (option.description && option.description.toLowerCase().includes(searchTerm.toLowerCase()))
     )
 
-    // Group options (simplified for code-only layouts)
-    const groupedOptions = { code: filteredOptions }
+    const groupedOptions = {
+        theme: filteredOptions.filter(option => option.type === 'theme'),
+        code: filteredOptions.filter(option => option.type === 'code')
+    }
 
     // Find selected layout
     useEffect(() => {
@@ -142,7 +144,7 @@ const LayoutSelector = ({
             className="flex items-start space-x-3 p-3 hover:bg-gray-50 cursor-pointer"
         >
             <div className="flex-shrink-0 mt-0.5">
-                <Code className="w-4 h-4 text-blue-600" />
+                {option.type === 'theme' ? <PanelsTopLeft className="w-4 h-4 text-blue-600" /> : <Code className="w-4 h-4 text-blue-600" />}
             </div>
             <div className="flex-1 min-w-0">
                 <div className="flex items-center space-x-2">
@@ -150,7 +152,7 @@ const LayoutSelector = ({
                         {option.label}
                     </div>
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                        Code
+                        {option.type === 'theme' ? 'Theme' : 'Code'}
                     </span>
                 </div>
                 {showDescription && option.description && (
@@ -211,14 +213,14 @@ const LayoutSelector = ({
                         {selectedLayout ? (
                             <>
                                 <div className="flex-shrink-0 mr-3">
-                                    <Code className="w-4 h-4 text-blue-600" />
+                                    {selectedLayout.type === 'theme' ? <PanelsTopLeft className="w-4 h-4 text-blue-600" /> : <Code className="w-4 h-4 text-blue-600" />}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="text-sm text-gray-900 truncate">
                                         {selectedLayout.label}
                                     </div>
                                     <div className="text-xs text-gray-500 truncate">
-                                        Code Layout
+                                        {selectedLayout.type === 'theme' ? 'Theme Layout' : 'Code Layout'}
                                     </div>
                                 </div>
                             </>
@@ -278,6 +280,11 @@ const LayoutSelector = ({
                                 {groupByType ? (
                                     <div>
                                         {renderGroup(
+                                            'Theme Layouts',
+                                            groupedOptions.theme,
+                                            <PanelsTopLeft className="w-4 h-4 text-blue-600" />
+                                        )}
+                                        {renderGroup(
                                             'Code Layouts',
                                             groupedOptions.code,
                                             <Code className="w-4 h-4 text-blue-600" />
@@ -312,4 +319,4 @@ const LayoutSelector = ({
     )
 }
 
-export default LayoutSelector 
+export default LayoutSelector
