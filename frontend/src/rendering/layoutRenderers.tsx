@@ -30,6 +30,4 @@ const LandingPageRender: LayoutRenderComponent = ({ renderSlot }) => (
 export const RENDER_LAYOUT_COMPONENTS: Record<string, LayoutRenderComponent> = {
     mainLayout: MainLayoutRender,
     landingPage: LandingPageRender,
-    main_layout: MainLayoutRender,
-    landing_page: LandingPageRender,
 }

@@ -11,6 +11,7 @@ from django.utils.safestring import mark_safe
 
 from .inheritance_helpers import InheritanceTreeHelpers
 from .inheritance_tree import InheritanceTreeBuilder
+from .layout_key_names import canonical_layout_key
 
 _UNSET = object()
 LEGACY_CODE_LAYOUT_RENDERING_ENABLED = False
@@ -749,11 +750,14 @@ class WebPageRenderer:
         layout_key = getattr(page_version, "code_layout", None) or getattr(layout, "name", None)
         if not layout_key:
             layout_key = theme.layouts.get("default_layout_key")
+        layout_key = canonical_layout_key(layout_key)
         return next(
             (
                 item
                 for item in theme.layouts.get("items", [])
-                if isinstance(item, dict) and item.get("key") == layout_key and item.get("status", "active") == "active"
+                if isinstance(item, dict)
+                and canonical_layout_key(item.get("key")) == layout_key
+                and item.get("status", "active") == "active"
             ),
             None,
         )
