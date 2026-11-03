@@ -193,7 +193,7 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect((heading as HTMLElement).contentEditable).not.toBe('true')
         expect(heading).toHaveAttribute('data-designer-target', 'heading')
         expect(document.querySelector('[data-designer-targets*="article"]')).toBeTruthy()
-        expect(document.querySelector('[data-designer-target="layout:main_layout:slot:main"]')).toBeTruthy()
+        expect(document.querySelector('[data-designer-target="layout:mainLayout:slot:main"]')).toBeTruthy()
         expect(document.querySelector('.page-editor-widget,.widget-header')).toBeNull()
         expect([...document.querySelectorAll('style')].some((style) => style.textContent?.includes('rgb(1,2,3)'))).toBe(true)
     })
@@ -233,7 +233,7 @@ describe('RenderFrameRuntime designer overlay', () => {
         await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview',
             action: 'select',
-            targetId: 'layout:main_layout:slot:hero',
+            targetId: 'layout:mainLayout:slot:hero',
             descendants: expect.arrayContaining([expect.objectContaining({
                 id: 'global-heading',
                 label: 'Heading 1',
@@ -1289,7 +1289,7 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             selectionPaths: {
                 slot: [
-                    expect.objectContaining({ id: 'layout:main_layout:slot:main', kind: 'layoutSlot', computedStyles: expect.objectContaining({ paddingTop: expect.any(String) }) }),
+                    expect.objectContaining({ id: 'layout:mainLayout:slot:main', kind: 'layoutSlot', computedStyles: expect.objectContaining({ paddingTop: expect.any(String) }) }),
                     expect.objectContaining({ id: 'slot:columns-1:left', styleTargetId: 'widget-slot:easy_widgets.TwoColumnsWidget:left', kind: 'slot', computedStyles: expect.objectContaining({ marginLeft: expect.any(String) }) }),
                 ],
                 widget: [

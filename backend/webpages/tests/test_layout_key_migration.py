@@ -5,7 +5,6 @@ from unittest import TestCase
 from webpages.layout_key_names import canonical_theme_snapshot
 from webpages.theme_layouts import default_theme_layouts, validate_theme_layouts
 
-
 migration = importlib.import_module("webpages.migrations.0092_camel_case_layout_keys")
 
 
