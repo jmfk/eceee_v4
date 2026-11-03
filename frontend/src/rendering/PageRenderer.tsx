@@ -62,7 +62,9 @@ export const PageRenderer = ({ model }: { model: RenderPageModel }) => {
 
     const renderSlot = (name: string) => {
         const camelName = name.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase())
-        const widgets = model.slots[name] || model.slots[camelName] || []
+        const snakeName = name.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)
+        const widgets = [model.slots[name], model.slots[camelName], model.slots[snakeName]]
+            .find((items) => items?.length) || []
         return renderWidgets(layoutDefinition && !model.designer
             ? visibleSlotWidgets(widgets, layoutDefinition.slots[name] || {})
             : widgets)
