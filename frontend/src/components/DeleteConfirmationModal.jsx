@@ -1,4 +1,5 @@
 import React from 'react'
+import { createPortal } from 'react-dom'
 import { AlertTriangle, X } from 'lucide-react'
 
 const DeleteConfirmationModal = ({
@@ -26,8 +27,8 @@ const DeleteConfirmationModal = ({
         }
     }
 
-    return (
-        <div className="eceee-editor-ui fixed inset-0 z-[10010] overflow-y-auto">
+    return createPortal(
+        <div className="eceee-editor-ui fixed inset-0 z-[10060] overflow-y-auto" role="dialog" aria-modal="true" aria-label={title || 'Confirm Deletion'}>
             {/* Backdrop */}
             <div
                 className="fixed inset-0 bg-black transition-opacity"
@@ -117,7 +118,8 @@ const DeleteConfirmationModal = ({
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     )
 }
 

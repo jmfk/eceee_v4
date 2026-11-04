@@ -4,6 +4,7 @@
  * Simple modal for confirming destructive actions
  */
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, X } from 'lucide-react';
 
 const ConfirmationModal = ({
@@ -36,11 +37,12 @@ const ConfirmationModal = ({
 
     const styles = variantStyles[variant] || variantStyles.danger;
 
-    return (
-        <>
-            {/* Backdrop */}
+    return createPortal(
             <div
-                className="fixed inset-0 bg-black/50 z-[10010] flex items-center justify-center"
+                className="eceee-editor-ui fixed inset-0 bg-black/50 z-[10060] flex items-center justify-center"
+                role="dialog"
+                aria-modal="true"
+                aria-label={title}
                 onClick={onClose}
             >
                 {/* Modal */}
@@ -84,8 +86,8 @@ const ConfirmationModal = ({
                         </button>
                     </div>
                 </div>
-            </div>
-        </>
+            </div>,
+        document.body
     );
 };
 
