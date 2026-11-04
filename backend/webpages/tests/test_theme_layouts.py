@@ -13,6 +13,7 @@ from django.utils.safestring import mark_safe
 from djangorestframework_camel_case.parser import CamelCaseJSONParser
 
 from core.models import Tenant
+from easy_widgets.widgets.content import ContentWidget
 from webpages.inheritance_tree import InheritanceTreeBuilder
 from webpages.models import PageTheme, WebPage
 from webpages.public_views import HostnamePageView
@@ -86,7 +87,9 @@ class ThemeLayoutValidationTests(SimpleTestCase):
         incoming = {
             "expectedVersionId": 12,
             "pageData": {"ignoredSlotWarnings": ["landingPage:landing_page"]},
-            "widgets": {"landingPage": [{"type": "easy_widgets.ContentWidget", "config": {"fontSize": 14}}]},
+            "widgets": {
+                "landingPage": [{"type": "easy_widgets.ContentWidget", "config": {"fontSize": 14, "showBorder": True}}]
+            },
         }
         parsed = PageVersionJSONParser().parse(io.BytesIO(json.dumps(incoming).encode()))
 
@@ -94,7 +97,9 @@ class ThemeLayoutValidationTests(SimpleTestCase):
         self.assertEqual(parsed["expected_version_id"], 12)
         self.assertEqual(parsed["page_data"]["ignored_slot_warnings"], ["landingPage:landing_page"])
         self.assertEqual(list(parsed["widgets"]), ["landingPage"])
-        self.assertEqual(parsed["widgets"]["landingPage"][0]["config"]["fontSize"], 14)
+        config = parsed["widgets"]["landingPage"][0]["config"]
+        self.assertEqual(config["font_size"], 14)
+        self.assertTrue(ContentWidget().prepare_template_context(config)["show_border"])
 
     def test_default_layouts_are_valid_and_portable(self):
         document = default_theme_layouts()
@@ -762,7 +767,7 @@ class ThemeLayoutUsageTests(TestCase):
         self.assertNotIn("mainLayout", theme_layout_usage(unrelated))
         self.assertIn(str(child.id), theme_layout_usage(inherited)["mainLayout"]["page_ids"])
 
-    def test_page_version_serializer_enforces_database_layout_widget_policy(self):
+    def test_page_version_serializer_saves_disallowed_widget_in_database_layout(self):
         user = User.objects.create_user("layout-policy", password="test")
         tenant = Tenant.objects.create(name="Layout policy", identifier="layout-policy", created_by=user)
         theme = PageTheme.objects.create(tenant=tenant, name="Policy theme", is_default=True, created_by=user)
@@ -780,8 +785,7 @@ class ThemeLayoutUsageTests(TestCase):
             partial=True,
         )
 
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("widgets", serializer.errors)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
 
     def test_page_version_serializer_preserves_existing_widgets_when_layout_changes(self):
         user = User.objects.create_user("layout-change-policy", password="test")

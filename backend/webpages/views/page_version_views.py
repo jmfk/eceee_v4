@@ -11,10 +11,11 @@ from django.utils.dateparse import parse_datetime
 from django_filters.rest_framework import DjangoFilterBackend
 from djangorestframework_camel_case.parser import CamelCaseJSONParser
 from djangorestframework_camel_case.render import CamelCaseJSONRenderer
+from djangorestframework_camel_case.util import underscoreize
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
-from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.renderers import BrowsableAPIRenderer
 from rest_framework.response import Response
 
@@ -35,12 +36,23 @@ from ..services.page_version_workflow import (
 
 
 class PageVersionJSONParser(CamelCaseJSONParser):
-    """Preserve widget slot and configuration keys in incoming versions."""
+    """Preserve slot identifiers while normalizing widget data for Django."""
 
-    json_underscoreize = {
-        **CamelCaseJSONParser.json_underscoreize,
-        "ignore_fields": (*CamelCaseJSONParser.json_underscoreize.get("ignore_fields", ()), "widgets"),
-    }
+    def parse(self, stream, media_type=None, parser_context=None):
+        data = JSONParser.parse(self, stream, media_type=media_type, parser_context=parser_context)
+        if not isinstance(data, dict) or "widgets" not in data:
+            return underscoreize(data, **self.json_underscoreize)
+
+        parsed = underscoreize(
+            {key: value for key, value in data.items() if key != "widgets"}, **self.json_underscoreize
+        )
+        widgets = data["widgets"]
+        parsed["widgets"] = (
+            {slot_key: underscoreize(items, **self.json_underscoreize) for slot_key, items in widgets.items()}
+            if isinstance(widgets, dict)
+            else underscoreize(widgets, **self.json_underscoreize)
+        )
+        return parsed
 
 
 class PageVersionJSONRenderer(CamelCaseJSONRenderer):
