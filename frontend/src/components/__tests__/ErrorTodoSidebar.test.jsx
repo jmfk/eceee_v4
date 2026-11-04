@@ -27,3 +27,11 @@ it('requires every content warning to be acknowledged before saving anyway', () 
     fireEvent.click(screen.getByRole('button', { name: 'Save anyway' }))
     expect(onSaveAcknowledged).toHaveBeenCalledOnce()
 })
+
+it('offers the explicit slot conversion from a content warning', () => {
+    const onConvertSlot = vi.fn()
+    const item = { id: 'old-slot', title: 'Content warning', detail: 'Legacy slot is hidden.', warning: true, slotConversion: { from: 'landing_page', to: 'landingPage' } }
+    render(<ErrorTodoSidebar items={[item]} onConvertSlot={onConvertSlot} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Convert to landingPage' }))
+    expect(onConvertSlot).toHaveBeenCalledWith(item)
+})

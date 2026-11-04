@@ -350,8 +350,31 @@ describe('LayoutDesignerWorkspace', () => {
         expect(screen.getByLabelText('Element type')).toHaveValue('slot')
         fireEvent.click(screen.getByRole('tab', { name: 'JSON' }))
         const savedDocument = JSON.parse(screen.getByLabelText('Canonical layout document').value)
-        expect(savedDocument.items[0].root.children[0].slot_key).toBe('slot_1')
-        expect(savedDocument.items[0].slots).toHaveProperty('slot_1')
+        expect(savedDocument.items[0].root.children[0].slot_key).toBe('slot1')
+        expect(savedDocument.items[0].slots).toHaveProperty('slot1')
+    })
+
+    it('renames a slot key in both the layout definition and canvas node', () => {
+        render(<Harness />)
+        fireEvent.click(screen.getByRole('button', { name: 'Slot · main' }))
+        const key = screen.getByLabelText('Slot key')
+        fireEvent.change(key, { target: { value: 'mainContent' } })
+        fireEvent.blur(key)
+
+        fireEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+        const savedDocument = JSON.parse(screen.getByLabelText('Canonical layout document').value)
+        expect(savedDocument.items[0].slots).toHaveProperty('mainContent')
+        expect(savedDocument.items[0].slots).not.toHaveProperty('main')
+        expect(savedDocument.items[0].root.children[0].slot_key).toBe('mainContent')
+    })
+
+    it('rejects snake_case and duplicate slot keys', () => {
+        render(<Harness />)
+        fireEvent.click(screen.getByRole('button', { name: 'Slot · main' }))
+        fireEvent.change(screen.getByLabelText('Slot key'), { target: { value: 'main_content' } })
+        fireEvent.blur(screen.getByLabelText('Slot key'))
+        expect(screen.getByRole('alert')).toHaveTextContent('camelCase')
+        expect(screen.getByRole('button', { name: 'Slot · main' })).toBeInTheDocument()
     })
 
     it('keeps numeric media target dimensions separate from CSS layout sizing', () => {

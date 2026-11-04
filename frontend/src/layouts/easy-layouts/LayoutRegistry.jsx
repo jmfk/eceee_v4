@@ -17,20 +17,20 @@ export { MainLayout, LandingPage };
  * EASY Layout Registry - Maps layout names to React components
  */
 export const EASY_LAYOUT_REGISTRY = {
-    'main_layout': {
+    'mainLayout': {
         component: MainLayout,
-        name: 'main_layout',
+        name: 'mainLayout',
         label: 'Main Layout',
         description: 'Optimized layout for blog posts with featured image, content, and sidebar',
         slots: ['header', 'navbar', 'main', 'sidebar', 'footer'],
         responsive: true
     },
-    'landing_page': {
+    'landingPage': {
         component: LandingPage,
-        name: 'landing_page',
+        name: 'landingPage',
         label: 'Landing Page',
         description: 'Full-width landing page layout with hero section and conversion focus',
-        slots: ['header', 'navbar', 'hero', 'landing_page', 'footer'],
+        slots: ['header', 'navbar', 'hero', 'landingPage', 'footer'],
         responsive: true
     }
 };
@@ -39,7 +39,7 @@ export const EASY_LAYOUT_REGISTRY = {
  * Get layout component by name
  */
 export const getLayoutComponent = (layoutName) => {
-    const layout = EASY_LAYOUT_REGISTRY[layoutName];
+    const layout = EASY_LAYOUT_REGISTRY[{ main_layout: 'mainLayout', landing_page: 'landingPage' }[layoutName] || layoutName];
     return layout ? layout.component : null;
 };
 
@@ -47,7 +47,7 @@ export const getLayoutComponent = (layoutName) => {
  * Get layout metadata
  */
 export const getLayoutMetadata = (layoutName) => {
-    return EASY_LAYOUT_REGISTRY[layoutName] || null;
+    return EASY_LAYOUT_REGISTRY[{ main_layout: 'mainLayout', landing_page: 'landingPage' }[layoutName] || layoutName] || null;
 };
 
 /**
@@ -61,5 +61,5 @@ export const getAvailableLayouts = () => {
  * Check if ECEEE layout exists
  */
 export const layoutExists = (layoutName) => {
-    return layoutName in EASY_LAYOUT_REGISTRY;
+    return Boolean(getLayoutMetadata(layoutName));
 };

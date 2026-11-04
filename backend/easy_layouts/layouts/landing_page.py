@@ -106,7 +106,7 @@ class LandingPageLayout(BaseLayout):
                 navbar,
                 hero,
                 {
-                    "name": "landing_page",
+                    "name": "landingPage",
                     "title": "Landing Page Main Content",
                     "description": "Primary content area for articles and posts",
                     "max_widgets": None,

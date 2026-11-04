@@ -10,7 +10,7 @@ import { AlertTriangle, ArrowRight, ExternalLink } from 'lucide-react'
  * - onNavigate: (item) => void
  * - className?: string
  */
-export default function ErrorTodoSidebar({ items = [], onNavigate, acknowledgedWarnings = [], onToggleWarning, onSaveAcknowledged, isSaving = false, className = '' }) {
+export default function ErrorTodoSidebar({ items = [], onNavigate, acknowledgedWarnings = [], onToggleWarning, onSaveAcknowledged, onConvertSlot, isSaving = false, className = '' }) {
     const unresolvedCount = items.length
     const reviewable = items.length > 0 && items.every((item) => item.warning)
     const allAcknowledged = reviewable && items.every((item) => acknowledgedWarnings.includes(item.id))
@@ -63,6 +63,7 @@ export default function ErrorTodoSidebar({ items = [], onNavigate, acknowledgedW
                                         </div>
                                     )}
                                     <div className="mt-2 flex items-center space-x-2">
+                                        {item.slotConversion && <button type="button" onClick={() => onConvertSlot?.(item)} className="inline-flex items-center text-xs text-blue-700 hover:text-blue-900 hover:underline">Convert to {item.slotConversion.to}</button>}
                                         {item.target && (
                                             <button
                                                 type="button"
