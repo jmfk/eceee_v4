@@ -925,22 +925,8 @@ def validate_layout_widgets(theme, layout_key, widgets, *, previous_widgets=None
                 warnings.append(f"Slot '{slot_key}' displays at most {maximum} widgets publicly.")
             elif len(items) > previous_count or not all(existing):
                 errors.append(f"Slot '{slot_key}' allows at most {maximum} widgets.")
-        allowed = policy.get("allowed_widget_types")
-        disallowed = policy.get("disallowed_widget_types") or []
-        for widget, was_existing in zip(items, existing):
-            widget_type = widget.get("type") if isinstance(widget, dict) else None
-            if not isinstance(widget_type, str) or not widget_type.strip():
-                continue
-            violates_policy = (allowed and not _widget_type_matches(widget_type, allowed)) or (
-                disallowed and _widget_type_matches(widget_type, disallowed)
-            )
-            if violates_policy:
-                if warnings is not None:
-                    warnings.append(
-                        f"Widget type '{widget_type}' is not allowed in slot '{slot_key}' and will not appear publicly."
-                    )
-                elif not was_existing:
-                    errors.append(f"Widget type '{widget_type}' is not allowed in slot '{slot_key}'.")
+        # Slot policy controls editor annotation and public rendering. Keeping a
+        # disallowed widget in a draft does not need save-time acknowledgement.
     if errors:
         raise ValidationError(errors)
     return widgets

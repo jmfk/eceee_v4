@@ -548,15 +548,13 @@ class ThemeLayoutValidationTests(SimpleTestCase):
 
         self.assertIs(validate_theme_layouts(document), document)
 
-    def test_widget_policies_reject_disallowed_types_and_enforce_finite_limits(self):
+    def test_widget_policies_allow_disallowed_types_on_save_and_enforce_finite_limits(self):
         theme = SimpleNamespace(layouts=default_theme_layouts())
 
-        with self.assertRaisesMessage(ValidationError, "not allowed"):
-            validate_layout_widgets(
-                theme,
-                "mainLayout",
-                {"main": [{"type": "easy_widgets.HeaderWidget"}]},
-            )
+        disallowed = {"main": [{"type": "easy_widgets.HeaderWidget"}]}
+        warnings = []
+        self.assertEqual(validate_layout_widgets(theme, "mainLayout", disallowed, warnings=warnings), disallowed)
+        self.assertEqual(warnings, [])
         with self.assertRaisesMessage(ValidationError, "at most 1"):
             validate_layout_widgets(
                 theme,
@@ -578,7 +576,7 @@ class ThemeLayoutValidationTests(SimpleTestCase):
         with self.assertRaisesMessage(ValidationError, "must have a type"):
             validate_layout_widgets(theme, "mainLayout", {"unused": [42]}, warnings=warnings)
 
-    def test_existing_disallowed_widget_is_grandfathered_only_in_its_original_slot(self):
+    def test_disallowed_widget_remains_editable_in_any_declared_slot(self):
         theme = SimpleNamespace(layouts=default_theme_layouts())
         legacy = {"main": [{"id": "legacy", "type": "easy_widgets.HeaderWidget", "config": {}}]}
 
@@ -586,12 +584,10 @@ class ThemeLayoutValidationTests(SimpleTestCase):
         self.assertEqual(validate_layout_widgets(theme, "mainLayout", edited, previous_widgets=legacy), edited)
 
         added = {"main": [*legacy["main"], {"id": "new", "type": "easy_widgets.HeaderWidget"}]}
-        with self.assertRaisesMessage(ValidationError, "not allowed"):
-            validate_layout_widgets(theme, "mainLayout", added, previous_widgets=legacy)
+        self.assertEqual(validate_layout_widgets(theme, "mainLayout", added, previous_widgets=legacy), added)
 
         moved = {"footer": legacy["main"]}
-        with self.assertRaisesMessage(ValidationError, "not allowed"):
-            validate_layout_widgets(theme, "mainLayout", moved, previous_widgets=legacy)
+        self.assertEqual(validate_layout_widgets(theme, "mainLayout", moved, previous_widgets=legacy), moved)
 
     def test_legacy_over_limit_slot_can_be_saved_but_not_expanded(self):
         theme = SimpleNamespace(layouts=default_theme_layouts())
@@ -634,8 +630,7 @@ class ThemeLayoutValidationTests(SimpleTestCase):
             partial=True,
             context={"review_content_warnings": True},
         )
-        self.assertFalse(reviewed_existing.is_valid())
-        self.assertIn("contentWarnings", reviewed_existing.errors)
+        self.assertTrue(reviewed_existing.is_valid(), reviewed_existing.errors)
 
         changed_layout = PageVersionSerializer(
             version, data={"layout_key": "mainLayout", "widgets": existing}, partial=True
@@ -658,8 +653,7 @@ class ThemeLayoutValidationTests(SimpleTestCase):
             ]
         }
         added = PageVersionSerializer(version, data={"widgets": new_widget}, partial=True)
-        self.assertFalse(added.is_valid())
-        self.assertIn("widgets", added.errors)
+        self.assertTrue(added.is_valid(), added.errors)
 
         reviewed = PageVersionSerializer(
             version,
@@ -667,8 +661,7 @@ class ThemeLayoutValidationTests(SimpleTestCase):
             partial=True,
             context={"review_content_warnings": True},
         )
-        self.assertFalse(reviewed.is_valid())
-        self.assertIn("contentWarnings", reviewed.errors)
+        self.assertTrue(reviewed.is_valid(), reviewed.errors)
 
         acknowledged = PageVersionSerializer(
             version,
