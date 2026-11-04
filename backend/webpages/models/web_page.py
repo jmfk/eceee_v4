@@ -1395,6 +1395,12 @@ class WebPage(models.Model):
                     "description": self.description or "",
                 }
             }
+            # Slot warning choices belong to the page's editing history, so new
+            # versions inherit them even when their content starts fresh.
+            if latest_version and isinstance(latest_version.page_data, dict):
+                ignored_slots = latest_version.page_data.get("ignoredSlotWarnings")
+                if isinstance(ignored_slots, list):
+                    page_data["ignoredSlotWarnings"] = ignored_slots.copy()
 
             # Get widgets from the most recent version with widgets (preserve widgets by default)
             widgets_data = {}

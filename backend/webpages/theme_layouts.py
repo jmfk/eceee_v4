@@ -909,7 +909,6 @@ def validate_layout_widgets(theme, layout_key, widgets, *, previous_widgets=None
                     and isinstance(camel_key, str)
                     and CAMEL_CASE_KEY.fullmatch(camel_key)
                     and camel_key in slots
-                    and not widgets.get(camel_key)
                     else ""
                 )
                 warnings.append(

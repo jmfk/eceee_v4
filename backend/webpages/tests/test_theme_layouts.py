@@ -111,7 +111,27 @@ class ThemeLayoutValidationTests(SimpleTestCase):
             previous_widgets=widgets,
             warnings=warnings,
         )
-        self.assertNotIn("Convert this slot", warnings[0])
+        self.assertIn("Convert this slot to 'landingPage'", warnings[0])
+
+    @patch("webpages.theme_widgets.version_widget_theme")
+    def test_ignored_slot_warning_stays_dismissed_for_the_page_version(self, resolve_theme):
+        theme = SimpleNamespace(pk=1, id=1, layouts=default_theme_layouts())
+        resolve_theme.return_value = theme
+        widgets = {"landing_page": [{"id": str(uuid.uuid4()), "type": "easy_widgets.HeadlineWidget"}]}
+        version = SimpleNamespace(
+            theme=theme,
+            theme_id=1,
+            page=SimpleNamespace(parent=None),
+            layout_key="landingPage",
+            code_layout="landingPage",
+            effective_date=None,
+            widgets=widgets,
+            page_data={"ignoredSlotWarnings": ["landingPage:landing_page"]},
+        )
+        reviewed = PageVersionSerializer(
+            version, data={"widgets": widgets}, partial=True, context={"review_content_warnings": True}
+        )
+        self.assertTrue(reviewed.is_valid(), reviewed.errors)
 
     def test_default_page_layouts_use_descriptive_structure_and_plain_footer_wrappers(self):
         layouts = {layout["key"]: layout for layout in default_theme_layouts()["items"]}
@@ -648,6 +668,19 @@ class ThemeLayoutValidationTests(SimpleTestCase):
 
 
 class ThemeLayoutUsageTests(TestCase):
+    def test_new_page_version_inherits_ignored_slot_warnings(self):
+        user = User.objects.create_user("slot-warning-owner", password="test")
+        tenant = Tenant.objects.create(name="Slot warnings", identifier="slot-warnings", created_by=user)
+        page = WebPage.objects.create(
+            tenant=tenant, title="Test page", slug="test-page", created_by=user, last_modified_by=user
+        )
+        first = page.create_version(user, "First draft")
+        first.page_data["ignoredSlotWarnings"] = ["landingPage:landing_page"]
+        first.save(update_fields=["page_data"])
+
+        second = page.create_version(user, "Second draft")
+        self.assertEqual(second.page_data["ignoredSlotWarnings"], ["landingPage:landing_page"])
+
     def test_inheritance_tree_uses_custom_theme_layout_slot_policies(self):
         user = User.objects.create_user("layout-tree-policy", password="test")
         tenant = Tenant.objects.create(name="Layout tree policy", identifier="layout-tree-policy", created_by=user)

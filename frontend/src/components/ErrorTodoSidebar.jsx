@@ -10,10 +10,10 @@ import { AlertTriangle, ArrowRight, ExternalLink } from 'lucide-react'
  * - onNavigate: (item) => void
  * - className?: string
  */
-export default function ErrorTodoSidebar({ items = [], onNavigate, acknowledgedWarnings = [], onToggleWarning, onSaveAcknowledged, onConvertSlot, isSaving = false, className = '' }) {
+export default function ErrorTodoSidebar({ items = [], onNavigate, warningChoices = {}, onChooseWarning, onSaveAcknowledged, occupiedSlots = {}, isSaving = false, className = '' }) {
     const unresolvedCount = items.length
     const reviewable = items.length > 0 && items.every((item) => item.warning)
-    const allAcknowledged = reviewable && items.every((item) => acknowledgedWarnings.includes(item.id))
+    const allAcknowledged = reviewable && items.every((item) => warningChoices[item.id])
 
     if (!items || items.length === 0) {
         return null
@@ -39,13 +39,6 @@ export default function ErrorTodoSidebar({ items = [], onNavigate, acknowledgedW
                     {items.map((item) => (
                         <div key={item.id} className={`rounded border p-3 ${item.warning ? 'border-amber-200 bg-amber-50' : 'border-red-200 bg-red-50'}`}>
                             <div className="flex items-start">
-                                {item.warning && <input
-                                    type="checkbox"
-                                    aria-label={`Acknowledge: ${item.detail || item.title}`}
-                                    checked={acknowledgedWarnings.includes(item.id)}
-                                    onChange={() => onToggleWarning?.(item.id)}
-                                    className="mr-2 mt-0.5"
-                                />}
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-start justify-between">
                                         <span className={`text-sm font-medium ${item.warning ? 'text-amber-900' : 'text-red-800'}`}>
@@ -62,8 +55,21 @@ export default function ErrorTodoSidebar({ items = [], onNavigate, acknowledgedW
                                             <span className="font-medium">How to fix:</span> {item.hint}
                                         </div>
                                     )}
+                                    {item.warning && <div className="mt-3 space-y-2 text-xs text-gray-800" role="group" aria-label={`Choose how to handle: ${item.detail || item.title}`}>
+                                        {item.slotConversion && <label className="flex items-start gap-2">
+                                            <input type="checkbox" className="mt-0.5" checked={warningChoices[item.id] === 'convert'} onChange={() => onChooseWarning?.(item.id, warningChoices[item.id] === 'convert' ? null : 'convert')} />
+                                            <span>Convert to {item.slotConversion.to}{occupiedSlots[item.slotConversion.to] ? ` (remove the hidden ${item.slotConversion.from} widgets; ${item.slotConversion.to} already has content)` : ` (move the widgets from ${item.slotConversion.from})`}</span>
+                                        </label>}
+                                        <label className="flex items-start gap-2">
+                                            <input type="checkbox" className="mt-0.5" checked={warningChoices[item.id] === 'keep'} onChange={() => onChooseWarning?.(item.id, warningChoices[item.id] === 'keep' ? null : 'keep')} />
+                                            <span>Keep unchanged for this save</span>
+                                        </label>
+                                        {item.slotConversion && <label className="flex items-start gap-2">
+                                            <input type="checkbox" className="mt-0.5" checked={warningChoices[item.id] === 'ignore'} onChange={() => onChooseWarning?.(item.id, warningChoices[item.id] === 'ignore' ? null : 'ignore')} />
+                                            <span>Keep unchanged and ignore this warning for this page</span>
+                                        </label>}
+                                    </div>}
                                     <div className="mt-2 flex items-center space-x-2">
-                                        {item.slotConversion && <button type="button" onClick={() => onConvertSlot?.(item)} className="inline-flex items-center text-xs text-blue-700 hover:text-blue-900 hover:underline">Convert to {item.slotConversion.to}</button>}
                                         {item.target && (
                                             <button
                                                 type="button"
@@ -94,7 +100,7 @@ export default function ErrorTodoSidebar({ items = [], onNavigate, acknowledgedW
                     onClick={onSaveAcknowledged}
                     disabled={!allAcknowledged || isSaving}
                     className="mt-4 min-h-8 rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >{isSaving ? 'Saving…' : 'Save anyway'}</button>}
+                >{isSaving ? 'Saving…' : 'Save choices'}</button>}
             </div>
         </aside>
     )
