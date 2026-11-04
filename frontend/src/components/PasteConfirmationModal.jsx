@@ -4,6 +4,7 @@
  * Shows Add/Replace options when pasting widgets into slots
  */
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { ClipboardPaste, X } from 'lucide-react';
 
 const PasteConfirmationModal = ({
@@ -27,11 +28,12 @@ const PasteConfirmationModal = ({
 
     const widgetText = widgetCount === 1 ? 'widget' : `${widgetCount} widgets`;
 
-    return (
-        <>
-            {/* Backdrop */}
+    return createPortal(
             <div
-                className="fixed inset-0 bg-black/50 z-[10010] flex items-center justify-center"
+                className="eceee-editor-ui fixed inset-0 bg-black/50 z-[10060] flex items-center justify-center"
+                role="dialog"
+                aria-modal="true"
+                aria-label={`Paste ${widgetText}`}
                 onClick={onClose}
             >
                 {/* Modal */}
@@ -95,8 +97,8 @@ const PasteConfirmationModal = ({
                         </button>
                     </div>
                 </div>
-            </div>
-        </>
+            </div>,
+        document.body
     );
 };
 

@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
 const Modal = ({
@@ -51,8 +52,8 @@ const Modal = ({
 
     const isCompact = size === 'sm'
 
-    return (
-        <div className="fixed inset-0 z-[10050] overflow-y-auto">
+    return createPortal(
+        <div className="eceee-editor-ui fixed inset-0 z-[10060] overflow-y-auto" role="dialog" aria-modal="true" aria-label={title}>
             {/* Backdrop */}
             <div
                 className="fixed inset-0 bg-black/50 transition-opacity"
@@ -92,8 +93,9 @@ const Modal = ({
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     )
 }
 
-export default Modal 
+export default Modal

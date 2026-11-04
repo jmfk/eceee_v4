@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Search, Package, Grid } from 'lucide-react';
 import { widgetsApi } from '../../api';
 import { useWidgetTheme } from '../../contexts/WidgetThemeContext';
@@ -115,8 +116,8 @@ const PageWidgetSelectionModal = ({
 
     if (!isOpen) return null;
 
-    return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10010] p-4">
+    return createPortal(
+        <div className="eceee-editor-ui fixed inset-0 bg-black/50 flex items-center justify-center z-[10060] p-4" role="dialog" aria-modal="true" aria-label={`Add Widget to ${slotLabel || slotName}`}>
             <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] flex flex-col">
                 {/* Modal Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -229,7 +230,8 @@ const PageWidgetSelectionModal = ({
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 
