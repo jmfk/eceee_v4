@@ -9,8 +9,8 @@
 Version-related serializers for the Web Page Publishing System
 """
 
-from copy import deepcopy
 import re
+from copy import deepcopy
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
