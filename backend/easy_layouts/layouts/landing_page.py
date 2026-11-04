@@ -2,7 +2,7 @@
 Landing Page Layout implementation.
 """
 
-from easy_layouts.layouts.shared_slots import header, navbar, footer, hero
+from easy_layouts.layouts.shared_slots import footer, header, hero, navbar
 from webpages.layout_registry import BaseLayout, register_layout
 
 
@@ -87,7 +87,7 @@ class LandingPageLayout(BaseLayout):
         display: flex;
         flex-direction: column;
     }
-    
+
     .landing-page-footer .slot-footer {
         min-height: var(--landing-footer-min-height);
         flex: 1;
