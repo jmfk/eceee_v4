@@ -51,6 +51,7 @@ const layoutNode = (type, label, { children = [], styles = {}, classNames = [], 
     return node
 }
 const splitList = (value) => String(value || '').split(/[\n,]/).map((item) => item.trim()).filter(Boolean)
+const camelCaseKey = /^[a-z][A-Za-z0-9]{0,63}$/
 const previewViewContentCount = (view) => {
     const widgets = view?.content?.widgets
     const widgetCount = widgets && typeof widgets === 'object'
@@ -451,7 +452,7 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
                 children: [addSlot('main', 'Main content', 50, { ...contentSlotFallback, required: true })],
             }))
         } else if (newLayoutStructure === 'grid') {
-            const gridSlot = addSlot('content_grid', 'Content grid', 50, { ...contentSlotFallback, required: true })
+            const gridSlot = addSlot('contentGrid', 'Content grid', 50, { ...contentSlotFallback, required: true })
             gridSlot.styles = stylesWithDimensionDefaults({
                 base: { width: '100%', min_height: '300px', display: 'grid', grid_template_columns: '1fr', gap: '24px' },
                 md: { grid_template_columns: 'repeat(2, minmax(0, 1fr))' },
@@ -465,7 +466,7 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
             }))
         } else {
             const columns = newLayoutStructure === 'three'
-                ? [['main', 'Main content'], ['sidebar', 'Sidebar'], ['secondary_sidebar', 'Secondary sidebar']]
+                ? [['main', 'Main content'], ['sidebar', 'Sidebar'], ['secondarySidebar', 'Secondary sidebar']]
                 : [['main', 'Main content'], ['sidebar', 'Sidebar']]
             const columnNodes = columns.map(([slotKey, label], columnIndex) => layoutNode('column', label, {
                 classNames: [`${key}-${slotKey.replaceAll('_', '-')}`],
@@ -523,7 +524,7 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
     const duplicateLayout = () => {
         const copy = clone(selectedLayout)
         copy.id = uuid()
-        copy.key = `${selectedLayout.key}_copy_${layouts.items.length + 1}`.slice(0, 64)
+        copy.key = `${selectedLayout.key}Copy${layouts.items.length + 1}`.slice(0, 64)
         copy.label = `${selectedLayout.label} copy`
         copy.root = freshenNodeIds(copy.root)
         commit({ ...clone(layouts), items: [...clone(layouts.items), copy] }, { layoutId: copy.id, nodeId: copy.root.id })
@@ -558,8 +559,8 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
         if (type === 'semantic') node.tag = 'section'
         if (type === 'slot') {
             let index = Object.keys(selectedLayout.slots).length + 1
-            key = `slot_${index}`
-            while (selectedLayout.slots[key]) key = `slot_${++index}`
+            key = `slot${index}`
+            while (selectedLayout.slots[key]) key = `slot${++index}`
             node.slot_key = key
             node.label = `Slot ${Object.keys(selectedLayout.slots).length + 1}`
             node.class_names = ['layout-slot', `slot-${key}`]
@@ -608,8 +609,8 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
             let newSlotKey = ''
             if (nextType === 'slot') {
                 let index = Object.keys(layout.slots).length + 1
-                newSlotKey = `slot_${index}`
-                while (layout.slots[newSlotKey]) newSlotKey = `slot_${++index}`
+                newSlotKey = `slot${index}`
+                while (layout.slots[newSlotKey]) newSlotKey = `slot${++index}`
                 layout.slots[newSlotKey] = {
                     label: selected.node.label || `Slot ${index}`,
                     description: '',
@@ -834,6 +835,36 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
         return layout
     })
 
+    const renameSlot = (nextKey) => {
+        const currentKey = selected?.node?.slot_key
+        if (!currentKey || nextKey === currentKey) return
+        if (!camelCaseKey.test(nextKey)) return setJsonError('Slot keys must use camelCase letters and numbers, start with a lowercase letter, and contain no underscores.')
+        if (Object.hasOwn(selectedLayout.slots, nextKey)) return setJsonError(`Slot key “${nextKey}” is already in use.`)
+        if ((workspace.previewContent?.views || []).some((view) => {
+            const viewLayout = view.content?.codeLayout || view.layout || layouts.default_layout_key
+            return viewLayout === selectedLayout.key && view.content?.widgets?.[currentKey]?.length
+        })) return setJsonError('A theme preview uses this slot. Move its preview widgets before renaming the slot.')
+        const next = clone(layouts)
+        const layout = next.items.find((item) => item.id === selectedLayout.id)
+        layout.slots = Object.fromEntries(Object.entries(layout.slots).map(([key, policy]) => [key === currentKey ? nextKey : key, policy]))
+        layout.root = mapNode(layout.root, selectedNodeId, (node) => ({
+            ...node,
+            slot_key: nextKey,
+            class_names: (node.class_names || []).map((name) => name === `slot-${currentKey}` ? `slot-${nextKey}` : name),
+        }))
+        const specialPages = next.special_pages || []
+        if (specialPages.some((page) => page.layout_key === layout.key && page.widgets?.[currentKey]?.length && page.widgets?.[nextKey]?.length)) {
+            return setJsonError('A special page already has widgets in the destination slot. Move those widgets before renaming.')
+        }
+        if (next.special_pages) next.special_pages = specialPages.map((page) => {
+            if (page.layout_key !== layout.key || !Object.hasOwn(page.widgets || {}, currentKey)) return page
+            const widgets = { ...page.widgets, [nextKey]: [...(page.widgets[currentKey] || []), ...(page.widgets[nextKey] || [])] }
+            delete widgets[currentKey]
+            return { ...page, widgets }
+        })
+        commit(next)
+    }
+
     const fillAvailableSlotHeight = () => updateLayout((layout) => {
         const current = findNode(layout.root, selectedNodeId)
         if (!current?.parent || current.node.type !== 'slot') return layout
@@ -1046,7 +1077,9 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
                     </div>}
                     {selected.node.type === 'semantic' && <label className="mt-3 block text-xs font-medium text-gray-700">Semantic element<select value={selected.node.tag || 'div'} onChange={(event) => updateNode((node) => ({ ...node, tag: event.target.value }))} className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm">{['div', 'header', 'nav', 'main', 'aside', 'section', 'footer'].map((tag) => <option key={tag}>{tag}</option>)}</select></label>}
                     {selected.node.type === 'slot' && <div className="mt-3 space-y-3">
-                        <p className="rounded bg-gray-50 px-2 py-1.5 font-mono text-[11px] text-gray-600">Key: {selected.node.slot_key}</p>
+                        <label className="block text-xs font-medium text-gray-700">Slot key<input key={selected.node.id + selected.node.slot_key} defaultValue={selected.node.slot_key} onBlur={(event) => renameSlot(event.target.value.trim())} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }} className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs" /></label>
+                        {!camelCaseKey.test(selected.node.slot_key) && <button type="button" onClick={() => renameSlot(selected.node.slot_key.replace(/_([a-z0-9])/g, (_, letter) => letter.toUpperCase()))} className="text-xs text-blue-700 hover:underline">Convert key to camelCase</button>}
+                        <p className="text-[11px] leading-4 text-gray-500">Existing page widgets keep their old slot key until you convert them from the page warning.</p>
                         <label className="block text-xs font-medium text-gray-700">Slot label<input value={selectedLayout.slots[selected.node.slot_key]?.label || ''} onChange={(event) => updateSlot((slot) => ({ ...slot, label: event.target.value }))} className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm" /></label>
                         <label className="block text-xs font-medium text-gray-700">Description<textarea value={selectedLayout.slots[selected.node.slot_key]?.description || ''} onChange={(event) => updateSlot((slot) => ({ ...slot, description: event.target.value }))} rows="2" className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm" /></label>
                         <label className="block text-xs font-medium text-gray-700">Maximum widgets<input type="number" min="1" value={selectedLayout.slots[selected.node.slot_key]?.max_widgets ?? ''} placeholder="Unlimited" onChange={(event) => updateSlot((slot) => ({ ...slot, max_widgets: event.target.value ? Number(event.target.value) : null }))} className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm" /></label>

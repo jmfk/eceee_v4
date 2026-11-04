@@ -3,6 +3,7 @@ Custom template tags and filters for the webpages app
 """
 
 import json
+import re
 
 from django import template
 
@@ -162,9 +163,12 @@ def render_slot(context, slot_name):
 
     # Get widgets for this specific slot
     slot_widgets = widgets_by_slot.get(slot_name, [])
+    if not slot_widgets and slot_name == "landingPage":
+        slot_widgets = widgets_by_slot.get("landing_page", [])
+    slot_class = re.sub(r"([a-z0-9])([A-Z])", r"\1-\2", slot_name).lower()
     if not slot_widgets:
         # No widgets for this slot - return empty slot container
-        return mark_safe(f'<div class="layout-slot slot-{slot_name.lower()}" data-slot-name="{slot_name}"></div>')
+        return mark_safe(f'<div class="layout-slot slot-{slot_class}" data-slot-name="{slot_name}"></div>')
 
     # Check if we have new-style rendered widgets (from WebPageRenderer)
     if slot_widgets and isinstance(slot_widgets[0], dict) and "html" in slot_widgets[0]:
@@ -195,7 +199,7 @@ def render_slot(context, slot_name):
 
     # Wrap in slot container with slot class
     return mark_safe(
-        f'<div class="layout-slot slot-{slot_name.lower()}" data-slot-name="{slot_name}">' f"{widgets_html}" f"</div>"
+        f'<div class="layout-slot slot-{slot_class}" data-slot-name="{slot_name}">' f"{widgets_html}" f"</div>"
     )
 
 

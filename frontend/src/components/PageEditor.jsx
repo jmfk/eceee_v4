@@ -57,6 +57,7 @@ import { HistoricalPageView } from './HistoricalVersionView'
 import { useClipboard } from '../contexts/ClipboardContext'
 import { getDefaultLayout } from '../utils/defaultLayout'
 import ErrorTodoSidebar from './ErrorTodoSidebar'
+import { convertSlotWidgets, slotConversionFromWarning } from '../utils/slotConversion'
 import SchemaDrivenForm from './SchemaDrivenForm'
 import StatusBar from './StatusBar'
 import WidgetEditorPanel from './WidgetEditorPanel'
@@ -1413,12 +1414,17 @@ const PageEditor = () => {
             const contentWarnings = errorData?.contentWarnings || errorData?.content_warnings
             if (Array.isArray(contentWarnings) && contentWarnings.length) {
                 addNotification('Review the content warnings to save this draft.', 'warning')
-                setErrorTodoItems(contentWarnings.map((warning, index) => ({
-                    id: `content-warning-${index}`,
-                    title: 'Content warning',
-                    detail: String(warning),
-                    warning: true,
-                })))
+                setErrorTodoItems(contentWarnings.map((warning, index) => {
+                    const detail = String(warning)
+                    const conversion = slotConversionFromWarning(detail)
+                    return {
+                        id: `content-warning-${index}`,
+                        title: 'Content warning',
+                        detail,
+                        warning: true,
+                        ...(conversion && { slotConversion: conversion }),
+                    }
+                }))
                 setAcknowledgedWarnings([])
             } else {
                 addNotification(`Save failed: ${error.message}`, 'error')
@@ -2315,6 +2321,12 @@ const PageEditor = () => {
                             acknowledgedWarnings={acknowledgedWarnings}
                             onToggleWarning={(id) => setAcknowledgedWarnings((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])}
                             onSaveAcknowledged={handleSaveAcknowledgedWarnings}
+                            onConvertSlot={(item) => {
+                                const { from, to } = item.slotConversion
+                                const widgets = localWidgets || pageVersionData?.widgets || {}
+                                const next = convertSlotWidgets(widgets, from, to)
+                                if (next) updateLocalWidgets(next)
+                            }}
                             isSaving={isSaving}
                             onNavigate={(item) => navigateToFix({ item, navigate, pageId, isNewPage, currentVersion, previousView })}
                         />

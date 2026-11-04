@@ -13,14 +13,14 @@
 {% endblock %}
 
 {% block content %}
-<div class="landing-page-container" data-render-layout="landing_page">
+<div class="landing-page-container" data-render-layout="landingPage">
   <div class="landing-page-wrapper">
     
     {% render_slot "header" %}
     {% render_slot "navbar" %}
     {% render_slot "hero" %}
     <main class="landing-page-main">
-      {% render_slot "landing_page" %}
+      {% render_slot "landingPage" %}
     </main>
 
     <div class="landing-page-footer">

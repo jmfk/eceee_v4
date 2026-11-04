@@ -13,6 +13,7 @@ from webpages.error_page_defaults import ERROR_PAGE_CONTENT, LEGACY_ERROR_PAGE_S
 
 SCHEMA_VERSION = 1
 LAYOUT_KEY = re.compile(r"^[a-z][A-Za-z0-9_]{0,63}$")
+CAMEL_CASE_KEY = re.compile(r"^[a-z][A-Za-z0-9]{0,63}$")
 WIDGET_ID = re.compile(
     r"^(?:widget-)?[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
     re.IGNORECASE,
@@ -897,8 +898,23 @@ def validate_layout_widgets(theme, layout_key, widgets, *, previous_widgets=None
         policy = slots.get(slot_key)
         if policy is None:
             if warnings is not None:
+                camel_key = (
+                    re.sub(r"_([a-z0-9])", lambda match: match.group(1).upper(), slot_key)
+                    if isinstance(slot_key, str)
+                    else slot_key
+                )
+                suggestion = (
+                    f" Convert this slot to '{camel_key}' to show its widgets."
+                    if camel_key != slot_key
+                    and isinstance(camel_key, str)
+                    and CAMEL_CASE_KEY.fullmatch(camel_key)
+                    and camel_key in slots
+                    and not widgets.get(camel_key)
+                    else ""
+                )
                 warnings.append(
                     f"Slot '{slot_key}' is not used by layout '{layout_key}' and its widgets will not appear publicly."
+                    + suggestion
                 )
             elif not all(existing):
                 errors.append(f"Slot '{slot_key}' is not declared by layout '{layout_key}'.")
@@ -1019,13 +1035,18 @@ def theme_layout_usage(theme):
 
 
 def validate_layout_compatibility(theme, updated_document):
-    """Block destructive key/slot changes while referenced content still exists."""
+    """Protect referenced layouts and slot policies while retaining historical widgets."""
     validate_theme_layouts(updated_document)
     previous = {item["id"]: item for item in (theme.layouts or {}).get("items", []) if isinstance(item, dict)}
     updated = {item["id"]: item for item in updated_document.get("items", [])}
     updated_by_key = {item["key"]: item for item in updated_document.get("items", [])}
     usage = theme_layout_usage(theme)
     errors = []
+    for layout_id, layout in updated.items():
+        if layout_id not in previous and layout.get("description") != "Migrated from the legacy code-layout registry.":
+            for slot_key in layout.get("slots", {}):
+                if not CAMEL_CASE_KEY.fullmatch(slot_key):
+                    errors.append(f"Slot key '{slot_key}' must use camelCase.")
     for layout_id, old_layout in previous.items():
         current = updated.get(layout_id)
         old_key = old_layout.get("key")
@@ -1042,13 +1063,12 @@ def validate_layout_compatibility(theme, updated_document):
             continue
         if current.get("key") != old_key and reference_count:
             errors.append(f"Layout key '{old_key}' is in use and cannot be renamed.")
-        removed_slots = set((old_layout.get("slots") or {})) - set((current.get("slots") or {}))
-        for slot_key in sorted(removed_slots):
-            slot_count = counts.get("slots", {}).get(slot_key, 0)
-            if slot_count:
-                errors.append(
-                    f"Slot '{old_key}.{slot_key}' contains content in {slot_count} versions and cannot be removed."
-                )
+        new_slots = set((current.get("slots") or {})) - set((old_layout.get("slots") or {}))
+        for slot_key in sorted(new_slots):
+            if not CAMEL_CASE_KEY.fullmatch(slot_key):
+                errors.append(f"Slot key '{slot_key}' must use camelCase.")
+        # Historical widgets remain stored under their old slot key. Editors can
+        # move them explicitly; the page validator warns until then.
         for slot_key, policy in (current.get("slots") or {}).items():
             details = counts.get("slot_details", {}).get(slot_key)
             if not details:

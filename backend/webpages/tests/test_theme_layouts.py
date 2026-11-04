@@ -94,6 +94,25 @@ class ThemeLayoutValidationTests(SimpleTestCase):
             {"mainLayout", "landingPage", "errorLayout"},
         )
 
+    def test_legacy_slot_warning_offers_safe_camel_case_conversion(self):
+        theme = SimpleNamespace(layouts=default_theme_layouts())
+        widgets = {"landing_page": [{"type": "easy_widgets.ContentWidget", "config": {}}]}
+        warnings = []
+
+        validate_layout_widgets(theme, "landingPage", widgets, previous_widgets=widgets, warnings=warnings)
+
+        self.assertIn("Convert this slot to 'landingPage'", warnings[0])
+
+        warnings = []
+        validate_layout_widgets(
+            theme,
+            "landingPage",
+            {**widgets, "landingPage": [{"type": "easy_widgets.HeadlineWidget", "config": {}}]},
+            previous_widgets=widgets,
+            warnings=warnings,
+        )
+        self.assertNotIn("Convert this slot", warnings[0])
+
     def test_default_page_layouts_use_descriptive_structure_and_plain_footer_wrappers(self):
         layouts = {layout["key"]: layout for layout in default_theme_layouts()["items"]}
 
@@ -785,3 +804,14 @@ class ThemeLayoutUsageTests(TestCase):
         restricted["items"][0]["slots"]["main"].pop("disallowed_widget_types", None)
         with self.assertRaisesMessage(ValidationError, "ContentWidget"):
             validate_layout_compatibility(theme, restricted)
+
+        renamed = deepcopy(theme.layouts)
+        renamed["items"][0]["slots"]["mainContent"] = renamed["items"][0]["slots"].pop("main")
+
+        def rename_node(node):
+            if node.get("slot_key") == "main":
+                node["slot_key"] = "mainContent"
+            for child in node.get("children", []):
+                rename_node(child)
+        rename_node(renamed["items"][0]["root"])
+        self.assertIs(validate_layout_compatibility(theme, renamed), renamed)
