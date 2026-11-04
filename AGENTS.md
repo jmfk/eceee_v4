@@ -74,35 +74,78 @@ Use the approved compact Tags style for new and revised CMS tools: 12px control 
   local machine, resolve the public production host through the established
   ECEEE production DNS records (`app.eceee.org`, `admin.eceee.org`, and
   `imgproxy.eceee.org`) and require them to agree on one public IPv4 address
-  before requesting the production gate. The default local `linode-cli` profile
+  before production SSH or deployment. The default local `linode-cli` profile
   may belong to another Linode account and must not be treated as authoritative
   for ECEEE production unless its account ownership has been independently
-  established. Report the resolved SSH host and exact command scope in the
-  gate, then use that address as the SSH target. If the DNS records disagree or
+  established. Report the resolved SSH host and command scope before the
+  operation, then use that address as the SSH target. If the DNS records disagree or
   the production mapping is otherwise ambiguous, stop and report that specific
   discrepancy. Never display Linode API tokens or configuration contents; apply
   `inspect-secrets-safely`.
-- For an owner gate, present one concrete operation and ask for a direct `Yes` or
-  `y` to approve it (`No` or `n` declines). A direct `Yes` or `y` in the next
-  owner message authorizes only that most recently reported operation, including
-  its exact target, scope, and stated risks. The owner need not repeat the host,
-  command, tag, commit, PR number, or risk acknowledgement in their reply. Do not
-  treat an out-of-context response, a reply to multiple pending choices, or a
-  response after the target or risk changes as authorization; report the updated
-  operation and ask again.
-- Codex may use SSH and run commands in production only after a fresh, explicit owner gate for the exact operation. Immediately before requesting that gate, report the production environment and host, the exact commands or tightly bounded command class, whether the work is read-only or mutating, the expected service and data impact, the evidence motivating it, and the rollback or recovery plan when applicable. The owner must authorize that reported operation in a new message; a general request to continue, prior approval, or an ambiguous keypad signal is not authorization.
-- Production authorization is limited to the reported environment, host, scope, commands, and time-bounded task. A materially different command, target, service, data set, risk, or recovery path requires a new report and explicit owner authorization. Stop if a command would expand beyond the approved scope, expose secrets, or require an unreviewed destructive action.
-- Prefer reviewed repository targets and scripts over ad hoc server commands. Durable production changes should normally go through local code/config changes, commit/push, and `deploy/scripts/`. A directly authorized emergency or diagnostic server change must be minimal, recorded in the handoff, verified after execution, and reconciled back into the repository when it represents persistent configuration or behavior.
-- After an owner gate, Codex may run the approved SSH, `docker exec`, `docker logs`, `docker compose`, Django management, database, status, logging, deployment, or recovery commands directly. Do not infer permission for adjacent commands; harmless command syntax adjustments are allowed only when they do not change the approved scope or risk.
-- Codex may run `make prod-deploy TAG=<release-tag>` only after a human deployment gate. Always deploy by a Git tag, never by passing a commit hash as `TAG`. Immediately before requesting that gate, verify the tag resolves to the intended exact commit and report the production environment, tag, exact commit, current CI/review status, expected operational and data-path impact, and known residual risks. The owner must then explicitly authorize deploying that tag and commit to production in a new message. Review, merge, preparation, prior risk acknowledgement, or a general request to continue is not deployment authorization.
-- For a fast-track production release, use `make prod-deploy TAG=<release-tag> FAST_RELEASE=1 FAST_BASE_REF=<deployed-commit>` only when the exact deployed commit is verified and the entire diff to the release is eligible. The fast path validates that the base is an ancestor, all changed files are under `frontend/src/`, `frontend/public/`, or `frontend/index.html`, and the base still matches production immediately before preflight. It then runs `frontend-lint frontend-test` instead of the broad local preflight. The file check is necessary but not sufficient: exclude authentication, tenant or data contracts, public rendering, dependencies, and other high-risk behavior even when their files are under `frontend/`. Report the narrower checks and residual risk in the deployment gate. A failed guard requires the normal preflight and a fresh gate; do not weaken or bypass the guard. Backup, locking, migration checks, service restart, and health checks remain in `make prod-deploy`.
-- Deployment authorization is valid only for the reported tag, commit, and production environment. Verify the tag still resolves to that commit immediately before deployment. Any tag movement, commit change, failed preflight requiring code/config changes, or materially changed risk invalidates the authorization and requires a fresh report and new explicit approval. A direct `Yes` or `y` to the concrete gate is explicit approval; an ambiguous keypad signal is not.
-- After the human gate, use only the reviewed `make prod-deploy` target and its repository scripts. Do not replace or bypass their preflight, backup, locking, migration, credential-provisioning, or health-check steps. Stop and report if they request interactive credentials, expose secrets, or require an unreviewed manual server action.
-- Before requesting the gate, verify that the deployment is expected to cause no more service disruption than the established `make prod-deploy` flow normally causes. Report any extra maintenance window, restart scope, temporary unavailability, or expansion to unrelated services; a materially larger operational impact requires a separate explicit owner decision before deployment.
-- Protect existing production data as a hard constraint. The reviewed preflight and backup must succeed before mutation; migrations must be reviewed for upgrade safety and non-destructive behavior. The authorized deployment must not include restoration, backfills, resets, destructive cleanup, `DELETE`, `TRUNCATE`, broad data rewrites, or other separately risky data operations unless the owner approves that exact operation through its own human gate.
-- If deployment or health verification fails after production mutation, do not improvise a manual fix, destructive rollback, or data restoration. Preserve production data, stop further mutation, report the completed phases and failure evidence, and request a new owner gate for the exact diagnostic or recovery path.
-- For production debugging, Codex may run `make prod-logs`, `make prod-status`, or explicitly approved SSH/read-only commands after the owner gate above. Redact output and use `inspect-secrets-safely` whenever credentials or secret-bearing configuration could be involved.
-- Production restoration, backfills, resets, destructive cleanup, `DELETE`, `TRUNCATE`, and broad data rewrites require a separate owner gate naming the exact data target and operation. Prefer a reviewed, backup-aware, resumable script in `deploy/scripts/`; verify the recovery point and rollback or roll-forward plan before execution.
+- An explicit owner request to **deploy** authorizes the normal, reviewed
+  `make prod-deploy TAG=<release-tag>` operation needed to deliver the current
+  task. An explicit request to **merge and deploy** authorizes both steps. Do not
+  ask again solely because the PR number, release tag, or merge commit was
+  created after that request. Report the resolved PR, tag, commit, CI/review
+  status, destination, expected impact, and material risks before acting. If
+  checks fail, fix and reverify within the same task; ask only when the target,
+  scope, operational impact, or data risk materially changes, or the user has
+  not requested the operation. A vague `continue` or ambiguous keypad signal
+  is not deployment authorization.
+- A deploy request also authorizes bounded read-only production checks needed
+  to prepare or verify that deploy, such as status, logs, current commit,
+  health, and a migration impact audit. State what is being checked and redact
+  output; do not use this permission for unrelated exploration or mutation.
+  Other production SSH operations require an explicit owner request for their
+  purpose and scope, but no duplicate confirmation when that request already
+  supplies it. Stop if the production host is ambiguous or a command would
+  expand beyond the authorized task or expose secrets.
+- Prefer reviewed repository targets and scripts over ad hoc server commands.
+  Durable production changes should normally go through local code/config
+  changes, commit/push, and `deploy/scripts/`. A directly authorized emergency
+  or diagnostic server change must be minimal, recorded in the handoff,
+  verified after execution, and reconciled back into the repository when it
+  represents persistent configuration or behavior.
+- Always deploy by a Git tag, never by passing a commit hash as `TAG`. Verify
+  immediately before deployment that the tag resolves to the reviewed commit
+  and that production DNS records agree. Use only the reviewed `make prod-deploy`
+  target and its repository scripts; preserve preflight, backup, locking,
+  migration, credential provisioning, restart, and health checks. Stop if they
+  request interactive credentials, expose secrets, or require an unreviewed
+  manual server action.
+- For a fast-track production release, use
+  `make prod-deploy TAG=<release-tag> FAST_RELEASE=1 FAST_BASE_REF=<deployed-commit>`
+  only when the exact deployed commit is verified and the entire diff is
+  eligible. The fast path validates that the base is an ancestor, all changed
+  files are under `frontend/src/`, `frontend/public/`, or `frontend/index.html`,
+  and the base still matches production immediately before preflight. It runs
+  `frontend-lint frontend-test` instead of the broad local preflight. Exclude
+  authentication, tenant or data contracts, public rendering, dependencies,
+  and other high-risk behavior even when files are under `frontend/`. Report
+  the narrower checks and residual risk. A failed guard requires the normal
+  preflight; do not weaken or bypass the guard. Backup, locking, migration
+  checks, service restart, and health checks remain in `make prod-deploy`.
+- Verify that the release is expected to cause no more disruption than the
+  normal deploy flow. Report any extra maintenance window, restart scope,
+  temporary unavailability, or expansion to unrelated services; obtain a new
+  decision only for materially larger impact.
+- Protect existing production data as a hard constraint. The reviewed preflight
+  and backup must succeed before mutation. Review migrations for upgrade safety,
+  tenant isolation, locking, failure recovery, and non-destructive behavior.
+  A requested deployment includes its reviewed, non-destructive migrations;
+  do not add a second data approval solely because they update existing rows.
+  Restoration, backfills, resets, destructive cleanup, `DELETE`, `TRUNCATE`,
+  or an unreviewed broad rewrite require a distinct explicit owner request
+  naming the data target and operation.
+- If deployment or health verification fails after production mutation, preserve
+  data and stop further mutation. Bounded read-only diagnostics may proceed
+  under the deploy request. Report the completed phases and failure evidence;
+  obtain explicit approval before manual repair, rollback, or restoration.
+  Prefer a reviewed, backup-aware, resumable recovery script and verify the
+  recovery point and rollback or roll-forward plan.
+- For production debugging, use bounded read-only status or logs within the
+  requested task. Redact output and use `inspect-secrets-safely` whenever
+  credentials or secret-bearing configuration could be involved.
 
 ## Common Commands
 
@@ -110,7 +153,7 @@ Use `make help` for the full list of targets. Key ones: `make servers`, `make mi
 
 Backend static assets: `cd backend && npm run build` / `npm run watch:css`
 
-## Pull Request Review And Merge Gate
+## Pull Request Review And Merge
 
 - Keep review and CI proportional to the changed risk. Before opening or updating
   a PR, inspect the complete intended diff once, batch verified fixes, run focused
@@ -121,16 +164,17 @@ Backend static assets: `cd backend && npm run build` / `npm run watch:css`
   warranted only when the fix changes the contract, risk, or substantial scope.
   If a review round produces no new verified findings, stop reviewing and report
   the result. Do not use repeated independent reviews as a substitute for a
-  clear risk decision. Keep required Full CI and owner merge gates below.
+  clear risk decision. Keep required Full CI and authorization checks below.
 - An owner may request the fast-track lane for a small, isolated, reversible fix.
   Eligible changes do not touch migrations, stored-data contracts, tenant scope,
   authorization, secrets, dependencies, CI/deployment controls, or production
   data paths. Patch size alone does not establish eligibility. Before merge,
   run focused local verification and confirm `Fast CI / Fast CI gate` succeeds
   for the current head. Report the changed behavior, checks, residual risk,
-  submitted reviews, review decision, unresolved threads, and mergeability,
-  then ask for one owner `Yes` or `y` to merge the named PR. Full CI and the
-  usual deep review may be deferred only in this lane, and only if active GitHub
+  submitted reviews, review decision, unresolved threads, and mergeability.
+  If the owner already requested merge for this task, proceed without a second
+  approval. Full CI and the usual deep review may be deferred only in this lane,
+  and only if active GitHub
   rules allow the merge without bypassing branch protection. Mark each PR body
   `Fast-track follow-up: pending` and record its head commit for a combined review.
   Review the accumulated diff, run Full CI or equivalent broad checks, and batch any fixes in one
@@ -147,40 +191,37 @@ Backend static assets: `cd backend && npm run build` / `npm run watch:css`
 - Before merging any pull request, fetch its current checks, submitted reviews,
   review decision, unresolved review threads when available, and mergeability.
   Do this immediately before the merge even if the PR was inspected earlier.
-- Except for an eligible fast-track PR, before requesting owner sign-off to merge, request Full CI by adding the
+- Except for an eligible fast-track PR, before merging, request Full CI by adding the
   `full-ci` label. If it is already present, remove and reapply it: retained labels
   do not request full runs on later pushes. Verify that the full workflow and
   `Full CI / Full CI gate` succeeded for the current head commit, separately from
   `Fast CI / Fast CI gate`. A later push requires a new full run and status report.
   See `docs/ci.md` for the GitHub ruleset activation and verification procedure.
-- Never merge a pull request unless the user has explicitly approved merging that
-  specific PR after the agent has reported the current head commit,
-  checks, submitted reviews, review decision, unresolved review threads, and
-  mergeability. That instruction is the repository owner's sign-off and may be
-  used instead of a submitted GitHub `APPROVED` review. A submitted approval from
-  another authorized reviewer is still valid supporting evidence, but is not
-  required for an owner-operated repository.
-- Owner sign-off is valid only for the reviewed head commit. Any later code change
-  invalidates it and requires a fresh status/review report followed by a new,
-  explicit approval to merge that PR. A direct `Yes` or `y` to a single concrete
-  merge gate counts. Comments, bot reports, successful checks,
-  branch-protection bypasses, and the agent's own review are not owner sign-off.
-- Do not infer merge authorization from requests to review, fix, commit, push,
-  synchronize, rebase, make mergeable, or report which branches can be merged.
-- Treat migrations, data migrations, backfills, tenancy or authorization changes,
-  destructive cleanup, and production data-path changes as high-risk. An agent
-  must never merge such a PR without a fresh risk review of the current head and
-  a separate owner gate naming the PR and reported high-risk change. A direct
-  `Yes` or `y` to that gate acknowledges the reported risk and approves the merge.
-  A prior general instruction to merge is insufficient.
+- An explicit owner request to **merge** authorizes merging the PR created for
+  the current task after review and the required checks pass. **Merge and deploy**
+  also authorizes that merge. Do not require the owner to repeat the instruction
+  after the PR number or final head commit becomes known. Immediately before
+  merging, report the current PR/head, checks, submitted reviews, review decision
+  (or that the provider cannot expose it), unresolved threads, mergeability,
+  changed behavior, and remaining material risks. The agent's own review and
+  passing CI are evidence, not a substitute for a missing merge request.
+- Review fixes and routine rebases within the requested task do not require
+  another approval; reverify the final head and refresh Full CI when required.
+  Ask for a new decision if the PR's purpose, data impact, or material risk
+  changes, or if the user only requested review, fixes, push, or a report.
+- Treat migrations, backfills, tenancy or authorization changes, destructive
+  cleanup, and production data-path changes as high-risk. Perform a fresh risk
+  review of the final head and report its concrete data and operational impact
+  before merging. A prior explicit **merge** request for the same task remains
+  authorization for a reviewed, non-destructive change; a destructive or newly
+  expanded operation needs its own explicit owner decision.
 - For migration or backfill PRs, the review must explicitly consider clean-database
   installation, upgrade from existing data, idempotency and resumability, tenant
   isolation, locking and performance, failure recovery, rollback or roll-forward,
   and operational verification. Record gaps instead of treating green tests as
   sufficient evidence.
-- If the required owner sign-off or authorization is absent, stop at a merge-ready
-  PR, state exactly what is missing, and leave the merge to the user. Repository
-  rules being bypassable does not weaken this gate.
+- If the user has not requested merge, stop at a merge-ready PR and state what
+  remains. Repository rules being bypassable do not create authorization.
 
 ## Testing Expectations
 
