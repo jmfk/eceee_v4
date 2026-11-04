@@ -335,7 +335,7 @@ def normalized_designer_preview(theme, layouts=None):
             ),
         ),
     )
-    configured = canonical_preview(preview_config).get("views", [])
+    configured = canonical_preview(preview_config, theme.layouts).get("views", [])
     views = []
     seen = set()
     for position, view in enumerate(configured):

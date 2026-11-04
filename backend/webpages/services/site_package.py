@@ -32,7 +32,12 @@ from file_manager.storage import S3MediaStorage
 from taxonomy.context import import_actor
 from taxonomy.models import Tag as TaxonomyTag
 from taxonomy.transfer import export_assignments, export_term, import_assignments, import_term
-from webpages.layout_key_names import canonical_layout_document, canonical_layout_key, canonical_preview
+from webpages.layout_key_names import (
+    canonical_layout_document,
+    canonical_layout_key,
+    canonical_preview,
+    canonical_slot_widgets,
+)
 from webpages.models import PageTheme, PageVersion, RemoteSiteBinding, SitePackageJob, WebPage
 from webpages.services.theme_preview_content import (
     EMBEDDED_IMAGE_PATTERN,
@@ -67,9 +72,7 @@ def _canonical_imported_layout(layout_key, widgets):
     key = layout_key or ""
     if key not in LEGACY_ERROR_LAYOUT_KEYS:
         key = canonical_layout_key(key)
-        if key == "landingPage" and isinstance(widgets, dict) and "landing_page" in widgets:
-            widgets = {**widgets, "landingPage": [*widgets["landing_page"], *(widgets.get("landingPage") or [])]}
-            widgets.pop("landing_page")
+        widgets = canonical_slot_widgets(widgets)
         return key, widgets
     normalized = dict(widgets) if isinstance(widgets, dict) else widgets
     if isinstance(normalized, dict):
@@ -2277,7 +2280,7 @@ class SitePackageImporter:
             "design_groups": data.get("design_groups", {}),
             "component_styles": data.get("component_styles", {}),
             "designer_preview": normalize_theme_preview_namespaces(
-                canonical_preview(data.get("designer_preview", {})), destination_tenant
+                canonical_preview(data.get("designer_preview", {}), layouts), destination_tenant
             ),
             "layouts": layouts,
             "widget_types": data.get("widget_types", {"version": 1, "items": []}),
@@ -2305,6 +2308,7 @@ class SitePackageImporter:
         return theme
 
     def _apply_theme_data(self, package, theme, data, layout_references=None):
+        layouts = _with_compatibility_layouts(data.get("layouts"), layout_references)
         values = {
             "name": data.get("name", theme.name),
             "description": data.get("description", ""),
@@ -2313,9 +2317,9 @@ class SitePackageImporter:
             "design_groups": data.get("design_groups", {}),
             "component_styles": data.get("component_styles", {}),
             "designer_preview": normalize_theme_preview_namespaces(
-                canonical_preview(data.get("designer_preview", {})), self._destination_tenant()
+                canonical_preview(data.get("designer_preview", {}), layouts), self._destination_tenant()
             ),
-            "layouts": _with_compatibility_layouts(data.get("layouts"), layout_references),
+            "layouts": layouts,
             "widget_types": data.get("widget_types", {"version": 1, "items": []}),
             "image_styles": data.get("image_styles", {}),
             "text_outline_styles": validate_text_outline_styles(
