@@ -11,9 +11,7 @@ class LandingPageLayout(BaseLayout):
     """Landing page layout optimized for conversions"""
 
     name = "landing_page"
-    description = (
-        "Full-width landing page layout with hero section and conversion focus"
-    )
+    description = "Full-width landing page layout with hero section and conversion focus"
     template_name = "easy_layouts/layouts/landing_page.html"
     css_classes = "layout-landing-page"
 

@@ -813,5 +813,6 @@ class ThemeLayoutUsageTests(TestCase):
                 node["slot_key"] = "mainContent"
             for child in node.get("children", []):
                 rename_node(child)
+
         rename_node(renamed["items"][0]["root"])
         self.assertIs(validate_layout_compatibility(theme, renamed), renamed)
