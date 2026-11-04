@@ -10,6 +10,7 @@ Version-related serializers for the Web Page Publishing System
 """
 
 from copy import deepcopy
+import re
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
@@ -21,6 +22,12 @@ from .base import UserSerializer
 from .theme import PageThemeSerializer
 
 SCHEDULE_PREDECESSOR_KEY = "scheduled_predecessor"
+SLOT_WARNING = re.compile(r"^Slot '([^']+)' is not used by layout '([^']+)' and its widgets will not appear publicly\.")
+
+
+def ignored_slot_warning_key(warning):
+    match = SLOT_WARNING.match(warning)
+    return f"{match[2]}:{match[1]}" if match else None
 
 
 def validate_reserved_page_attributes(version, page_data):
@@ -67,6 +74,9 @@ def validate_page_data_for_version(version, value, *, code_layout=None, warnings
         "enable_css_injection",
     }
     filtered_data = {key: item for key, item in value.items() if key not in forbidden}
+    ignored = filtered_data.get("ignoredSlotWarnings", [])
+    if not isinstance(ignored, list) or any(not isinstance(key, str) for key in ignored):
+        raise serializers.ValidationError({"ignoredSlotWarnings": "Expected a list of slot warning keys."})
     if version is None:
         return filtered_data
 
@@ -353,6 +363,13 @@ class PageVersionSerializer(serializers.ModelSerializer):
                 code_layout=attrs.get("code_layout"),
                 warnings=content_warnings,
             )
+        ignored = attrs.get("page_data", getattr(self.instance, "page_data", {}) if self.instance else {}).get(
+            "ignoredSlotWarnings", []
+        )
+        if isinstance(ignored, list):
+            content_warnings = [
+                warning for warning in content_warnings or [] if ignored_slot_warning_key(warning) not in ignored
+            ]
         if content_warnings and not self.context.get("acknowledge_content_warnings"):
             raise serializers.ValidationError({"contentWarnings": content_warnings})
         return super().validate(attrs)

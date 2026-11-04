@@ -57,7 +57,7 @@ import { HistoricalPageView } from './HistoricalVersionView'
 import { useClipboard } from '../contexts/ClipboardContext'
 import { getDefaultLayout } from '../utils/defaultLayout'
 import ErrorTodoSidebar from './ErrorTodoSidebar'
-import { convertSlotWidgets, slotConversionFromWarning } from '../utils/slotConversion'
+import { applySlotWarningChoices, slotConversionFromWarning } from '../utils/slotConversion'
 import SchemaDrivenForm from './SchemaDrivenForm'
 import StatusBar from './StatusBar'
 import WidgetEditorPanel from './WidgetEditorPanel'
@@ -560,7 +560,7 @@ const PageEditor = () => {
 
     // Validation To-Do sidebar state
     const [errorTodoItems, setErrorTodoItems] = useState([])
-    const [acknowledgedWarnings, setAcknowledgedWarnings] = useState([])
+    const [warningChoices, setWarningChoices] = useState({})
     const [schemaValidationState, setSchemaValidationState] = useState({ isValid: true, hasErrors: false })
 
     // Namespace for media operations
@@ -1292,7 +1292,7 @@ const PageEditor = () => {
                 );
 
                 const conflictRetryCount = saveOptions.conflictRetryCount || 0;
-                if (conflictAnalysis.canAutoMerge && conflictRetryCount < 3) {
+                if (conflictAnalysis.canAutoMerge && conflictRetryCount < 3 && !saveOptions.versionDataOverrides) {
                     // Auto-merge successful - retry save with merged data
                     console.log('✅ Auto-merge successful, retrying save...');
                     addNotification(
@@ -1322,7 +1322,7 @@ const PageEditor = () => {
                         originalVersion: currentVersionDataForSave,
                         serverWebpage,
                         serverVersion,
-                        saveOptions
+                        saveOptions: { ...saveOptions, versionDataOverrides: null }
                     });
                     setShowConflictModal(true);
                     return { saved: false, reason: 'conflict', saveResult }; // Don't proceed with save
@@ -1384,7 +1384,7 @@ const PageEditor = () => {
 
             // Clear To-Do items on success
             setErrorTodoItems([])
-            setAcknowledgedWarnings([])
+            setWarningChoices({})
 
             // Show success notification with smart summary
             const actionDescription = saveResult.versionResult
@@ -1420,12 +1420,12 @@ const PageEditor = () => {
                     return {
                         id: `content-warning-${index}`,
                         title: 'Content warning',
-                        detail,
+                        detail: conversion ? detail.split(' Convert this slot to ')[0] : detail,
                         warning: true,
                         ...(conversion && { slotConversion: conversion }),
                     }
                 }))
-                setAcknowledgedWarnings([])
+                setWarningChoices({})
             } else {
                 addNotification(`Save failed: ${error.message}`, 'error')
                 showError(`Save failed: ${error.message}`)
@@ -1535,16 +1535,27 @@ const PageEditor = () => {
     }, [handleSaveFromStatusBar, currentVersion, pageVersionData]);
 
     const handleSaveAcknowledgedWarnings = useCallback(async () => {
-        if (!errorTodoItems.length || errorTodoItems.some((item) => !item.warning || !acknowledgedWarnings.includes(item.id))) return
+        if (!errorTodoItems.length || errorTodoItems.some((item) => !item.warning || !warningChoices[item.id])) return
+        const resolution = applySlotWarningChoices(
+            pageVersionData?.widgets || localWidgets || {},
+            pageVersionData?.pageData?.ignoredSlotWarnings || [],
+            errorTodoItems,
+            warningChoices,
+        )
+        if (!resolution) return
+        const versionDataOverrides = {
+            widgets: resolution.widgets,
+            pageData: { ...(pageVersionData?.pageData || {}), ignoredSlotWarnings: resolution.ignoredSlotWarnings },
+        }
         setIsSaving(true)
         try {
-            await handleActualSave({ acknowledgeContentWarnings: true, description: 'Saved with reviewed content warnings' })
+            await handleActualSave({ acknowledgeContentWarnings: true, versionDataOverrides, description: 'Saved with reviewed content warnings' })
         } catch {
             // The save path reports the current server response in the sidebar.
         } finally {
             setIsSaving(false)
         }
-    }, [acknowledgedWarnings, errorTodoItems, handleActualSave])
+    }, [warningChoices, errorTodoItems, handleActualSave, pageVersionData, localWidgets])
 
     const handleVersionRestored = useCallback(async (restoredVersion) => {
         const processed = processLoadedVersionData(restoredVersion);
@@ -2318,15 +2329,10 @@ const PageEditor = () => {
                     {errorTodoItems.length > 0 && (
                         <ErrorTodoSidebar
                             items={errorTodoItems}
-                            acknowledgedWarnings={acknowledgedWarnings}
-                            onToggleWarning={(id) => setAcknowledgedWarnings((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])}
+                            warningChoices={warningChoices}
+                            onChooseWarning={(id, choice) => setWarningChoices((current) => ({ ...current, [id]: choice }))}
                             onSaveAcknowledged={handleSaveAcknowledgedWarnings}
-                            onConvertSlot={(item) => {
-                                const { from, to } = item.slotConversion
-                                const widgets = localWidgets || pageVersionData?.widgets || {}
-                                const next = convertSlotWidgets(widgets, from, to)
-                                if (next) updateLocalWidgets(next)
-                            }}
+                            occupiedSlots={Object.fromEntries(Object.entries(pageVersionData?.widgets || localWidgets || {}).map(([key, value]) => [key, Array.isArray(value) && value.length > 0]))}
                             isSaving={isSaving}
                             onNavigate={(item) => navigateToFix({ item, navigate, pageId, isNewPage, currentVersion, previousView })}
                         />
