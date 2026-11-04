@@ -74,9 +74,9 @@ def validate_page_data_for_version(version, value, *, code_layout=None, warnings
         "enable_css_injection",
     }
     filtered_data = {key: item for key, item in value.items() if key not in forbidden}
-    ignored = filtered_data.get("ignoredSlotWarnings", [])
+    ignored = filtered_data.get("ignored_slot_warnings", [])
     if not isinstance(ignored, list) or any(not isinstance(key, str) for key in ignored):
-        raise serializers.ValidationError({"ignoredSlotWarnings": "Expected a list of slot warning keys."})
+        raise serializers.ValidationError({"ignored_slot_warnings": "Expected a list of slot warning keys."})
     if version is None:
         return filtered_data
 
@@ -364,7 +364,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
                 warnings=content_warnings,
             )
         ignored = attrs.get("page_data", getattr(self.instance, "page_data", {}) if self.instance else {}).get(
-            "ignoredSlotWarnings", []
+            "ignored_slot_warnings", []
         )
         if isinstance(ignored, list):
             content_warnings = [

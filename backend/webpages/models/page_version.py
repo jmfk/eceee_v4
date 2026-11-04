@@ -459,9 +459,9 @@ class PageVersion(models.Model):
         version_number = (latest_version.version_number + 1) if latest_version else 1
         page_data = self.page_data.copy()
         if latest_version and isinstance(latest_version.page_data, dict):
-            ignored_slots = latest_version.page_data.get("ignoredSlotWarnings")
+            ignored_slots = latest_version.page_data.get("ignored_slot_warnings")
             if isinstance(ignored_slots, list):
-                page_data["ignoredSlotWarnings"] = ignored_slots.copy()
+                page_data["ignored_slot_warnings"] = ignored_slots.copy()
 
         # Create new draft version (no effective_date = draft)
         draft = PageVersion.objects.create(

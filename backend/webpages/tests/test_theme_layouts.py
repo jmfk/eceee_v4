@@ -113,8 +113,9 @@ class ThemeLayoutValidationTests(SimpleTestCase):
         )
         self.assertIn("Convert this slot to 'landingPage'", warnings[0])
 
+    @patch("webpages.serializers.version.PageDataSchema.get_effective_schema_for_layout", return_value=None)
     @patch("webpages.theme_widgets.version_widget_theme")
-    def test_ignored_slot_warning_stays_dismissed_for_the_page_version(self, resolve_theme):
+    def test_ignored_slot_warning_stays_dismissed_for_the_page_version(self, resolve_theme, _get_schema):
         theme = SimpleNamespace(pk=1, id=1, layouts=default_theme_layouts())
         resolve_theme.return_value = theme
         widgets = {"landing_page": [{"id": str(uuid.uuid4()), "type": "easy_widgets.HeadlineWidget"}]}
@@ -126,12 +127,23 @@ class ThemeLayoutValidationTests(SimpleTestCase):
             code_layout="landingPage",
             effective_date=None,
             widgets=widgets,
-            page_data={"ignoredSlotWarnings": ["landingPage:landing_page"]},
+            page_data={},
         )
+        parsed = CamelCaseJSONParser().parse(
+            io.BytesIO(json.dumps({"pageData": {"ignoredSlotWarnings": ["landingPage:landing_page"]}}).encode())
+        )
+        self.assertEqual(parsed["page_data"]["ignored_slot_warnings"], ["landingPage:landing_page"])
+        rendered = json.loads(PageVersionJSONRenderer().render({"page_data": parsed["page_data"]}))
+        self.assertEqual(rendered["pageData"]["ignoredSlotWarnings"], ["landingPage:landing_page"])
         reviewed = PageVersionSerializer(
-            version, data={"widgets": widgets}, partial=True, context={"review_content_warnings": True}
+            version, data={"widgets": widgets, **parsed}, partial=True, context={"review_content_warnings": True}
         )
         self.assertTrue(reviewed.is_valid(), reviewed.errors)
+        version.page_data = reviewed.validated_data["page_data"]
+        reviewed_again = PageVersionSerializer(
+            version, data={"widgets": widgets}, partial=True, context={"review_content_warnings": True}
+        )
+        self.assertTrue(reviewed_again.is_valid(), reviewed_again.errors)
 
     def test_default_page_layouts_use_descriptive_structure_and_plain_footer_wrappers(self):
         layouts = {layout["key"]: layout for layout in default_theme_layouts()["items"]}
@@ -676,13 +688,13 @@ class ThemeLayoutUsageTests(TestCase):
         )
         first = page.create_version(user, "Published version", auto_publish=True)
         second = page.create_version(user, "Second draft")
-        second.page_data["ignoredSlotWarnings"] = ["landingPage:landing_page"]
+        second.page_data["ignored_slot_warnings"] = ["landingPage:landing_page"]
         second.save(update_fields=["page_data"])
 
         copied = page.create_version(user, "New version")
-        self.assertEqual(copied.page_data["ignoredSlotWarnings"], ["landingPage:landing_page"])
+        self.assertEqual(copied.page_data["ignored_slot_warnings"], ["landingPage:landing_page"])
         third = first.create_draft_from_published(user, "Draft from published")
-        self.assertEqual(third.page_data["ignoredSlotWarnings"], ["landingPage:landing_page"])
+        self.assertEqual(third.page_data["ignored_slot_warnings"], ["landingPage:landing_page"])
 
     def test_inheritance_tree_uses_custom_theme_layout_slot_policies(self):
         user = User.objects.create_user("layout-tree-policy", password="test")
