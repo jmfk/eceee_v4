@@ -28,7 +28,7 @@ from webpages.theme_layouts import (
     validate_layout_widgets,
     validate_theme_layouts,
 )
-from webpages.views.page_version_views import PageVersionJSONRenderer
+from webpages.views.page_version_views import PageVersionJSONParser, PageVersionJSONRenderer, PageVersionViewSet
 
 
 class ThemeLayoutValidationTests(SimpleTestCase):
@@ -82,6 +82,19 @@ class ThemeLayoutValidationTests(SimpleTestCase):
         self.assertEqual(rendered["version"]["versionNumber"], 2)
         self.assertEqual(list(rendered["version"]["widgets"]), ["landing_page"])
         self.assertEqual(rendered["version"]["widgets"]["landing_page"][0]["config"]["fontSize"], 14)
+
+        incoming = {
+            "expectedVersionId": 12,
+            "pageData": {"ignoredSlotWarnings": ["landingPage:landing_page"]},
+            "widgets": {"landingPage": [{"type": "easy_widgets.ContentWidget", "config": {"fontSize": 14}}]},
+        }
+        parsed = PageVersionJSONParser().parse(io.BytesIO(json.dumps(incoming).encode()))
+
+        self.assertIn(PageVersionJSONParser, PageVersionViewSet.parser_classes)
+        self.assertEqual(parsed["expected_version_id"], 12)
+        self.assertEqual(parsed["page_data"]["ignored_slot_warnings"], ["landingPage:landing_page"])
+        self.assertEqual(list(parsed["widgets"]), ["landingPage"])
+        self.assertEqual(parsed["widgets"]["landingPage"][0]["config"]["fontSize"], 14)
 
     def test_default_layouts_are_valid_and_portable(self):
         document = default_theme_layouts()

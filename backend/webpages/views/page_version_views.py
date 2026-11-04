@@ -9,10 +9,12 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django_filters.rest_framework import DjangoFilterBackend
+from djangorestframework_camel_case.parser import CamelCaseJSONParser
 from djangorestframework_camel_case.render import CamelCaseJSONRenderer
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.renderers import BrowsableAPIRenderer
 from rest_framework.response import Response
 
@@ -30,6 +32,15 @@ from ..services.page_version_workflow import (
     WorkflowError,
     workflow_payload,
 )
+
+
+class PageVersionJSONParser(CamelCaseJSONParser):
+    """Preserve widget slot and configuration keys in incoming versions."""
+
+    json_underscoreize = {
+        **CamelCaseJSONParser.json_underscoreize,
+        "ignore_fields": (*CamelCaseJSONParser.json_underscoreize.get("ignore_fields", ()), "widgets"),
+    }
 
 
 class PageVersionJSONRenderer(CamelCaseJSONRenderer):
@@ -52,6 +63,7 @@ class PageVersionViewSet(
 
     queryset = PageVersion.objects.select_related("page", "created_by", "last_edited_by").all()
     serializer_class = PageVersionSerializer
+    parser_classes = [PageVersionJSONParser, FormParser, MultiPartParser]
     renderer_classes = [PageVersionJSONRenderer, BrowsableAPIRenderer]
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
