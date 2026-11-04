@@ -1413,6 +1413,10 @@ const PageEditor = () => {
             const errorData = error?.response?.data || error?.originalError?.response?.data
             const contentWarnings = errorData?.contentWarnings || errorData?.content_warnings
             if (Array.isArray(contentWarnings) && contentWarnings.length) {
+                if (saveOptions.stageConvertedWidgets) {
+                    setPageVersionData((current) => ({ ...current, ...saveOptions.versionDataOverrides }))
+                    setLocalWidgets(saveOptions.versionDataOverrides.widgets)
+                }
                 addNotification('Review the content warnings to save this draft.', 'warning')
                 setErrorTodoItems(contentWarnings.map((warning, index) => {
                     const detail = String(warning)
@@ -1547,9 +1551,15 @@ const PageEditor = () => {
             widgets: resolution.widgets,
             pageData: { ...(pageVersionData?.pageData || {}), ignoredSlotWarnings: resolution.ignoredSlotWarnings },
         }
+        const hasConversion = errorTodoItems.some((item) => warningChoices[item.id] === 'convert')
         setIsSaving(true)
         try {
-            await handleActualSave({ acknowledgeContentWarnings: true, versionDataOverrides, description: 'Saved with reviewed content warnings' })
+            await handleActualSave({
+                acknowledgeContentWarnings: !hasConversion,
+                stageConvertedWidgets: hasConversion,
+                versionDataOverrides,
+                description: 'Saved with reviewed content warnings',
+            })
         } catch {
             // The save path reports the current server response in the sidebar.
         } finally {
