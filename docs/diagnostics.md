@@ -99,9 +99,9 @@ PostgreSQL test instance and must not be reused by unrelated tests.
 
 ## Installation and operational gates
 
-Nothing is enabled by default. Do not run this section in production without the
-repository's explicit owner gates for each bounded operation, including secret
-provisioning, roles/views, timer installation and tagged deployment. This document
+Nothing is enabled by default. Secret provisioning, roles/views and timer
+installation need explicit owner requests for their distinct scope. A request
+to deploy authorizes the normal tagged release under `AGENTS.md`; this document
 is not an authorization or a replacement for `make prod-deploy`.
 
 1. Review the PRD/ADR, projections, PostgreSQL privileges and service impact.

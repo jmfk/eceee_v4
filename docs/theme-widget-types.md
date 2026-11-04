@@ -63,4 +63,4 @@ Live browser verification on 2026-10-21 used real authentication, an isolated Po
 - An incompatible page-theme change being rejected without losing saved content.
 - Person-card and fact-box rendering at 375px and 1280px without horizontal overflow, plus reachable instance-editor save controls at both widths.
 
-The live check found slot toolbars overlapping the new instance editor. Its layer now matches the existing widget editor panel; ordinary browser clicks successfully save page and object instances. Focused instance-editor and widget-panel tests also pass. Production migration/deployment remains subject to the repository's separate owner gates.
+The live check found slot toolbars overlapping the new instance editor. Its layer now matches the existing widget editor panel; ordinary browser clicks successfully save page and object instances. Focused instance-editor and widget-panel tests also pass. Production migration and deployment follow the current authorization and safety checks in `AGENTS.md`.
