@@ -674,12 +674,15 @@ class ThemeLayoutUsageTests(TestCase):
         page = WebPage.objects.create(
             tenant=tenant, title="Test page", slug="test-page", created_by=user, last_modified_by=user
         )
-        first = page.create_version(user, "First draft")
-        first.page_data["ignoredSlotWarnings"] = ["landingPage:landing_page"]
-        first.save(update_fields=["page_data"])
-
+        first = page.create_version(user, "Published version", auto_publish=True)
         second = page.create_version(user, "Second draft")
-        self.assertEqual(second.page_data["ignoredSlotWarnings"], ["landingPage:landing_page"])
+        second.page_data["ignoredSlotWarnings"] = ["landingPage:landing_page"]
+        second.save(update_fields=["page_data"])
+
+        copied = page.create_version(user, "New version")
+        self.assertEqual(copied.page_data["ignoredSlotWarnings"], ["landingPage:landing_page"])
+        third = first.create_draft_from_published(user, "Draft from published")
+        self.assertEqual(third.page_data["ignoredSlotWarnings"], ["landingPage:landing_page"])
 
     def test_inheritance_tree_uses_custom_theme_layout_slot_policies(self):
         user = User.objects.create_user("layout-tree-policy", password="test")
