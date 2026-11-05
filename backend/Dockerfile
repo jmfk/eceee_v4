@@ -1,5 +1,5 @@
 # Use Python 3.11 slim image
-FROM python:3.11-slim
+FROM python:3.11-slim AS dependencies
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -31,6 +31,18 @@ RUN apt-get update \
 COPY requirements/ requirements/
 ARG REQUIREMENTS_FILE=production.txt
 RUN pip install --no-cache-dir -r requirements/${REQUIREMENTS_FILE}
+
+# CI mounts the current checkout at /app. Cache only tools and dependencies so
+# ordinary source edits do not rebuild or export the complete application image.
+FROM dependencies AS ci
+RUN mkdir -p /app/logs /app/static /app/media /app/staticfiles \
+    && adduser --disabled-password --gecos '' appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+CMD ["python", "manage.py", "test"]
+
+# Keep the normal development/production image as the default final target.
+FROM dependencies AS runtime
 
 # Copy project
 COPY . .

@@ -63,6 +63,28 @@ def main():
     assert "frontend-admin-e2e" not in reusable["jobs"]
     assert "frontend-admin-e2e" in browser["jobs"]
     assert full["jobs"]["checks"]["with"]["historical_migrations"] is True
+    backend_steps = {step.get("name"): step for step in reusable["jobs"]["backend-tests"]["steps"]}
+    image_cache = backend_steps["Restore backend dependency image"]
+    assert image_cache["uses"] == "actions/cache@v4"
+    image_key = image_cache["with"]["key"]
+    for key_part in (
+        "runner.os",
+        "runner.arch",
+        "steps.image-key.outputs.week",
+        "backend/Dockerfile",
+        "backend/requirements/**",
+    ):
+        assert key_part in image_key
+    assert "restore-keys" not in image_cache["with"]  # Never restore different dependencies.
+    image_build = backend_steps["Build backend dependency image on cache miss"]
+    assert image_build["with"]["target"] == "ci"
+    assert image_build["with"]["pull"] is True
+    assert "steps.image-key.outputs.week" in image_build["with"]["cache-from"]
+    assert "steps.image-key.outputs.week" in image_build["with"]["cache-to"]
+    assert image_build["if"] == "steps.image-cache.outputs.cache-hit != 'true'"
+    assert (
+        backend_steps["Load cached backend dependency image"]["if"] == "steps.image-cache.outputs.cache-hit == 'true'"
+    )
     gate = reusable["jobs"]["ci-gate"]
     assert gate["if"] == "always()"
     assert gate["name"] == "${{ inputs.full && 'Full CI gate' || 'Fast CI gate' }}"

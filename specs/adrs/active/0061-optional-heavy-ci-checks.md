@@ -21,6 +21,11 @@ Log timestamps and test source identify historical Kanban, taxonomy and theme
 schema replays as expensive work (approximately 25–52 seconds per boundary,
 including setup/cleanup). These are not precise per-test measurements.
 
+The first timing-enabled PR run measured the tagged taxonomy replay at 36.359s,
+theme replay at 27.491s and Kanban replay at 18.573s (about 82s combined). The next
+slowest individual test was 2.089s. This supports selecting those three historical
+replays rather than broadly making normal correctness tests optional.
+
 ## Decision
 
 Keep dependency-aware frontend selection, required unit/integration checks,
@@ -45,12 +50,21 @@ Report the twenty slowest Django tests including setup/teardown, and pytest's
 fifteen slowest durations. Keep timing informational. Do not turn tests optional
 solely because they exceed an arbitrary time threshold.
 
+Cache a ready-to-load dependency-only Docker image by runner OS/architecture,
+ISO week, Dockerfile and requirement-file content. Build the `ci` target only on
+an exact-key miss; use the existing layer cache as fallback and bind-mount the
+current source into every test run. Do not cache a database or test outcomes.
+The runtime image stays the final/default Dockerfile target. Weekly invalidation
+refreshes unpinned dependencies without making ordinary source edits rebuild
+all tools. GitHub's normal branch cache isolation remains intact.
+
 ## Consequences
 
 Historical replay selection reduces unrelated backend test time. Moving browser
-checks alone does not improve the measured critical path. Image building and
-duplicate pre/post-merge full runs remain separate costs; this change does not
-claim to solve them or bypass current release evidence.
+checks alone does not improve the measured critical path. Warm image cache hits
+avoid rebuilding/exporting dependencies; cold misses and duplicate pre/post-merge
+full runs remain separate costs. Actual savings must be measured after adoption;
+current release evidence is not bypassed.
 
 Browser regressions can reach production before a scheduled/manual check catches
 them. The owner explicitly requested non-blocking heavy checks. Schema changes
