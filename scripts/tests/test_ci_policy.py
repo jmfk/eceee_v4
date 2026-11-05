@@ -47,6 +47,26 @@ class CIPolicyTests(unittest.TestCase):
     def test_deleted_files_still_select_their_package(self):
         self.assertEqual(policy.select(["frontend/src/Removed.jsx"], "fast", "base")["frontend"], "true")
 
+    def test_historical_migrations_follow_schema_and_test_changes(self):
+        for path in (
+            "backend/core/migrations/0003.py",
+            "backend/core/models.py",
+            "backend/core/models/tenant.py",
+            "backend/core/fixtures/seed.json",
+            "backend/taxonomy/tests/test_migrations.py",
+            "backend/kanban/tests.py",
+            "backend/webpages/tests/test_theme_versions.py",
+            "backend/config/settings.py",
+            "backend/requirements/dev.txt",
+            ".github/workflows/ci.yml",
+            "unknown/path",
+        ):
+            with self.subTest(path=path):
+                self.assertTrue(policy.historical_migrations_required([path]))
+        for path in ("frontend/src/App.jsx", "backend/cms_auth/impersonation.py", "docs/ci.md"):
+            with self.subTest(path=path):
+                self.assertFalse(policy.historical_migrations_required([path]))
+
     def test_full_gate_rejects_skipped_missing_failed_and_cancelled_checks(self):
         names = [
             "detect",
@@ -55,7 +75,6 @@ class CIPolicyTests(unittest.TestCase):
             "frontend-lint",
             "backend-tests",
             "frontend-tests",
-            "frontend-admin-e2e",
             "publisher-checks",
         ]
         needs = {name: {"result": "success"} for name in names}

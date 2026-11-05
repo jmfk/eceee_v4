@@ -44,7 +44,6 @@ def full_jobs():
             "Frontend lint",
             "Backend tests",
             "Frontend unit tests",
-            "Frontend admin Playwright",
             "Publisher checks",
         )
     ]
@@ -147,6 +146,11 @@ class DeploymentEvidenceTests(unittest.TestCase):
     def test_accepts_exact_clean_release_with_complete_full_gate(self):
         self.assertEqual(self.verify(FakeEvidence())["commit"], "head")
 
+    def test_browser_workflow_is_not_part_of_release_evidence(self):
+        jobs = full_jobs()
+        self.assertFalse(any("Playwright" in job["name"] for job in jobs))
+        self.assertEqual(self.verify(FakeEvidence(jobs=jobs))["commit"], "head")
+
     def test_accepts_selected_gate_only_inside_fresh_low_risk_baseline(self):
         jobs = [
             {"name": name, "conclusion": "success", "completed_at": FRESH}
@@ -184,7 +188,7 @@ class DeploymentEvidenceTests(unittest.TestCase):
             self.verify(evidence)
 
     def test_rejects_skipped_required_full_job_and_stale_or_future_gate(self):
-        for name in ("Backend tests", "Frontend admin Playwright", "Publisher checks", "Full CI gate"):
+        for name in ("Backend tests", "Publisher checks", "Full CI gate"):
             jobs = full_jobs()
             next(job for job in jobs if job["name"] == f"Full CI / {name}")["conclusion"] = "skipped"
             with self.subTest(name=name), self.assertRaises(policy.EvidenceError):

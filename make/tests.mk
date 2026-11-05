@@ -24,6 +24,7 @@ refresh-db-collation: prepare-test-infra
 		-c "UPDATE pg_database SET datcollversion = NULL WHERE datname IN ('template1', 'postgres', 'test_eceee_v4_test');" >/dev/null
 
 # Run backend tests
+BACKEND_TEST_ARGS ?=
 # The real profile-install API regression also exercises the operator CLI, which
 # lives outside the backend image. Mount only its source dependencies read-only.
 DEFINITION_TEST_SOURCES = \
@@ -41,7 +42,7 @@ backend-test: prepare-test-infra refresh-db-collation ## Run the backend test su
 		-e REDIS_URL=redis://test-redis:6379/0 \
 		-e AWS_ACCESS_KEY_ID=test-eceee -e AWS_SECRET_ACCESS_KEY=test-eceee-secret \
 		-e AWS_S3_INTERNAL_ENDPOINT_URL=http://test-minio:9000 \
-		backend sh -c 'python manage.py test --keepdb --verbosity=2 --failfast --noinput && pytest taxonomy/tests/test_governance.py taxonomy/tests/test_assignments.py taxonomy/tests/test_required_media.py --ds=config.settings --reuse-db -q'
+		backend sh -c 'python manage.py test --keepdb --verbosity=2 --failfast --noinput --testrunner=utils.test_runner.TimingDiscoverRunner $(BACKEND_TEST_ARGS) && pytest taxonomy/tests/test_governance.py taxonomy/tests/test_assignments.py taxonomy/tests/test_required_media.py --ds=config.settings --reuse-db --durations=15 -q'
 
 # Run the focused News migration suite against PostgreSQL. Historical migrations
 # contain PostgreSQL-native ArrayFields and therefore cannot be validated on SQLite.

@@ -87,7 +87,6 @@ class Evidence:
                 "Frontend lint",
                 "Backend tests",
                 "Frontend unit tests",
-                "Frontend admin Playwright",
                 "Publisher checks",
             }
             passed = passed and all(

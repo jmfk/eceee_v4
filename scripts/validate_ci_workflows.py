@@ -55,8 +55,14 @@ def main():
     assert set(fast["jobs"]["gate"]["needs"]) == {"policy", "checks", "full"}
     for workflow in (fast, full):
         assert workflow["jobs"]["checks"]["uses"] == "./.github/workflows/ci-checks.yml"
-    for job in ("backend-tests", "publisher-checks", "frontend-admin-e2e"):
+    for job in ("backend-tests", "publisher-checks"):
         assert reusable["jobs"][job]["if"].startswith("inputs.full &&")
+    browser = workflows["ci-browser.yml"]
+    browser_events = browser.get("on", browser.get(True))
+    assert set(browser_events) == {"workflow_dispatch", "schedule"}
+    assert "frontend-admin-e2e" not in reusable["jobs"]
+    assert "frontend-admin-e2e" in browser["jobs"]
+    assert full["jobs"]["checks"]["with"]["historical_migrations"] is True
     gate = reusable["jobs"]["ci-gate"]
     assert gate["if"] == "always()"
     assert gate["name"] == "${{ inputs.full && 'Full CI gate' || 'Fast CI gate' }}"

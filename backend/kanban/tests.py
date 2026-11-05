@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 from asgiref.sync import async_to_sync
 from django.contrib.auth.models import AnonymousUser, User
-from django.test import SimpleTestCase, TestCase, TransactionTestCase
+from django.test import SimpleTestCase, TestCase, TransactionTestCase, tag
 from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate
 
@@ -1092,6 +1092,7 @@ class KanbanSocketTests(TransactionTestCase):
             with ThreadPoolExecutor(max_workers=2) as pool:
                 self.assertEqual(sorted(pool.map(edit, [1, 2])), [200, 409])
 
+    @tag("historical_migration")
     def test_additive_migration_preserves_existing_tenant_data(self):
         from django.db import connection
         from django.db.migrations.executor import MigrationExecutor

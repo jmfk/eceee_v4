@@ -4,7 +4,7 @@
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
-| ADR-0057 | [Risk-based CI cadence and exact-commit deployment evidence](active/0057-risk-based-ci-and-deploy-evidence.md) | accepted | PRD-0041 |
+| ADR-0057 | [Risk-based CI cadence and exact-commit deployment evidence](archive/0057-risk-based-ci-and-deploy-evidence.md) | superseded | PRD-0041 |
 | ADR-0056 | [Uteslut legacybibliotek och rapportsidor från aktuell innehållsimport](active/0056-exclude-legacy-publications-from-editorial-import.md) | accepted | PRD-0034 |
 | ADR-0055 | [Explicit email verification before optional MFA](active/0055-explicit-email-verification-before-mfa.md) | accepted | PRD-0038 |
 | ADR-0054 | [Compatible Postmark delivery for authentication email](active/0054-postmark-authentication-email-backend.md) | accepted | PRD-0038 |
@@ -79,3 +79,4 @@
 | ADR-0058 | [Server-enforced read-only user perspective](archive/0058-read-only-user-perspective.md) | superseded | PRD-0042 |
 
 | ADR-0059 | [Editable temporary user perspective](archive/0059-editable-user-perspective.md) | superseded | PRD-0043 |
+| ADR-0061 | [Optional browser checks and targeted historical migration replays](active/0061-optional-heavy-ci-checks.md) | accepted | PRD-0041 |

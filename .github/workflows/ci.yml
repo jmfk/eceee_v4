@@ -22,6 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       full: ${{ steps.plan.outputs.full }}
+      reason: ${{ steps.plan.outputs.reason }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -51,6 +52,7 @@ jobs:
     uses: ./.github/workflows/ci-checks.yml
     with:
       full: true
+      historical_migrations: ${{ needs.policy.outputs.reason != 'high-risk or unknown change' }}
   gate:
     name: CI policy gate
     runs-on: ubuntu-latest
