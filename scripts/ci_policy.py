@@ -53,6 +53,26 @@ def select(paths, mode, base):
     return {**{key: str(value).lower() for key, value in selected.items()}, "base": base}
 
 
+def historical_migrations_required(paths):
+    """Replay old schemas for schema/fixture changes, retaining conservative controls."""
+    for path in paths:
+        if path.startswith(("frontend/", "publisher/", "docs/", "manuals/", "specs/", "ToDo/")):
+            continue
+        if path.endswith(".md") and path != "AGENTS.md":
+            continue
+        if not path.startswith("backend/"):
+            return True
+        if path.startswith("backend/config/"):
+            return True
+        if any(part in path for part in ("/migrations/", "/models/", "/fixtures/", "/requirements/")):
+            return True
+        if Path(path).name in {"models.py", "settings.py", "conftest.py"} or "migration" in Path(path).name:
+            return True
+        if path in {"backend/kanban/tests.py", "backend/webpages/tests/test_theme_versions.py"}:
+            return True
+    return False
+
+
 def verify_gate(needs, full):
     required = {"detect", "python-tests"}
     outputs = needs.get("detect", {}).get("outputs", {})
@@ -63,7 +83,6 @@ def verify_gate(needs, full):
                 "frontend-lint",
                 "backend-tests",
                 "frontend-tests",
-                "frontend-admin-e2e",
                 "publisher-checks",
             }
         )
@@ -105,7 +124,17 @@ def main():
     selection.add_argument("--github-output", type=Path)
     sub.add_parser("gate")
     sub.add_parser("workflow-gate")
+    backend = sub.add_parser("backend-test-args")
+    backend.add_argument("--base", required=True)
+    backend.add_argument("--historical", choices=("true", "false"), required=True)
     args = parser.parse_args()
+    if args.command == "backend-test-args":
+        paths = subprocess.check_output(
+            ["git", "diff", "--name-only", "--no-renames", args.base, "HEAD"], text=True
+        ).splitlines()
+        if args.historical == "false" and not historical_migrations_required(paths):
+            print("--exclude-tag=historical_migration")
+        return
     if args.command == "workflow-gate":
         try:
             verify_workflow_gate(json.loads(os.environ["NEEDS_JSON"]))

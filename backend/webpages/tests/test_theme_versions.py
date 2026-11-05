@@ -6,7 +6,7 @@ from cryptography.fernet import Fernet
 from django.contrib.auth.models import User
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
-from django.test import TestCase, TransactionTestCase, override_settings
+from django.test import TestCase, TransactionTestCase, override_settings, tag
 from rest_framework.test import APIClient
 
 from core.models import Tenant
@@ -653,6 +653,7 @@ class ThemeVersionApiTests(TestCase):
         )
 
 
+@tag("historical_migration")
 class ThemeVersionMigrationTests(TransactionTestCase):
     migrate_from = ("webpages", "0072_pageversiontag_pageversion_canonical_tags_and_more")
     migrate_to = ("webpages", "0076_themeversion_name")

@@ -24,8 +24,7 @@ ruleset helper. Existing remote rulesets are preserved.
 
 The CI caller selects exactly one reusable job set: `Fast CI` or `Full CI`. A
 full gate requires every full job to succeed: Python helpers, backend/frontend
-lint, Django integration, frontend units/build, browser/pilot baselines and
-publisher production checks. Skipped, missing, failed and cancelled required
+lint, Django integration, frontend units/build, publisher production checks. Skipped, missing, failed and cancelled required
 jobs cannot satisfy the full gate.
 
 Full CI also runs on main every Monday at 03:00 UTC. Use workflow dispatch on
@@ -71,4 +70,21 @@ The operator's OrbStack limit is 6 GiB on a 16 GiB Mac, verified after its requi
 restart. Keep frontend checks at two workers (one during resource diagnosis).
 Do not stop shared provider services or unrelated projects to make a test pass.
 
-Decision: [ADR-0057](../specs/adrs/active/0057-risk-based-ci-and-deploy-evidence.md).
+Decision: [ADR-0061](../specs/adrs/active/0061-optional-heavy-ci-checks.md).
+
+## Optional heavy checks and timing
+
+`Optional browser regression tests` runs Playwright admin and pilot baselines
+weekly, or through Actions → Run workflow. It is independent of required CI and
+never contributes to the merge or deployment gate.
+
+Historical schema replays carry the `historical_migration` tag. CI includes them
+for schema/model/fixture/control changes, changes to those tests, cadence full
+runs, weekly checks and explicit full runs. Other backend runs exclude only that
+tag. Local `make backend-test` still includes them by default. Django prints its
+twenty slowest tests (including setup/teardown); pytest prints fifteen durations.
+
+Measured run 1055: backend 10m50s (image 4m18s, test command 6m01s), frontend
+3m17s, browser 3m03s, publisher 2m54s. The backend was the critical path; making
+Playwright optional alone would not have shortened that run. Exact per-test
+Django timings were unavailable before the timing runner was added.

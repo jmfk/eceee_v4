@@ -6,6 +6,7 @@ locked: true
 created: 2026-11-05
 related_adrs:
   - ADR-0057
+  - ADR-0061
 ---
 
 # PRD-0041: Risk-based test selection and CI-backed deployment
@@ -44,7 +45,7 @@ release times and resource-dependent timeouts on the operator's machine.
 
 ## Linked ADRs
 
-- [ADR-0057](../adrs/active/0057-risk-based-ci-and-deploy-evidence.md)
+- [ADR-0057](../adrs/archive/0057-risk-based-ci-and-deploy-evidence.md)
 
 ## Completion Evidence
 
@@ -55,3 +56,5 @@ release times and resource-dependent timeouts on the operator's machine.
 - OrbStack configured at 6144 MiB; runtime reports 6283915264 usable bytes after restart.
 - Real Vitest dependency collection selected 57 files for the prior shared-layout change (232 total files).
 - Rollout uses the high-risk full CI gate before merge and exact merged-commit evidence before deployment.
+
+- Follow-up owner request: browser checks become optional/manual and historical schema replays are selected as defined by [ADR-0061](../adrs/active/0061-optional-heavy-ci-checks.md).

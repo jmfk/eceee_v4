@@ -1,9 +1,10 @@
 from django.core.management import call_command
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
-from django.test import TransactionTestCase
+from django.test import TransactionTestCase, tag
 
 
+@tag("historical_migration")
 class TypedTagUpgradeMigrationTests(TransactionTestCase):
     """Exercise the same populated-schema upgrade path used in production."""
 

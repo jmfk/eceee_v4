@@ -6,6 +6,9 @@ on:
       full:
         type: boolean
         required: true
+      historical_migrations:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -185,6 +188,8 @@ jobs:
       COMPOSE_PROJECT_NAME: eceeev4ci-${{ github.run_id }}-${{ github.run_attempt }}-backendtests
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: docker/setup-buildx-action@v3
 
@@ -220,7 +225,12 @@ jobs:
           EOF
 
       - name: Run backend tests
-        run: make backend-test
+        env:
+          BASE_SHA: ${{ needs.detect.outputs.base }}
+          HISTORICAL_MIGRATIONS: ${{ inputs.historical_migrations }}
+        run: |
+          args=$(python3 scripts/ci_policy.py backend-test-args --base "$BASE_SHA" --historical "$HISTORICAL_MIGRATIONS")
+          make backend-test BACKEND_TEST_ARGS="$args"
 
       - name: Verify pilot comparator rejects regressions
         run: python3 -m unittest discover -s scripts/tests -p test_pilot_baseline.py -v
@@ -265,43 +275,6 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-  frontend-admin-e2e:
-    name: Frontend admin Playwright
-    runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.60.0-noble
-    needs: detect
-    if: inputs.full && needs.detect.outputs.frontend == 'true'
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Run admin Playwright tests
-        working-directory: frontend
-        run: npm run test:e2e:admin
-
-      - name: Run isolated pilot browser baseline
-        working-directory: frontend
-        run: npx playwright test --config playwright.pilot.config.js
-
-      - name: Upload Playwright report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-admin-playwright-report
-          path: |
-            frontend/playwright-report/
-            frontend/test-results/pilot/
-          if-no-files-found: ignore
-
   python-tests:
     name: Python helper tests
     runs-on: ubuntu-latest
@@ -343,7 +316,7 @@ jobs:
     name: ${{ inputs.full && 'Full CI gate' || 'Fast CI gate' }}
     runs-on: ubuntu-latest
     if: always()
-    needs: [detect, python-tests, backend-lint, frontend-lint, backend-tests, frontend-tests, frontend-admin-e2e, publisher-checks, publisher-unit-tests]
+    needs: [detect, python-tests, backend-lint, frontend-lint, backend-tests, frontend-tests, publisher-checks, publisher-unit-tests]
     steps:
       - uses: actions/checkout@v4
       - name: Require the expected checks to succeed

@@ -1,13 +1,14 @@
 ---
 id: ADR-0057
 title: Risk-based CI cadence and exact-commit deployment evidence
-status: accepted
+status: superseded
 date: 2026-11-05
 related_prds:
   - PRD-0041
 supersedes:
   - ADR-0048
-superseded_by: []
+superseded_by:
+  - ADR-0061
 ---
 
 # ADR-0057: Risk-based CI cadence and exact-commit deployment evidence
