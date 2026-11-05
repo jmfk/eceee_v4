@@ -81,7 +81,7 @@ endef
 .PHONY: configure-local-infra configure-support local-dev-check shared-infra-check use-external-infra
 .PHONY: check-servers check-conf check-db clear-layout-cache clear-layout-cache-all
 .PHONY: tailwind-build tailwind-watch sync-from sync-to
-.PHONY: prod-preflight prod-deploy prod-restart prod-env prod-rollback prod-backup
+.PHONY: prod-preflight-local prod-preflight prod-deploy prod-restart prod-env prod-rollback prod-backup
 .PHONY: prod-reconcile-classifications prod-backfill-typed-tags prod-theme-access-key validate-typed-tags-backup
 .PHONY: validate-prod-typed-tags-backup prod-logs prod-status prod-audit-tenant-access
 .PHONY: prod-logs-caddy prod-shell-caddy prod-ssh prod-shell prod-bash
@@ -210,7 +210,7 @@ help: ## Show this help message (use: make help-TARGET for one target)
 		echo "Production Deployment:"; \
 		echo "  prod-configure-support  Plan support settings (APPLY=yes, optional ACTIVATE=yes)"; \
 		echo "  prod-support-recipient  Plan support-only login creation (SUPPORT_RECIPIENT=email)"; \
-		echo "  prod-deploy       Check and deploy latest main, or a specific TAG/ref/hash"; \
+		echo "  prod-deploy       Verify CI and deploy an exact release TAG"; \
 		echo "  prod-rollback     Rollback to previous deployment"; \
 		echo "  prod-backup       Run ad-hoc production DB backup"; \
 		echo "  validate-prod-typed-tags-backup  Create, fetch, and locally validate a fresh production backup"; \

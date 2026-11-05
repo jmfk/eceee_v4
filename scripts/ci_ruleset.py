@@ -6,7 +6,7 @@ import re
 import subprocess
 
 RULESET_NAME = "ECEEE CI merge gates"
-CHECKS = ("Fast CI / Fast CI gate", "Full CI / Full CI gate")
+CHECKS = ("CI policy gate",)
 ACTIONS_APP_ID = 15368
 
 

@@ -113,18 +113,10 @@ Use the approved compact Tags style for new and revised CMS tools: 12px control 
   migration, credential provisioning, restart, and health checks. Stop if they
   request interactive credentials, expose secrets, or require an unreviewed
   manual server action.
-- For a fast-track production release, use
-  `make prod-deploy TAG=<release-tag> FAST_RELEASE=1 FAST_BASE_REF=<deployed-commit>`
-  only when the exact deployed commit is verified and the entire diff is
-  eligible. The fast path validates that the base is an ancestor, all changed
-  files are under `frontend/src/`, `frontend/public/`, or `frontend/index.html`,
-  and the base still matches production immediately before preflight. It runs
-  `frontend-lint frontend-test` instead of the broad local preflight. Exclude
-  authentication, tenant or data contracts, public rendering, dependencies,
-  and other high-risk behavior even when files are under `frontend/`. Report
-  the narrower checks and residual risk. A failed guard requires the normal
-  preflight; do not weaken or bypass the guard. Backup, locking, migration
-  checks, service restart, and health checks remain in `make prod-deploy`.
+- Normal tagged deployments use fresh exact-commit CI evidence. The old
+  `FAST_RELEASE` path is retired. Use `make prod-preflight-local` only for explicit
+  local diagnosis, not as an automatic duplicate of CI. Missing or failed CI
+  evidence blocks deployment; do not bypass its gate.
 - Verify that the release is expected to cause no more disruption than the
   normal deploy flow. Report any extra maintenance window, restart scope,
   temporary unavailability, or expansion to unrelated services; obtain a new
@@ -165,21 +157,9 @@ Backend static assets: `cd backend && npm run build` / `npm run watch:css`
   If a review round produces no new verified findings, stop reviewing and report
   the result. Do not use repeated independent reviews as a substitute for a
   clear risk decision. Keep required Full CI and authorization checks below.
-- An owner may request the fast-track lane for a small, isolated, reversible fix.
-  Eligible changes do not touch migrations, stored-data contracts, tenant scope,
-  authorization, secrets, dependencies, CI/deployment controls, or production
-  data paths. Patch size alone does not establish eligibility. Before merge,
-  run focused local verification and confirm `Fast CI / Fast CI gate` succeeds
-  for the current head. Report the changed behavior, checks, residual risk,
-  submitted reviews, review decision, unresolved threads, and mergeability.
-  If the owner already requested merge for this task, proceed without a second
-  approval. Full CI and the usual deep review may be deferred only in this lane,
-  and only if active GitHub
-  rules allow the merge without bypassing branch protection. Mark each PR body
-  `Fast-track follow-up: pending` and record its head commit for a combined review.
-  Review the accumulated diff, run Full CI or equivalent broad checks, and batch any fixes in one
-  follow-up PR within one week or after five fast-track merges, whichever comes
-  first. An unresolved follow-up blocks further fast-track merges.
+- Ordinary low-risk changes use selected tests without a separate fast-track
+  approval lane. High-risk, cadence-due and unknown changes require the full gate.
+  Review remains required and proportional to risk; passing CI is not review.
 - After addressing review feedback on an existing pull request, always run the
   relevant local verification, commit the completed review fixes, and push them
   to that pull request's branch before handing the work back. Do not leave
@@ -191,12 +171,15 @@ Backend static assets: `cd backend && npm run build` / `npm run watch:css`
 - Before merging any pull request, fetch its current checks, submitted reviews,
   review decision, unresolved review threads when available, and mergeability.
   Do this immediately before the merge even if the PR was inspected earlier.
-- Except for an eligible fast-track PR, before merging, request Full CI by adding the
-  `full-ci` label. If it is already present, remove and reapply it: retained labels
-  do not request full runs on later pushes. Verify that the full workflow and
-  `Full CI / Full CI gate` succeeded for the current head commit, separately from
-  `Fast CI / Fast CI gate`. A later push requires a new full run and status report.
-  See `docs/ci.md` for the GitHub ruleset activation and verification procedure.
+- Follow the risk/cadence plan from `scripts/ci_evidence.py`: affected tests for
+  ordinary changes; full CI at high risk, every tenth merged PR, or weekly.
+  Include the prospective PR in the cadence. Verify the current head's successful
+  `Fast CI / Fast CI gate` or, when full is required, `Full CI / Full CI gate`.
+  Request the `full-ci` label only if a required full run is not already present;
+  do not launch duplicate full runs for the same head. Later pushes require fresh
+  evidence. Deployment reuses exact merged-commit main CI through `make prod-deploy`;
+  do not repeat local full suites after valid CI. Keep backup, locking, migration,
+  environment and health checks. See `docs/ci.md`.
 - An explicit owner request to **merge** authorizes merging the PR created for
   the current task after review and the required checks pass. **Merge and deploy**
   also authorizes that merge. Do not require the owner to repeat the instruction

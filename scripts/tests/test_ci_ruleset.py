@@ -17,13 +17,14 @@ class CIRulesetTests(unittest.TestCase):
             ]
         }
 
-    def test_only_main_and_both_exact_actions_checks_are_required(self):
+    def test_only_main_and_the_stable_policy_check_are_required(self):
         desired = rules.desired_ruleset()
         self.assertEqual(desired["conditions"]["ref_name"]["include"], ["refs/heads/main"])
         self.assertEqual(desired["bypass_actors"], [])
         params = desired["rules"][0]["parameters"]
         self.assertTrue(params["strict_required_status_checks_policy"])
         self.assertEqual([item["context"] for item in params["required_status_checks"]], list(rules.CHECKS))
+        self.assertEqual(rules.CHECKS, ("CI policy gate",))
 
     def test_refuses_missing_or_skipped_verification(self):
         for checks in ({"check_runs": []}, self.checks("skipped")):

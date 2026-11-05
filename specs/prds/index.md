@@ -2,6 +2,7 @@
 
 | ID | Title | Status | Related ADRs |
 | --- | --- | --- | --- |
+| PRD-0041 | [Risk-based test selection and CI-backed deployment](0041-risk-based-ci-and-deploy-evidence.md) | completed | ADR-0057 |
 | PRD-0038 | [Apple and Google sign-in with optional MFA](0038-social-login-and-mfa.md) | in-progress | [ADR-0053](../adrs/active/0053-browser-sessions-social-login-and-mfa.md), [ADR-0054](../adrs/active/0054-postmark-authentication-email-backend.md), [ADR-0055](../adrs/active/0055-explicit-email-verification-before-mfa.md) |
 | PRD-0035 | [Klassificeringens läsbyte och obligatorisk mediataggning](0035-classification-cutover-and-required-media.md) | in-progress | [ADR-0050](../adrs/active/0050-classification-cutover-and-media-integrity.md) |
 | PRD-0034 | [Förenklad innehållsmodell och legacyimport](0034-simplified-legacy-content-import.md) | in-progress | [ADR-0056](../adrs/active/0056-exclude-legacy-publications-from-editorial-import.md), [ADR-0047](../adrs/active/0047-portable-editorial-definitions-and-draft-import.md), [ADR-0046](../adrs/active/0046-unified-articles-and-bounded-legacy-import.md), [ADR-0043](../adrs/active/0043-classification-governance.md), [ADR-0025](../adrs/active/0025-authenticated-legacy-migration-api.md), [ADR-0049](../adrs/active/0049-transaction-safe-legacy-media-repairs.md) |
@@ -10,7 +11,7 @@
 | PRD-0032 | [Tenantens instruktionsfilmer, inbox och support](0032-tenant-inbox-and-support.md) | in-progress | [ADR-0044](../adrs/active/0044-tenant-inbox-and-private-support.md) |
 | PRD-0030 | [Object publishing workflow](0030-object-publishing-workflow.md) | completed | [ADR-0042](../adrs/active/0042-canonical-object-workflow.md) |
 | PRD-0027 | [Theme text outline styles](0027-theme-text-outline-styles.md) | completed | [ADR-0036](../adrs/active/0036-theme-text-effects.md), [ADR-0037](../adrs/active/0037-preserve-stale-designer-draft-edits.md), [ADR-0038](../adrs/active/0038-outline-only-theme-publication.md) |
-| PRD-0028 | [Framework-independent render catalog and widget schema pilot](0028-framework-independent-content-contract.md) | in-progress; shared contract pilot | [ADR-0039](../adrs/active/0039-frozen-pilot-behavior-baseline.md), [ADR-0041](../adrs/active/0041-shared-widget-contract-source.md), [ADR-0048](../adrs/active/0048-fast-ci-and-full-merge-gate.md) |
+| PRD-0028 | [Framework-independent render catalog and widget schema pilot](0028-framework-independent-content-contract.md) | in-progress; shared contract pilot | [ADR-0039](../adrs/active/0039-frozen-pilot-behavior-baseline.md), [ADR-0041](../adrs/active/0041-shared-widget-contract-source.md), [ADR-0048](../adrs/archive/0048-fast-ci-and-full-merge-gate.md) |
 | PRD-0026 | [Inline banner styling](0026-inline-banner-styling.md) | completed | [ADR-0034](../adrs/archive/0034-banner-presentation-overrides.md), [ADR-0035](../adrs/active/0035-plain-banner-text.md) |
 | PRD-0029 | [Theme-owned versioned widget types](0029-theme-widget-types.md) | completed | [ADR-0040](../adrs/active/0040-theme-widget-revisions.md) |
 | PRD-0025 | [Stable widget field editing](0025-stable-widget-field-editing.md) | completed | [ADR-0033](../adrs/active/0033-widget-editor-session-and-field-ownership.md) |

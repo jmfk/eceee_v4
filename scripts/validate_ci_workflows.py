@@ -6,7 +6,7 @@ from pathlib import Path
 
 def validate_full_concurrency(workflow):
     group = workflow["concurrency"]["group"]
-    if "${{ github.event.pull_request.number }}" not in group or "${{ github.event.label.name }}" not in group:
+    if "github.event.pull_request.number" not in group or "github.event.label.name" not in group:
         raise ValueError("Full CI concurrency must isolate both the PR and the triggering label")
 
 
@@ -34,11 +34,24 @@ def main():
     # PyYAML's YAML 1.1 parser treats the Actions `on` key as the boolean True.
     full_events = full.get("on", full.get(True))
     fast_events = fast.get("on", fast.get(True))
-    assert full_events == {"pull_request": {"types": ["labeled"]}}
+    assert full_events["pull_request"] == {"types": ["labeled"]}
+    assert full_events["schedule"] == [{"cron": "0 3 * * 1"}]
+    assert "workflow_dispatch" in full_events
+    assert "github.ref" in full["concurrency"]["group"]
     assert "labeled" not in fast_events["pull_request"]["types"]
     assert fast["jobs"]["checks"]["with"]["full"] is False
     assert full["jobs"]["checks"]["with"]["full"] is True
-    assert full["jobs"]["checks"]["if"] == "github.event.label.name == 'full-ci'"
+    assert full["jobs"]["checks"]["if"] == "github.event_name != 'pull_request' || github.event.label.name == 'full-ci'"
+    assert fast["jobs"]["checks"]["needs"] == "policy"
+    assert fast["jobs"]["checks"]["if"] == "needs.policy.outputs.full == 'false'"
+    assert fast["jobs"]["full"]["if"] == "needs.policy.outputs.full == 'true'"
+    assert fast["jobs"]["full"]["with"]["full"] is True
+    assert fast["jobs"]["full"]["name"] == "Full CI"
+    assert fast["permissions"]["actions"] == "read"
+    assert fast["permissions"]["pull-requests"] == "read"
+    assert fast["jobs"]["gate"]["name"] == "CI policy gate"
+    assert fast["jobs"]["gate"]["if"] == "always()"
+    assert set(fast["jobs"]["gate"]["needs"]) == {"policy", "checks", "full"}
     for workflow in (fast, full):
         assert workflow["jobs"]["checks"]["uses"] == "./.github/workflows/ci-checks.yml"
     for job in ("backend-tests", "publisher-checks", "frontend-admin-e2e"):

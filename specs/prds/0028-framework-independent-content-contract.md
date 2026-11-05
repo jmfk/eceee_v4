@@ -101,7 +101,7 @@ Den befintliga Next-publishern renderar utan Django vid förfrågningar, men reg
 
 ## CI cadence follow-up
 
-[ADR-0048](../adrs/active/0048-fast-ci-and-full-merge-gate.md) moves complete pilot
+[ADR-0048](../adrs/archive/0048-fast-ci-and-full-merge-gate.md) moves complete pilot
 verification to the explicit full CI merge gate while retaining lightweight helper
 and affected package unit tests on ordinary pushes. Pilot requirements and reference
 provenance remain unchanged. Repository enforcement needs post-merge activation.

@@ -27,28 +27,22 @@ prod-activate-support: ## Plan a support reload using existing images; APPLY=yes
 prod-support-recipient: ## Plan support-only login creation; SUPPORT_RECIPIENT=email and APPLY=yes after owner gate.
 	python3 deploy/scripts/provision-support-recipient.py --email "$(SUPPORT_RECIPIENT)" $(if $(filter yes,$(APPLY)),--apply)
 
-prod-preflight: ## Run checks required before production deploy (use: make prod-preflight [TAG=v0.x.x|hash])
+prod-preflight: ## Verify exact-revision GitHub CI evidence without repeating tests locally.
+	@DEPLOY_REF=$$(bash deploy/scripts/resolve-deploy-ref.sh "$(TAG)"); \
+	python3 scripts/ci_evidence.py verify-deploy --ref "$$DEPLOY_REF"
+
+prod-preflight-local: ## Run the full local diagnostic preflight explicitly.
 	bash deploy/scripts/preflight.sh "$(TAG)"
 
-prod-deploy: ## Run checks, then deploy to production (FAST_RELEASE=1 uses frontend-only preflight for eligible tagged fixes)
+prod-deploy: ## Verify tagged CI evidence, then deploy with backup, locking and health checks.
 	@set -e; \
-	case "$(FAST_RELEASE)" in 0|1) ;; *) echo "FAST_RELEASE must be 0 or 1" >&2; exit 2;; esac; \
-	if [ "$(FAST_RELEASE)" = 1 ]; then \
-		case "$(TAG)" in v[0-9]*) ;; *) echo "Fast release requires a version tag" >&2; exit 2;; esac; \
-	fi; \
+	case "$(TAG)" in v[0-9]*) ;; *) echo "Production deploy requires a release tag" >&2; exit 2;; esac; \
+	if [ "$(FAST_RELEASE)" != 0 ]; then echo "FAST_RELEASE is retired; verified CI evidence is required" >&2; exit 2; fi; \
 	DEPLOY_REF=$$(bash deploy/scripts/resolve-deploy-ref.sh "$(TAG)"); \
+	TAG_REF=$$(git rev-parse --verify "refs/tags/$(TAG)^{commit}"); \
+	if [ "$$DEPLOY_REF" != "$$TAG_REF" ]; then echo "Release tag mismatch" >&2; exit 2; fi; \
 	echo "Resolved deploy ref: $$DEPLOY_REF"; \
-	if [ "$(FAST_RELEASE)" = 1 ]; then \
-		bash deploy/scripts/validate-fast-release.sh "$(FAST_BASE_REF)" "$$DEPLOY_REF" "$(TAG)"; \
-		CURRENT_REF=$$(ssh -o BatchMode=yes -o ConnectTimeout=10 "$(PROD_HOST)" "git -C '$(PROD_DIR)' rev-parse HEAD"); \
-		if [ "$$CURRENT_REF" != "$(FAST_BASE_REF)" ]; then \
-			echo "Fast release base no longer matches production; request a new gate." >&2; exit 2; \
-		fi; \
-		echo "Fast release preflight: frontend-lint frontend-test"; \
-		PREFLIGHT_TARGETS="frontend-lint frontend-test" bash deploy/scripts/preflight.sh "$$DEPLOY_REF"; \
-	else \
-		PREFLIGHT_TARGETS="lint test regression-test" bash deploy/scripts/preflight.sh "$$DEPLOY_REF"; \
-	fi; \
+	python3 scripts/ci_evidence.py verify-deploy --ref "$$DEPLOY_REF"; \
 	bash deploy/scripts/setup-env.sh "$(PROD_HOST)" "$(PROD_DIR)" --deploy "$$DEPLOY_REF"
 
 prod-restart: ## Sync deploy/.env and restart production containers
