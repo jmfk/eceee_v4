@@ -90,9 +90,34 @@ def websocket_session_is_valid(user, scope):
     from django.conf import settings
     from django.utils.crypto import constant_time_compare
 
+    if not user or not user.is_authenticated:
+        return False
+    session = scope.get("session")
+    perspective_actor_id = scope.get("cms_perspective_actor_id")
+    if perspective_actor_id:
+        from django.contrib.auth import get_user_model
+
+        from .impersonation import websocket_target
+
+        if session is None or not session.session_key:
+            return False
+        from importlib import import_module
+
+        live = import_module(settings.SESSION_ENGINE).SessionStore(session_key=session.session_key)
+        actor = get_user_model().objects.filter(pk=perspective_actor_id).first()
+        target = websocket_target(actor, live)
+        authenticated_actor = bool(
+            actor
+            and live.get("_auth_user_id") == str(actor.pk)
+            and constant_time_compare(live.get("_auth_user_hash", ""), actor.get_session_auth_hash())
+        )
+        if settings.DEBUG and getattr(settings, "DEV_AUTO_LOGIN", True) and scope.get("cms_dev_auto_login"):
+            authenticated_actor = bool(actor and actor.get_username() == "dev_auto_user")
+        return bool(authenticated_actor and target and target.pk == user.pk)
+    if session is not None and session.get("cms_user_perspective"):
+        return False
     if settings.DEBUG and getattr(settings, "DEV_AUTO_LOGIN", True) and scope.get("cms_dev_auto_login"):
         return bool(user and user.is_active)
-    session = scope.get("session")
     if session is None or not session.session_key:
         return False
     # Reload instead of trusting the copy captured at WebSocket connection time.
@@ -100,7 +125,8 @@ def websocket_session_is_valid(user, scope):
 
     live = import_module(settings.SESSION_ENGINE).SessionStore(session_key=session.session_key)
     return (
-        live.get("_auth_user_id") == str(user.pk)
+        not live.get("cms_user_perspective")
+        and live.get("_auth_user_id") == str(user.pk)
         and constant_time_compare(live.get("_auth_user_hash", ""), user.get_session_auth_hash())
         and session_is_valid(user, live)
     )

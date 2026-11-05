@@ -6,6 +6,7 @@ import client from '../api/client'
 import { supportError } from '../api/support'
 import { useSupportTenant } from '../components/support/useSupportContext'
 import CompactSelect from '../components/classification/CompactSelect'
+import UserPerspectiveButton from '../components/UserPerspectiveButton'
 
 const names = { 'settings.read': 'Läsa inställningar', 'settings.write': 'Ändra inställningar', 'integrations.manage': 'Hantera integrationer', 'statistics.read': 'Läsa statistik', 'ai.use': 'Använda AI-verktyg', 'tenant.admin': 'Administrera hela arbetsytan', 'roles.manage': 'Hantera roller', 'support.read': 'Läsa och svara på supportärenden', 'support.publish': 'Publicera instruktionsfilmer' }
 const englishNames = { 'settings.read': 'Read settings', 'settings.write': 'Edit settings', 'integrations.manage': 'Manage integrations', 'statistics.read': 'Read statistics', 'ai.use': 'Use AI tools', 'tenant.admin': 'Administer the entire workspace', 'roles.manage': 'Manage roles', 'support.read': 'Read and reply to support requests', 'support.publish': 'Publish instruction videos' }
@@ -60,7 +61,10 @@ export default function RoleSettings() {
                             <p className="text-gray-500 mt-1">{member.isSystemOwner ? (language === 'sv-se' ? 'Systemägare' : 'System owner') : member.isOwner ? (language === 'sv-se' ? 'Arbetsyteägare' : 'Workspace owner') : assigned.length ? assigned.map((role) => role.name).join(', ') : (language === 'sv-se' ? 'Standardåtkomst' : 'Default access')}</p>
                             <details className="text-gray-500 mt-1"><summary className="cursor-pointer">{member.permissions.length} {language === 'sv-se' ? 'effektiva behörigheter' : 'effective permissions'}</summary><p className="mt-1 max-w-3xl leading-5">{member.permissions.map((permission) => permissionName(permission, language)).join(' · ')}</p></details>
                         </div>
-                        <button type="button" disabled={!query.data.canGrantAdmin && assigned.some((role) => role.permissions.includes('tenant.admin'))} title={!query.data.canGrantAdmin && assigned.some((role) => role.permissions.includes('tenant.admin')) ? (language === 'sv-se' ? 'Bara arbetsyteägaren kan ändra administratörsroller.' : 'Only the workspace owner can change administrator roles.') : undefined} onClick={() => { setMemberDraft({ id: member.id, name: member.name, roleIds: [...member.roleIds] }); setDraft(null); setStatus('') }}>{language === 'sv-se' ? 'Redigera roller' : 'Edit roles'}</button>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <UserPerspectiveButton target={{ id: member.id, isActive: member.isActive !== false, isSuperuser: member.isSystemOwner }} />
+                            <button type="button" disabled={!query.data.canGrantAdmin && assigned.some((role) => role.permissions.includes('tenant.admin'))} title={!query.data.canGrantAdmin && assigned.some((role) => role.permissions.includes('tenant.admin')) ? (language === 'sv-se' ? 'Bara arbetsyteägaren kan ändra administratörsroller.' : 'Only the workspace owner can change administrator roles.') : undefined} onClick={() => { setMemberDraft({ id: member.id, name: member.name, roleIds: [...member.roleIds] }); setDraft(null); setStatus('') }}>{language === 'sv-se' ? 'Redigera roller' : 'Edit roles'}</button>
+                        </div>
                     </div>
                 })}</div>
             </section>
@@ -68,8 +72,8 @@ export default function RoleSettings() {
                 <button type="button" onClick={() => { setNewMember({ userId: '', roleIds: [] }); setMemberDraft(null); setDraft(null) }}>{language === 'sv-se' ? 'Lägg till befintligt konto' : 'Add existing account'}</button>
                 {newMember && <form className="user-tools-panel mt-3 space-y-4" onSubmit={(event) => { event.preventDefault(); if (newMember.userId && newMember.roleIds.length) addMember.mutate() }}>
                     <h2 className="text-lg font-semibold">{language === 'sv-se' ? 'Ny medlem i arbetsytan' : 'New workspace member'}</h2>
-                    <div className="block max-w-sm text-xs"><span>{language === 'sv-se' ? 'Systemkonto' : 'System account'}</span>
-                        <CompactSelect label={language === 'sv-se' ? 'Systemkonto' : 'System account'} required className="block w-full mt-1" value={newMember.userId} onChange={(event) => setNewMember({ ...newMember, userId: event.target.value })}>
+                    <div className="cms-compact-select-field max-w-sm text-xs"><span className="cms-compact-select-label" aria-hidden="true">{language === 'sv-se' ? 'Systemkonto' : 'System account'}</span>
+                        <CompactSelect label={language === 'sv-se' ? 'Systemkonto' : 'System account'} required value={newMember.userId} onChange={(event) => setNewMember({ ...newMember, userId: event.target.value })}>
                             <option value="">{language === 'sv-se' ? 'Välj konto' : 'Choose account'}</option>
                             {(accounts.data || []).filter((account) => account.isActive && !query.data.members.some((member) => member.id === account.id)).map((account) => <option key={account.id} value={account.id}>{account.username}</option>)}
                         </CompactSelect>

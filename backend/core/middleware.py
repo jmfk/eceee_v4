@@ -31,7 +31,14 @@ class TenantContextMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
-    EXEMPT_PATHS = ("/health/", "/_allauth/", "/accounts/", "/csrf-token/", "/api/v1/auth/")
+    EXEMPT_PATHS = (
+        "/api/v1/utils/user-perspective/",
+        "/health/",
+        "/_allauth/",
+        "/accounts/",
+        "/csrf-token/",
+        "/api/v1/auth/",
+    )
     BOARD_GUEST_PATHS = (
         "/api/v1/kanban/",
         "/api/v1/utils/current-user/",

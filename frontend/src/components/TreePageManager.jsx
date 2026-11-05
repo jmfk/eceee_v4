@@ -32,6 +32,7 @@ import { pagesApi, sitePackagesApi, versionsApi } from '../api'
 import { designerThemesApi } from '../api/designerThemes'
 import { deletePage } from '../api/pages'
 import PageTreeNode from './PageTreeNode'
+import AccessDenied from './AccessDenied'
 import TreeImporterModalV2 from './TreeImporterModalV2'
 import BulkActionsToolbar from './BulkActionsToolbar'
 import Tooltip from './Tooltip'
@@ -1344,6 +1345,10 @@ const TreePageManager = () => {
     const handleModalClose = useCallback((modalType) => {
         addNotification(`${modalType} dialog closed`, 'info', 'modal-close')
     }, [addNotification])
+
+    if (error?.response?.status === 403 || (searchTerm && searchError?.response?.status === 403)) {
+        return <AccessDenied />
+    }
 
     if (error) {
         return (

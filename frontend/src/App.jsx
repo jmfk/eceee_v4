@@ -1,5 +1,6 @@
 import { canAccessCmsPath } from './utils/cmsNavigation'
 import RoleSettings from './pages/RoleSettings'
+import UserPerspectiveBanner from './components/UserPerspectiveBanner'
 /*
  * Copyright (C) 2025 Johan Mats Fred Karlsson
  *
@@ -654,6 +655,7 @@ function App() {
             <AppVersionReloadGuard />
             <ClipboardProvider>
               <AuthProvider>
+                <UserPerspectiveBanner />
                 <SessionExpiredOverlay />
                 <RouterProvider router={router} />
               </AuthProvider>

@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 import { getUserList, generatePasswordReset, createUser, updateUser, deleteUser } from '../api/users';
 import { Users, Shield, Mail, Calendar, Key, Copy, X, CheckCircle, UserPlus, AlertCircle, Trash2, Edit } from 'lucide-react';
+import UserPerspectiveButton from '../components/UserPerspectiveButton';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const UserManagementPage = () => {
@@ -437,6 +438,7 @@ const UserManagementPage = () => {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                             <div className="flex items-center space-x-2">
+                                                <UserPerspectiveButton target={u} />
                                                 <button
                                                     onClick={() => handleEditClick(u)}
                                                     className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"

@@ -5,6 +5,7 @@ URL Configuration for General Utilities
 from django.urls import include, path, re_path
 from rest_framework.routers import DefaultRouter
 
+from cms_auth.impersonation import user_perspective
 from core.profile_views import ProfilePhotoView
 from core.role_views import RolesView, WorkspaceMemberView
 from core.tenant_views import TenantDetailView, TenantListView
@@ -29,7 +30,9 @@ clipboard_patterns = [
     ),
 ]
 
+
 urlpatterns = [
+    path("user-perspective/", user_perspective, name="user_perspective"),
     # Field Types
     path("field-types/", views.get_field_types, name="get_field_types"),
     path("field-types/register/", views.register_field_type, name="register_field_type"),

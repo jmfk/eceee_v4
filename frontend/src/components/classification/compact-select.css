@@ -1,5 +1,6 @@
-.classification-manager .cms-compact-select {
+.cms-compact-select {
     display: flex;
+    align-items: center;
     width: 100%;
     justify-content: space-between;
     gap: .75rem;
@@ -15,11 +16,37 @@
     line-height: 1rem;
     text-align: left;
 }
-.classification-manager .cms-compact-select > svg { flex-shrink: 0; color: #6b7280; }
-.classification-manager .cms-compact-select:is(:focus-visible, [aria-expanded='true']) {
+.cms-compact-select-value { min-width: 0; flex: 1; }
+.cms-compact-select > svg { flex-shrink: 0; color: #6b7280; }
+.cms-compact-select:is(:focus-visible, [aria-expanded='true']) {
     border-color: #2563eb;
     outline: none;
     box-shadow: none;
+}
+.cms-compact-select-field { position: relative; padding-top: 8px; }
+.cms-compact-select-field > .cms-compact-select-label {
+    position: absolute;
+    top: 23px;
+    left: 8px;
+    z-index: 1;
+    max-width: calc(100% - 40px);
+    padding: 0 2px;
+    transform: translateY(-50%);
+    background: white;
+    color: #6b7280;
+    font-size: 12px;
+    line-height: 14px;
+    pointer-events: none;
+    transition: top 140ms ease, font-size 140ms ease;
+}
+.cms-compact-select-field:is(:focus-within, :has(> .cms-compact-select[data-filled='true']), :has(> .cms-compact-select[aria-expanded='true'])) > .cms-compact-select-label {
+    top: 8px;
+    font-size: 11px;
+}
+.cms-compact-select-field:focus-within > .cms-compact-select-label { color: #2563eb; }
+.cms-compact-select-field:not(:focus-within) > .cms-compact-select[data-filled='false']:not([aria-expanded='true']) .cms-compact-select-value { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+    .cms-compact-select-field > .cms-compact-select-label { transition: none; }
 }
 .cms-compact-select-options {
     z-index: 100;

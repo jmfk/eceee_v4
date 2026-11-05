@@ -490,14 +490,18 @@ function Compose({ context, link, publish = false }) {
     const navigate = useNavigate()
     const location = useLocation()
     const queryClient = useQueryClient()
+    const accessRequest = !publish && new URLSearchParams(location.search).get('requestAccess') === '1'
+    const swedish = getCmsCopyLanguage() === 'sv-se'
     const [labelIds, setLabelIds] = useState(() => context.messageLabels?.filter((label) => label.key === 'question').map((label) => label.id) || [])
-    const [recipients, setRecipients] = useState(context.supportAvailable ? ['support'] : [])
+    const [recipients, setRecipients] = useState(() => accessRequest && context.accessRequestRecipients?.length ? context.accessRequestRecipients : context.supportAvailable ? ['support'] : [])
     const [files, setFiles] = useState([])
     const [checkingFiles, setCheckingFiles] = useState(false)
     const fileCache = useRef(new Map())
-    const [includeDiagnostics, setIncludeDiagnostics] = useState(() => new URLSearchParams(location.search).has('from'))
-    const [title, setTitle] = useState('')
-    const [body, setBody] = useState('')
+    const [includeDiagnostics, setIncludeDiagnostics] = useState(() => !accessRequest && new URLSearchParams(location.search).has('from'))
+    const [title, setTitle] = useState(accessRequest ? (swedish ? 'Begäran om mer åtkomst' : 'Request for more access') : '')
+    const [body, setBody] = useState(accessRequest ? (swedish
+        ? 'Jag saknar åtkomst till vyn i länken nedan. Kan en administratör hjälpa mig att få rätt behörighet?'
+        : 'I do not have access to the view linked below. Could an administrator help me get the permissions I need?') : '')
     const [transcript, setTranscript] = useState('')
     const [language, setLanguage] = useState(() => {
         const requested = new URLSearchParams(location.search).get('lang')
@@ -590,7 +594,7 @@ function Compose({ context, link, publish = false }) {
             <h2>
                 {publish
                     ? 'Publicera instruktion'
-                    : 'Nytt meddelande'}
+                    : accessRequest ? (swedish ? 'Begär mer åtkomst' : 'Request more access') : 'Nytt meddelande'}
             </h2>
             <p>
                 {publish
@@ -733,7 +737,7 @@ function Compose({ context, link, publish = false }) {
                                 : 'Skicka som nytt ärende'
                             : publish
                               ? `Publicera till ${context.tenant.name}`
-                              : 'Skicka meddelande'}
+                              : accessRequest ? (swedish ? 'Skicka åtkomstförfrågan' : 'Send access request') : 'Skicka meddelande'}
                     </button>
                 </fieldset>
             </form>

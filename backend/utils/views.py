@@ -525,6 +525,8 @@ class CurrentUserView(APIView):
             context={"additional_designer_tenants": list(administrative_tenants.order_by("name"))},
         )
         data = dict(serializer.data)
+        if getattr(request, "user_perspective", None):
+            data["user_perspective"] = request.user_perspective
         from cms_auth.models import UserLanguagePreference
 
         data["preferredLanguage"] = (
