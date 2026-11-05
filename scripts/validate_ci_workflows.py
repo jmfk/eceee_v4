@@ -49,6 +49,7 @@ def main():
     assert fast["jobs"]["full"]["name"] == "Full CI"
     assert fast["permissions"]["actions"] == "read"
     assert fast["permissions"]["pull-requests"] == "read"
+    assert reusable["jobs"]["frontend-tests"]["steps"][0]["with"]["fetch-depth"] == 0
     assert fast["jobs"]["gate"]["name"] == "CI policy gate"
     assert fast["jobs"]["gate"]["if"] == "always()"
     assert set(fast["jobs"]["gate"]["needs"]) == {"policy", "checks", "full"}
