@@ -191,17 +191,40 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: docker/setup-buildx-action@v3
+      - name: Select backend image cache key
+        id: image-key
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
 
-      - name: Build cached backend image
+      - name: Restore backend dependency image
+        id: image-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/eceee-backend-ci-image.tar
+          key: backend-ci-image-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.image-key.outputs.week }}-${{ hashFiles('backend/Dockerfile', 'backend/requirements/**') }}
+
+      - uses: docker/setup-buildx-action@v3
+        if: steps.image-cache.outputs.cache-hit != 'true'
+
+      - name: Build backend dependency image on cache miss
+        if: steps.image-cache.outputs.cache-hit != 'true'
         uses: docker/build-push-action@v6
         with:
           context: backend
+          target: ci
+          pull: true
           load: true
           tags: eceee-v4-backend:latest
           build-args: REQUIREMENTS_FILE=dev.txt
-          cache-from: type=gha,scope=backend-ci
-          cache-to: type=gha,mode=max,scope=backend-ci
+          cache-from: type=gha,scope=backend-ci-deps-${{ steps.image-key.outputs.week }}
+          cache-to: type=gha,mode=max,scope=backend-ci-deps-${{ steps.image-key.outputs.week }}
+
+      - name: Save backend dependency image
+        if: steps.image-cache.outputs.cache-hit != 'true'
+        run: docker image save eceee-v4-backend:latest -o /tmp/eceee-backend-ci-image.tar
+
+      - name: Load cached backend dependency image
+        if: steps.image-cache.outputs.cache-hit == 'true'
+        run: docker image load -i /tmp/eceee-backend-ci-image.tar
 
       - name: Prepare CI environment
         run: |

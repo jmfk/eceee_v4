@@ -88,3 +88,22 @@ Measured run 1055: backend 10m50s (image 4m18s, test command 6m01s), frontend
 3m17s, browser 3m03s, publisher 2m54s. The backend was the critical path; making
 Playwright optional alone would not have shortened that run. Exact per-test
 Django timings were unavailable before the timing runner was added.
+
+The first timing-enabled PR run measured the tagged tests at 36.359s (taxonomy
+upgrade/backfill), 27.491s (theme asset migration) and 18.573s (Kanban upgrade).
+The next slowest individual test was 2.089s. Keep those faster correctness tests
+required; the measured historical replays account for about 82 seconds together.
+
+## Backend image cache
+
+CI restores a ready-to-load dependency image using an exact key containing the
+runner OS/architecture, ISO week, Dockerfile and all requirement files. On a miss,
+it builds the Dockerfile's `ci` target, saves the image and retains BuildKit layer
+caching as a fallback. The target contains tools and Python dependencies; the
+Compose bind mount supplies the current checkout at `/app` on every test run.
+Application source edits therefore reuse the image without testing stale code.
+
+Dependency/Dockerfile edits and the weekly key force rebuilding. There is no
+fallback to an image built for different dependencies. GitHub's branch cache
+scope rules still apply, so a PR cache cannot seed the first main-branch build.
+The first run after adoption is cold; subsequent speedups must be measured in CI.
