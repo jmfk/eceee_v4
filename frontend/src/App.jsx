@@ -571,20 +571,8 @@ export const AppRoutes = () => {
         {/* Version timeline page - fullscreen without navbar */}
         <Route path="/pages/:pageId/versions" element={<PrivateRoute><VersionTimelinePage /></PrivateRoute>} />
 
-        {/* 404 route */}
-        <Route path="*" element={
-          <div className="fixed inset-0 bg-gray-50 flex flex-col">
-            <Navbar />
-            <main className="flex-1 overflow-hidden">
-              <div className="h-full overflow-y-auto">
-                <div className="container mx-auto px-4 py-8">
-                  <NotFoundPage />
-                </div>
-              </div>
-            </main>
-            <StatusBar customStatusContent={<span>Page Not Found</span>} />
-          </div>
-        } />
+        {/* Error pages are standalone and never mount authenticated application chrome. */}
+        <Route path="*" element={<main className="min-h-screen bg-gray-50 px-4 py-12"><NotFoundPage /></main>} />
       </Routes>
 
       <Toaster

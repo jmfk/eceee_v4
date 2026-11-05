@@ -97,7 +97,7 @@ def websocket_session_is_valid(user, scope):
     if perspective_actor_id:
         from django.contrib.auth import get_user_model
 
-        from .impersonation import websocket_target
+        from .impersonation import get_record, websocket_target
 
         if session is None or not session.session_key:
             return False
@@ -113,8 +113,17 @@ def websocket_session_is_valid(user, scope):
         )
         if settings.DEBUG and getattr(settings, "DEV_AUTO_LOGIN", True) and scope.get("cms_dev_auto_login"):
             authenticated_actor = bool(actor and actor.get_username() == "dev_auto_user")
-        return bool(authenticated_actor and target and target.pk == user.pk)
-    if session is not None and session.get("cms_user_perspective"):
+        record = get_record(live)
+        return bool(
+            authenticated_actor
+            and target
+            and target.pk == user.pk
+            and record
+            and record.get("nonce") == scope.get("cms_perspective_nonce")
+        )
+    from .impersonation import get_record
+
+    if session is not None and get_record(session):
         return False
     if settings.DEBUG and getattr(settings, "DEV_AUTO_LOGIN", True) and scope.get("cms_dev_auto_login"):
         return bool(user and user.is_active)
@@ -125,7 +134,7 @@ def websocket_session_is_valid(user, scope):
 
     live = import_module(settings.SESSION_ENGINE).SessionStore(session_key=session.session_key)
     return (
-        not live.get("cms_user_perspective")
+        not get_record(live)
         and live.get("_auth_user_id") == str(user.pk)
         and constant_time_compare(live.get("_auth_user_hash", ""), user.get_session_auth_hash())
         and session_is_valid(user, live)

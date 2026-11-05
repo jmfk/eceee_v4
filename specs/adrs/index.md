@@ -56,7 +56,9 @@
 | ADR-0052 | [Explicit read-only system diagnostics](active/0052-read-only-system-diagnostics.md) | accepted | PRD-0037 |
 
 
-| ADR-0059 | [Editable temporary user perspective](active/0059-editable-user-perspective.md) | accepted | PRD-0043 |
+
+
+| ADR-0060 | [Stable login sessions during delegation](active/0060-stable-login-session-delegation.md) | accepted | PRD-0043 |
 
 ## Archived Decisions
 
@@ -75,3 +77,5 @@
 | ADR-0048 | [Fast push feedback and an exact-revision full CI merge gate](archive/0048-fast-ci-and-full-merge-gate.md) | superseded | PRD-0028 |
 
 | ADR-0058 | [Server-enforced read-only user perspective](archive/0058-read-only-user-perspective.md) | superseded | PRD-0042 |
+
+| ADR-0059 | [Editable temporary user perspective](archive/0059-editable-user-perspective.md) | superseded | PRD-0043 |

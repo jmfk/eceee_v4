@@ -6,6 +6,7 @@ locked: true
 created: 2026-11-05
 related_adrs:
   - ADR-0059
+  - ADR-0060
 ---
 
 # PRD-0043: Editable temporary user perspective
@@ -31,7 +32,7 @@ The owner explicitly requested editing as the selected user, extending PRD-0042'
 
 ## Linked ADRs
 
-- [ADR-0059](../adrs/active/0059-editable-user-perspective.md)
+- [ADR-0059](../adrs/archive/0059-editable-user-perspective.md)
 
 ## Implementation Notes
 
@@ -43,3 +44,8 @@ The owner explicitly requested editing as the selected user, extending PRD-0042'
 - Scoped Python/frontend lint, Vite production build and specs validation passed. Existing TreePageManager lint warnings remain unchanged.
 - Browser verification: enter as an existing account, retain the identity banner after reload, and return to the original administrator. Swedish access-denied and prefilled access-request views verified at desktop and 640px widths.
 - No database migration or new dependency. Local demo accounts are not release artifacts; no production account or tenant data is transferred.
+
+## Recovery correction
+
+- [ADR-0060](../adrs/active/0060-stable-login-session-delegation.md) fixes reproduced multi-tab login-cookie loss, preserves delegated state independently of stale session payloads, and keeps an independent return endpoint available when workspace bootstrap fails.
+- Sign-in and 404 surfaces cover/remove admin navigation. Email sign-in uses the email credential field. Google/Apple remain controlled by configured providers.

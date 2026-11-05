@@ -30,6 +30,38 @@ export const AuthProvider = ({ children }) => {
     const requestQueueRef = useRef([]);
 
 
+    const hasUserPerspective = Boolean(user?.userPerspective);
+
+    const queueRequest = useCallback((request) => {
+        // Skip queueing if request doesn't have config (e.g., WebSocket verification events)
+        // Only queue actual API requests that can be retried
+        if (!request || !request.config) {
+            return;
+        }
+
+        // A delegated action must never be replayed after signing back in as the administrator.
+        if (hasUserPerspective) {
+            request.reject?.(new Error('User view interrupted. Return to your administrator account before trying again.'));
+            return;
+        }
+
+        // Create a unique key for deduplication
+        const requestKey = `${request.config.method}-${request.config.url}-${JSON.stringify(request.config.data)}`;
+
+        // Check if this request is already queued
+        const isDuplicate = requestQueueRef.current.some(
+            queuedRequest => {
+                const queuedKey = `${queuedRequest.config.method}-${queuedRequest.config.url}-${JSON.stringify(queuedRequest.config.data)}`;
+                return queuedKey === requestKey;
+            }
+        );
+
+        if (!isDuplicate) {
+            requestQueueRef.current.push(request);
+        }
+    }, [hasUserPerspective]);
+
+
     // Listen for session expired events from API client
     useEffect(() => {
         const handleSessionExpired = (event) => {
@@ -49,13 +81,28 @@ export const AuthProvider = ({ children }) => {
         return () => {
             window.removeEventListener('session-expired', handleSessionExpired);
         };
-    }, [sessionExpired]);
+    }, [sessionExpired, queueRequest]);
 
     const fetchUserDetails = useCallback(async () => {
         const response = await fetch('/api/v1/utils/current-user/', {
             credentials: 'include', cache: 'no-store', headers: { 'Content-Type': 'application/json' },
         });
-        if (!response.ok) return null;
+        if (!response.ok) {
+            // Workspace/bootstrap failure must not hide a still-valid administrator's exit action.
+            if (response.status === 401 || response.status === 403) {
+                const recovery = await fetch('/api/v1/utils/user-perspective/', {
+                    credentials: 'include', cache: 'no-store', headers: { 'Content-Type': 'application/json' },
+                });
+                if (recovery.ok) {
+                    const state = await recovery.json();
+                    if (state.active && state.userPerspective) return {
+                        id: state.userPerspective.userId, username: state.userPerspective.username,
+                        isSuperuser: false, permissions: [], designerTenants: [], userPerspective: state.userPerspective,
+                    };
+                }
+            }
+            return null;
+        }
         const data = await response.json();
         if (data.designerTenants?.length) reconcileCurrentTenantId(data.currentWorkspace, data.designerTenants);
         return data;
@@ -79,28 +126,6 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => { checkAuthStatus(); }, [checkAuthStatus]);
 
-    const queueRequest = (request) => {
-        // Skip queueing if request doesn't have config (e.g., WebSocket verification events)
-        // Only queue actual API requests that can be retried
-        if (!request || !request.config) {
-            return;
-        }
-
-        // Create a unique key for deduplication
-        const requestKey = `${request.config.method}-${request.config.url}-${JSON.stringify(request.config.data)}`;
-
-        // Check if this request is already queued
-        const isDuplicate = requestQueueRef.current.some(
-            queuedRequest => {
-                const queuedKey = `${queuedRequest.config.method}-${queuedRequest.config.url}-${JSON.stringify(queuedRequest.config.data)}`;
-                return queuedKey === requestKey;
-            }
-        );
-
-        if (!isDuplicate) {
-            requestQueueRef.current.push(request);
-        }
-    };
 
     const retryQueuedRequests = async () => {
         const queue = [...requestQueueRef.current];

@@ -22,8 +22,8 @@ vi.mock('../contexts/AuthContext', () => ({
     useAuth: vi.fn(() => ({ user: { username: 'editor' } })),
 }))
 
-vi.mock('../components/Navbar', () => ({ default: () => null }))
-vi.mock('../components/StatusBar', () => ({ default: () => null }))
+vi.mock('../components/Navbar', () => ({ default: () => <nav aria-label="Admin navigation">Admin navigation</nav> }))
+vi.mock('../components/StatusBar', () => ({ default: () => <footer>Admin status</footer> }))
 vi.mock('../pages/ProfilePage', () => ({ default: () => <div>Personal profile</div> }))
 
 vi.mock('../components/PrivateRoute', () => ({
@@ -57,6 +57,14 @@ describe('AppRoutes', () => {
         rerender(<MemoryRouter initialEntries={['/']}><AppRoutes /><LocationProbe /></MemoryRouter>)
         await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/profile'))
         expect(screen.getByText('Personal profile')).toBeInTheDocument()
+    })
+
+    it('renders a standalone 404 without admin navigation or status', () => {
+        useAuth.mockReturnValue({ isLoading: false, isAuthenticated: false, user: null })
+        render(<MemoryRouter initialEntries={['/missing-route']}><AppRoutes /></MemoryRouter>)
+        expect(screen.getByRole('heading', { name: 'Page Not Found' })).toBeInTheDocument()
+        expect(screen.queryByRole('navigation', { name: 'Admin navigation' })).not.toBeInTheDocument()
+        expect(screen.queryByText('Admin status')).not.toBeInTheDocument()
     })
 
     it('redirects the legacy experiments route into Settings', async () => {
