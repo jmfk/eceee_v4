@@ -99,7 +99,10 @@ def valid_actor(request):
 @require_http_methods(["GET", "POST", "DELETE"])
 def user_perspective(request):
     if not valid_actor(request):
-        return JsonResponse({"detail": "A system owner's browser sign-in is required."}, status=403)
+        actor = getattr(request, "perspective_actor", request.user)
+        return JsonResponse(
+            {"detail": "A system owner's browser sign-in is required."}, status=403 if actor.is_authenticated else 401
+        )
     actor = getattr(request, "perspective_actor", request.user)
     if request.method != "GET":
         if not request.session.session_key:

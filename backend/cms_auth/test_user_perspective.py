@@ -96,7 +96,7 @@ class UserPerspectiveTests(TestCase):
         self.write(method="delete")
         self.assertTrue(before == self.client.cookies[settings.SESSION_COOKIE_NAME].value)
         self.assertFalse(self.client.get(CONTROL_PATH).json()["active"])
-        self.assertEqual(Client().get(CONTROL_PATH).status_code, 403)
+        self.assertEqual(Client().get(CONTROL_PATH).status_code, 401)
 
     def test_legacy_delegation_is_upgraded_without_changing_login(self):
         session = self.client.session

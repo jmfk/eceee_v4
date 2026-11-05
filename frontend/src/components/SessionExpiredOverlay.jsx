@@ -16,7 +16,7 @@ export default function SessionExpiredOverlay() {
         setError('')
         try { await stopUserPerspective() }
         catch (error) {
-            if ([401, 403].includes(error.response?.status)) setRequiresLogin(true)
+            if (error.response?.status === 401) setRequiresLogin(true)
             else setError('Could not return to your account. Please try again.')
             setReturning(false)
         }
