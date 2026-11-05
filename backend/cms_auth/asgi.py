@@ -1,6 +1,7 @@
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser
 
+from .impersonation import get_record
 from .security import session_is_valid, websocket_session_is_valid
 
 
@@ -13,7 +14,7 @@ class AccountSecurityASGIMiddleware:
         user = scope.get("user")
         if user and user.is_authenticated:
             session = scope.get("session")
-            record = await database_sync_to_async(session.get)("cms_user_perspective") if session is not None else None
+            record = await database_sync_to_async(get_record)(session) if session is not None else None
             if record:
                 valid = await database_sync_to_async(session_is_valid)(user, scope["session"])
             else:
@@ -29,7 +30,7 @@ class UserPerspectiveASGIMiddleware:
 
     async def __call__(self, scope, receive, send):
         session = scope.get("session")
-        record = await database_sync_to_async(session.get)("cms_user_perspective") if session is not None else None
+        record = await database_sync_to_async(get_record)(session) if session is not None else None
         if record:
             from .impersonation import websocket_target
 
@@ -37,5 +38,6 @@ class UserPerspectiveASGIMiddleware:
             actor = scope.get("user")
             target = await database_sync_to_async(websocket_target)(actor, session)
             scope["cms_perspective_actor_id"] = actor.pk if actor and actor.is_authenticated else None
+            scope["cms_perspective_nonce"] = record.get("nonce")
             scope["user"] = target or AnonymousUser()
         return await self.inner(scope, receive, send)

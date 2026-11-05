@@ -1,7 +1,7 @@
 ---
 id: ADR-0059
 title: Editable temporary user perspective
-status: accepted
+status: superseded
 created: 2026-11-05
 related_prds:
   - PRD-0043
@@ -24,3 +24,5 @@ Changes are real and are authored as the target user. The persistent banner make
 ## Related PRD
 
 - [PRD-0043](../../prds/0043-editable-user-perspective.md)
+
+Superseded by [ADR-0060](../active/0060-stable-login-session-delegation.md) after production multi-tab session loss was reproduced.

@@ -71,7 +71,8 @@ export default function AuthenticationForm({ onAuthenticated, destination = '/',
         event.preventDefault(); setBusy(true); setError('')
         try {
             const isEmail = pending?.id === 'verify_email'
-            const data = isEmail ? { key: code } : { username: identifier, password }
+            const loginId = identifier.trim()
+            const data = isEmail ? { key: code } : { [loginId.includes('@') ? 'email' : 'username']: loginId, password }
             const result = await authRequest(isEmail ? '/auth/email/verify' : '/auth/login', { method: 'POST', data })
             if (result.status === 400) setError(authError(result))
             else await handleResult(result)

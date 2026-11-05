@@ -3,13 +3,20 @@
 import json
 import logging
 import time
+import uuid
+from datetime import datetime
+from datetime import timezone as datetime_timezone
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.sessions.models import Session
+from django.db import transaction
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
 from rest_framework import serializers
 
+from .models import UserPerspectiveSession
 from .security import security_version, session_is_valid
 
 logger = logging.getLogger(__name__)
@@ -21,6 +28,50 @@ DURATION = 30 * 60
 
 class PerspectiveSerializer(serializers.Serializer):
     user_id = serializers.IntegerField(min_value=1)
+
+
+def state_record(state):
+    return {
+        "actor_id": state.actor_id,
+        "user_id": state.target_id,
+        "username": state.target_username,
+        "security_version": state.target_security_version,
+        "expires_at": int(state.expires_at.timestamp()),
+        "original_workspace": state.original_workspace,
+        "nonce": str(state.nonce),
+    }
+
+
+def get_record(session):
+    if session.session_key:
+        state = UserPerspectiveSession.objects.filter(session_id=session.session_key).first()
+        if state:
+            # Ended rows are tombstones: an older in-flight session save cannot resurrect v0.1.76 state.
+            return state_record(state) if state.active else None
+    return session.get(SESSION_KEY)
+
+
+def state_defaults(record, *, active=True):
+    return {
+        "actor_id": record["actor_id"],
+        "target_id": record["user_id"] if get_user_model().objects.filter(pk=record["user_id"]).exists() else None,
+        "target_username": record["username"],
+        "target_security_version": record["security_version"],
+        "expires_at": datetime.fromtimestamp(record["expires_at"], tz=datetime_timezone.utc),
+        "original_workspace": record.get("original_workspace") or "",
+        "nonce": record.get("nonce") or uuid.uuid4(),
+        "active": active,
+    }
+
+
+def preserve_legacy_record(session, record):
+    if record.get("nonce") or not session.session_key:
+        return record
+    # Upgrade only this live, validated delegation; no global session/data rewrite is needed.
+    state, _ = UserPerspectiveSession.objects.get_or_create(
+        session_id=session.session_key, defaults=state_defaults(record)
+    )
+    return state_record(state) if state.active else None
 
 
 def metadata(record, *, expired=False):
@@ -44,23 +95,56 @@ def valid_actor(request):
 
 
 @csrf_protect
-@require_http_methods(["POST", "DELETE"])
+@transaction.atomic
+@require_http_methods(["GET", "POST", "DELETE"])
 def user_perspective(request):
     if not valid_actor(request):
         return JsonResponse({"detail": "A system owner's browser sign-in is required."}, status=403)
     actor = getattr(request, "perspective_actor", request.user)
-    record = request.session.get(SESSION_KEY)
+    if request.method != "GET":
+        if not request.session.session_key:
+            request.session.create()
+        try:
+            # Entry and exit must observe the same order as their state changes.
+            Session.objects.select_for_update().get(pk=request.session.session_key)
+        except Session.DoesNotExist:
+            return JsonResponse({"detail": "The original administrator must sign in again."}, status=401)
+        # Authentication may have materialized an older payload before this lock was available.
+        request.session = request.session.__class__(session_key=request.session.session_key)
+        if not valid_actor(request):
+            return JsonResponse({"detail": "The original administrator must sign in again."}, status=401)
+    record = get_record(request.session)
+    if request.method == "GET":
+        target = (
+            get_user_model().objects.filter(pk=record["user_id"], is_active=True, is_superuser=False).first()
+            if record
+            else None
+        )
+        expired = bool(
+            record
+            and (
+                time.time() >= record["expires_at"]
+                or not target
+                or security_version(target) != record["security_version"]
+            )
+        )
+        return JsonResponse(
+            {"active": bool(record), "userPerspective": metadata(record, expired=expired) if record else None},
+            headers={"Cache-Control": "no-store"},
+        )
     if request.method == "DELETE":
         if record:
             if record["actor_id"] != actor.pk:
                 return JsonResponse({"detail": "The original administrator must sign in again."}, status=403)
-            request.session.pop(SESSION_KEY)
+            UserPerspectiveSession.objects.update_or_create(
+                session_id=request.session.session_key, defaults=state_defaults(record, active=False)
+            )
+            request.session.pop(SESSION_KEY, None)
             original_workspace = record.get("original_workspace")
             if original_workspace:
                 request.session["selected_tenant_identifier"] = original_workspace
             else:
                 request.session.pop("selected_tenant_identifier", None)
-            request.session.cycle_key()
             logger.info("User perspective stopped actor_id=%s target_id=%s", actor.pk, record["user_id"])
         response = JsonResponse({"active": False})
     else:
@@ -84,12 +168,18 @@ def user_perspective(request):
             "security_version": security_version(target),
             "expires_at": int(time.time()) + DURATION,
             "original_workspace": request.session.get("selected_tenant_identifier"),
+            "nonce": str(uuid.uuid4()),
         }
-        request.session[SESSION_KEY] = record
+        UserPerspectiveSession.objects.update_or_create(
+            session_id=request.session.session_key, defaults=state_defaults(record)
+        )
         request.session.pop("selected_tenant_identifier", None)
-        request.session.cycle_key()
         logger.info("User perspective started actor_id=%s target_id=%s", actor.pk, target.pk)
         response = JsonResponse({"active": True, "userPerspective": metadata(record)})
+    # Save workspace metadata while holding the same lock. A delayed response must
+    # not save its stale payload after a later enter/exit has already completed.
+    request.session.save()
+    request.session.modified = request.COOKIES.get(settings.SESSION_COOKIE_NAME) != request.session.session_key
     response["Cache-Control"] = "no-store"
     return response
 
@@ -101,7 +191,7 @@ class UserPerspectiveMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        record = request.session.get(SESSION_KEY)
+        record = get_record(request.session)
         if request.path == "/csrf-token/" and request.method == "GET":
             return self.get_response(request)
         if not record:
@@ -110,10 +200,14 @@ class UserPerspectiveMiddleware:
         if not valid_actor(request) or record["actor_id"] != request.user.pk:
             if not request.headers.get("Authorization") and request.path.startswith(("/_allauth/", "/accounts/")):
                 # A revoked original login must still be able to complete normal sign-in/MFA.
+                UserPerspectiveSession.objects.filter(session_id=request.session.session_key).update(active=False)
                 request.session.pop(SESSION_KEY, None)
                 return self.get_response(request)
             return JsonResponse({"detail": "The original administrator must sign in again."}, status=401)
         if request.path == CONTROL_PATH:
+            return self.get_response(request)
+        record = preserve_legacy_record(request.session, record)
+        if not record:
             return self.get_response(request)
         target = get_user_model().objects.filter(pk=record["user_id"]).first()
         expired = bool(
@@ -163,7 +257,7 @@ class UserPerspectiveMiddleware:
 
 def websocket_target(actor, session):
     """Resolve a live delegation without creating a login/MFA record for the target."""
-    record = session.get(SESSION_KEY) if session is not None else None
+    record = get_record(session) if session is not None else None
     if not record or not actor or not actor.is_superuser or not session_is_valid(actor, session):
         return None
     if record["actor_id"] != actor.pk or time.time() >= record["expires_at"]:

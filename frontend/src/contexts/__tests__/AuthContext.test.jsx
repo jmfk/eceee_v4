@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -71,6 +71,29 @@ describe('AuthProvider workspace synchronization', () => {
             expect(getCurrentTenantId()).toBe('eceee-production-copy')
             expect(localStorage.getItem('eceee_tenant_id')).toBeNull()
         })
+    })
+
+    it('retains the return action if a valid delegated login cannot load its workspace bootstrap', async () => {
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async url => url === '/api/v1/utils/current-user/'
+            ? { ok: false, status: 403 }
+            : { ok: true, json: async () => ({ active: true, userPerspective: { userId: 7, username: 'restricted-user', expiresAt: 9999999999 } }) })
+        const Recovery = () => {
+            const { user } = useAuth()
+            return <div>{user?.userPerspective ? 'Return available' : 'No recovery'}</div>
+        }
+        render(<AuthProvider><Recovery /></AuthProvider>)
+        expect(await screen.findByText('Return available')).toBeInTheDocument()
+    })
+
+    it('rejects interrupted delegated writes instead of queueing them for administrator reauthentication', async () => {
+        vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, json: async () => ({ id: 7, username: 'reader', userPerspective: { username: 'reader' } }) })
+        const reject = vi.fn()
+        render(<AuthProvider><AuthState /></AuthProvider>)
+        await screen.findByText('reader')
+        act(() => window.dispatchEvent(new CustomEvent('session-expired', { detail: {
+            config: { method: 'post', url: '/protected-write/' }, reject, resolve: vi.fn(),
+        } })))
+        await waitFor(() => expect(reject).toHaveBeenCalledWith(expect.any(Error)))
     })
 
     it('updates language without discarding an unsaved form draft', async () => {

@@ -4,6 +4,7 @@ import AuthenticationForm from '../AuthenticationForm'
 import AccountSecurityPanel from '../AccountSecurityPanel'
 import SessionExpiredOverlay from '../../SessionExpiredOverlay'
 import { useAuth } from '../../../contexts/AuthContext'
+import { stopUserPerspective } from '../../../api/userPerspective'
 import { authRequest, redirectToProvider, requireAuthResult } from '../../../api/auth'
 
 vi.mock('../../../api/auth', () => ({
@@ -13,6 +14,7 @@ vi.mock('../../../api/auth', () => ({
 }))
 
 vi.mock('../../../contexts/AuthContext', () => ({ useAuth: vi.fn() }))
+vi.mock('../../../api/userPerspective', () => ({ stopUserPerspective: vi.fn() }))
 
 beforeEach(() => { vi.clearAllMocks() })
 
@@ -49,6 +51,15 @@ describe('AuthenticationForm', () => {
         fireEvent.click(await screen.findByRole('button', { name: 'Sign in with Apple' }))
         await waitFor(() => expect(redirectToProvider).toHaveBeenCalledWith('apple', 'login', '/inbox?tenant=target'))
         expect(screen.queryByText('Sign in with Google')).not.toBeInTheDocument()
+    })
+
+    it('submits email identifiers using the provider email field', async () => {
+        authRequest.mockImplementation(async path => path === '/config' ? { status: 200 } : { status: 401 })
+        render(<AuthenticationForm onAuthenticated={vi.fn()} />)
+        fireEvent.change(await screen.findByLabelText('Username or email'), { target: { value: ' editor@example.invalid ' } })
+        fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'synthetic-test-password' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+        await waitFor(() => expect(authRequest).toHaveBeenCalledWith('/auth/login', { method: 'POST', data: { email: 'editor@example.invalid', password: 'synthetic-test-password' } }))
     })
 
     it('shows invalid-code errors without authenticating', async () => {
@@ -95,4 +106,23 @@ it('restores an expired session in place without offering provider navigation', 
     fireEvent.click(screen.getByRole('button', { name: 'Verify code' }))
     await waitFor(() => expect(login).toHaveBeenCalledTimes(1))
     expect(redirectToProvider).not.toHaveBeenCalled()
+})
+
+
+it('offers the independent administrator return action before requesting another login', async () => {
+    useAuth.mockReturnValue({ sessionExpired: true, user: { userPerspective: { username: 'reader' } } })
+    stopUserPerspective.mockResolvedValue(undefined)
+    render(<SessionExpiredOverlay />)
+    expect(screen.queryByLabelText('Password')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Return to my administrator account' }))
+    await waitFor(() => expect(stopUserPerspective).toHaveBeenCalledOnce())
+})
+
+it('shows the standalone login only when the original administrator session has ended', async () => {
+    useAuth.mockReturnValue({ sessionExpired: true, login: vi.fn(), user: { userPerspective: {} } })
+    stopUserPerspective.mockRejectedValue({ response: { status: 401 } })
+    authRequest.mockResolvedValue({ status: 401 })
+    render(<SessionExpiredOverlay />)
+    fireEvent.click(screen.getByRole('button', { name: 'Return to my administrator account' }))
+    expect(await screen.findByLabelText('Password')).toBeInTheDocument()
 })

@@ -611,6 +611,7 @@ LOGGING = {
         "level": "INFO" if DEBUG else "WARNING",
     },
     "loggers": {
+        "cms_auth.impersonation": {"handlers": _default_handlers, "level": "INFO", "propagate": False},
         "django": {
             "handlers": _default_handlers,
             "level": "INFO",
