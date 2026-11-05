@@ -126,3 +126,14 @@ it('shows the standalone login only when the original administrator session has 
     fireEvent.click(screen.getByRole('button', { name: 'Return to my administrator account' }))
     expect(await screen.findByLabelText('Password')).toBeInTheDocument()
 })
+
+
+it('keeps the return action available when the server rejects a request without ending the login', async () => {
+    useAuth.mockReturnValue({ sessionExpired: true, user: { userPerspective: {} } })
+    stopUserPerspective.mockRejectedValue({ response: { status: 403 } })
+    render(<SessionExpiredOverlay />)
+    fireEvent.click(screen.getByRole('button', { name: 'Return to my administrator account' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not return to your account.')
+    expect(screen.getByRole('button', { name: 'Return to my administrator account' })).toBeEnabled()
+    expect(screen.queryByLabelText('Password')).not.toBeInTheDocument()
+})
