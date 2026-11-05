@@ -110,6 +110,22 @@ describe('tenant inbox journey', () => {
         expect(screen.queryByRole('navigation', { name: 'Inboxnavigation' })).not.toBeInTheDocument()
     })
 
+    it('prefills an access request for administrators even without a configured support team', async () => {
+        const original = supportRequest.getMockImplementation()
+        supportRequest.mockImplementation((tenant, path, method, data) => path === 'context/'
+            ? Promise.resolve({ ...context, supportAvailable: false, accessRequestRecipients: ['user:12'], recipients: [{ id: 'user:12', name: 'Workspace owner', kind: 'user' }] })
+            : original(tenant, path, method, data))
+        renderInbox('/inbox/new?tenant=a&requestAccess=1&from=https%3A%2F%2Fcms.example.invalid%2Fpages')
+        await screen.findByRole('heading', { name: 'Begär mer åtkomst' })
+        expect(screen.getByLabelText('Titel')).toHaveValue('Begäran om mer åtkomst')
+        expect(screen.getByLabelText('Beskrivning').value).toContain('Kan en administratör')
+        expect(screen.getByRole('checkbox', { name: /Bifoga filtrerad diagnostik/ })).not.toBeChecked()
+        fireEvent.click(screen.getByRole('button', { name: 'Skicka åtkomstförfrågan' }))
+        await waitFor(() => expect(supportRequest).toHaveBeenCalledWith('a', 'threads/', 'post', expect.objectContaining({
+            title: 'Begäran om mer åtkomst', recipients: ['user:12'], location: 'https://cms.example.invalid/pages',
+        })))
+    })
+
     it('adds several message labels instead of choosing one type', async () => {
         renderInbox('/inbox/new?tenant=a')
         await screen.findByRole('heading', { name: 'Nytt meddelande' })

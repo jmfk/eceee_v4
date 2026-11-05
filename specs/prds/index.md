@@ -43,3 +43,7 @@
 | PRD-0037 | [Read-only system diagnostics](0037-read-only-system-diagnostics.md) | completed | [ADR-0052](../adrs/active/0052-read-only-system-diagnostics.md) |
 | PRD-0039 | [Kanban contrast, dragging and contextual actions](0039-kanban-interactions.md) | in-progress | ADR-0054 |
 | PRD-0040 | [Contextual Kanban card detail](0040-kanban-card-detail.md) | completed | ADR-0055 |
+
+| PRD-0042 | [Temporary user perspective](0042-temporary-user-perspective.md) | started | ADR-0058 |
+
+| PRD-0043 | [Editable temporary user perspective](0043-editable-user-perspective.md) | completed | ADR-0059 |

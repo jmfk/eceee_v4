@@ -1,6 +1,10 @@
 import React, { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { canAccessCmsPath } from '../utils/cmsNavigation';
+import AccessDenied from './AccessDenied';
+import Navbar from './Navbar';
+import StatusBar from './StatusBar';
 
 /**
  * PrivateRoute - Protects routes that require authentication
@@ -9,7 +13,7 @@ import { useAuth } from '../contexts/AuthContext';
  * the intended destination for post-login redirect.
  */
 const PrivateRoute = ({ children }) => {
-    const { isAuthenticated, isLoading, checkAuthStatus } = useAuth();
+    const { isAuthenticated, isLoading, checkAuthStatus, user } = useAuth();
     const location = useLocation();
 
     // Re-check auth status when component mounts
@@ -34,6 +38,14 @@ const PrivateRoute = ({ children }) => {
     // Redirect to login if not authenticated
     if (!isAuthenticated) {
         return <Navigate to="/login" state={{ from: location }} replace />;
+    }
+
+    if (!canAccessCmsPath(user, location.pathname)) {
+        return <div className="fixed inset-0 flex flex-col bg-gray-50">
+            <Navbar />
+            <main className="flex-1 overflow-y-auto"><AccessDenied /></main>
+            <StatusBar />
+        </div>;
     }
 
     // Render the protected component

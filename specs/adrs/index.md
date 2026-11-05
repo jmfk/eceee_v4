@@ -55,6 +55,9 @@
 | ADR-0032 | [Eval-first prompt optimization](active/0032-eval-first-prompt-optimization.md) | accepted | PRD-0022, PRD-0023, PRD-0024 |
 | ADR-0052 | [Explicit read-only system diagnostics](active/0052-read-only-system-diagnostics.md) | accepted | PRD-0037 |
 
+
+| ADR-0059 | [Editable temporary user perspective](active/0059-editable-user-perspective.md) | accepted | PRD-0043 |
+
 ## Archived Decisions
 
 | ID | Title | Status | Related PRDs |
@@ -70,3 +73,5 @@
 | ADR-0055 | [Contextual Kanban card overlay](active/0055-contextual-kanban-card-overlay.md) | accepted | PRD-0040 |
 
 | ADR-0048 | [Fast push feedback and an exact-revision full CI merge gate](archive/0048-fast-ci-and-full-merge-gate.md) | superseded | PRD-0028 |
+
+| ADR-0058 | [Server-enforced read-only user perspective](archive/0058-read-only-user-perspective.md) | superseded | PRD-0042 |

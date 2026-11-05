@@ -43,6 +43,6 @@ class PersonalTokenAuthentication(TokenAuthentication):
 class BrowserSessionAuthentication(SessionAuthentication):
     def authenticate(self, request):
         result = super().authenticate(request)
-        if result and not session_is_valid(result[0], request.session):
+        if result and not session_is_valid(getattr(request, "perspective_actor", result[0]), request.session):
             raise AuthenticationFailed("Session expired. Sign in again.")
         return result

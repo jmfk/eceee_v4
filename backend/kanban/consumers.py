@@ -11,10 +11,17 @@ from .services import can_access
 class KanbanConsumer(AsyncJsonWebsocketConsumer):
     @database_sync_to_async
     def authorized(self):
+        if self.scope.get("cms_perspective_actor_id"):
+            from cms_auth.security import websocket_session_is_valid
+
+            if not websocket_session_is_valid(self.scope.get("user"), self.scope):
+                return False
         protocols = self.scope.get("subprotocols", [])
         if len(protocols) == 2 and protocols[0] == "kanban":
             try:
                 user, tenant = resolve_ticket(protocols[1])
+                if self.scope.get("cms_perspective_actor_id") and user.pk != self.scope["user"].pk:
+                    return False
                 return str(tenant.pk) == str(self.tenant_id) and can_access(user, tenant)
             except AuthenticationFailed:
                 return False

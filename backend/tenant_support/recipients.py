@@ -57,3 +57,18 @@ def resolve(tenant, specs, actor=None):
     if not users and not boards and not support:
         raise ValidationError({"recipients": "Gruppen har inga aktiva mottagare."})
     return support, users, boards
+
+
+def access_request_recipients(tenant, actor):
+    """Use only existing, active directory recipients who can help grant access."""
+    from core.models import TenantRole
+
+    candidates = list(members(tenant).exclude(pk=actor.pk))
+    admin_ids = {user.pk for user in candidates if user.pk == tenant.created_by_id or user.is_superuser}
+    for role in TenantRole.objects.filter(tenant=tenant).prefetch_related("users"):
+        if {"roles.manage", "tenant.admin"} & set(role.permissions):
+            admin_ids.update(user.pk for user in role.users.all())
+    recipients = [f"user:{user.pk}" for user in candidates if user.pk in admin_ids]
+    if support_users(tenant):
+        recipients.append("support")
+    return recipients

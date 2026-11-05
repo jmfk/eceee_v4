@@ -32,7 +32,7 @@ from .models import (
     SupportRole,
     SupportThread,
 )
-from .recipients import directory, resolve
+from .recipients import access_request_recipients, directory, resolve
 from .serializers import (
     ArchiveInput,
     InstructionSerializer,
@@ -133,6 +133,7 @@ class ContextView(SupportView):
                 "recipient_count": members(tenant).exclude(pk=user.pk).count(),
                 "support_available": bool(support_users(tenant)),
                 "recipients": directory(tenant, user),
+                "access_request_recipients": access_request_recipients(tenant, user),
                 "message_labels": MessageLabelSerializer(
                     MessageLabel.objects.filter(tenant=tenant, active=True), many=True
                 ).data,

@@ -233,6 +233,7 @@ MIDDLEWARE = [
     "allauth.account.middleware.AccountMiddleware",
     "cms_auth.middleware.AccountSecurityMiddleware",
     "utils.middleware.dev_auth.DevAutoLoginMiddleware",  # Auto-login for development (only active when DEBUG=True)
+    "cms_auth.impersonation.UserPerspectiveMiddleware",
     "taxonomy.context.ClassificationActorMiddleware",
     "core.middleware.TenantContextMiddleware",  # Set tenant context after session/dev authentication
     "django_htmx.middleware.HtmxMiddleware",

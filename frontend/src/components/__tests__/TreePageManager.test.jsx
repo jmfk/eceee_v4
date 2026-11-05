@@ -549,6 +549,15 @@ describe('TreePageManager', () => {
         })
     })
 
+    it('explains forbidden access and links to an access request instead of retrying', async () => {
+        pagesApi.getRootPages.mockRejectedValue({ response: { status: 403 }, message: 'Request failed with status code 403' })
+        renderWithProviders(<TreePageManager />)
+        expect(await screen.findByRole('heading', { name: 'You do not have access to this view' })).toBeInTheDocument()
+        expect(screen.getByRole('link', { name: 'Request more access' })).toHaveAttribute('href', expect.stringContaining('requestAccess=1'))
+        expect(screen.queryByText('Try Again')).not.toBeInTheDocument()
+        expect(screen.queryByText('Request failed with status code 403')).not.toBeInTheDocument()
+    })
+
     it('handles error state gracefully', async () => {
         const mockError = new Error('API Error')
         pagesApi.getRootPages.mockRejectedValue(mockError)
