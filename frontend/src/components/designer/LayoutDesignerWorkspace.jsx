@@ -1,5 +1,5 @@
 import { createElement, useEffect, useMemo, useRef, useState } from 'react'
-import { Archive, ArrowDown, ArrowLeftFromLine, ArrowRightFromLine, ArrowUp, Braces, Copy, Eye, FileKey, Image as ImageIcon, KeyRound, Maximize2, Minus, Palette, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Redo2, RotateCcw, Trash2, Type, Undo2 } from 'lucide-react'
+import { Archive, ArrowDown, ArrowLeftFromLine, ArrowRightFromLine, ArrowUp, Braces, Check, Copy, Eye, FileKey, Image as ImageIcon, KeyRound, Maximize2, Minus, Palette, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Redo2, RotateCcw, Trash2, Type, Undo2 } from 'lucide-react'
 
 import RenderFrame from '../../rendering/RenderFrame'
 import { createDesignerRenderModel, createPageRenderModel, withLayoutPreviewPlaceholders } from '../../rendering/adapters'
@@ -9,12 +9,13 @@ import { buildDesignerTheme } from '../../utils/editorThemeCSS'
 import MediaSelectModal from '../media/MediaSelectModal'
 import { themeBreakpointDefinition } from '../theme/breakpointConfig'
 import { ThemeColorField, ThemeFontField, ThemeFontsEditor, ThemePaletteEditor } from './ThemeDesignTokens'
-import { inheritedLayoutStyle } from './layoutStyleInheritance'
+import { effectiveLayoutStyle, inheritedLayoutStyle } from './layoutStyleInheritance'
 import ResponsivePreviewCanvas from './ResponsivePreviewCanvas'
 import SpecialPagesEditor from './SpecialPagesEditor'
 
 const nodeTypes = ['container', 'section', 'grid', 'row', 'column', 'semantic', 'slot']
 const styleFields = ['display', 'width', 'height', 'min_width', 'max_width', 'min_height', 'grid_template_columns', 'grid_column', 'flex_direction', 'flex_wrap', 'flex_grow', 'order', 'gap', 'padding', 'margin', 'align_items', 'justify_content', 'background_color', 'background_image', 'background_position', 'background_size', 'background_repeat', 'color', 'font_family', 'border', 'border_radius']
+const defaultWidgetTypes = { header: 'easy_widgets.HeaderWidget', navbar: 'easy_widgets.NavbarWidget', hero: 'easy_widgets.HeroWidget', footer: 'easy_widgets.FooterWidget' }
 const dimensionStyleFields = ['width', 'height', 'min_width', 'max_width', 'min_height']
 const dimensionStyleDefaults = { width: 'auto', height: 'auto', min_width: 'auto', max_width: 'none', min_height: 'auto' }
 const unitlessNumberPattern = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/
@@ -130,6 +131,14 @@ const TreeNode = ({ node, selectedId, onSelect, onDragStart, onDrop, disabled = 
     </li>
 )
 
+const hasAutoTopMargin = (value) => {
+    // Parse CSS shorthand so auto margins on both edges count as centering.
+    const style = document.createElement('div').style
+    style.margin = String(value || '')
+    return style.marginTop === 'auto' && style.marginBottom !== 'auto'
+}
+const presetButtonClass = (active) => `inline-flex items-center gap-1.5 rounded border px-2 py-1.5 text-xs ${active ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`
+
 const iconButton = 'inline-flex min-h-8 min-w-8 items-center justify-center rounded text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-35'
 
 const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace, disabled, initialLayoutKey = '', initialAction = '', onInitialActionHandled }) => {
@@ -158,6 +167,7 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
     const [canvasViewportSize, setCanvasViewportSize] = useState({ width: 0, height: 0 })
     const [imagePickerOpen, setImagePickerOpen] = useState(false)
     const [previewSource, setPreviewSource] = useState('layout')
+    const [showCanvasContent, setShowCanvasContent] = useState(true)
     const [createLayoutOpen, setCreateLayoutOpen] = useState(false)
     const [newLayoutLabel, setNewLayoutLabel] = useState('')
     const [newLayoutStructure, setNewLayoutStructure] = useState('one')
@@ -173,6 +183,12 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
     const selected = selectedLayout ? findNode(selectedLayout.root, selectedNodeId) : null
     const usage = workspace.layoutUsage?.[selectedLayout?.key] || { pageCount: 0, pageIds: [], versionCount: 0, schemaCount: 0, slots: {} }
     const activeStyleBreakpoint = activeBreakpoint === 'xs' ? 'base' : activeBreakpoint
+    const effectiveStyle = (node, field) => effectiveLayoutStyle(node, field, activeBreakpoint, workspace.breakpoints)
+    const parentIsVerticalFlex = ['flex', 'inline-flex'].includes(effectiveStyle(selected?.parent, 'display'))
+        && ['column', 'column-reverse'].includes(effectiveStyle(selected?.parent, 'flex_direction'))
+    const fillsAvailableHeight = parentIsVerticalFlex && Number(effectiveStyle(selected?.node, 'flex_grow')) > 0
+    const pushedToBottom = parentIsVerticalFlex && hasAutoTopMargin(effectiveStyle(selected?.node, 'margin'))
+    const activeBreakpointLabel = activeStyleBreakpoint === 'base' ? 'Base' : themeBreakpointDefinition(activeBreakpoint)?.label || activeBreakpoint.toUpperCase()
     const nonDimensionStyleFields = styleFields.filter((field) => !dimensionStyleFields.includes(field))
     const styleFieldGroups = [
         { label: 'Dimensions', fields: dimensionStyleFields },
@@ -435,9 +451,15 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
         }
 
         const pageChildren = []
-        if (newLayoutRegions.header) pageChildren.push(addSlot('header', 'Header', 10, { max_widgets: 1, collapse_behavior: 'any', default_widgets: [{ type: 'header' }] }))
-        if (newLayoutRegions.navbar) pageChildren.push(addSlot('navbar', 'Navigation', 20, { max_widgets: 1, collapse_behavior: 'any', default_widgets: [{ type: 'navbar' }] }))
-        if (newLayoutRegions.hero) pageChildren.push(addSlot('hero', 'Hero', 30, { max_widgets: 1, collapse_behavior: 'any', default_widgets: [{ type: 'hero', config: {} }] }))
+        const headerChildren = []
+        if (newLayoutRegions.header) headerChildren.push(addSlot('header', 'Header', 10, { max_widgets: 1, collapse_behavior: 'any', default_widgets: [{ type: 'header' }] }))
+        if (newLayoutRegions.navbar) headerChildren.push(addSlot('navbar', 'Navigation', 20, { max_widgets: 1, collapse_behavior: 'any', default_widgets: [{ type: 'navbar' }] }))
+        if (headerChildren.length) pageChildren.push(layoutNode('container', 'Header wrapper', {
+            styles: { base: { width: '100%', display: 'flex', flex_direction: 'column' } },
+            children: headerChildren,
+        }))
+        const mainChildren = []
+        if (newLayoutRegions.hero) mainChildren.push(addSlot('hero', 'Hero', 30, { max_widgets: 1, collapse_behavior: 'any', default_widgets: [{ type: 'hero', config: {} }] }))
 
         const contentSlotFallback = {
             allows_inheritance: false,
@@ -445,10 +467,9 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
             disallowed_widget_types: ['easy_widgets.FooterWidget', 'easy_widgets.NavbarWidget', 'easy_widgets.HeaderWidget'],
         }
         if (newLayoutStructure === 'one') {
-            pageChildren.push(layoutNode('semantic', 'Main content', {
-                tag: 'main',
+            mainChildren.push(layoutNode('container', 'Page content', {
                 classNames: [`${key}-main`],
-                styles: { base: { width: '100%', min_height: '300px', padding: '30px 40px' } },
+                styles: { base: { width: '100%', min_height: '300px', flex_grow: '1', padding: '30px 40px' } },
                 children: [addSlot('main', 'Main content', 50, { ...contentSlotFallback, required: true })],
             }))
         } else if (newLayoutStructure === 'grid') {
@@ -458,10 +479,9 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
                 md: { grid_template_columns: 'repeat(2, minmax(0, 1fr))' },
                 xl: { grid_template_columns: 'repeat(3, minmax(0, 1fr))' },
             })
-            pageChildren.push(layoutNode('semantic', 'Main content', {
-                tag: 'main',
+            mainChildren.push(layoutNode('container', 'Page content', {
                 classNames: [`${key}-main`],
-                styles: { base: { width: '100%', min_height: '300px', padding: '30px 40px' } },
+                styles: { base: { width: '100%', min_height: '300px', flex_grow: '1', padding: '30px 40px' } },
                 children: [gridSlot],
             }))
         } else {
@@ -472,20 +492,26 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
                 classNames: [`${key}-${slotKey.replaceAll('_', '-')}`],
                 children: [addSlot(slotKey, label, 50 + columnIndex * 10, { ...contentSlotFallback, required: slotKey === 'main' })],
             }))
-            pageChildren.push(layoutNode('grid', `${columns.length}-column content`, {
+            mainChildren.push(layoutNode('grid', `${columns.length}-column content`, {
                 classNames: [`${key}-content-grid`],
                 styles: {
-                    base: { width: '100%', min_height: '300px', display: 'grid', grid_template_columns: '1fr', gap: '30px', padding: '30px 40px' },
+                    base: { width: '100%', min_height: '300px', flex_grow: '1', display: 'grid', grid_template_columns: '1fr', gap: '30px', padding: '30px 40px' },
                     lg: { grid_template_columns: `repeat(${columns.length}, minmax(0, 1fr))` },
                 },
                 children: columnNodes,
             }))
         }
 
+        pageChildren.push(layoutNode('semantic', 'Main content', {
+            tag: 'main',
+            styles: { base: { width: '100%', display: 'flex', flex_direction: 'column', flex_grow: '1', min_width: '0' } },
+            children: mainChildren,
+        }))
+
         if (newLayoutRegions.footer) {
             pageChildren.push(layoutNode('container', 'Footer wrapper', {
                 classNames: [`${key}-footer`],
-                styles: { base: { width: '100%', display: 'flex', flex_direction: 'column' } },
+                styles: { base: { width: '100%', display: 'flex', flex_direction: 'column', margin: 'auto 0 0' } },
                 children: [addSlot('footer', 'Footer', 1000, { max_widgets: 1, collapse_behavior: 'any', default_widgets: [{ type: 'footer' }] })],
             }))
         }
@@ -773,12 +799,6 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
     const layoutPreviewInput = useMemo(() => ({ theme: layoutPreviewTheme }), [layoutPreviewTheme])
     const layoutThemePreview = useBrowserRenderStyles(layoutPreviewInput)
 
-    const canvasModel = useMemo(() => {
-        if (!selectedLayout) return null
-        const slots = Object.fromEntries(Object.keys(selectedLayout.slots).map((key) => [key, []]))
-        return { layout: selectedLayout.key, layoutDefinition: selectedLayout, layoutDefinitionRequired: true, layoutBreakpoints: workspace.breakpoints, slots, context: { preview: true }, themeCss: layoutThemePreview.css, fontUrl: layoutThemePreview.fontUrl, designer: { catalog: {}, texts: {}, assets: [], guidesEnabled: false, layoutCanvas: true } }
-    }, [layoutThemePreview, selectedLayout, workspace.breakpoints])
-
     const layoutPreviewSources = useMemo(() => {
         if (!selectedLayout) return []
         const specialPages = (layouts.special_pages || [])
@@ -816,7 +836,7 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
         }
         const widgets = source?.kind === 'special'
             ? source.page.widgets || {}
-            : Object.fromEntries(Object.entries(selectedLayout.slots || {}).map(([slot, policy]) => [slot, policy.default_widgets || []]))
+            : Object.fromEntries(Object.entries(selectedLayout.slots || {}).map(([slot, policy]) => [slot, (policy.default_widgets || []).map((widget, index) => ({ ...widget, id: widget.id || `layout-default-${selectedLayout.id}-${slot}-${index}`, type: defaultWidgetTypes[widget.type] || widget.type, config: widget.config || {} }))]))
         return withLayoutPreviewPlaceholders(createPageRenderModel({
             layout: selectedLayout.key,
             layoutDefinition: selectedLayout,
@@ -828,6 +848,15 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
             fontUrl: layoutThemePreview.fontUrl,
         }), selectedLayout)
     }, [layoutPreviewSources, layoutThemePreview, previewSource, selectedLayout, workspace, workspace.breakpoints])
+
+    const canvasModel = useMemo(() => {
+        if (!previewModel) return null
+        return {
+            ...previewModel,
+            slots: showCanvasContent ? previewModel.slots : Object.fromEntries(Object.keys(selectedLayout.slots).map((key) => [key, []])),
+            designer: { ...previewModel.designer, guidesEnabled: false, layoutCanvas: true },
+        }
+    }, [previewModel, selectedLayout, showCanvasContent])
 
     const updateSlot = (updater) => updateLayout((layout) => {
         const key = selected.node.slot_key
@@ -865,9 +894,9 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
         commit(next)
     }
 
-    const fillAvailableSlotHeight = () => updateLayout((layout) => {
+    const fillAvailableHeight = () => updateLayout((layout) => {
         const current = findNode(layout.root, selectedNodeId)
-        if (!current?.parent || current.node.type !== 'slot') return layout
+        if (!current?.parent) return layout
         let root = mapNode(layout.root, current.parent.id, (parent) => ({
             ...parent,
             styles: {
@@ -877,6 +906,7 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
                     display: 'flex',
                     flex_direction: 'column',
                     flex_grow: '1',
+                    ...(parent.id === layout.root.id ? { min_height: parent.styles?.base?.min_height || '100vh' } : {}),
                 },
             },
         }))
@@ -1001,6 +1031,8 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
                         <button type="button" onClick={() => addNode('section', 'after')} disabled={disabled || !selected?.parent} className="rounded px-2 py-1 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-35">Add after</button>
                     </div>
                     <div className="flex items-center gap-2">
+                        <label className="inline-flex items-center gap-1.5 text-xs text-gray-700"><input type="checkbox" checked={showCanvasContent} onChange={(event) => setShowCanvasContent(event.target.checked)} />Show content</label>
+                        {showCanvasContent && <select aria-label="Canvas content" value={previewSource} onChange={(event) => setPreviewSource(event.target.value)} className="max-w-40 rounded border border-gray-300 px-2 py-1 text-xs">{layoutPreviewSources.map((source) => <option key={source.key} value={source.key}>{source.label}</option>)}</select>}
                         <div role="group" aria-label="Theme breakpoint" className="flex items-center rounded-md border border-gray-300 p-0.5">
                             {breakpointEntries.map(([key, minimum]) => {
                                 const definition = themeBreakpointDefinition(key)
@@ -1094,13 +1126,16 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
                         <label className="block text-xs font-medium text-gray-700">Inheritable widget types<textarea value={(selectedLayout.slots[selected.node.slot_key]?.inheritable_types || []).join('\n')} onChange={(event) => updateSlot((slot) => ({ ...slot, inheritable_types: splitList(event.target.value) }))} placeholder="One component type per line" rows="3" className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs" /></label>
                         <fieldset className="space-y-2 rounded border border-gray-200 p-2"><legend className="px-1 text-xs font-medium text-gray-700">Media target dimensions (px)</legend><p className="text-[11px] leading-4 text-gray-500">Used for responsive image sizing only. These values do not set the slot's CSS width or height.</p>{['mobile', 'tablet', 'desktop'].map((size) => <div key={size} className="grid grid-cols-[1fr_72px_72px] items-center gap-2 text-xs"><span className="capitalize text-gray-600">{size}</span>{['width', 'height'].map((dimension) => <input key={dimension} aria-label={`${size} media ${dimension} in pixels`} type="number" min="1" placeholder={dimension} value={selectedLayout.slots[selected.node.slot_key]?.dimensions?.[size]?.[dimension] ?? ''} onChange={(event) => updateSlot((slot) => { const dimensions = clone(slot.dimensions || {}); dimensions[size] = { ...(dimensions[size] || {}) }; if (event.target.value) dimensions[size][dimension] = Number(event.target.value); else delete dimensions[size][dimension]; return { ...slot, dimensions } })} className="min-w-0 rounded border border-gray-300 px-2 py-1.5 text-xs" />)}</div>)}</fieldset>
                         <details className="rounded border border-gray-200 bg-gray-50 p-2"><summary className="cursor-pointer text-xs font-medium text-gray-700">Default widgets (read-only)</summary><pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-[11px] text-gray-600">{JSON.stringify(selectedLayout.slots[selected.node.slot_key]?.default_widgets || [], null, 2)}</pre></details>
-                        <div className="rounded border border-blue-200 bg-blue-50 p-2">
-                            <p className="text-[11px] leading-4 text-blue-900">Let this content area use the remaining page height while still growing when its content needs more room.</p>
-                            <button type="button" onClick={fillAvailableSlotHeight} className="mt-2 w-full rounded border border-blue-600 bg-white px-2 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50">Fill available height</button>
-                            <p className="mt-1 text-[10px] leading-4 text-blue-800">Applies a vertical flex container to the parent and flexible, auto-height sizing to this slot at Base.</p>
-                        </div>
-                        <p className="rounded bg-blue-50 px-2 py-1.5 text-[11px] leading-4 text-blue-800">An empty auto-height slot gets a 40px selection area only in the Layout Editor. The published slot still uses its theme-defined Dimensions.</p>
+                        <p className="rounded bg-blue-50 px-2 py-1.5 text-[11px] leading-4 text-blue-800">With Show content enabled, widget content determines this slot’s height. Empty slots get a 40px selection area in the canvas only. Media target dimensions do not set layout height.</p>
                         <p className="text-xs text-gray-500">{usage.slots?.[selected.node.slot_key] || 0} versions contain widgets in this slot.</p>
+                    </div>}
+                    {selected.parent && <div className="mt-4 space-y-2">
+                        <p className="text-[11px] leading-4 text-gray-500">Sizing and alignment apply to this {selected.node.type === 'slot' ? 'slot, outside its widgets' : 'layout element'}. Widget backgrounds are assigned in the theme’s widget design groups.</p>
+                        <div className="flex flex-wrap gap-2">
+                            <button type="button" onClick={fillAvailableHeight} aria-pressed={fillsAvailableHeight} title={`${fillsAvailableHeight ? 'Active' : 'Inactive'} at ${activeBreakpointLabel}. Apply at Base.`} className={presetButtonClass(fillsAvailableHeight)}><Check aria-hidden="true" className={`h-3 w-3 ${fillsAvailableHeight ? '' : 'invisible'}`} />Fill available height</button>
+                            <button type="button" onClick={() => updateNode((node) => ({ ...node, styles: { ...node.styles, base: { ...node.styles?.base, margin: 'auto 0 0' } } }))} aria-pressed={pushedToBottom} title={`${pushedToBottom ? 'Active' : 'Inactive'} at ${activeBreakpointLabel}. Apply at Base.`} className={presetButtonClass(pushedToBottom)}><Check aria-hidden="true" className={`h-3 w-3 ${pushedToBottom ? '' : 'invisible'}`} />Push to bottom</button>
+                        </div>
+                        <p className="text-[11px] leading-4 text-gray-500">Fill makes the parent a vertical flex container and lets this element grow. Push to bottom uses free space above this element in a vertical flex parent. Both apply at Base; larger breakpoint overrides still apply.</p>
                     </div>}
                     <div className="mt-4 space-y-4">
                         {styleFieldGroups.map((group, groupIndex) => <section key={group.label} className="space-y-2">

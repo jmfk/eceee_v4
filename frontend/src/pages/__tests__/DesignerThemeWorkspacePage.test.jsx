@@ -2832,7 +2832,11 @@ describe('DesignerThemeWorkspacePage', () => {
                 source: iframe.contentWindow,
         }))
         await waitFor(() => expect(screen.getByLabelText('Example text')).toHaveValue('A revised example heading'))
-        expect(postMessage).not.toHaveBeenCalled()
+        // Late style compilation may render, but must preserve the inline edit.
+        for (const [message] of postMessage.mock.calls.filter(([message]) => message.action === 'render')) {
+            expect(message.model.designer.texts['content:0']).toBe('A revised example heading')
+        }
+        expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'updateText' }), '*')
         fireEvent.change(screen.getByLabelText('Example text'), { target: { value: 'Inspector heading' } })
         expect(postMessage).toHaveBeenCalledWith({
             source: 'eceee-render-host', action: 'updateText', targetId: 'content:0', text: 'Inspector heading',

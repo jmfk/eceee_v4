@@ -1320,6 +1320,13 @@ const SemanticThemeWorkspace = ({
         return () => { current = false }
     }, [contentMode, previewModel, selectedViewImages])
 
+    // Snapshot inline edits at send time, including during delayed style/image updates.
+    // Typing stays in the ref so it does not rebuild the preview or disturb the caret.
+    const preparePreviewModel = (model) => contentMode === 'demo' ? {
+        ...model,
+        designer: { ...model.designer, texts: { ...model.designer?.texts, ...(pendingPreviewTextsRef.current[viewId] || {}) } },
+    } : model
+
     const configuredBreakpoints = getBreakpoints(workspace)
     const previewCanvasWidth = designerPreviewWidth(viewport, configuredBreakpoints)
     const previewScale = Math.min(1, previewFrameWidth / previewCanvasWidth)
@@ -2717,6 +2724,7 @@ const SemanticThemeWorkspace = ({
                     {contentMode === 'none' || (contentMode === 'demo' && !selectedView) ? <div className="flex h-full items-center justify-center p-6 text-sm text-gray-500">There is no page or object to preview.</div> : contentMode === 'content' && !sourceContentModel ? <div className="flex h-full items-center justify-center gap-2 p-6 text-sm text-gray-500">{loadingContent && <Loader2 className="h-4 w-4 animate-spin" />}{loadingContent ? 'Loading the selected content…' : 'The selected content could not be loaded.'}</div> : <RenderFrame
                         frameRef={iframeRef}
                         model={renderPreviewModel}
+                        prepareModel={preparePreviewModel}
                         title="Live theme preview"
                         className="absolute top-0 border-0 bg-white"
                         style={{
