@@ -189,7 +189,7 @@ describe('Navbar', () => {
 
     expect(navigation).toHaveClass('nav-collapsed')
     expect(desktopMenu).not.toHaveClass('hidden')
-    expect(screen.queryByRole('link', { name: 'Pages' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Pages' })).toBeInTheDocument()
 
     resize(800)
     resize(800)
@@ -213,10 +213,44 @@ describe('Navbar', () => {
 
     resize(800)
     expect(screen.getByRole('button', { name: 'Open navigation menu' })).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByRole('link', { name: 'Pages' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Pages' })).toBeInTheDocument()
 
     unmount()
     expect(observers[0].disconnect).toHaveBeenCalledOnce()
+  })
+
+  it('keeps primary sections visible and only puts secondary sections in overflow', () => {
+    availableWidth = 800
+    renderNavbar()
+    for (const name of ['Pages', 'Publisher', 'Media', 'Tags', 'Designer', 'Profile']) {
+      expect(screen.getByRole('link', { name })).toBeInTheDocument()
+    }
+    expect(screen.queryByRole('link', { name: 'Trash' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
+    const overflow = document.getElementById('cms-mobile-navigation')
+    for (const name of ['Trash', 'Statistics', 'Settings']) {
+      expect(within(overflow).getByRole('link', { name })).toBeInTheDocument()
+    }
+    expect(within(overflow).queryByRole('link', { name: 'Pages' })).not.toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.getByRole('button', { name: 'Open navigation menu' })).toHaveFocus()
+    expect(document.getElementById('cms-mobile-navigation')).toBeNull()
+  })
+
+  it('shows only Media and Designer for Designer-only users', () => {
+    useAuth.mockReturnValue({ user: { isDesignerOnly: true, permissions: ['theme.read', 'media.read'] } })
+    renderNavbar('/media')
+    expect(screen.getByRole('link', { name: 'Media' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Designer' })).toBeInTheDocument()
+    for (const name of ['Pages', 'Publisher', 'Tags', 'Profile', 'Settings']) {
+      expect(screen.queryByRole('link', { name })).not.toBeInTheDocument()
+    }
+  })
+
+  it('does not show Designer without Designer access', () => {
+    useAuth.mockReturnValue({ user: { permissions: ['page.read', 'media.read'] } })
+    renderNavbar()
+    expect(screen.queryByRole('link', { name: 'Designer' })).not.toBeInTheDocument()
   })
 
   it('keeps the desktop menu when Safari reports a spurious pixel of scroll overflow', () => {

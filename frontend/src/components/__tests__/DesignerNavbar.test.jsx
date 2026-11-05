@@ -28,6 +28,8 @@ describe('DesignerNavbar', () => {
     it('offers CMS users a direct path back to the page overview', () => {
         render(<MemoryRouter><DesignerNavbar /></MemoryRouter>)
 
+        expect(screen.getByRole('link', { name: 'Media' })).toHaveAttribute('href', '/media')
+        expect(screen.getByRole('link', { name: 'Designer' })).toHaveAttribute('href', '/designer/themes')
         expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
         expect(screen.getByText('designer')).toBeInTheDocument()
         expect(screen.getByRole('link', { name: 'Back to CMS' })).toHaveAttribute('href', '/pages')
@@ -46,6 +48,8 @@ describe('DesignerNavbar', () => {
 
         expect(screen.queryByRole('link', { name: 'Back to CMS' })).not.toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Back to CMS' })).toBeDisabled()
+        expect(screen.queryByRole('link', { name: 'Media' })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Media' })).toBeDisabled()
         expect(screen.getByRole('button', { name: 'Back to CMS' })).toHaveAttribute(
             'title',
             'Save or discard local changes before returning to CMS',

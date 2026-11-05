@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom'
-import { ArrowLeft, LogOut, Palette } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
+import { ArrowLeft, LogOut, Palette, FolderOpen } from 'lucide-react'
 
 import { useAuth } from '../contexts/AuthContext'
 
@@ -8,6 +8,7 @@ const DesignerNavbar = ({
     cmsNavigationDisabledReason = 'Save or discard local changes before returning to CMS',
 }) => {
     const { logout, user } = useAuth()
+    const { pathname } = useLocation()
     const cmsLinkContent = <>
         <ArrowLeft className="h-4 w-4" />
         <span aria-hidden="true"><span className="hidden sm:inline">Back to </span>CMS</span>
@@ -16,10 +17,16 @@ const DesignerNavbar = ({
     return (
         <nav className="border-b border-gray-200 bg-white" aria-label="Designer navigation">
             <div className="mx-auto flex h-14 items-center justify-between px-4 sm:px-6">
-                <Link to="/designer/themes" className="inline-flex items-center gap-2 font-semibold text-gray-900">
-                    <Palette className="h-5 w-5 text-blue-600" />
-                    Designer themes
-                </Link>
+                <div className="flex h-full min-w-0 items-stretch gap-4 overflow-x-auto">
+                    {[{ name: 'Media', href: '/media', icon: FolderOpen }, { name: 'Designer', href: '/designer/themes', icon: Palette }].map((item) => {
+                        const active = pathname.startsWith(item.name === 'Designer' ? '/designer' : item.href)
+                        const classes = `inline-flex shrink-0 items-center gap-2 border-b-2 px-1 text-sm font-medium ${active ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`
+                        const content = <><item.icon className="h-4 w-4" aria-hidden="true" />{item.name}</>
+                        return cmsNavigationDisabled && item.name === 'Media'
+                            ? <button key={item.name} type="button" disabled title={cmsNavigationDisabledReason} className={`${classes} opacity-50`}>{content}</button>
+                            : <Link key={item.name} to={item.href} aria-current={active ? 'page' : undefined} className={classes}>{content}</Link>
+                    })}
+                </div>
                 <div className="flex items-center gap-3">
                     {!user?.isDesignerOnly && (cmsNavigationDisabled
                         ? <button type="button" disabled aria-label="Back to CMS" title={cmsNavigationDisabledReason} className="inline-flex min-h-9 items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-gray-400">{cmsLinkContent}</button>

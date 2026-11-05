@@ -573,7 +573,7 @@ const WidgetSlot = ({
                                         {/* Empty slot handling - only when NO inherited AND NO local widgets */}
                                         {(!Array.isArray(displayInheritedWidgets) || displayInheritedWidgets.length === 0) && displayLocalWidgets.length === 0 && (
                                             <div
-                                                className={`eceee-editor-ui empty-slot text-center py-12 text-gray-500 border-2 border-dashed ${pasteModeActive ? 'border-purple-500 bg-purple-50 cursor-pointer hover:bg-purple-100' : 'border-gray-300'} relative`}
+                                                className={`eceee-editor-ui empty-slot flex min-h-48 flex-col items-center justify-center gap-3 px-6 py-8 text-gray-500 border-2 border-dashed ${pasteModeActive ? 'border-purple-500 bg-purple-50 cursor-pointer hover:bg-purple-100' : 'border-gray-300'} relative`}
                                                 onClick={(e) => {
                                                     if (pasteModeActive && onPasteAtPosition) {
                                                         const pastePath = widgetPath.length === 0 ? [] : slotPath;
@@ -592,22 +592,20 @@ const WidgetSlot = ({
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <Layout className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                                                        <div className="text-lg font-medium text-gray-900 mb-2">{label}</div>
-                                                        <div className="text-sm">{description}</div>
+                                                        <div className="max-w-md text-sm text-gray-600">{description || `Add a widget to ${label || name}.`}</div>
 
-                                                        <div className="mt-4">
+                                                        <div>
                                                             <button
                                                                 onClick={handleAddWidget}
                                                                 data-testid={`page-editor-add-widget-${name}`}
-                                                                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                                                className="inline-flex max-w-full items-center justify-center gap-2 rounded bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
                                                             >
-                                                                <Plus className="h-4 w-4 mr-2" />
+                                                                <Plus className="h-4 w-4 shrink-0" aria-hidden="true" />
                                                                 Add Your First Widget
                                                             </button>
                                                         </div>
                                                         {finalRequired && (
-                                                            <p className="text-xs text-orange-600 mt-2">This slot is required</p>
+                                                            <p className="text-xs text-orange-600">This slot is required</p>
                                                         )}
                                                     </>
                                                 )}
