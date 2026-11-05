@@ -9,7 +9,7 @@ const framePostMessage = vi.fn()
 vi.mock('../../../rendering/RenderFrame', () => ({
     default: ({ model, onMessage, style, frameRef }) => {
         if (frameRef) frameRef.current = { contentWindow: { postMessage: framePostMessage } }
-        return <button type="button" data-layout-canvas={String(Boolean(model.designer?.layoutCanvas))} data-empty-slots={String(Object.values(model.slots).every((items) => items.length === 0))} data-frame-width={style?.width} data-root-md-height={model.layoutDefinition.root.styles?.md?.height || ''} data-root-md-background={model.layoutDefinition.root.styles?.md?.background_color || ''} data-root-md-image={model.layoutDefinition.root.styles?.md?.background_image || ''} data-font-url={model.fontUrl || ''} data-root-presentation-color={model.layoutDefinition.root.presentation_color || ''} onClick={() => onMessage?.({ data: { source: 'eceee-designer-preview', action: 'select', targetId: `layout-node:${model.layoutDefinition.root.children[0].id}` } })}>Canvas · {model.layoutDefinition.label}</button>
+        return <button type="button" data-layout-canvas={String(Boolean(model.designer?.layoutCanvas))} data-empty-slots={String(Object.values(model.slots).every((items) => items.length === 0))} data-slot-types={JSON.stringify(Object.fromEntries(Object.entries(model.slots).map(([key, widgets]) => [key, widgets.map((widget) => widget.type)])))} data-frame-width={style?.width} data-root-md-height={model.layoutDefinition.root.styles?.md?.height || ''} data-root-md-background={model.layoutDefinition.root.styles?.md?.background_color || ''} data-root-md-image={model.layoutDefinition.root.styles?.md?.background_image || ''} data-font-url={model.fontUrl || ''} data-root-presentation-color={model.layoutDefinition.root.presentation_color || ''} onClick={() => onMessage?.({ data: { source: 'eceee-designer-preview', action: 'select', targetId: `layout-node:${model.layoutDefinition.root.children[0].id}` } })}>Canvas · {model.layoutDefinition.label}</button>
     },
 }))
 vi.mock('../../media/MediaSelectModal', () => ({
@@ -78,11 +78,50 @@ describe('LayoutDesignerWorkspace', () => {
 
         expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-layout-canvas', 'true')
-        expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-empty-slots', 'true')
+        expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-empty-slots', 'false')
         fireEvent.click(screen.getByRole('button', { name: /Main layout mainLayout/ }))
         fireEvent.change(screen.getByLabelText('Layout label'), { target: { value: 'Article layout' } })
         expect(screen.getByRole('button', { name: 'Canvas · Article layout' })).toBeInTheDocument()
         expect(screen.getByText('Article layout')).toBeInTheDocument()
+    })
+
+    it('renders id-less layout defaults as real header widgets rather than placeholders', () => {
+        const source = structuredClone(document)
+        source.items[0].slots.main.default_widgets = [{ type: 'header' }]
+        render(<Harness sourceDocument={source} />)
+        expect(JSON.parse(screen.getByRole('button', { name: 'Canvas · Main layout' }).getAttribute('data-slot-types')).main).toEqual(['easy_widgets.HeaderWidget'])
+    })
+
+    it('shares the chosen content between canvas and preview and can hide it for structural editing', () => {
+        render(<Harness previewViews={[
+            { id: 'real-page', label: 'Real page', layout: 'mainLayout', content: { codeLayout: 'mainLayout', widgets: { main: [{ id: 'heading', type: 'easy_widgets.HeadlineWidget', config: { content: 'Real content' } }] } } },
+        ]} />)
+        expect(screen.getByLabelText('Show content')).toBeChecked()
+        fireEvent.change(screen.getByLabelText('Canvas content'), { target: { value: 'view:real-page' } })
+        fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+        expect(screen.getByLabelText('Content')).toHaveValue('view:real-page')
+        fireEvent.click(screen.getByRole('tab', { name: 'Visual' }))
+        fireEvent.click(screen.getByLabelText('Show content'))
+        expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-empty-slots', 'true')
+    })
+
+    it('lets a main content container grow and pushes a footer below it', () => {
+        const layoutDocument = structuredClone(document)
+        const root = layoutDocument.items[0].root
+        const slot = root.children[0]
+        root.children = [{
+            id: '9b33d852-d009-47de-859b-a68761070c91', type: 'semantic', tag: 'main', label: 'Content area', children: [slot], styles: { base: { min_height: '310px' } },
+        }, { id: '1549ac28-aa5f-48d7-9780-0e730276135e', type: 'container', label: 'Footer wrapper', children: [], styles: {} }]
+        render(<Harness sourceDocument={layoutDocument} />)
+        fireEvent.click(screen.getByRole('button', { name: 'Content area <main>' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Fill available height' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Footer wrapper' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Push to bottom' }))
+        fireEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+        const saved = JSON.parse(screen.getByLabelText('Canonical layout document').value).items[0].root
+        expect(saved.styles.base).toMatchObject({ display: 'flex', flex_direction: 'column', min_height: '100vh' })
+        expect(saved.children[0].styles.base).toMatchObject({ height: 'auto', flex_grow: '1' })
+        expect(saved.children[1].styles.base.margin).toBe('auto 0 0')
     })
 
     it('previews the current unsaved layout at responsive widths without editor guides', () => {
@@ -229,6 +268,52 @@ describe('LayoutDesignerWorkspace', () => {
         expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-root-md-height', '240px')
     })
 
+    it('shows existing inherited fill and bottom alignment settings without applying them again', () => {
+        const source = structuredClone(document)
+        source.items[0].root.styles.base = { display: 'flex', flex_direction: 'column' }
+        source.items[0].root.children[0].styles = { base: { flex_grow: '1', margin: 'auto 0 0' } }
+        render(<Harness sourceDocument={source} />)
+        fireEvent.click(screen.getByRole('button', { name: 'Slot · main' }))
+
+        expect(screen.getByRole('button', { name: 'Fill available height' })).toHaveAttribute('aria-pressed', 'true')
+        expect(screen.getByRole('button', { name: 'Push to bottom' })).toHaveAttribute('aria-pressed', 'true')
+        expect(screen.getByRole('button', { name: 'Push to bottom' })).toHaveClass('bg-blue-50')
+    })
+
+    it('updates preset status from breakpoint overrides and direct style edits', () => {
+        const source = structuredClone(document)
+        source.items[0].root.styles.base = { display: 'flex', flex_direction: 'column' }
+        source.items[0].root.children[0].styles = {
+            base: { flex_grow: '1', margin: 'auto 0 0' },
+            md: { flex_grow: '0', margin: 'auto 0' },
+        }
+        render(<Harness sourceDocument={source} />)
+        fireEvent.click(screen.getByRole('button', { name: 'Slot · main' }))
+        expect(screen.getByRole('button', { name: 'Fill available height' })).toHaveAttribute('aria-pressed', 'false')
+        expect(screen.getByRole('button', { name: 'Push to bottom' })).toHaveAttribute('aria-pressed', 'false')
+
+        fireEvent.click(screen.getByRole('button', { name: 'Base breakpoint at 0px' }))
+        expect(screen.getByRole('button', { name: 'Fill available height' })).toHaveAttribute('aria-pressed', 'true')
+        expect(screen.getByRole('button', { name: 'Push to bottom' })).toHaveAttribute('aria-pressed', 'true')
+
+        fireEvent.change(screen.getByLabelText('flex grow value'), { target: { value: '0' } })
+        fireEvent.change(screen.getByLabelText('margin value'), { target: { value: '0' } })
+        expect(screen.getByRole('button', { name: 'Fill available height' })).toHaveAttribute('aria-pressed', 'false')
+        expect(screen.getByRole('button', { name: 'Push to bottom' })).toHaveAttribute('aria-pressed', 'false')
+    })
+
+    it('does not show fill as active without a vertical flex parent', () => {
+        const source = structuredClone(document)
+        source.items[0].root.styles.base = { display: 'block' }
+        source.items[0].root.children[0].styles = { base: { flex_grow: '1', margin: 'auto 0 0' } }
+        render(<Harness sourceDocument={source} />)
+        fireEvent.click(screen.getByRole('button', { name: 'Slot · main' }))
+        expect(screen.getByRole('button', { name: 'Fill available height' })).toHaveAttribute('aria-pressed', 'false')
+        expect(screen.getByRole('button', { name: 'Push to bottom' })).toHaveAttribute('aria-pressed', 'false')
+        fireEvent.click(screen.getByRole('button', { name: 'Fill available height' }))
+        expect(screen.getByRole('button', { name: 'Fill available height' })).toHaveAttribute('aria-pressed', 'true')
+    })
+
     it('configures a slot to fill available height without fixing its content height', () => {
         render(<Harness />)
 
@@ -267,6 +352,15 @@ describe('LayoutDesignerWorkspace', () => {
         fireEvent.click(screen.getByRole('tab', { name: 'JSON' }))
         const savedDocument = JSON.parse(screen.getByLabelText('Canonical layout document').value)
         const created = savedDocument.items.find((layout) => layout.label === 'Article with sidebar')
+        const [header, main, footer] = created.root.children[0].children
+        expect(header.label).toBe('Header wrapper')
+        expect(header.children.map((node) => node.slot_key)).toEqual(['header', 'navbar'])
+        expect(main.tag).toBe('main')
+        expect(main.children[0].slot_key).toBe('hero')
+        expect(main.children[1].type).toBe('grid')
+        expect(main.styles.base.flex_grow).toBe('1')
+        expect(footer.label).toBe('Footer wrapper')
+        expect(footer.styles.base.margin).toBe('auto 0 0')
         expect(Object.keys(created.slots)).toEqual(['header', 'navbar', 'hero', 'main', 'sidebar', 'footer'])
         const nodes = []
         const collect = (node) => {
@@ -274,6 +368,7 @@ describe('LayoutDesignerWorkspace', () => {
             node.children.forEach(collect)
         }
         collect(created.root)
+        expect(nodes.find((node) => node.label === '2-column content').styles.base.flex_grow).toBe('1')
         expect(nodes.map((node) => node.label)).toEqual(expect.arrayContaining(['Viewport background', 'Page surface', '2-column content', 'Main content', 'Sidebar', 'Footer wrapper']))
         expect(nodes.every((node) => ['width', 'height', 'max_width', 'min_height'].every((field) => Object.hasOwn(node.styles.base, field)))).toBe(true)
         expect(nodes.every((node) => ['width', 'height', 'max_width', 'min_height'].every((field) => node.editable_parameters.includes(field)))).toBe(true)

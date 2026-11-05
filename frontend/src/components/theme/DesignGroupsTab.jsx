@@ -2936,6 +2936,7 @@ const DesignGroupsTab = ({
 
                     {expandedLayoutProps[originalGroupIndex] && (
                       <div className="px-4 pb-4">
+                        <p className="mb-3 text-xs text-gray-500">To assign a widget background, choose its widget type in Targeting, open its container part below, then add Background image at the desired breakpoint. Base (xs) applies to every size until overridden. Layout Editor backgrounds apply separately to the surrounding layout element or slot.</p>
                         {(() => {
                           const effectiveBreakpoints = getBreakpoints({ breakpoints });
                           const selectedWidgetTypes = group.widgetTypes || (group.widgetType ? [group.widgetType] : []);

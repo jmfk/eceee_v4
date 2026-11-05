@@ -2299,13 +2299,15 @@ class PageTheme(models.Model):
             parsed = urlparse(str(image_url))
             path = parsed.path or str(image_url)
 
-            filename = filename or posixpath.basename(path)
-            if not filename:
-                return image_url
-
-            current_theme_path = f"theme_images/{self.id}/library/{filename}"
-            if system_storage.exists(current_theme_path):
-                return system_storage.url(current_theme_path)
+            # Portable imports may retain the display filename while storing the
+            # bytes under the content-addressed filename in the URL.
+            filenames = dict.fromkeys([filename, posixpath.basename(path)])
+            for candidate in filenames:
+                if not candidate or candidate != posixpath.basename(candidate):
+                    continue
+                current_theme_path = f"theme_images/{self.id}/library/{candidate}"
+                if system_storage.exists(current_theme_path):
+                    return system_storage.url(current_theme_path)
         except Exception:
             return image_url
 

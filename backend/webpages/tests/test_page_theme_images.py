@@ -7,6 +7,25 @@ from webpages.serializers.theme import PageThemeSerializer
 
 
 class PageThemeImageResolutionTests(SimpleTestCase):
+    def test_imported_image_uses_stored_basename_when_display_filename_is_missing(self):
+        theme = PageTheme(id=3, name="Imported")
+        with patch("webpages.models.page_theme.system_storage") as storage:
+            storage.exists.side_effect = lambda path: path == "theme_images/3/library/hashed.png"
+            storage.url.return_value = "http://localhost/media/theme_images/3/library/hashed.png"
+            resolved = theme._resolve_theme_library_image_url(
+                "https://old.example/theme_images/2/library/hashed.png", "Header original.png"
+            )
+        self.assertEqual(resolved, storage.url.return_value)
+        self.assertEqual(storage.exists.call_count, 2)
+
+    def test_missing_imported_image_preserves_original_url(self):
+        theme = PageTheme(id=3, name="Imported")
+        url = "https://old.example/theme_images/2/library/hashed.png"
+        with patch("webpages.models.page_theme.system_storage") as storage:
+            storage.exists.return_value = False
+            self.assertEqual(theme._resolve_theme_library_image_url(url, "original.png"), url)
+            storage.url.assert_not_called()
+
     def test_serializer_includes_gallery_and_carousel_styles(self):
         theme = PageTheme(
             id=3,

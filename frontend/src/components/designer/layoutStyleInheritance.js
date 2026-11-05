@@ -20,3 +20,10 @@ export const inheritedLayoutStyle = (node, field, activeBreakpoint, breakpoints)
     }
     return null
 }
+
+export const effectiveLayoutStyle = (node, field, activeBreakpoint, breakpoints) => {
+    if (!node) return undefined
+    const activeKey = activeBreakpoint === 'xs' ? 'base' : activeBreakpoint
+    const value = node.styles?.[activeKey]?.[field]
+    return hasStyleValue(value) ? value : inheritedLayoutStyle(node, field, activeBreakpoint, breakpoints)?.value
+}
