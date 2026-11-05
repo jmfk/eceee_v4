@@ -211,7 +211,8 @@ class UserPerspectiveMiddleware:
             return self.get_response(request)
         record = preserve_legacy_record(request.session, record)
         if not record:
-            return self.get_response(request)
+            # This request entered as the target. Never promote it after a concurrent exit.
+            return JsonResponse({"detail": "User perspective changed. Reload before continuing."}, status=409)
         target = get_user_model().objects.filter(pk=record["user_id"]).first()
         expired = bool(
             time.time() >= record["expires_at"]
