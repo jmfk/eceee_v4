@@ -165,6 +165,32 @@ class UserPerspectiveTests(TestCase):
         self.assertEqual(self.client.session.get("selected_tenant_identifier"), "original")
         self.assertEqual(self.client.get("/protected/").json()["user"], self.admin.pk)
 
+    def test_legacy_request_cannot_be_promoted_to_admin_when_exit_wins_during_import(self):
+        from unittest.mock import patch
+
+        from .impersonation import preserve_legacy_record
+
+        session = self.client.session
+        session[SESSION_KEY] = {
+            "actor_id": self.admin.pk,
+            "user_id": self.target.pk,
+            "username": self.target.username,
+            "security_version": 0,
+            "expires_at": int(time.time()) + 1800,
+            "original_workspace": "original",
+        }
+        session.save()
+
+        def exit_before_import(request_session, record):
+            self.assertEqual(self.write(method="delete").status_code, 200)
+            return preserve_legacy_record(request_session, record)
+
+        with patch("cms_auth.impersonation.preserve_legacy_record", side_effect=exit_before_import):
+            response = self.write("/protected/")
+        self.assertEqual(
+            response.status_code, 409, "An interrupted delegated request must not continue as administrator."
+        )
+
     def test_requires_csrf_and_system_owner_browser_session(self):
         self.assertEqual(self.client.post(CONTROL_PATH, {"userId": self.target.pk}).status_code, 403)
         self.assertEqual(
