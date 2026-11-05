@@ -17,7 +17,7 @@ const navigation = [
   { name: 'Trash', href: '/trash', icon: Trash2 },
   { name: 'Statistics', href: '/statistics', icon: BarChart2 },
   { name: 'Tags', href: '/tags', icon: Hash },
-  { name: 'Designer', href: '/designer/themes', icon: Palette, Flag },
+  { name: 'Designer', href: '/designer/themes', icon: Palette },
   { name: 'Settings', href: '/settings', icon: Settings },
   { name: 'Profile', href: '/profile', icon: UserIcon },
 ]
@@ -41,8 +41,12 @@ const Navbar = () => {
     : scopedTenant ? `/inbox?tenant=${encodeURIComponent(scopedTenant)}` : '/inbox'
   const settingsHref = scopedTenant ? `/settings?tenant=${encodeURIComponent(scopedTenant)}` : '/settings'
   const supportSettingsHref = scopedTenant ? `/settings/support?tenant=${encodeURIComponent(scopedTenant)}` : '/settings/support'
-  const visibleNavigation = navigation.filter((item) =>
-    canAccessCmsPath(user, item.href) || (item.href === '/settings' && (support.data?.canSupport || support.data?.canManage)))
+  const visibleNavigation = navigation.filter((item) => user?.isDesignerOnly
+    ? ['Media', 'Designer'].includes(item.name)
+    : canAccessCmsPath(user, item.href) || (item.href === '/settings' && (support.data?.canSupport || support.data?.canManage)))
+  const primaryNames = ['Pages', 'Publisher', 'Media', 'Tags', 'Designer', 'Profile']
+  const primaryNavigation = visibleNavigation.filter((item) => primaryNames.includes(item.name))
+  const overflowNavigation = visibleNavigation.filter((item) => !primaryNames.includes(item.name))
   const navigationHref = (item) => {
     if (item.href === '/profile') return profileHref
     if (item.href === '/settings') return supportSettingsOnly ? supportSettingsHref : settingsHref
@@ -111,6 +115,8 @@ const Navbar = () => {
     return () => ro.disconnect()
   }, [])
 
+  useEffect(() => { setIsOpen(false) }, [location.pathname, location.search])
+
   // Click outside handler for mobile menu
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -120,8 +126,18 @@ const Navbar = () => {
     }
 
     if (isOpen) {
+      const handleKeyDown = (event) => {
+        if (event.key === 'Escape') {
+          setIsOpen(false)
+          navRef.current?.querySelector('[aria-controls="cms-mobile-navigation"]')?.focus()
+        }
+      }
       document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
+      document.addEventListener('keydown', handleKeyDown)
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+        document.removeEventListener('keydown', handleKeyDown)
+      }
     }
   }, [isOpen])
 
@@ -158,8 +174,22 @@ const Navbar = () => {
             {!['/profile', '/inbox', '/kanban'].some((path) => location.pathname.startsWith(path)) && <Link className="flex items-center gap-1 px-3 py-2 text-sm text-gray-600" to={`/inbox/new?from=${encodeURIComponent(safeReportLocation(window.location.href))}`}><Flag size={16} />{t('Report a problem')}</Link>}
           </div>
 
-          {/* Mobile/Collapsed menu button */}
-          <div className={`flex items-center ${isCollapsed ? 'flex' : 'hidden'}`} aria-hidden={!isCollapsed} inert={!isCollapsed}>
+          {isCollapsed && (
+            <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto" aria-label="Main sections">
+              {primaryNavigation.map((item) => (
+                <Link key={item.name} to={navigationHref(item)}
+                  state={item.name === 'Profile' ? { reportFrom: location.state?.reportFrom || safeReportLocation(window.location.href) } : undefined}
+                  onClick={() => setIsOpen(false)}
+                  className={`flex shrink-0 items-center gap-1.5 rounded px-2 py-2 text-xs font-medium focus-visible:outline-blue-600 ${isActive(item.href) ? 'text-primary-600 bg-primary-50' : 'text-gray-600 hover:bg-gray-50'}`}>
+                  <item.icon className="h-4 w-4" aria-hidden="true" />
+                  <span>{t(item.name)}{item.name === 'Profile' && inboxCount > 0 ? ` (${inboxCount})` : ''}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+          {/* Secondary destinations stay in the menu on the right. */}
+          <div className={`shrink-0 items-center ${isCollapsed ? 'flex' : 'hidden'}`} aria-hidden={!isCollapsed} inert={!isCollapsed}>
             <button
               type="button"
               onClick={() => setIsOpen(!isOpen)}
@@ -175,7 +205,6 @@ const Navbar = () => {
               )}
             </button>
           </div>
-        </div>
         {workspaces.length > 1 && (
           <button type="button" onClick={openWorkspaceDialog} aria-label={t('Switch workspace')}
             title={`${t('Current workspace')}: ${user.currentWorkspace?.name || currentWorkspace}`}
@@ -187,10 +216,10 @@ const Navbar = () => {
 
         {/* Mobile/Collapsed navigation */}
         {isOpen && isCollapsed && (
-          <div id="cms-mobile-navigation" className="py-4 border-t border-gray-200">
+          <div id="cms-mobile-navigation" className="ml-auto max-w-sm py-3 border-t border-gray-200">
             <div className="space-y-2">
               {!['/profile', '/inbox', '/kanban'].some((path) => location.pathname.startsWith(path)) && <Link className="px-3 py-2 text-sm text-gray-600" to={`/inbox/new?from=${encodeURIComponent(safeReportLocation(window.location.href))}`} onClick={() => setIsOpen(false)}>{t('Report a problem')}</Link>}
-              {visibleNavigation.map((item) => (
+              {overflowNavigation.map((item) => (
                 <Link
                   key={item.name}
                   to={navigationHref(item)}
@@ -215,7 +244,7 @@ const Navbar = () => {
       <Dialog open={workspaceDialogOpen} onClose={() => { if (!isSwitchingWorkspace) setWorkspaceDialogOpen(false) }} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <DialogPanel className="w-full max-w-sm rounded border border-gray-200 bg-white p-5 shadow-lg">
+          <DialogPanel className="h-[min(70dvh,400px)] w-full max-w-sm overflow-y-auto rounded border border-gray-200 bg-white p-5 shadow-lg">
             <DialogTitle className="text-lg font-semibold text-gray-900">{t('Switch workspace')}</DialogTitle>
             <p className="mt-1 text-xs text-gray-600">{t('Choose which workspace to use in this browser session.')}</p>
             <label htmlFor="cms-workspace-switcher" className="mt-4 block text-xs font-medium text-gray-700">{t('Current workspace')}</label>
