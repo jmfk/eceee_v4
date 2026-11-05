@@ -32,7 +32,7 @@ jobs:
       - name: Select checks for changed files
         id: select
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
         run: |
           python3 scripts/ci_policy.py select --base "$BASE_SHA" --head HEAD \
             --mode "${{ inputs.full && 'full' || 'fast' }}" --github-output "$GITHUB_OUTPUT"
@@ -251,8 +251,17 @@ jobs:
         run: npm ci
 
       - name: Run frontend unit tests
+        env:
+          BASE_SHA: ${{ needs.detect.outputs.base }}
+          FULL_CI: ${{ inputs.full }}
+        run: |
+          args=()
+          if [ "$FULL_CI" = true ]; then args+=(--full); fi
+          python3 scripts/run_frontend_ci.py --base "$BASE_SHA" "${args[@]}"
+
+      - name: Build frontend
         working-directory: frontend
-        run: npm run test:run -- --bail=1 --maxWorkers=2
+        run: npm run build
 
   frontend-admin-e2e:
     name: Frontend admin Playwright

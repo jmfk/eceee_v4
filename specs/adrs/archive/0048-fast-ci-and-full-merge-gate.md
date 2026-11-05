@@ -1,12 +1,12 @@
 ---
 id: ADR-0048
 title: Fast push feedback and an exact-revision full CI merge gate
-status: accepted
+status: superseded
 date: 2026-10-22
 related_prds:
   - PRD-0028
 supersedes: []
-superseded_by: []
+superseded_by: [ADR-0057]
 ---
 
 # ADR-0048: Fast push feedback and an exact-revision full CI merge gate

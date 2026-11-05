@@ -9,14 +9,56 @@ on:
 
 permissions:
   contents: read
+  actions: read
+  pull-requests: read
 
 concurrency:
   group: fast-ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  policy:
+    name: Plan CI
+    runs-on: ubuntu-latest
+    outputs:
+      full: ${{ steps.plan.outputs.full }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Select risk and cadence
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+        run: |
+          args=()
+          if [ "$IS_PR" = true ]; then args+=(--prospective-pr); fi
+          python3 scripts/ci_evidence.py plan --base "$BASE_SHA" --head HEAD \
+            "${args[@]}" --github-output "$GITHUB_OUTPUT"
   checks:
     name: Fast CI
+    needs: policy
+    if: needs.policy.outputs.full == 'false'
     uses: ./.github/workflows/ci-checks.yml
     with:
       full: false
+  full:
+    name: Full CI
+    needs: policy
+    if: needs.policy.outputs.full == 'true'
+    uses: ./.github/workflows/ci-checks.yml
+    with:
+      full: true
+  gate:
+    name: CI policy gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [policy, checks, full]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require the planned verification
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: python3 scripts/ci_policy.py workflow-gate

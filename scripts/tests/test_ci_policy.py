@@ -16,6 +16,22 @@ SPEC.loader.exec_module(policy)
 
 
 class CIPolicyTests(unittest.TestCase):
+    def test_stable_workflow_gate_requires_the_selected_caller(self):
+        for mode, selected, skipped in (("true", "full", "checks"), ("false", "checks", "full")):
+            needs = {
+                "policy": {"result": "success", "outputs": {"full": mode}},
+                selected: {"result": "success"},
+                skipped: {"result": "skipped"},
+            }
+            policy.verify_workflow_gate(needs)
+            for result in ("failure", "skipped", "cancelled", None):
+                with self.subTest(mode=mode, result=result), self.assertRaises(ValueError):
+                    policy.verify_workflow_gate({**needs, selected: {"result": result}})
+            with self.assertRaises(ValueError):
+                policy.verify_workflow_gate({**needs, skipped: {"result": "success"}})
+        with self.assertRaises(ValueError):
+            policy.verify_workflow_gate({"policy": {"result": "success", "outputs": {}}})
+
     def test_package_selection_and_shared_contracts(self):
         result = policy.select(["backend/core/views.py", "frontend/src/App.jsx"], "fast", "base")
         self.assertEqual([result[p] for p in ("backend", "frontend", "publisher")], ["true", "true", "false"])

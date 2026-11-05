@@ -7,6 +7,29 @@ import subprocess
 from pathlib import Path
 
 
+def high_risk(paths):
+    """Keep persisted data, authorization, shared runtime and controls conservative."""
+    for path in paths:
+        if path == "AGENTS.md":
+            return True
+        if path.startswith(("docs/", "manuals/", "specs/", "ToDo/")) or path.endswith(".md"):
+            continue
+        if path.startswith("frontend/src/"):
+            relative = path.removeprefix("frontend/src/")
+            if relative.startswith(("components/", "pages/", "locales/")) and not any(
+                word in relative.lower()
+                for word in ("auth", "login", "permission", "tenant", "session", "editor", "publish", "designer/")
+            ):
+                continue
+            return True
+        if path.startswith("frontend/public/"):
+            continue
+        # Backend changes may affect persistence/security across Django apps.
+        # Unknown paths and dependency/build/CI/deploy changes always go full.
+        return True
+    return False
+
+
 def select(paths, mode, base):
     selected = {"backend": False, "frontend": False, "publisher": False}
     for path in paths:
@@ -62,6 +85,16 @@ def verify_gate(needs, full):
         raise ValueError("A CI job failed, was cancelled, or has not completed")
 
 
+def verify_workflow_gate(needs):
+    """One stable branch-protection check for the conditional reusable callers."""
+    mode = needs.get("policy", {}).get("outputs", {}).get("full")
+    if mode not in {"true", "false"} or needs.get("policy", {}).get("result") != "success":
+        raise ValueError("CI risk/cadence plan did not succeed")
+    selected, skipped = ("full", "checks") if mode == "true" else ("checks", "full")
+    if needs.get(selected, {}).get("result") != "success" or needs.get(skipped, {}).get("result") != "skipped":
+        raise ValueError("The planned CI caller did not succeed exclusively")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -71,7 +104,15 @@ def main():
     selection.add_argument("--mode", choices=("fast", "full"), required=True)
     selection.add_argument("--github-output", type=Path)
     sub.add_parser("gate")
+    sub.add_parser("workflow-gate")
     args = parser.parse_args()
+    if args.command == "workflow-gate":
+        try:
+            verify_workflow_gate(json.loads(os.environ["NEEDS_JSON"]))
+        except (ValueError, KeyError) as error:
+            parser.exit(1, f"{error}\n")
+        print("The planned CI verification succeeded")
+        return
     if args.command == "gate":
         try:
             verify_gate(json.loads(os.environ["NEEDS_JSON"]), os.environ["FULL_CI"] == "true")

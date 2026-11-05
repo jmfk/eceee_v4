@@ -4,6 +4,7 @@
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
+| ADR-0057 | [Risk-based CI cadence and exact-commit deployment evidence](active/0057-risk-based-ci-and-deploy-evidence.md) | accepted | PRD-0041 |
 | ADR-0056 | [Uteslut legacybibliotek och rapportsidor från aktuell innehållsimport](active/0056-exclude-legacy-publications-from-editorial-import.md) | accepted | PRD-0034 |
 | ADR-0055 | [Explicit email verification before optional MFA](active/0055-explicit-email-verification-before-mfa.md) | accepted | PRD-0038 |
 | ADR-0054 | [Compatible Postmark delivery for authentication email](active/0054-postmark-authentication-email-backend.md) | accepted | PRD-0038 |
@@ -11,7 +12,6 @@
 | ADR-0051 | [Tenant recipient snapshots and stable board list roles](active/0051-workspace-messaging-and-roles.md) | accepted | PRD-0036 |
 | ADR-0050 | [Klassificeringens aktivering och medieintegritet](active/0050-classification-cutover-and-media-integrity.md) | accepted | PRD-0035, PRD-0031 |
 | ADR-0049 | [Replayable legacy media with transaction-safe placeholder repairs](active/0049-transaction-safe-legacy-media-repairs.md) | accepted | PRD-0012, PRD-0034 |
-| ADR-0048 | [Fast push feedback and an exact-revision full CI merge gate](active/0048-fast-ci-and-full-merge-gate.md) | accepted | PRD-0028 |
 | ADR-0047 | [Portable editorial definitions and checkpointed draft imports](active/0047-portable-editorial-definitions-and-draft-import.md) | accepted | PRD-0034, PRD-0031 |
 | ADR-0046 | [Gemensam Artikel och avgränsad legacyimport](active/0046-unified-articles-and-bounded-legacy-import.md) | accepted | PRD-0034, PRD-0012, PRD-0031 |
 | ADR-0043 | [Classification governance and staged cutover](active/0043-classification-governance.md) | accepted | PRD-0031 |
@@ -68,3 +68,5 @@
 
 | ADR-0054 | [Kanban card presentation and mirrors](active/0054-kanban-card-presentation.md) | accepted | PRD-0039 |
 | ADR-0055 | [Contextual Kanban card overlay](active/0055-contextual-kanban-card-overlay.md) | accepted | PRD-0040 |
+
+| ADR-0048 | [Fast push feedback and an exact-revision full CI merge gate](archive/0048-fast-ci-and-full-merge-gate.md) | superseded | PRD-0028 |
