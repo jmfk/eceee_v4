@@ -570,7 +570,7 @@ const CreateTagModal = ({ tag, namespace, onClose, onSuccess }) => {
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="h-[min(75dvh,600px)] w-full max-w-md overflow-y-auto rounded-lg bg-white shadow-xl mx-4">
                 <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                     <div className="text-xl font-semibold" role="heading" aria-level="2">
                         {tag ? 'Edit Tag' : 'Create Tag'}
@@ -714,7 +714,7 @@ const MergeTagsModal = ({ selectedTagIds, tags, onClose, onSuccess }) => {
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4">
+            <div className="h-[min(75dvh,600px)] w-full max-w-lg overflow-y-auto rounded-lg bg-white shadow-xl mx-4">
                 <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <GitMerge className="w-5 h-5 text-blue-600" />

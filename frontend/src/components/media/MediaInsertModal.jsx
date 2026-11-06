@@ -365,7 +365,7 @@ const MediaInsertModal = ({
 
     return (
         <div className="fixed inset-0 z-[10010] flex items-center justify-center bg-black/50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+            <div className="flex h-[min(90dvh,900px)] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
                     <div className="flex items-center gap-3">
@@ -579,7 +579,7 @@ const MediaInsertModal = ({
                                         onChange={(e) => handleConfigChange('galleryStyle', e.target.value || null)}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     >
-                                        <option value="">Default (fit, quality 85, webp)</option>
+                                        <option value="">Default (no upscaling, quality 85, webp)</option>
                                         {availableImageStyles.map(style => (
                                             <option key={style.value} value={style.value}>
                                                 {style.label}

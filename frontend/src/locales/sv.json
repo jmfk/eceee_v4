@@ -950,7 +950,7 @@
   "Decrease max colors": "Minska maxfärger",
   "Default": "försummelse",
   "Default (No component styles available in theme)": "Standard (Inga komponenter i teman har tillgängliga stilar)",
-  "Default (fit, quality 85, webp)": "Standard (passform, kvalitet 85, webp)",
+  "Default (no upscaling, quality 85, webp)": "Standard (ingen förstoring, kvalitet 85, webp)",
   "Default Configuration": "Standardkonfiguration",
   "Default Only": "Endast standard",
   "Default Theme": "Standardtema",

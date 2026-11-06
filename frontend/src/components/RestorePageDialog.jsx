@@ -89,7 +89,7 @@ export default function RestorePageDialog({ page, onConfirm, onCancel }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+            <div className="flex h-[min(85dvh,760px)] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
                     <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">Restore Page</div>
@@ -102,7 +102,7 @@ export default function RestorePageDialog({ page, onConfirm, onCancel }) {
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6">
+                <div className="min-h-0 flex-1 overflow-y-auto p-6">
                     {/* Page Info */}
                     <div className="mb-6">
                         <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">

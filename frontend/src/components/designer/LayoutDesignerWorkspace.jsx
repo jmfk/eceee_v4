@@ -1204,7 +1204,7 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
             </aside>
         </div>}
         {createLayoutOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCreateLayoutOpen(false) }}>
-            <section role="dialog" aria-modal="true" aria-labelledby="create-layout-title" onKeyDown={(event) => { if (event.key === 'Escape') setCreateLayoutOpen(false) }} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl">
+            <section role="dialog" aria-modal="true" aria-labelledby="create-layout-title" onKeyDown={(event) => { if (event.key === 'Escape') setCreateLayoutOpen(false) }} className="h-[min(85dvh,760px)] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl">
                 <div className="border-b border-gray-200 px-5 py-4">
                     <h2 id="create-layout-title" className="text-base font-semibold text-gray-900">Create layout</h2>
                     <p className="mt-1 text-sm text-gray-600">Start with a usable theme layout. Every element gets explicit CSS dimensions that you can change in the inspector.</p>

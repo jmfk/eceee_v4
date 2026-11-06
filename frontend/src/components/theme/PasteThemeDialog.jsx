@@ -82,7 +82,7 @@ const PasteThemeDialog = ({ isOpen, onClose, onConfirm, targetTheme, isPasting =
 
     return (
         <div className="fixed inset-0 z-[10010] flex items-center justify-center bg-black bg-opacity-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="mx-4 h-[min(85dvh,760px)] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
                     <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="2">Paste Theme Data</div>
                     <button

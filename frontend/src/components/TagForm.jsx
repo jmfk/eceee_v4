@@ -89,7 +89,7 @@ const TagForm = ({ tag = null, onSave, onCancel, isLoading = false }) => {
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="h-[min(75dvh,600px)] w-full max-w-md overflow-y-auto rounded-lg bg-white shadow-xl">
                 <div className="flex items-center justify-between p-6 border-b">
                     <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">
                         {tag ? 'Edit Tag' : 'Create New Tag'}

@@ -123,7 +123,7 @@ const RemoteObjectImport = ({ onClose, onCompleted }) => {
 
     return (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-10" role="dialog" aria-modal="true" aria-labelledby="remote-object-title">
-            <div className="w-full max-w-3xl rounded-lg bg-white p-6 shadow-xl">
+            <div className="h-[min(85dvh,760px)] w-full max-w-3xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
                 <div className="flex items-start justify-between gap-4">
                     <div><h2 id="remote-object-title" className="text-xl font-semibold text-gray-900">Import remote objects</h2><p className="mt-1 text-sm text-gray-600">Limit the candidate list, then choose the root objects to import.</p></div>
                     <button type="button" onClick={onClose} aria-label="Close remote object import" className="rounded-md p-2 text-gray-500 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><X className="h-5 w-5" /></button>

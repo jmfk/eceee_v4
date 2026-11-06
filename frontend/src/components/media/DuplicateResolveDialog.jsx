@@ -39,7 +39,7 @@ const DuplicateResolveDialog = ({ duplicates, onResolve, onCancel }) => {
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] flex flex-col">
+            <div className="flex h-[min(85dvh,760px)] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
                     <div className="flex items-center">
@@ -57,7 +57,7 @@ const DuplicateResolveDialog = ({ duplicates, onResolve, onCancel }) => {
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6">
+                <div className="min-h-0 flex-1 overflow-y-auto p-6">
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                         <div className="flex items-start">
                             <Copy className="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />

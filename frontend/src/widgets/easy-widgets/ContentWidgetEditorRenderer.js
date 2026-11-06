@@ -457,9 +457,13 @@ const injectMediaInsertStyles = () => {
         
         /* Media Insert Images */
         .media-insert img {
-            width: 100%;
+            width: auto;
+            max-width: 100%;
             height: auto;
             display: block;
+        }
+        .media-gallery-item img {
+            width: 100%;
         }
         
         /* Media Caption */

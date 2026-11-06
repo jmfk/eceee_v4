@@ -122,7 +122,7 @@ const TreeImporterModal = ({ isOpen, onClose, parentPage = null, onSuccess }) =>
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="h-[min(85dvh,760px)] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
                     <div className="flex items-center space-x-2">

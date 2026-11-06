@@ -3404,7 +3404,7 @@ const DesignGroupsTab = ({
       {/* Import Modal */}
       {importModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="flex h-[min(85dvh,760px)] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-gray-200">
               <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">

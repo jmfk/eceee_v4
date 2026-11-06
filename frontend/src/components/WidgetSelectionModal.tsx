@@ -160,9 +160,9 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10010]">
             <div
                 ref={modalRef}
-                className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden"
+                className="mx-4 flex h-[min(85dvh,760px)] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-xl"
             >
-                <div className="p-6">
+                <div className="flex min-h-0 flex-1 flex-col p-6">
                     {/* Header */}
                     <div className="flex items-center justify-between mb-4">
                         <div>
@@ -209,7 +209,7 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
                     )}
 
                     {/* Widget Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+                    <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto md:grid-cols-2">
                         {isFilteringTypes ? (
                             <div className="col-span-full flex items-center justify-center py-12">
                                 <div className="text-center">

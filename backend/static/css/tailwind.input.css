@@ -30,19 +30,22 @@
 /* WYSIWYG Image Width Classes */
 .media-insert img.img-width-full,
 .media-insert .img-width-full {
-    width: 100%;
+    width: auto;
+    max-width: 100%;
     height: auto;
 }
 
 .media-insert img.img-width-half,
 .media-insert .img-width-half {
-    width: 50%;
+    width: auto;
+    max-width: 50%;
     height: auto;
 }
 
 .media-insert img.img-width-third,
 .media-insert .img-width-third {
-    width: 33.33%;
+    width: auto;
+    max-width: 33.33%;
     height: auto;
 }
 

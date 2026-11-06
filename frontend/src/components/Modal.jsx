@@ -66,11 +66,7 @@ const Modal = ({
                     relative bg-white rounded-lg shadow-xl transform transition-all flex flex-col
                     w-full ${getSizeClasses()}
                 `}
-                style={isCompact ? {} : {
-                    height: '85vh',
-                    maxHeight: '800px',
-                    minHeight: '500px'
-                }}>
+                style={{ height: isCompact ? 'min(70dvh, 400px)' : 'min(85dvh, 800px)' }}>
                     {/* Header */}
                     <div className={`flex items-center justify-between border-b border-gray-200 flex-shrink-0 ${isCompact ? 'px-4 py-3' : 'p-6'}`}>
                         <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">
@@ -87,8 +83,8 @@ const Modal = ({
                         )}
                     </div>
 
-                    {/* Content - scrollable for large modals, auto for compact */}
-                    <div className={isCompact ? 'px-4 py-3' : 'p-6 flex-1 overflow-y-auto'}>
+                    {/* Content scrolls while the dialog frame stays stable. */}
+                    <div className={`min-h-0 flex-1 overflow-y-auto ${isCompact ? 'px-4 py-3' : 'p-6'}`}>
                         {children}
                     </div>
                 </div>

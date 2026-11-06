@@ -493,7 +493,7 @@ const NamespaceForm = ({ namespace = null, onSave, onCancel, isLoading = false }
 
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-600/10 px-4" role="dialog" aria-modal="true" aria-labelledby="namespace-form-title">
-            <div className="relative top-20 mx-auto w-full max-w-md rounded-md border bg-white p-5 shadow-lg">
+            <div className="relative top-20 mx-auto h-[min(75dvh,600px)] w-full max-w-md overflow-y-auto rounded-md border bg-white p-5 shadow-lg">
                 <div className="flex items-center justify-between mb-4">
                     <div id="namespace-form-title" className="text-lg font-medium text-gray-900" role="heading" aria-level="3">
                         {namespace ? 'Edit Namespace' : 'Create Namespace'}
@@ -639,7 +639,7 @@ const ContentSummaryModal = ({ data, onClose }) => {
 
     return (
         <div className="fixed inset-0 bg-gray-600/10 overflow-y-auto h-full w-full z-50">
-            <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="relative top-20 mx-auto h-[min(75dvh,600px)] w-96 overflow-y-auto rounded-md border bg-white p-5 shadow-lg">
                 <div className="flex items-center justify-between mb-4">
                     <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">
                         Content Summary: {namespace.name}
