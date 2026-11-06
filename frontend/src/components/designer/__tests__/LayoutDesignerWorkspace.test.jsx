@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import LayoutDesignerWorkspace from '../LayoutDesignerWorkspace'
@@ -73,6 +74,21 @@ const Harness = ({ disabled = false, sourceDocument = document, viewport = 'md',
 }
 
 describe('LayoutDesignerWorkspace', () => {
+    it('updates slot widget policies through searchable multi-selects without changing other metadata', async () => {
+        const user = userEvent.setup()
+        render(<Harness />)
+        await user.click(screen.getByRole('button', { name: 'Slot · main' }))
+        const allowed = screen.getByRole('combobox', { name: 'Allowed widget types' })
+        await user.click(allowed)
+        await user.type(allowed, 'news flash')
+        await user.click(screen.getByRole('option', { name: /News Flash/ }))
+        await user.keyboard('{Escape}')
+        expect(screen.getByRole('combobox', { name: 'Disallowed widget types' })).toBeDisabled()
+        await user.click(screen.getByRole('tab', { name: 'JSON' }))
+        const saved = JSON.parse(screen.getByLabelText('Canonical layout document').value)
+        expect(saved.items[0].slots.main).toMatchObject({ label: 'Main', max_widgets: null, allowed_widget_types: ['easy_widgets.NewsFlashWidget'] })
+    })
+
     it('keeps the tree, canvas, and inspector on the same layout document', () => {
         render(<Harness />)
 
