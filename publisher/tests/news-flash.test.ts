@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { newsFlashItems } from '../src/news-flash';
+import { newsFlashItems, newsFlashPage } from '../src/news-flash';
 import type { PageReader, PublishedObject } from '../src/model';
 
 const at = new Date('2026-11-06T12:00:00Z');
@@ -40,7 +40,7 @@ describe('News Flash published selection', () => {
       return all.filter(item => !q.excludeObjectIds?.includes(item.id)).slice(q.offset || 0, (q.offset || 0) + q.limit);
     }) } as unknown as PageReader;
     const pages = [];
-    for (const offset of [0, 12, 24]) pages.push(...await newsFlashItems(db, query, 'tenant-7', at, { offset, limit: 12 }));
+    for (const offset of [0, 12, 24]) pages.push(...await newsFlashItems(db, query, 'tenant-7', at, { offset, limit: 12, priorityId: offset ? '5' : undefined }));
     expect(pages[0]).toEqual(priority);
     expect(pages).toHaveLength(30);
     expect(new Set(pages.map(item => item.id)).size).toBe(30);
@@ -48,10 +48,24 @@ describe('News Flash published selection', () => {
 
   it('excludes the promoted story before applying the offset on subsequent batches', async () => {
     const db = reader(story('99', { newsPriority: true }));
-    await newsFlashItems(db, query, 'tenant-7', at, { offset: 12, limit: 12 });
+    await newsFlashItems(db, query, 'tenant-7', at, { offset: 12, limit: 12, priorityId: '99' });
     expect(db.publishedObjects).toHaveBeenLastCalledWith(expect.objectContaining({
       excludeObjectIds: ['99'], offset: 11, limit: 12,
     }), 'tenant-7', at);
+  });
+
+  it('does not skip a regular story if priority expires between pages', async () => {
+    const all = Array.from({ length: 24 }, (_, index) => story(String(24 - index)));
+    const priority = story('99', { newsPriority: true, newsPriorityUntil: '2026-11-06T12:00:01Z' });
+    const db = { publishedObjects: vi.fn(async (q: { newsPriorityOnly?: boolean; excludeObjectIds?: string[]; offset?: number; limit: number }) => {
+      if (q.newsPriorityOnly) return [priority];
+      return all.filter(item => !q.excludeObjectIds?.includes(item.id)).slice(q.offset || 0, (q.offset || 0) + q.limit);
+    }) } as unknown as PageReader;
+    const first = await newsFlashPage(db, query, 'tenant-7', at, { limit: 12 });
+    const next = await newsFlashPage(db, query, 'tenant-7', new Date('2026-11-06T12:00:02Z'), { limit: 12, offset: 12, priorityId: first.priorityId });
+    expect(first.items.map(item => item.id)).toEqual(['99', ...all.slice(0, 11).map(item => item.id)]);
+    expect(next.items.map(item => item.id)).toEqual(all.slice(11, 23).map(item => item.id));
+    expect(db.publishedObjects).toHaveBeenCalledTimes(3);
   });
 
   it('honors an expiry with an explicit timezone', async () => {

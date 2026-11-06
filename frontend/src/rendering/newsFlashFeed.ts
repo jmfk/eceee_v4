@@ -22,14 +22,14 @@ export const useNewsFlashFeed = (widget: RenderWidgetModel, context: RenderConte
     const source = newsFlashFeedUrl(widget, context)
     const initial = Array.isArray(widget.data?.items) ? widget.data.items : []
     const [state, setState] = useState({ items: initial, visible: Math.min(total, NEWS_FLASH_BATCH),
-        offset: initial.length, busy: false, error: widget.data?.status === 'error',
+        offset: initial.length, priorityId: widget.data?.priorityId as string | null | undefined, busy: false, error: widget.data?.status === 'error',
         exhausted: widget.data?.status === 'empty' || (widget.data?.status === 'ready' && initial.length < Math.min(total, NEWS_FLASH_BATCH)) })
     const generation = useRef(0)
     const busy = useRef(false)
     useEffect(() => {
         generation.current++
         busy.current = false
-        setState({ items: initial, visible: Math.min(total, NEWS_FLASH_BATCH), offset: initial.length,
+        setState({ items: initial, visible: Math.min(total, NEWS_FLASH_BATCH), offset: initial.length, priorityId: widget.data?.priorityId as string | null | undefined,
             busy: false, error: widget.data?.status === 'error',
             exhausted: widget.data?.status === 'empty' || (widget.data?.status === 'ready' && initial.length < Math.min(total, NEWS_FLASH_BATCH)) })
         return () => { generation.current++ }
@@ -49,6 +49,7 @@ export const useNewsFlashFeed = (widget: RenderWidgetModel, context: RenderConte
             const url = new URL(source, window.location.origin)
             url.searchParams.set('limit', String(limit))
             url.searchParams.set('offset', String(state.offset))
+            if (state.offset > 0) url.searchParams.set('priorityId', state.priorityId ?? 'none')
             const response = await fetch(url.toString(), { credentials: 'omit' })
             if (!response.ok) throw new Error('News unavailable')
             const result = await response.json()
@@ -57,14 +58,14 @@ export const useNewsFlashFeed = (widget: RenderWidgetModel, context: RenderConte
             setState(previous => {
                 const ids = new Set(previous.items.map((item: any) => String(item.id)))
                 return { ...previous, items: [...previous.items, ...result.items.filter((item: any) => !ids.has(String(item.id)))],
-                    offset: previous.offset + result.items.length, exhausted: result.items.length < limit, busy: false, error: false }
+                    priorityId: result.priorityId ?? null, offset: previous.offset + result.items.length, exhausted: result.items.length < limit, busy: false, error: false }
             })
         } catch {
             if (requestGeneration === generation.current) setState(previous => ({ ...previous, busy: false, error: true }))
         } finally {
             if (requestGeneration === generation.current) busy.current = false
         }
-    }, [source, state.offset, state.exhausted, total])
+    }, [source, state.offset, state.priorityId, state.exhausted, total])
     const reveal = useCallback(() => {
         setState(previous => ({ ...previous, visible: Math.min(total, previous.visible + NEWS_FLASH_BATCH) }))
     }, [total])

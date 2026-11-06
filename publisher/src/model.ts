@@ -1,4 +1,4 @@
-import { newsFlashItems } from './news-flash';
+import { newsFlashPage } from './news-flash';
 import { newsFlashLayout, NEWS_FLASH_BATCH } from '../../frontend/src/rendering/newsFlashLayout';
 import { compilePublisherStyles, defaultSpecialPages, widgetVariantClasses } from './theme';
 import { responsiveImageSources, type ResponsiveImageOptions } from './imgproxy';
@@ -759,16 +759,19 @@ async function resolvePublishedData(
     const prepared = config === widget.config ? widget : { ...widget, config };
     let items: PublishedObject[] | null = null;
     let item: PublishedObject | undefined;
+    let newsFlashPriorityId: DbId | null = null;
     if (widget.type === 'easy_widgets.NewsFlashWidget') {
       try {
         const types = stringList(config.objectTypes ?? config.object_types ?? ['article']);
         const total = newsFlashLayout(config).total;
-        items = total ? await newsFlashItems(reader, {
+        const page = total ? await newsFlashPage(reader, {
           objectTypeIds: types.filter(type => /^\d+$/.test(type)),
           objectTypeNames: types.filter(type => !/^\d+$/.test(type)),
           classificationIds: stringList(config.classificationIds ?? config.classification_ids),
           includeDescendants: (config.includeDescendants ?? config.include_descendants) !== false,
-        }, tenantId, at, { limit: Math.min(NEWS_FLASH_BATCH, total) }) : [];
+        }, tenantId, at, { limit: Math.min(NEWS_FLASH_BATCH, total) }) : { items: [], priorityId: null };
+        items = page.items;
+        newsFlashPriorityId = page.priorityId;
       } catch {
         // A failed optional feed must preserve the page and its card positions.
         return { ...prepared, data: { status: 'error', items: [] } };
@@ -862,7 +865,7 @@ async function resolvePublishedData(
       const configuredBase = String(config.newsPagePath ?? config.news_page_path ?? '/news/');
       const newsBase = configuredBase.startsWith('/') && !configuredBase.startsWith('//')
         ? configuredBase.split(/[?#]/)[0].replace(/\/$/, '') : '/news';
-      return { ...prepared, data: { status: items.length ? 'ready' : 'empty', items: items.map(value => ({
+      return { ...prepared, data: { ...(widget.type === 'easy_widgets.NewsFlashWidget' ? { priorityId: newsFlashPriorityId } : {}), status: items.length ? 'ready' : 'empty', items: items.map(value => ({
         ...value,
         path: usesObjectTypePath
           ? `${newsBase}/${encodeURIComponent(value.slug)}/`

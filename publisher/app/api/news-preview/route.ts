@@ -1,5 +1,5 @@
 import { database } from '@/src/db';
-import { newsFlashItems } from '../../../src/news-flash';
+import { newsFlashPage } from '../../../src/news-flash';
 import { contentHostname } from '../../../src/hostname';
 
 export const runtime = 'nodejs';
@@ -20,16 +20,19 @@ export async function GET(request: Request) {
   const classifications = params.getAll('classificationId');
   const limit = Number(params.get('limit'));
   const offset = Number(params.get('offset') || 0);
+  const flash = params.get('newsFlash') === 'true';
+  const priorityId = params.get('priorityId');
   if (!validId(siteId) || !types.length || types.length > 20 || types.some(type => !validType(type))
       || classifications.length > 20 || classifications.some(id => !validClassification(id))
       || !Number.isSafeInteger(offset) || offset < 0
+      || (flash && offset > 0 && (priorityId === null || (priorityId !== 'none' && !validId(priorityId))))
       || !Number.isInteger(limit) || limit < 1 || limit > 50) {
     return Response.json({ error: 'Invalid news query.' }, { status: 400, headers: responseHeaders });
   }
 
   const hostname = contentHostname(request.headers.get('host') || '');
   try {
-    const items = await database.withSnapshot(async reader => {
+    const page = await database.withSnapshot(async reader => {
       const root = await reader.root(hostname);
       if (!root || root.id !== siteId) return null;
       const at = new Date();
@@ -44,12 +47,12 @@ export async function GET(request: Request) {
         limit,
         sortOrder: '-publish_date',
       };
-      return params.get('newsFlash') === 'true'
-        ? newsFlashItems(reader, query, root.tenant_id, at, { limit, offset })
-        : reader.publishedObjects(query, root.tenant_id, at);
+      return flash
+        ? newsFlashPage(reader, query, root.tenant_id, at, { limit, offset, priorityId: priorityId === 'none' ? null : priorityId })
+        : { items: await reader.publishedObjects(query, root.tenant_id, at) };
     });
-    if (!items) return Response.json({ error: 'Site not found.' }, { status: 404, headers: responseHeaders });
-    return Response.json({ items: items.map(({ id, slug, title, objectType, data, publishDate, isFeatured }) => ({
+    if (!page) return Response.json({ error: 'Site not found.' }, { status: 404, headers: responseHeaders });
+    return Response.json({ ...(flash ? { priorityId: 'priorityId' in page ? page.priorityId : null } : {}), items: page.items.map(({ id, slug, title, objectType, data, publishDate, isFeatured }) => ({
       id, slug, title, objectType, data, publishDate, isFeatured,
     })) }, { headers: responseHeaders });
   } catch (error) {

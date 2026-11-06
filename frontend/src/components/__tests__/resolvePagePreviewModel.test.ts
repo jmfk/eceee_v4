@@ -32,7 +32,7 @@ describe('page preview model resolution', () => {
     })
 
     it('requests exactly three News Flash stories using the shared priority endpoint', async () => {
-        const fetchNews = vi.fn(async () => ({ ok: true, json: async () => ({ items: [{ id: 1, slug: 'priority', data: { newsPriority: true } }] }) }))
+        const fetchNews = vi.fn(async () => ({ ok: true, json: async () => ({ priorityId: '1', items: [{ id: 1, slug: 'priority', data: { newsPriority: true } }] }) }))
         vi.stubGlobal('fetch', fetchNews)
         const model = createPageRenderModel({ widgets: { main: [
             { id: 'flash', type: 'easy_widgets.NewsFlashWidget', config: { limit: 50 } },
@@ -43,6 +43,7 @@ describe('page preview model resolution', () => {
         expect(params.get('limit')).toBe('3')
         expect(params.getAll('type')).toEqual(['article'])
         expect(resolved.slots.main[0].data?.items).toHaveLength(1)
+        expect(resolved.slots.main[0].data?.priorityId).toBe('1')
     })
 
     it('requests featured blocks and latest news with distinct selection rules', async () => {

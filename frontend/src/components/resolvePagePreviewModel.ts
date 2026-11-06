@@ -133,11 +133,11 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
         return [widget, ...collectWidgets(nested)]
     })
     let allWidgets = collectWidgets(Object.values(next.slots).flat())
-    const newsRequests = new Map<string, Promise<any[]>>()
+    const newsRequests = new Map<string, Promise<{ items: any[]; priorityId?: string | null }>>()
     const previewNews = (widget: RenderWidgetModel) => {
         const configured = widget.config.objectTypes ?? widget.config.object_types ?? [widget.type === 'easy_widgets.NewsFlashWidget' ? 'article' : 'news']
         const types = Array.isArray(configured) ? configured.map(String) : []
-        if (!types.length || (widget.type === 'easy_widgets.NewsFlashWidget' && !newsFlashLayout(widget.config).total)) return Promise.resolve([])
+        if (!types.length || (widget.type === 'easy_widgets.NewsFlashWidget' && !newsFlashLayout(widget.config).total)) return Promise.resolve({ items: [] })
         const params = new URLSearchParams()
         params.set('siteId', String(next.context.siteId || ''))
         types.forEach(type => params.append('type', type))
@@ -154,7 +154,8 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
         if (!newsRequests.has(url)) newsRequests.set(url, fetch(url, { credentials: 'omit' }).then(async response => {
             if (!response.ok) throw new Error(`News preview failed (${response.status}).`)
             const result = await response.json()
-            return Array.isArray(result.items) ? result.items : []
+            return { items: Array.isArray(result.items) ? result.items : [],
+                ...(widget.type === 'easy_widgets.NewsFlashWidget' ? { priorityId: result.priorityId ?? null } : {}), }
         }))
         return newsRequests.get(url)!
     }
@@ -263,8 +264,9 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
         const objectTypes = widget.config.objectTypes || widget.config.object_types || []
         if (widget.type === 'easy_widgets.NewsFlashWidget' || widget.type === 'easy_widgets.TopNewsPlugWidget' || widget.type === 'easy_widgets.SidebarTopNewsWidget') {
             try {
-                const items = await previewNews(widget)
-                widget.data = { ...widget.data, status: items.length ? 'ready' : 'empty', items }
+                const result = await previewNews(widget)
+                const items = result.items
+                widget.data = { ...widget.data, ...result, status: items.length ? 'ready' : 'empty', items }
             } catch (error: any) {
                 widget.data = { ...widget.data, status: 'error', error: error?.message || 'Failed to load preview data.', items: [] }
             }

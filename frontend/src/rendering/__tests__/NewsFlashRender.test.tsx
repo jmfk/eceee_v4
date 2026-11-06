@@ -73,6 +73,20 @@ describe('News Flash presentation', () => {
         expect(fetchNews.mock.calls.map(([url]) => new URL(url).searchParams.get('offset'))).toEqual(['12', '12'])
         await waitFor(() => expect(screen.queryByRole('button')).not.toBeInTheDocument())
     })
+    it('preserves the initial priority decision through every continuation request', async () => {
+        const fetchNews = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ priorityId: '99', items: stories(12, 12) }) })
+            .mockResolvedValueOnce({ ok: true, json: async () => ({ priorityId: '99', items: stories(24, 2) }) })
+        vi.stubGlobal('fetch', fetchNews)
+        render(<NewsFlashRender widget={{ ...fixture, config: { fullWidthCount: 1, halfWidthCount: 25 },
+            data: { status: 'ready', priorityId: '99', items: [{ id: 99, title: 'Priority', slug: 'priority' }, ...stories(1, 11)] } }} context={{ ...context, siteId: 85 }} />)
+        fireEvent.click(screen.getByRole('button', { name: 'Load more news' }))
+        await screen.findByText('Story 23')
+        fireEvent.click(screen.getByRole('button', { name: 'Load more news' }))
+        await screen.findByText('Story 25')
+        expect(fetchNews.mock.calls.map(([url]) => new URL(url).searchParams.get('priorityId'))).toEqual(['99', '99'])
+        expect(screen.getAllByRole('article')).toHaveLength(26)
+    })
+
     it('automatically loads the next bounded page when the sentinel enters the viewport', async () => {
         let observeCallback: IntersectionObserverCallback
         vi.stubGlobal('IntersectionObserver', class {

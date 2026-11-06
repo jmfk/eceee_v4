@@ -55,6 +55,17 @@ describe('public news preview route', () => {
       expect.objectContaining({ newsPriorityOnly: true, limit: 1 }), 'tenant-a', expect.any(Date));
   });
 
+  it('requires and preserves the initial priority decision on continuation requests', async () => {
+    expect((await GET(request('siteId=85&type=article&newsFlash=true&limit=12&offset=12'))).status).toBe(400);
+    expect((await GET(request('siteId=85&type=article&newsFlash=true&limit=12&offset=12&priorityId=bad'))).status).toBe(400);
+    const response = await GET(request('siteId=85&type=article&newsFlash=true&limit=12&offset=12&priorityId=99'));
+    expect(response.status).toBe(200);
+    expect((await response.json()).priorityId).toBe('99');
+    expect(mocks.publishedObjects).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      excludeObjectIds: ['99'], offset: 11, limit: 12,
+    }), 'tenant-a', expect.any(Date));
+  });
+
   it('denies a mismatched or unpublished site before querying news', async () => {
     expect((await GET(request('siteId=86&type=news&limit=2'))).status).toBe(404);
     mocks.version.mockResolvedValue(null);
