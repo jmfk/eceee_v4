@@ -749,7 +749,8 @@ const PageTreeNode = memo(({
                                         handleHostnameClick()
                                     }}
                                     className="block max-w-full truncate text-left text-xs text-gray-500 transition-colors hover:text-blue-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                                    title={sanitizedPage.hostnames?.[0] || 'Hostname missing — click to edit'}
+                                    title={sanitizedPage.hostnames?.[0] ? 'Edit hostnames in page settings' : 'Hostname missing — click to edit'}
+                                    aria-label={`Edit hostnames for ${page.title} in page settings`}
                                 >
                                     {sanitizedPage.hostnames?.[0] || '(hostname missing)'}
                                 </button>

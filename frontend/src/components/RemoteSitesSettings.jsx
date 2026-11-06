@@ -49,7 +49,6 @@ export default function RemoteSitesSettings() {
     const [checkpoints, setCheckpoints] = useState([])
     const [checkpointPage, setCheckpointPage] = useState(1)
     const [hasMoreCheckpoints, setHasMoreCheckpoints] = useState(false)
-    const [syncEnabled, setSyncEnabled] = useState(true)
     const [connectionForm, setConnectionForm] = useState(emptyConnection)
     const [editingConnectionId, setEditingConnectionId] = useState(null)
     const [showConnectionForm, setShowConnectionForm] = useState(false)
@@ -71,7 +70,6 @@ export default function RemoteSitesSettings() {
         setCheckpoints(checkpointResult.results || [])
         setCheckpointPage(1)
         setHasMoreCheckpoints(Boolean(checkpointResult.next))
-        setSyncEnabled(keyResult.syncEnabled !== false)
     }
 
     const refreshAfterMutation = async (successMessage) => {
@@ -266,7 +264,6 @@ export default function RemoteSitesSettings() {
             <p className="mt-2 max-w-2xl text-sm text-gray-600">Connect this workspace to other ECEEE sites and control which sites can transfer content from this one.</p>
 
             {error && <div role="alert" className="mt-6 border-l-4 border-red-500 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
-            {!syncEnabled && <div className="mt-6 border-l-4 border-amber-500 bg-amber-50 px-4 py-3 text-sm text-amber-900">Remote sync is disabled on this installation. Saved keys cannot be used until an operator enables it.</div>}
 
             {issuedSecret && <section aria-label="New remote site key" className="mt-8 border-l-4 border-green-500 bg-green-50 px-5 py-4">
                 <div className="flex items-start justify-between gap-4">
@@ -288,7 +285,7 @@ export default function RemoteSitesSettings() {
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h2 id="outgoing-connections-heading" className="text-lg font-semibold text-gray-900">Connections to other sites</h2>
-                        <p className="mt-1 text-sm text-gray-600">Used when importing themes, sites, objects, and media from another workspace.</p>
+                        <p className="mt-1 text-sm text-gray-600">Add the other installation’s URL, workspace identifier, and a key created in that installation’s Remote sites settings. This URL is the API address; each site's public hostnames are managed on its root page.</p>
                     </div>
                     <button type="button" onClick={() => { setConnectionForm(emptyConnection); setEditingConnectionId(null); setShowConnectionForm(true) }} className="inline-flex min-h-10 items-center gap-2 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white"><Plus className="h-4 w-4" />Add connection</button>
                 </div>
@@ -296,7 +293,7 @@ export default function RemoteSitesSettings() {
                 {showConnectionForm && <div className="mt-6 border-y border-gray-200 py-6">
                     <div className="grid gap-4 md:grid-cols-2">
                         <label className="text-sm font-medium text-gray-700">Name<input aria-label="Connection name" value={connectionForm.name} onChange={(event) => setConnectionForm({ ...connectionForm, name: event.target.value })} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal" /></label>
-                        <label className="text-sm font-medium text-gray-700">Site URL<input aria-label="Site URL" type="url" placeholder="https://example.org" value={connectionForm.baseUrl} onChange={(event) => setConnectionForm({ ...connectionForm, baseUrl: event.target.value })} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal" /></label>
+                        <label className="text-sm font-medium text-gray-700">Remote installation URL<input aria-label="Site URL" type="url" placeholder="https://admin.example.org" value={connectionForm.baseUrl} onChange={(event) => setConnectionForm({ ...connectionForm, baseUrl: event.target.value })} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal" /></label>
                         <label className="text-sm font-medium text-gray-700">Remote workspace<input aria-label="Remote workspace" value={connectionForm.remoteWorkspace} onChange={(event) => setConnectionForm({ ...connectionForm, remoteWorkspace: event.target.value })} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal" /></label>
                         <label className="text-sm font-medium text-gray-700">Remote site key{editingConnectionId && <span className="font-normal text-gray-500"> · leave blank to keep current</span>}<input aria-label="Remote site key" type="password" autoComplete="new-password" value={connectionForm.accessKey} onChange={(event) => setConnectionForm({ ...connectionForm, accessKey: event.target.value })} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal" /></label>
                     </div>

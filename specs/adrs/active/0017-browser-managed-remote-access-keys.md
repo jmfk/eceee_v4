@@ -30,7 +30,8 @@ The web flow removes unnecessary production shell access while preserving the ex
 - Workspace administrators can mint credentials capable of exporting themes or sites from that workspace.
 - The UI and API must strongly communicate that a returned secret cannot be recovered.
 - Revoked keys remain as auditable metadata and may be reactivated only by rotation.
-- Disabling remote sync makes the credentials unusable but does not alter their stored state.
+- Scoped web-managed keys remain usable for their permitted transfer operations even when the legacy theme sync flag is disabled.
+- Saved outbound credentials use an application-secret-derived encryption fallback when no dedicated keyring is configured.
 - CLI and web flows must continue to use the same generator, hash format, capability identifiers, and model.
 
 ## Alternatives Considered
