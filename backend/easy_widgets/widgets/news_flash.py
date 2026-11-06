@@ -1,6 +1,6 @@
 """CMS discovery/validation adapter; News Flash rendering and selection use TypeScript."""
 
-from typing import List, Union
+from typing import List, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
@@ -24,6 +24,9 @@ class NewsFlashConfig(BaseModel):
     )
     include_descendants: bool = Field(default=True, description="Include descendant classifications")
     news_page_path: str = Field(default="/news/", description="Path to the news detail page")
+    image_shape: Literal["square", "landscape"] = Field(
+        default="landscape", title="Image shape", json_schema_extra={"group": "Layout"}
+    )
     show_excerpts: bool = Field(default=True, description="Show short summaries")
     full_width_count: int = Field(default=1, ge=0, title="Full-width stories", json_schema_extra={"group": "Layout"})
     half_width_count: int = Field(default=2, ge=0, title="Half-width stories", json_schema_extra={"group": "Layout"})

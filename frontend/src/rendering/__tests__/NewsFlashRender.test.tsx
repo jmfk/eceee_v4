@@ -47,6 +47,15 @@ describe('News Flash presentation', () => {
         expect(screen.getByRole('button', { name: 'Retry loading news' })).toBeInTheDocument()
     })
 
+    it.each(['square', 'landscape'])('uses the %s image shape below the full-width headline', imageShape => {
+        const { container } = render(<NewsFlashRender widget={{ ...fixture, config: { ...fixture.config, imageShape } }} context={context} />)
+        const card = container.querySelector('.news-flash-story')!
+        expect(card).toHaveClass(`news-flash-image-${imageShape}`)
+        expect(card.firstElementChild).toHaveClass('news-flash-title')
+        expect(card.querySelector('.news-flash-body .news-flash-image img')).toBeInTheDocument()
+        expect(card.querySelector('.news-flash-body .news-flash-excerpt')).toBeInTheDocument()
+    })
+
     it('supports all-zero counts', () => {
         render(<NewsFlashRender widget={{ ...fixture, config: { fullWidthCount: 0, halfWidthCount: 0, thirdWidthCount: 0 } }} context={context} />)
         expect(screen.queryByRole('article')).not.toBeInTheDocument()

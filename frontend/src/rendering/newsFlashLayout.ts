@@ -11,3 +11,6 @@ export const newsFlashLayout = (config: Record<string, any> = {}) => {
     return { full, half, third, total: Math.min(Number.MAX_SAFE_INTEGER, full + half + third),
         size: (index: number) => index < full ? 'full' : index < full + half ? 'half' : 'third' }
 }
+
+export const newsFlashImageShape = (config: Record<string, any> = {}) =>
+    (config.imageShape ?? config.image_shape) === 'square' ? 'square' : 'landscape'
