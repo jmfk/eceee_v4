@@ -12,6 +12,9 @@ export const newsHomeEditorSchema = (widgetType: string, source: Schema | null):
     }
     if (widgetType === 'easy_widgets.NewsFlashWidget') {
         delete properties.limit
+        for (const [key, title, fallback] of [
+            ['fullWidthCount', 'Full-width stories', 1], ['halfWidthCount', 'Half-width stories', 2], ['thirdWidthCount', 'Third-width stories', 0],
+        ] as const) properties[key] = { type: 'integer', title, default: fallback, minimum: 0, component: 'NumberInput', min: 0, step: 1, group: 'Layout' }
     } else if (widgetType === 'easy_widgets.TopNewsPlugWidget') {
         properties.layout = {
             ...properties.layout,

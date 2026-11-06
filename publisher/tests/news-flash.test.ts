@@ -18,7 +18,7 @@ describe('News Flash published selection', () => {
   it('finds an older priority independently of the latest-three window', async () => {
     const db = reader(story('old-priority', { newsPriority: true }));
     expect((await newsFlashItems(db, query, 'tenant-7', at)).map(item => item.id)).toEqual(['old-priority', '3', '2']);
-    expect(db.publishedObjects).toHaveBeenNthCalledWith(2,
+    expect(db.publishedObjects).toHaveBeenNthCalledWith(1,
       expect.objectContaining({ ...query, newsPriorityOnly: true, limit: 1, sortOrder: '-publish_date', activeTypeOnly: true }), 'tenant-7', at);
   });
 
@@ -30,6 +30,28 @@ describe('News Flash published selection', () => {
     const db = reader(story('newest-priority', { newsPriority: true, newsPriorityUntil: until }));
     expect(await newsFlashItems(db, query, 'tenant-7', at)).toEqual(recent);
     expect(db.publishedObjects).toHaveBeenCalledTimes(2);
+  });
+
+  it('pages through every story exactly once when the priority is outside the first ordinary batch', async () => {
+    const all = Array.from({ length: 30 }, (_, index) => story(String(30 - index)));
+    const priority = story('5', { newsPriority: true });
+    const db = { publishedObjects: vi.fn(async (q: { newsPriorityOnly?: boolean; excludeObjectIds?: string[]; offset?: number; limit: number }) => {
+      if (q.newsPriorityOnly) return [priority];
+      return all.filter(item => !q.excludeObjectIds?.includes(item.id)).slice(q.offset || 0, (q.offset || 0) + q.limit);
+    }) } as unknown as PageReader;
+    const pages = [];
+    for (const offset of [0, 12, 24]) pages.push(...await newsFlashItems(db, query, 'tenant-7', at, { offset, limit: 12 }));
+    expect(pages[0]).toEqual(priority);
+    expect(pages).toHaveLength(30);
+    expect(new Set(pages.map(item => item.id)).size).toBe(30);
+  });
+
+  it('excludes the promoted story before applying the offset on subsequent batches', async () => {
+    const db = reader(story('99', { newsPriority: true }));
+    await newsFlashItems(db, query, 'tenant-7', at, { offset: 12, limit: 12 });
+    expect(db.publishedObjects).toHaveBeenLastCalledWith(expect.objectContaining({
+      excludeObjectIds: ['99'], offset: 11, limit: 12,
+    }), 'tenant-7', at);
   });
 
   it('honors an expiry with an explicit timezone', async () => {

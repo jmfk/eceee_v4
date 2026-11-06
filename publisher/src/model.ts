@@ -1,4 +1,5 @@
 import { newsFlashItems } from './news-flash';
+import { newsFlashLayout, NEWS_FLASH_BATCH } from '../../frontend/src/rendering/newsFlashLayout';
 import { compilePublisherStyles, defaultSpecialPages, widgetVariantClasses } from './theme';
 import { responsiveImageSources, type ResponsiveImageOptions } from './imgproxy';
 import type { ThemeLayoutDefinition, ThemeLayoutDocument, ThemeLayoutSlot, ThemeSpecialPage } from '../../frontend/src/rendering/types';
@@ -116,6 +117,8 @@ export interface PublishedObjectQuery {
   featuredFirst?: boolean;
   featuredOnly?: boolean;
   newsPriorityOnly?: boolean;
+  offset?: number;
+  excludeObjectIds?: DbId[];
   pinnedFirst?: boolean;
   includeHierarchy?: boolean;
   status?: 'draft' | 'archived';
@@ -757,13 +760,19 @@ async function resolvePublishedData(
     let items: PublishedObject[] | null = null;
     let item: PublishedObject | undefined;
     if (widget.type === 'easy_widgets.NewsFlashWidget') {
-      const types = stringList(config.objectTypes ?? config.object_types ?? ['article']);
-      items = await newsFlashItems(reader, {
-        objectTypeIds: types.filter(type => /^\d+$/.test(type)),
-        objectTypeNames: types.filter(type => !/^\d+$/.test(type)),
-        classificationIds: stringList(config.classificationIds ?? config.classification_ids),
-        includeDescendants: (config.includeDescendants ?? config.include_descendants) !== false,
-      }, tenantId, at);
+      try {
+        const types = stringList(config.objectTypes ?? config.object_types ?? ['article']);
+        const total = newsFlashLayout(config).total;
+        items = total ? await newsFlashItems(reader, {
+          objectTypeIds: types.filter(type => /^\d+$/.test(type)),
+          objectTypeNames: types.filter(type => !/^\d+$/.test(type)),
+          classificationIds: stringList(config.classificationIds ?? config.classification_ids),
+          includeDescendants: (config.includeDescendants ?? config.include_descendants) !== false,
+        }, tenantId, at, { limit: Math.min(NEWS_FLASH_BATCH, total) }) : [];
+      } catch {
+        // A failed optional feed must preserve the page and its card positions.
+        return { ...prepared, data: { status: 'error', items: [] } };
+      }
     } else if (widget.type === 'easy_widgets.NewsListWidget') {
       const configuredTypes = config.objectTypes !== undefined ? config.objectTypes : config.object_types;
       const objectTypeIds = stringList(configuredTypes);

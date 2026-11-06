@@ -55,6 +55,16 @@ describe('WidgetEditorPanel contract', () => {
         isolatedFormProps.length = 0
     })
 
+    it('initializes saved News Flash widgets with visible layout defaults without losing other settings', async () => {
+        render(<WidgetEditorPanel isOpen onClose={vi.fn()} onSave={vi.fn()} onRealTimeUpdate={vi.fn()}
+            widgetData={{ id: 'flash', type: 'easy_widgets.NewsFlashWidget', slotName: 'main', config: { objectTypes: ['article'], limit: 3 } }}
+            schema={{ properties: {} }} context={{ contextType: 'page', pageId: '101', versionId: '201' }} />)
+        await screen.findByRole('button', { name: 'Apply panel edit' })
+        expect(isolatedFormProps.at(-1).initWidgetData.config).toMatchObject({
+            objectTypes: ['article'], fullWidthCount: 1, halfWidthCount: 2, thirdWidthCount: 0,
+        })
+    })
+
     it('routes panel edits through real-time updates and imperative save', async () => {
         const user = userEvent.setup()
         const onRealTimeUpdate = vi.fn()

@@ -1,8 +1,8 @@
 {# Markup fallback for resolved data. Public selection/rendering is owned by the TypeScript publisher. #}
 <section class="news-flash-widget" aria-label="News Flash" data-widget-type="news-flash">
     <div class="news-flash-grid">
-        {% for item in news_items|slice:":3" %}
-            <article class="news-flash-story{% if forloop.first %} news-flash-lead{% endif %}{% if item.featured_image_url %} has-image{% endif %}" data-object-id="{{ item.id }}">
+        {% for item in news_items %}
+            <article class="news-flash-story{% if forloop.counter0 < config.full_width_count %} news-flash-full news-flash-lead{% elif forloop.counter0 < config.full_width_count|add:config.half_width_count %} news-flash-half{% else %} news-flash-third{% endif %}{% if item.featured_image_url %} has-image{% endif %}" data-object-id="{{ item.id }}">
                 <div class="news-flash-copy">
                     <h3 class="news-flash-title"><a href="{{ item.path }}">{{ item.title }}</a></h3>
                     {% if config.show_excerpts and item.excerpt_text %}<p class="news-flash-excerpt">{{ item.excerpt_text }}</p>{% endif %}

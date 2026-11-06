@@ -19,8 +19,10 @@ export async function GET(request: Request) {
   const types = params.getAll('type');
   const classifications = params.getAll('classificationId');
   const limit = Number(params.get('limit'));
+  const offset = Number(params.get('offset') || 0);
   if (!validId(siteId) || !types.length || types.length > 20 || types.some(type => !validType(type))
       || classifications.length > 20 || classifications.some(id => !validClassification(id))
+      || !Number.isSafeInteger(offset) || offset < 0
       || !Number.isInteger(limit) || limit < 1 || limit > 50) {
     return Response.json({ error: 'Invalid news query.' }, { status: 400, headers: responseHeaders });
   }
@@ -43,7 +45,7 @@ export async function GET(request: Request) {
         sortOrder: '-publish_date',
       };
       return params.get('newsFlash') === 'true'
-        ? newsFlashItems(reader, query, root.tenant_id, at)
+        ? newsFlashItems(reader, query, root.tenant_id, at, { limit, offset })
         : reader.publishedObjects(query, root.tenant_id, at);
     });
     if (!items) return Response.json({ error: 'Site not found.' }, { status: 404, headers: responseHeaders });

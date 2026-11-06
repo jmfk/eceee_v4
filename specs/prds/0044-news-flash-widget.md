@@ -39,3 +39,5 @@ related_adrs:
 - Chrome fixture rendering verified three stories once each, in the same order, at 680px and 280px container widths. The wide layout has a lead spanning two columns; the narrow layout has compact supporting rows.
 - Local Article definition 8 in workspace `eceee-production-copy` now contains the two priority fields. Saved through the authenticated CMS editor after the narrower machine key refused definition writes; API readback verified all existing property values remained intact. No object instances were changed or published.
 - Production deployment and definition changes are not included. Full legacy Django feed resolution is intentionally not added; see ADR-0062.
+
+- Subsequent owner-requested count, placeholder and progressive-loading expansion is tracked separately in [PRD-0045](0045-news-flash-layouts-and-loading.md) and ADR-0064.

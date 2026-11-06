@@ -20,6 +20,17 @@ describe('page preview model resolution', () => {
     })
     afterEach(() => vi.unstubAllGlobals())
 
+    it('bounds the first News Flash batch for a large configured layout', async () => {
+        const fetchNews = vi.fn(async () => ({ ok: true, json: async () => ({ items: [] }) }))
+        vi.stubGlobal('fetch', fetchNews)
+        const model = createPageRenderModel({ widgets: { main: [
+            { id: 'flash', type: 'easy_widgets.NewsFlashWidget', config: { fullWidthCount: 0, halfWidthCount: 4, thirdWidthCount: 1000 } },
+        ] }, context: { siteId: 85, siteHostnames: ['eceee.localhost'] } })
+        const resolved = await resolvePagePreviewModel(model)
+        expect(new URL(fetchNews.mock.calls[0][0]).searchParams.get('limit')).toBe('12')
+        expect(resolved.slots.main[0].data?.feedUrl).toBe(fetchNews.mock.calls[0][0])
+    })
+
     it('requests exactly three News Flash stories using the shared priority endpoint', async () => {
         const fetchNews = vi.fn(async () => ({ ok: true, json: async () => ({ items: [{ id: 1, slug: 'priority', data: { newsPriority: true } }] }) }))
         vi.stubGlobal('fetch', fetchNews)

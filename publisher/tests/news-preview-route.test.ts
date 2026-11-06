@@ -45,15 +45,13 @@ describe('public news preview route', () => {
   });
 
   it('uses the same prioritized News Flash selection within the host tenant', async () => {
-    mocks.publishedObjects.mockResolvedValueOnce([
-      { id: '3', title: 'Latest', slug: 'latest', data: {} },
-      { id: '2', title: 'Second', slug: 'second', data: {} },
-      { id: '1', title: 'Third', slug: 'third', data: {} },
-    ]).mockResolvedValueOnce([{ id: '0', title: 'Priority', slug: 'priority', data: { newsPriority: true } }]);
+    mocks.publishedObjects.mockImplementation(async (query: { newsPriorityOnly?: boolean }) => query.newsPriorityOnly
+      ? [{ id: '0', title: 'Priority', slug: 'priority', data: { newsPriority: true } }]
+      : [3, 2, 1].map(id => ({ id: String(id), title: 'Story', data: {} })));
     const response = await GET(request('siteId=85&type=article&limit=3&newsFlash=true'));
     expect(response.status).toBe(200);
     expect((await response.json()).items.map((item: { id: string }) => item.id)).toEqual(['0', '3', '2']);
-    expect(mocks.publishedObjects).toHaveBeenNthCalledWith(2,
+    expect(mocks.publishedObjects).toHaveBeenNthCalledWith(1,
       expect.objectContaining({ newsPriorityOnly: true, limit: 1 }), 'tenant-a', expect.any(Date));
   });
 
@@ -68,6 +66,8 @@ describe('public news preview route', () => {
     expect((await GET(request('siteId=85&type=news&limit=51'))).status).toBe(400);
     expect((await GET(request('siteId=85&type=bad%2Ftype&limit=2'))).status).toBe(400);
     expect((await GET(request('siteId=85&type=news&classificationId=invalid&limit=2'))).status).toBe(400);
+    expect((await GET(request('siteId=85&type=news&limit=12&offset=-1'))).status).toBe(400);
+    expect((await GET(request('siteId=85&type=news&limit=12&offset=1.5'))).status).toBe(400);
     expect(mocks.root).not.toHaveBeenCalled();
   });
 });

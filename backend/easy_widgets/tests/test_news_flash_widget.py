@@ -16,16 +16,18 @@ class NewsFlashContractTests(SimpleTestCase):
             showExcerpts=False,
             classificationIds=["11111111-1111-4111-8111-111111111111"],
         ).model_dump(by_alias=True)
-        self.assertEqual(config["limit"], 3)
+        self.assertEqual(config["fullWidthCount"], 1)
+        self.assertEqual(config["halfWidthCount"], 2)
+        self.assertEqual(config["thirdWidthCount"], 0)
         self.assertEqual(config["objectTypes"], [8, "article"])
         self.assertEqual(config["newsPagePath"], "/updates/")
         self.assertFalse(config["showExcerpts"])
 
-    def test_story_count_cannot_be_changed_to_another_layout_count(self):
+    def test_counts_support_zero_and_large_values_but_reject_negative_values(self):
+        config = NewsFlashConfig(fullWidthCount=0, halfWidthCount=1000, thirdWidthCount=3)
+        self.assertEqual(config.half_width_count, 1000)
         with self.assertRaises(ValidationError):
-            NewsFlashConfig(limit=2)
-        with self.assertRaises(ValidationError):
-            NewsFlashConfig(limit=4)
+            NewsFlashConfig(thirdWidthCount=-1)
 
     def test_initial_article_definition_contains_optional_priority_controls(self):
         fields = DEFINITIONS["article"][2]
