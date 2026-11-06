@@ -10,7 +10,7 @@ import { SpecialEditorRenderer, hasSpecialEditor } from './special-editors'
 import IsolatedFormRenderer from './IsolatedFormRenderer.jsx'
 import WidgetPublishingInheritanceFields from './WidgetPublishingInheritanceFields.jsx'
 import WidgetQuickReference from './widget-help/WidgetQuickReference'
-import { newsFlashLayout } from '../rendering/newsFlashLayout'
+import { newsFlashLayout, newsFlashImageShape } from '../rendering/newsFlashLayout'
 import { newsHomeEditorSchema } from '../widgets/easy-widgets/newsHomeSchema'
 
 
@@ -381,6 +381,7 @@ const WidgetEditorPanel = forwardRef(({
         const layout = newsFlashLayout(widgetData.config)
         return { ...widgetData, config: { ...widgetData.config,
             fullWidthCount: layout.full, halfWidthCount: layout.half, thirdWidthCount: layout.third,
+            imageShape: newsFlashImageShape(widgetData.config),
         } }
     }, [widgetData])
 

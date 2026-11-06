@@ -29,6 +29,12 @@ class NewsFlashContractTests(SimpleTestCase):
         with self.assertRaises(ValidationError):
             NewsFlashConfig(thirdWidthCount=-1)
 
+    def test_image_shape_is_validated_and_preserved(self):
+        self.assertEqual(NewsFlashConfig(imageShape="square").model_dump(by_alias=True)["imageShape"], "square")
+        self.assertEqual(NewsFlashConfig().image_shape, "landscape")
+        with self.assertRaises(ValidationError):
+            NewsFlashConfig(imageShape="invalid")
+
     def test_initial_article_definition_contains_optional_priority_controls(self):
         fields = DEFINITIONS["article"][2]
         self.assertEqual(fields["newsPriority"]["componentType"], "boolean")

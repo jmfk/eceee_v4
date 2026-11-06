@@ -28,3 +28,11 @@ Use a centered maximum outer width of 1280px, with 40px side insets and 30px gut
 The search/header area above the grid in the reference is outside News Flash. Apply 30px top/bottom grid spacing. Below an 800px widget-container width, stack stories with 16px insets/gaps and 140px compact supporting rows, retaining a 310px lead. Measurements and responsive rules are shared by editor placeholders and public cards through the render catalog.
 
 Chrome DOM measurements verified 1200/585/380px cards, 310px card heights, 175×140px supporting images, matching editor placeholders, and stacked 288px cards inside a 320px container with no horizontal overflow. Focused widget/registry checks and frontend build passed. Live published data was not rechecked for this CSS-only update.
+
+## Image shapes and spacing ownership clarification (2026-11-06)
+
+The owner's follow-up image reference replaces the previous edge-aligned image layout. Headings span the card above the summary/image row, reserving two lines while allowing longer content to grow. Offer square (1:1) and landscape (7:4) image shapes in widget settings; landscape is the default. Images are inset, aligned beside the summary, and cropped with object-fit cover. Editor placeholders use the same geometry. Narrow slots stack the summary and image to avoid squeezing text.
+
+The owner clarified that outer padding comes from surrounding layouts. Inspection confirms main_layout.py provides 40px horizontal and 30px vertical padding and landing_page.py provides 30px around main content. Remove News Flash's own outer padding, max-width and centering: it fills its slot. The earlier 1280px outer-width/inset responsibility recorded above is superseded by this clarification. In a 1200px content slot, 30px gutters still give 585px half and 380px third-width cards. Card-internal padding is retained.
+
+Chrome verified square 140×140px and landscape 245×140px images inside 585×310px cards, full-width headlines, and a 320px mobile card without horizontal overflow. The live landing-page slot has one 30px padding wrapper and zero News Flash outer padding. Focused render/editor/configuration checks, publisher typecheck and frontend build passed.

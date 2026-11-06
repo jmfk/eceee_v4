@@ -1,7 +1,7 @@
 import React from 'react'
 import { value } from './primitives'
 import { NewsFlashCard, NewsFlashPlaceholder } from './NewsFlashCard'
-import { newsFlashLayout } from './newsFlashLayout'
+import { newsFlashLayout, newsFlashImageShape } from './newsFlashLayout'
 import { useNewsFlashFeed } from './newsFlashFeed'
 import type { WidgetRenderComponent } from './types'
 
@@ -16,8 +16,8 @@ export const NewsFlashRender: WidgetRenderComponent = ({ widget, context }) => {
     return <section className="news-flash-widget" aria-label="News Flash" data-widget-type="news-flash" aria-busy={loading}>
         <div className="news-flash-grid">
             {Array.from({ length: feed.visible }, (_, index) => feed.items[index]
-                ? <NewsFlashCard key={index} item={feed.items[index] as Record<string, any>} size={layout.size(index)} base={base} showExcerpts={showExcerpts} />
-                : <NewsFlashPlaceholder key={index} index={index} size={layout.size(index)} loading={loading} />)}
+                ? <NewsFlashCard key={index} item={feed.items[index] as Record<string, any>} size={layout.size(index)} imageShape={newsFlashImageShape(widget.config)} base={base} showExcerpts={showExcerpts} />
+                : <NewsFlashPlaceholder key={index} index={index} size={layout.size(index)} imageShape={newsFlashImageShape(widget.config)} loading={loading} />)}
         </div>
         {feed.error && <p role="status">News could not be loaded.</p>}
         {feed.canLoad && <div ref={feed.sentinel} className="news-flash-more">
