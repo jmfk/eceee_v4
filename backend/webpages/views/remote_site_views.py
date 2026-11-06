@@ -1,6 +1,5 @@
 """Workspace administration for scoped inbound remote-site credentials."""
 
-from django.conf import settings
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, serializers, status
@@ -80,12 +79,7 @@ class RemoteAccessKeysView(APIView):
     def get(self, request):
         tenant = _workspace_admin(request)
         keys = ThemeRemoteAccessKey.objects.filter(tenant=tenant).order_by("name")
-        return Response(
-            {
-                "results": [_key_data(access_key) for access_key in keys],
-                "syncEnabled": bool(getattr(settings, "THEME_SYNC_ENABLED", False)),
-            }
-        )
+        return Response({"results": [_key_data(access_key) for access_key in keys]})
 
     @transaction.atomic
     def post(self, request):

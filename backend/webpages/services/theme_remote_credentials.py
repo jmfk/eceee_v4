@@ -18,10 +18,14 @@ class RemoteCredentialConfigurationError(RuntimeError):
 
 def _cipher():
     configured = list(getattr(settings, "THEME_REMOTE_CREDENTIAL_KEYS", []))
-    if not configured and settings.DEBUG:
-        configured = [base64.urlsafe_b64encode(hashlib.sha256(settings.SECRET_KEY.encode()).digest()).decode()]
-    if not configured:
-        raise RemoteCredentialConfigurationError("Remote credential encryption is not configured.")
+    # SECRET_KEY is already required by every installation. Keep it as a
+    # decryption fallback when an operator adds a dedicated rotation key later.
+    fallback = base64.urlsafe_b64encode(
+        hashlib.sha256(f"eceee-remote-credentials:{settings.SECRET_KEY}".encode()).digest()
+    ).decode()
+    # Preserve ciphertext written by the earlier development-only fallback.
+    legacy_fallback = base64.urlsafe_b64encode(hashlib.sha256(settings.SECRET_KEY.encode()).digest()).decode()
+    configured.extend([fallback, legacy_fallback])
     try:
         return MultiFernet([Fernet(key.encode()) for key in configured])
     except (TypeError, ValueError) as exc:

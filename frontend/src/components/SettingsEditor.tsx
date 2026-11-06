@@ -320,6 +320,16 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                     />
                 )}
 
+                {!webpageData?.parent && <section className="bg-white rounded-lg shadow p-6" aria-labelledby="site-address-heading">
+                    <h2 id="site-address-heading" className="text-lg font-semibold text-gray-900 mb-2">Site address</h2>
+                    <p className="mb-5 text-sm text-gray-600">These are the public hostnames for this root site. Change them here when an imported site has the wrong address.</p>
+                    <HostnameListEditor
+                        value={localValues.hostnames}
+                        onChange={hostnames => handlePageFieldChange('hostnames', hostnames)}
+                        checkAvailability={checkHostnameAvailability}
+                    />
+                </section>}
+
                 {/* SEO & Metadata Section */}
                 <div className="bg-white rounded-lg shadow p-6">
                     <div className="text-lg font-semibold text-gray-900 mb-6" role="heading" aria-level="2">SEO & Metadata</div>
@@ -338,11 +348,6 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                             />
                         </div>
 
-                        {!webpageData?.parent && <HostnameListEditor
-                            value={localValues.hostnames}
-                            onChange={hostnames => handlePageFieldChange('hostnames', hostnames)}
-                            checkAvailability={checkHostnameAvailability}
-                        />}
                     </div>
                 </div>
             </div>

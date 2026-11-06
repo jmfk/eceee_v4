@@ -19,7 +19,7 @@ from webpages.models import (
     WebPage,
 )
 from webpages.services.theme_remote import RemoteThemeError, remote_sync_request
-from webpages.services.theme_remote_credentials import encrypt_access_key, generate_access_key
+from webpages.services.theme_remote_credentials import decrypt_access_key, encrypt_access_key, generate_access_key
 
 
 @override_settings(THEME_REMOTE_CREDENTIAL_KEYS=[Fernet.generate_key().decode()])
@@ -330,6 +330,42 @@ class ThemeVersionApiTests(TestCase):
         self.assertEqual(delete_response.status_code, 204)
         connection.refresh_from_db()
         self.assertTrue(connection.is_default)
+
+    @override_settings(THEME_REMOTE_CREDENTIAL_KEYS=[])
+    def test_remote_connection_uses_application_secret_without_extra_deployment_key(self):
+        created = self.client.post(
+            "/api/v1/webpages/designer/remote-connections/",
+            {
+                "name": "Remote",
+                "base_url": "https://remote.example",
+                "remote_workspace": "remote",
+                "access_key": "test-secret",
+            },
+            format="json",
+        )
+        self.assertEqual(created.status_code, 201, created.data)
+        saved = ThemeRemoteConnection.objects.get(id=created.data["id"])
+        self.assertEqual(decrypt_access_key(saved.encrypted_access_key), "test-secret")
+
+    @override_settings(THEME_SYNC_ENABLED=False)
+    def test_web_issued_key_allows_theme_transfer_without_deployment_flag(self):
+        created = self.client.post(
+            "/api/v1/webpages/remote-sites/access-keys/",
+            {"name": "Remote", "capabilities": ["theme.transfer"]},
+            format="json",
+        )
+        self.assertEqual(created.status_code, 201, created.data)
+        self.client.force_authenticate(user=None)
+        self.client.credentials(
+            HTTP_X_TENANT_ID=str(self.tenant.id),
+            HTTP_AUTHORIZATION=f"ThemeKey {created.data['secret']}",
+        )
+        pulled = self.client.post("/api/v1/webpages/themes/sync/pull/", {}, format="json")
+        self.assertEqual(pulled.status_code, 200, pulled.data)
+        self.client.force_authenticate(self.user)
+        self.client.credentials(HTTP_X_TENANT_ID=str(self.tenant.id))
+        legacy_pull = self.client.post("/api/v1/webpages/themes/sync/pull/", {}, format="json")
+        self.assertEqual(legacy_pull.status_code, 403, legacy_pull.data)
 
     def test_changing_credential_scheme_requires_a_new_access_key(self):
         connection = ThemeRemoteConnection.objects.create(

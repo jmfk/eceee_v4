@@ -56,8 +56,10 @@ class ThemeSyncViewSet(viewsets.ViewSet):
 
             raise PermissionDenied("This access key is not permitted to transfer themes.")
 
-    def check_sync_enabled(self):
+    def check_sync_enabled(self, request):
         """Check if theme sync is enabled"""
+        if isinstance(request.auth, ThemeRemoteAccessKey):
+            return None
         if not getattr(settings, "THEME_SYNC_ENABLED", False):
             return Response(
                 {"error": "Theme sync is disabled. Set THEME_SYNC_ENABLED=True to enable."},
@@ -73,7 +75,7 @@ class ThemeSyncViewSet(viewsets.ViewSet):
         Query params:
         - since_version: Minimum version to return (default: 0)
         """
-        check = self.check_sync_enabled()
+        check = self.check_sync_enabled(request)
         if check:
             return check
 
@@ -110,7 +112,7 @@ class ThemeSyncViewSet(viewsets.ViewSet):
         Pull all themes from server (initial sync).
         Returns all themes with their current versions.
         """
-        check = self.check_sync_enabled()
+        check = self.check_sync_enabled(request)
         if check:
             return check
 
@@ -161,7 +163,7 @@ class ThemeSyncViewSet(viewsets.ViewSet):
 
         Returns 409 Conflict if version mismatch.
         """
-        check = self.check_sync_enabled()
+        check = self.check_sync_enabled(request)
         if check:
             return check
 
@@ -278,7 +280,7 @@ class ThemeSyncViewSet(viewsets.ViewSet):
         - name: Theme name
         - version: Client version
         """
-        check = self.check_sync_enabled()
+        check = self.check_sync_enabled(request)
         if check:
             return check
 
@@ -341,7 +343,7 @@ class ThemeSyncViewSet(viewsets.ViewSet):
             "force": true  # Must be explicitly set
         }
         """
-        check = self.check_sync_enabled()
+        check = self.check_sync_enabled(request)
         if check:
             return check
 

@@ -262,6 +262,8 @@ Each workspace can use several saved remote-site connections, with one connectio
 
 On the remote installation, a workspace administrator can create the key in **Settings → Remote Sites → Access to this site**. Choose whether the connection may transfer themes, sites, or both, then copy the key when it is shown. The key cannot be displayed again.
 
+Keys created in the web UI can transfer themes without enabling `THEME_SYNC_ENABLED`. That setting still controls legacy theme sync clients that use other credential types. Site transfer uses its own scoped endpoint. The installation URL in a saved connection points to the remote API; the public hostnames shown in the site import list come from each remote root page. To change one, open **Pages** on the source installation, click the root site's hostname, then use **Settings → Site address** to remove the wrong hostname and add the correct one. Save the page settings before loading the remote sites again.
+
 The production command remains available for automation and recovery:
 
 1. Enable the sync API with `THEME_SYNC_ENABLED=True`.
@@ -288,17 +290,16 @@ The production command remains available for automation and recovery:
 
 3. Copy the final output line directly into the connecting installation's **Settings → Remote Sites → Connections to other sites → Add connection** form. Do not save it in source control or chat.
 
-On the local installation, configure credential encryption before saving connections. Generate a Fernet key once and place it in the protected runtime environment as `THEME_REMOTE_CREDENTIAL_KEYS`. The first key encrypts new values; additional comma-separated keys allow key rotation and decrypt older values.
+Saved connection credentials use an encryption key derived from the installation's `SECRET_KEY` by default. Operators may configure `THEME_REMOTE_CREDENTIAL_KEYS` as a dedicated Fernet keyring; the first key encrypts new values and older configured keys plus the application-secret fallback remain available for decryption. Keep `SECRET_KEY` stable while saved connections use its fallback.
 
 ```bash
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-In development only, Django derives a local encryption key from `SECRET_KEY` when the setting is absent. Production intentionally refuses to save or use remote credentials without the explicit encryption key.
 
 ### Remote object structures
 
-The Object Browser can pull selected top-level object trees from a saved remote site. For this workflow, save the connection with credential type **Machine API key**. The key on the remote installation must be bound to the intended workspace and have both `object.read` and `object.transfer` scopes. A legacy theme access key cannot read or export objects.
+The Object Browser can pull selected top-level object trees from a saved remote site. Create a remote site key on the source installation with **Objects and media** enabled, then save that key on the connecting installation. The key is bound to the source workspace and grants `object.read` and `object.transfer`. Existing machine API key connections continue to work for compatibility.
 
 The import wizard first selects object types and a per-type candidate limit (maximum 500), then exact roots. Preflight includes descendants, outgoing object references, versions, managed media, legacy and canonical media tags, and media collections. A transfer is limited to 10,000 objects and 2 GB of uncompressed media. Packages expire after 24 hours.
 
@@ -315,7 +316,7 @@ The sync service uses these backend endpoints:
 All endpoints require:
 - Authentication (API_TOKEN or API_USERNAME/API_PASSWORD)
 - `X-Tenant-ID` header (automatically added by sync service using TENANT_ID)
-- `THEME_SYNC_ENABLED=True` on the backend
+- `THEME_SYNC_ENABLED=True` on the backend for legacy clients; scoped Remote sites keys do not require it
 
 ## Multi-Tenancy
 

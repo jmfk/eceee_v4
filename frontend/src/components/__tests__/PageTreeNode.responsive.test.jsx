@@ -117,4 +117,14 @@ describe('PageTreeNode responsive actions and metadata', () => {
         expect(onEdit).toHaveBeenCalledWith({ ...responsivePage, editorTab: 'settings' })
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
+
+    it('opens root settings when clicking an existing hostname', async () => {
+        const user = userEvent.setup()
+        const onEdit = vi.fn()
+        renderNode({ onEdit, page: { ...responsivePage, hostnames: ['eceee.eeee.org'] } })
+
+        await user.click(screen.getByRole('button', { name: `Edit hostnames for ${responsivePage.title} in page settings` }))
+
+        expect(onEdit).toHaveBeenCalledWith(expect.objectContaining({ id: 42, editorTab: 'settings' }))
+    })
 })
