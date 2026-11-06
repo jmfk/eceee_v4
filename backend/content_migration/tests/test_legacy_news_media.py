@@ -93,6 +93,36 @@ class LegacyNewsMediaImporterTests(TestCase):
         self.assertFalse(restored.metadata["migration_placeholder"])
 
     @patch("content_migration.legacy_news.media.storage")
+    def test_deleted_placeholder_recovery_removes_marker_with_explicit_classifications(self, mocked_storage):
+        from file_manager.models import MediaTag
+        from taxonomy.assignments import classification_ids
+        from taxonomy.legacy import canonical_for
+
+        source_url = "https://legacy.example/recovered-explicit.jpg"
+        mocked_storage.overwrite_file.side_effect = lambda path, file: self._upload_result(file.read(), path)
+        mocked_storage.get_public_url.return_value = "https://media.example/recovered.jpg"
+        with patch.object(self.importer, "_read_image", side_effect=ValueError("http-404")):
+            placeholder = self.importer.import_image(source_url)
+        marker = MediaTag.objects.get(namespace=self.namespace, slug="migration-placeholder")
+        marker_id = str(canonical_for(marker, self.user).pk)
+        original_ids = set(classification_ids(placeholder))
+        self.assertIn(marker_id, original_ids)
+        selected = MediaTag.objects.create(
+            name="Editorial", slug="editorial", namespace=self.namespace, created_by=self.user
+        )
+        selected_id = str(canonical_for(selected, self.user).pk)
+        self.assertTrue(placeholder.delete(user=self.user))
+        importer = LegacyMediaImporter(
+            namespace=self.namespace, tenant=self.tenant, user=self.user, classification_ids=[selected_id]
+        )
+        with patch.object(importer, "_read_image", return_value=(b"recovered-explicit", "image/jpeg")):
+            restored = importer.import_image(source_url, resume=True, omit_unavailable=True)
+        self.assertEqual(restored.pk, placeholder.pk)
+        self.assertFalse(restored.is_deleted)
+        self.assertFalse(restored.metadata["migration_placeholder"])
+        self.assertEqual(set(classification_ids(restored)), (original_ids - {marker_id}) | {selected_id})
+
+    @patch("content_migration.legacy_news.media.storage")
     def test_resume_replaces_placeholder_without_changing_media_id(self, mocked_storage):
         source_url = "https://legacy.example/retry.jpg"
         stable_path = self.importer._storage_path(source_url)

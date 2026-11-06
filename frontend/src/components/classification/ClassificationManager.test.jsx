@@ -117,6 +117,28 @@ describe('classification management', () => {
         expect(await within(list).findByText('legacy')).toBeInTheDocument()
         expect(screen.queryByRole('region', { name: 'Existing tags' })).toBeNull()
     })
+    it('keeps media pagination available across pages containing only mapped tags', async () => {
+        taxonomyApi.types.mockResolvedValue({ results: [] })
+        mediaTagsApi.list.mockImplementation(({ page }) => vi.fn().mockResolvedValue({
+            results: page === 2
+                ? [{ id: 'legacy', name: 'Unmigrated media tag', usageCount: 2 }]
+                : [{ id: `mapped-${page}`, name: 'Mapped tag', classificationId: 'canonical' }],
+            next: page < 3 ? `/media/tags/?page=${page + 1}` : null,
+        }))
+        renderManager({ namespace: 'editorial' })
+        const next = await screen.findByRole('button', { name: 'Next media tags' })
+        expect(screen.getByText('No unmigrated media tags on this page.')).toBeInTheDocument()
+        expect(screen.queryByText(/No tag types yet/)).not.toBeInTheDocument()
+        fireEvent.click(next)
+        expect(await screen.findByText('Unmigrated media tag')).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Next media tags' }))
+        expect(await screen.findByText('No unmigrated media tags on this page.')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Next media tags' })).not.toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Previous media tags' }))
+        expect(await screen.findByText('Unmigrated media tag')).toBeInTheDocument()
+        expect(mediaTagsApi.list).toHaveBeenCalledWith(expect.objectContaining({ namespace: 'editorial', page: 3 }))
+    })
+
     it('opens editable types in the form and keeps read-only types in detail mode', async () => {
         const type = { ...definition, key: 'topics', namespace: 4, description: 'Editorial subjects', allowedUses: ['pages'], revision: 1, permissions: ['administer'] }
         taxonomyApi.types.mockResolvedValue({ results: [type, { id: 'other', name: 'Media', key: 'media', namespace: 4, allowedUses: [], permissions: [] }] })

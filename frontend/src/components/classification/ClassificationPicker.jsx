@@ -75,10 +75,12 @@ export default function ClassificationPicker({ value = [], selectedTerms = [], o
             {value.map(termId => {
                 const term = selected.data?.find(item => String(item.id) === String(termId))
                     || selectedTerms.find(item => String(item.classificationId || item.id) === String(termId))
+                const label = term?.path || term?.name || 'Unknown tag'
+                const removeLabel = term?.path || term?.name || termId
                 return <li key={termId} className="flex items-center justify-between gap-2">
-                    <span className="min-w-0 flex-1 break-words" title={`ID: ${termId}`}>{term?.name || term?.path || 'Unknown tag'}{term?.status && term.status !== 'approved' ? ` (${term.status})` : ''}</span>
-                    <button type="button" className="classification-selected-remove ml-auto shrink-0" aria-label={`Remove ${term?.name || termId}`}
-                        title={`Remove ${term?.name || termId}`} onClick={() => onChange(value.filter(item => item !== termId))}>
+                    <span className="min-w-0 flex-1 break-words" title={`ID: ${termId}`}>{label}{term?.status && term.status !== 'approved' ? ` (${term.status})` : ''}</span>
+                    <button type="button" className="classification-selected-remove ml-auto shrink-0" aria-label={`Remove ${removeLabel}`}
+                        title={`Remove ${removeLabel}`} onClick={() => onChange(value.filter(item => item !== termId))}>
                         <X size={14} aria-hidden="true" />
                     </button>
                 </li>
