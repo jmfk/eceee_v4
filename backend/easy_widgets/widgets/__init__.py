@@ -4,30 +4,31 @@ Widget implementations for easy_widgets.
 This module contains individual widget implementations organized into separate files.
 """
 
+from .banner import BannerWidget
+from .bio import BioWidget
+
 # Import all widget classes to make them available when the module is imported
 from .content import ContentWidget
 from .content_card import ContentCardWidget
-from .banner import BannerWidget
-from .bio import BioWidget
-from .image import ImageWidget
-from .table import TableWidget
 from .footer import FooterWidget
+from .forms import FormsWidget
 from .header import HeaderWidget
 from .headline import HeadlineWidget
 from .hero import HeroWidget
+from .image import ImageWidget
 from .navbar import NavbarWidget
 from .navigation import NavigationWidget
-from .sidebar import SidebarWidget
-from .forms import FormsWidget
-from .two_columns import TwoColumnsWidget
-from .three_columns import ThreeColumnsWidget
-from .section import SectionWidget
-from .path_debug import PathDebugWidget
-from .news_list import NewsListWidget
-from .news_flash import NewsFlashWidget
 from .news_detail import NewsDetailWidget
-from .top_news_plug import TopNewsPlugWidget
+from .news_flash import NewsFlashWidget
+from .news_list import NewsListWidget
+from .path_debug import PathDebugWidget
+from .section import SectionWidget
+from .sidebar import SidebarWidget
 from .sidebar_top_news import SidebarTopNewsWidget
+from .table import TableWidget
+from .three_columns import ThreeColumnsWidget
+from .top_news_plug import TopNewsPlugWidget
+from .two_columns import TwoColumnsWidget
 
 # Make all widgets available at the package level
 __all__ = [
