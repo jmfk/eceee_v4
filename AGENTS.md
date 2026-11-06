@@ -168,14 +168,21 @@ Backend static assets: `cd backend && npm run build` / `npm run watch:css`
   the reason.
 - Never equate passing CI with code review or approval. Report CI status,
   submitted reviews, and GitHub's `reviewDecision` as separate facts.
-- Before merging any pull request, fetch its current checks, submitted reviews,
-  review decision, unresolved review threads when available, and mergeability.
-  Do this immediately before the merge even if the PR was inspected earlier.
+- Review, risk assessment and required tests/CI belong before approval of the
+  final head commit. Once that commit is approved and the owner requests merge,
+  merge directly. Do not rerun tests, restart CI, cycle the `full-ci` label,
+  repeat review or ask for another confirmation as part of merging.
+- Immediately before merge, make one read-only check of the head SHA, existing
+  check results, submitted reviews, review decision, unresolved threads and
+  mergeability. Reuse successful evidence for that exact commit; checking its
+  status must not trigger new work. Report the result briefly and merge with an
+  exact-head guard, without bypassing branch protection.
 - Follow the risk/cadence plan from `scripts/ci_evidence.py`: affected tests for
   ordinary changes; full CI at high risk, every tenth merged PR, or weekly.
   Include the prospective PR in the cadence. Verify the current head's successful
   `Fast CI / Fast CI gate` or, when full is required, `Full CI / Full CI gate`.
-  Request the `full-ci` label only if a required full run is not already present;
+  During preparation/review, request the `full-ci` label only if a required full
+  run is not already present;
   do not launch duplicate full runs for the same head. Later pushes require fresh
   evidence. Deployment reuses exact merged-commit main CI through `make prod-deploy`;
   do not repeat local full suites after valid CI. Keep backup, locking, migration,
@@ -188,14 +195,16 @@ Backend static assets: `cd backend && npm run build` / `npm run watch:css`
   (or that the provider cannot expose it), unresolved threads, mergeability,
   changed behavior, and remaining material risks. The agent's own review and
   passing CI are evidence, not a substitute for a missing merge request.
-- Review fixes and routine rebases within the requested task do not require
-  another approval; reverify the final head and refresh Full CI when required.
-  Ask for a new decision if the PR's purpose, data impact, or material risk
-  changes, or if the user only requested review, fixes, push, or a report.
+- If the approved head changes, required evidence is missing or failing, a
+  blocking finding appears or GitHub prevents the merge, stop and report the
+  specific blocker. Do not silently turn a merge request into fixes, a rebase,
+  another review or a test/CI cycle. Base-branch movement alone does not require
+  a rebase when the approved head remains mergeable with valid required checks.
 - Treat migrations, backfills, tenancy or authorization changes, destructive
-  cleanup, and production data-path changes as high-risk. Perform a fresh risk
-  review of the final head and report its concrete data and operational impact
-  before merging. A prior explicit **merge** request for the same task remains
+  cleanup, and production data-path changes as high-risk. Review the final head's
+  concrete data and operational impact before approval, then reuse that review
+  for the unchanged approved commit. A prior explicit **merge** request for the
+  same task remains
   authorization for a reviewed, non-destructive change; a destructive or newly
   expanded operation needs its own explicit owner decision.
 - For migration or backfill PRs, the review must explicitly consider clean-database
@@ -205,6 +214,11 @@ Backend static assets: `cd backend && npm run build` / `npm run watch:css`
   sufficient evidence.
 - If the user has not requested merge, stop at a merge-ready PR and state what
   remains. Repository rules being bypassable do not create authorization.
+- This direct-merge rule supersedes older merge-workflow instructions requiring
+  another confirmation, review or Full CI run after approval. Production
+  deployment, destructive operations and their separate authorization rules are
+  unchanged. Automatic checks triggered by GitHub after merge may run normally;
+  they are not a reason to delay or retest an already approved merge.
 
 ## Testing Expectations
 

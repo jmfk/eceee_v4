@@ -37,6 +37,21 @@ gh workflow run ci-full.yml --ref main
 gh pr edit <number> --add-label full-ci
 ```
 
+## Approved merges
+
+Complete review and the required checks before approval of the final head.
+After approval, an explicit owner request to merge means merge directly: no new
+tests, CI reruns, `full-ci` label cycle, review round or repeated confirmation.
+Read the current head, existing checks, submitted reviews, review decision,
+unresolved review threads and mergeability once; reuse valid evidence for the
+unchanged approved commit and use an exact-head merge guard.
+Do not bypass branch protection.
+
+If the head changes, required evidence is missing/failing or a blocker appears,
+report it instead of starting another review/test cycle under the merge request.
+Ordinary base movement does not itself require a rebase. GitHub's automatic
+post-merge checks may still run; production deployment keeps its separate gates.
+
 ## Deployment
 
 ```sh
