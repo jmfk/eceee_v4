@@ -166,7 +166,7 @@ const MediaSelectModal = ({
 
     return createPortal(
         <div className="eceee-editor-ui fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10020]">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+            <div className="flex h-[min(90dvh,900px)] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
                     <div>
@@ -188,7 +188,7 @@ const MediaSelectModal = ({
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-auto">
+                <div className="min-h-0 flex-1 overflow-auto">
                     <div className="p-6">
                         {/* Currently Selected Section */}
                         {currentSelection && (

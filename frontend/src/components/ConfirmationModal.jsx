@@ -47,7 +47,7 @@ const ConfirmationModal = ({
             >
                 {/* Modal */}
                 <div
-                    className="bg-white shadow-xl max-w-md w-full mx-4"
+                    className="flex h-[min(70dvh,400px)] w-full max-w-md flex-col overflow-hidden bg-white shadow-xl mx-4"
                     onClick={(e) => e.stopPropagation()}
                 >
                     {/* Header */}
@@ -66,7 +66,7 @@ const ConfirmationModal = ({
                     </div>
 
                     {/* Body */}
-                    <div className="px-6 py-4">
+                    <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
                         <div className="text-gray-700">{message}</div>
                     </div>
 

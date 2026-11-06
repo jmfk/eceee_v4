@@ -15,7 +15,7 @@ const AnalysisProgressDialog = ({ isOpen, progress, onSkip }) => {
 
     return (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50">
-            <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <div className="h-[min(75dvh,600px)] w-full max-w-md overflow-y-auto rounded-lg bg-white p-6 shadow-xl mx-4">
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-4">
                     <Loader className="w-6 h-6 text-blue-600 animate-spin" />

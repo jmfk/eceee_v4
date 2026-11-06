@@ -10,7 +10,7 @@ export default function MediaTagWidget({ tags = [], onChange, disabled = false, 
     }, [tags, onChange, valid])
     const ids = [...new Set(valid.map(tag => typeof tag === 'string' ? tag : (tag.classificationId || tag.id)).filter(Boolean))]
     return <div className="space-y-2">
-        <ClassificationPicker value={ids} namespace={namespace} use="media_files" disabled={disabled}
+        <ClassificationPicker value={ids} selectedTerms={valid.filter(tag => typeof tag === 'object')} namespace={namespace} use="media_files" disabled={disabled}
             onChange={async selected => {
                 try {
                     const terms = await Promise.all(selected.map(async id => await taxonomyApi.term(id)))

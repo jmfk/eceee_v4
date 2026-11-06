@@ -3,7 +3,7 @@ import { Code, FileText, GitBranch, Settings, X, BookOpen, ExternalLink } from '
 const CustomWidgetCreator = ({ onClose }) => {
     return (
         <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="mx-4 h-[min(85dvh,760px)] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
                     <div className="flex items-center space-x-3">
@@ -202,4 +202,4 @@ class MyCustomWidget(BaseWidget):
     )
 }
 
-export default CustomWidgetCreator 
+export default CustomWidgetCreator

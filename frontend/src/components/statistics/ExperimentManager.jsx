@@ -162,7 +162,7 @@ const ExperimentManager = ({ tenantId }) => {
 
       {showCreateModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-[10010]">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+          <div className="h-[min(75dvh,600px)] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-8 shadow-2xl">
             <h2 className="text-xl font-bold text-slate-900 mb-6">Create New Experiment</h2>
             <div className="space-y-4">
               <div>

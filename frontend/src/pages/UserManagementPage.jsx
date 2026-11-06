@@ -559,7 +559,7 @@ const UserManagementPage = () => {
             {/* Create User Modal */}
             {showCreateModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+                    <div className="h-[min(85dvh,760px)] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
                         <div className="flex items-center justify-between mb-4">
                             <div className="text-lg font-semibold text-gray-900 flex items-center" role="heading" aria-level="3">
                                 <UserPlus className="w-5 h-5 mr-2 text-blue-600" />
@@ -753,7 +753,7 @@ const UserManagementPage = () => {
             {/* Edit User Modal */}
             {showEditModal && editFormData && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+                    <div className="h-[min(85dvh,760px)] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
                         <div className="flex items-center justify-between mb-4">
                             <div className="text-lg font-semibold text-gray-900 flex items-center" role="heading" aria-level="3">
                                 <Edit className="w-5 h-5 mr-2 text-blue-600" />

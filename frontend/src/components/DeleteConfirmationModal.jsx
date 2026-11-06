@@ -37,10 +37,10 @@ const DeleteConfirmationModal = ({
             />
 
             {/* Modal Container */}
-            <div className="flex justify-center min-h-screen px-4 text-center sm:block sm:p-0" style={{ alignItems: 'flex-start', paddingTop: '20vh' }}>
+            <div className="flex min-h-screen items-center justify-center px-4 text-center sm:p-0">
                 {/* Modal */}
                 <div
-                    className="relative inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6 z-10"
+                    className="relative z-10 h-[min(70dvh,400px)] w-full max-w-lg overflow-y-auto rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl sm:p-6"
                     onKeyDown={handleKeyDown}
                     tabIndex={-1}
                 >

@@ -479,7 +479,7 @@ const CodexScriptBlockModal = ({
                     event.preventDefault()
                     if (canSubmit) onSubmit()
                 }}
-                className="w-full max-w-xl rounded border border-gray-200 bg-white p-4 shadow-xl"
+                className="h-[min(75dvh,600px)] w-full max-w-xl overflow-y-auto rounded border border-gray-200 bg-white p-4 shadow-xl"
             >
                 <div className="flex items-start justify-between gap-4">
                     <div>
@@ -559,7 +559,7 @@ const MetadataChangeConfirmModal = ({ change, isApplying, onConfirm, onCancel })
                 aria-modal="true"
                 aria-labelledby="metadata-change-title"
                 aria-describedby="metadata-change-description"
-                className="w-full max-w-md rounded border border-gray-200 bg-white p-4 shadow-xl"
+                className="h-[min(70dvh,400px)] w-full max-w-md overflow-y-auto rounded border border-gray-200 bg-white p-4 shadow-xl"
             >
                 <h2 id="metadata-change-title" className="text-base font-semibold text-gray-900">
                     {title}
@@ -609,7 +609,7 @@ const SaveAsModal = ({ isOpen, guideId, overwrite, error, isSaving, onGuideIdCha
                     event.preventDefault()
                     if (normalizedGuideId) onSubmit(normalizedGuideId)
                 }}
-                className="w-full max-w-md rounded border border-gray-200 bg-white p-4 shadow-xl"
+                className="h-[min(70dvh,400px)] w-full max-w-md overflow-y-auto rounded border border-gray-200 bg-white p-4 shadow-xl"
             >
                 <h2 id="save-as-title" className="text-base font-semibold text-gray-900">Save manuscript as</h2>
                 <p className="mt-2 text-sm leading-6 text-gray-600">
@@ -1222,7 +1222,7 @@ const RecordingImportDialog = ({ run, onClose, onImport }) => {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/60 px-4 py-6">
-            <section className="w-full max-w-2xl rounded border border-gray-200 bg-white shadow-xl">
+            <section className="h-[min(85dvh,760px)] w-full max-w-2xl overflow-y-auto rounded border border-gray-200 bg-white shadow-xl">
                 <div className="border-b border-gray-200 px-5 py-4">
                     <h2 className="text-base font-semibold text-gray-900">Import recorded actions</h2>
                     <p className="mt-1 text-sm text-gray-500">

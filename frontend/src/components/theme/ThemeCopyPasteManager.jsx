@@ -427,7 +427,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
             {/* Paste Modal */}
             {showPasteModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full">
+                    <div className="h-[min(85dvh,760px)] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl">
                         {/* Header */}
                         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                             <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="2">
@@ -569,7 +569,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
             {/* Selective Copy Dialog */}
             {showSelectiveCopyDialog && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+                    <div className="h-[min(75dvh,600px)] w-full max-w-md overflow-y-auto rounded-lg bg-white shadow-xl">
                         {/* Header */}
                         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                             <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="2">

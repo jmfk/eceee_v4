@@ -54,11 +54,12 @@ export async function renderMediaImage(mediaData, config, slotDimensions = null)
         'half': 0.5,
         'third': 0.33
     };
-    const imgWidth = Math.round(slotWidth * widthMultipliers[width]);
+    const originalWidth = Number(mediaData.width || mediaData.originalWidth) || null;
+    const originalHeight = Number(mediaData.height || mediaData.originalHeight) || null;
+    const slotImageWidth = Math.round(slotWidth * widthMultipliers[width]);
+    const imgWidth = originalWidth ? Math.min(slotImageWidth, originalWidth) : slotImageWidth;
 
     // Calculate height based on original image aspect ratio
-    const originalWidth = mediaData.width || mediaData.originalWidth;
-    const originalHeight = mediaData.height || mediaData.originalHeight;
     const imgHeight = (originalWidth && originalHeight)
         ? Math.round((originalHeight / originalWidth) * imgWidth)
         : null;
@@ -85,6 +86,8 @@ export async function renderMediaImage(mediaData, config, slotDimensions = null)
         src="${imageUrl}" 
         alt="${escapeHtml(alt)}" 
         class="${widthClass}"
+        ${originalWidth ? `width="${imgWidth}"` : ''}
+        ${imgHeight ? `height="${imgHeight}"` : ''}
         loading="lazy" 
     />`;
 

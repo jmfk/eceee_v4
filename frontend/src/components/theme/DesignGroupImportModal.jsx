@@ -72,7 +72,7 @@ const DesignGroupImportModal = ({ themeId, onClose, onImported, hasUnsavedChange
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="design-group-import-title"
-                className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-xl"
+                className="flex h-[min(85dvh,760px)] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-xl"
                 onClick={(event) => event.stopPropagation()}
             >
                 <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-200 p-4">

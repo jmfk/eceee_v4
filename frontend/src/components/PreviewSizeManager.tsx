@@ -134,7 +134,7 @@ const PreviewSizeManager: React.FC<PreviewSizeManagerProps> = ({
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="mx-4 flex h-[min(85dvh,760px)] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                     <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">
@@ -149,7 +149,7 @@ const PreviewSizeManager: React.FC<PreviewSizeManagerProps> = ({
                 </div>
 
                 {/* Body */}
-                <div className="flex-1 overflow-y-auto px-6 py-4">
+                <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
                     {/* Add/Edit Form */}
                     {isAdding && (
                         <form onSubmit={handleSubmit} className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">

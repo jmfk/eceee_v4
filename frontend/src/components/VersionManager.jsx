@@ -386,7 +386,7 @@ const VersionManager = ({ pageId, onClose }) => {
 
     return (
         <div className="fixed inset-0 bg-black/10 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div className="flex h-[min(85dvh,800px)] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white">
                 <div className="p-6 border-b border-gray-200">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
@@ -424,7 +424,7 @@ const VersionManager = ({ pageId, onClose }) => {
                     </div>
                 </div>
 
-                <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                <div className="min-h-0 flex-1 overflow-y-auto p-6">
                     {versionsLoading ? (
                         <div className="flex justify-center py-8">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>

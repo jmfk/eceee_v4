@@ -24,7 +24,7 @@ describe('DesignGroupsInfoModal', () => {
         render(<DesignGroupsInfoModal widgetType="HeaderWidget" themeId={7} onClose={vi.fn()} />)
 
         const dialog = screen.getByRole('dialog', { name: 'Widget Styling' })
-        expect(dialog).toHaveClass('max-h-[calc(100dvh-2rem)]', 'flex', 'flex-col', 'overflow-hidden')
+        expect(dialog).toHaveClass('h-[min(85dvh,760px)]', 'flex', 'flex-col', 'overflow-hidden')
 
         const content = screen.getByText('This widget is styled entirely through Design Groups in the theme editor.').parentElement.parentElement
         expect(content).toHaveClass('flex-1', 'min-h-0', 'overflow-y-auto')

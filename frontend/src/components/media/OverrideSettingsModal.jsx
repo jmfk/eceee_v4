@@ -24,7 +24,7 @@ const OverrideSettingsModal = ({ isOpen, onClose, config, onConfigChange, select
 
     return (
         <div className="fixed inset-0 z-[10020] flex items-center justify-center bg-black/50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+            <div className="flex h-[min(75dvh,600px)] w-full max-w-md flex-col overflow-hidden rounded-lg bg-white shadow-xl">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
                     <div className="flex items-center gap-3">

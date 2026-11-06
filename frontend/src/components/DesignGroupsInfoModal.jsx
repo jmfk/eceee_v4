@@ -25,7 +25,7 @@ const DesignGroupsInfoModal = ({ widgetType, onClose, themeId }) => {
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="widget-styling-title"
-                className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden"
+                className="flex h-[min(85dvh,760px)] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-white shadow-xl"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}

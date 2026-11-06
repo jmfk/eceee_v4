@@ -258,7 +258,7 @@
 .kb-board-summary { padding-left: 16px; border-left: 1px solid #aeb8c7; color: #475569; font-size: 13px; font-weight: 600; white-space: nowrap; }
 .kb-board-dialog { position: relative; z-index: 110; color-scheme: light; }
 .kb-board-dialog-backdrop { position: fixed; inset: 0; background: rgb(17 24 39 / 0.45); }
-.kb-board-dialog-panel { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(440px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 18px; border: 1px solid #d1d5db; border-radius: 5px; background: white; box-shadow: 0 20px 50px rgb(0 0 0 / 0.22); font: 12px/1.5 Inter, sans-serif; }
+.kb-board-dialog-panel { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(440px, calc(100vw - 24px)); height: min(70dvh, 600px); overflow: auto; padding: 18px; border: 1px solid #d1d5db; border-radius: 5px; background: white; box-shadow: 0 20px 50px rgb(0 0 0 / 0.22); font: 12px/1.5 Inter, sans-serif; }
 .kb-board-dialog-panel > header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .kb-board-dialog-panel > header h2 { font-size: 16px; font-weight: 600; }
 .kb-board-dialog-panel > header button { min-width: 28px; min-height: 28px; display: grid; place-items: center; }

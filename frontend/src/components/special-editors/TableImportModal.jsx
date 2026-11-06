@@ -414,7 +414,7 @@ const TableImportModal = ({ isOpen, onClose, onImport, existingData }) => {
 
     return (
         <div className="fixed inset-0 z-[10010] flex items-center justify-center bg-black/50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="flex h-[min(85dvh,800px)] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b">
                     <div className="text-xl font-semibold" role="heading" aria-level="2">Import Table</div>
