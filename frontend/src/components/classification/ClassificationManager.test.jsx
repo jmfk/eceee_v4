@@ -5,12 +5,14 @@ import userEvent from '@testing-library/user-event'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import ClassificationManager from './ClassificationManager'
 import { taxonomyApi } from '../../api/taxonomy'
+import { mediaTagsApi } from '../../api/media'
 
 vi.mock('../../api/taxonomy', () => ({ taxonomyApi: {
     types: vi.fn(), legacyTypes: vi.fn(), terms: vi.fn(), proposals: vi.fn(), history: vi.fn(), usage: vi.fn(), grants: vi.fn(), members: vi.fn(),
     namespaces: vi.fn(), objectTypes: vi.fn(), createType: vi.fn(), configure: vi.fn(), create: vi.fn(), propose: vi.fn(), change: vi.fn(), changeType: vi.fn(), undo: vi.fn(), decide: vi.fn(),
 }, classificationError: error => error.message }))
 vi.mock('../../utils/tenant', () => ({ getCurrentTenantId: () => 'tenant' }))
+vi.mock('../../api/media', () => ({ mediaTagsApi: { list: vi.fn() } }))
 
 const definition = { id: 'type', name: 'Topics', permissions: ['use', 'propose', 'create', 'edit', 'restore', 'approve'] }
 function renderManager(props = {}) {
@@ -30,6 +32,7 @@ beforeEach(() => {
     taxonomyApi.proposals.mockResolvedValue({ count: 0, results: [] })
     taxonomyApi.namespaces.mockResolvedValue({ results: [] })
     taxonomyApi.objectTypes.mockResolvedValue({ results: [] })
+    mediaTagsApi.list.mockReturnValue(vi.fn().mockResolvedValue({ count: 0, results: [] }))
 })
 
 describe('classification management', () => {
@@ -96,6 +99,23 @@ describe('classification management', () => {
         expect(screen.getByRole('heading', { name: 'New tag type' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Types' })).toHaveAttribute('aria-pressed', 'true')
         expect(screen.queryByLabelText('Tag type')).not.toBeInTheDocument()
+    })
+    it('shows unmigrated image tags in the shared manager with their usage', async () => {
+        taxonomyApi.types.mockResolvedValue({ count: 0, results: [] })
+        mediaTagsApi.list.mockReturnValue(vi.fn().mockResolvedValue({ count: 2, results: [
+            { id: 'legacy-id', name: 'legacy', usageCount: 127 },
+            { id: 'mapped-id', name: 'mapped', classificationId: 'canonical-id', usageCount: 4 },
+        ] }))
+        renderManager({ namespace: 'editorial' })
+        const list = await screen.findByRole('region', { name: 'Existing media tags' })
+        expect(within(list).getByText('legacy')).toHaveAttribute('title', 'ID: legacy-id')
+        expect(within(list).getByText('127 files')).toBeInTheDocument()
+        expect(within(list).queryByText('mapped')).toBeNull()
+        expect(screen.queryByText(/No tag types yet/)).toBeNull()
+        expect(mediaTagsApi.list).toHaveBeenCalledWith(expect.objectContaining({ namespace: 'editorial', page: 1 }))
+        fireEvent.change(screen.getByRole('searchbox', { name: 'Search tags' }), { target: { value: 'legacy' } })
+        expect(await within(list).findByText('legacy')).toBeInTheDocument()
+        expect(screen.queryByRole('region', { name: 'Existing tags' })).toBeNull()
     })
     it('opens editable types in the form and keeps read-only types in detail mode', async () => {
         const type = { ...definition, key: 'topics', namespace: 4, description: 'Editorial subjects', allowedUses: ['pages'], revision: 1, permissions: ['administer'] }

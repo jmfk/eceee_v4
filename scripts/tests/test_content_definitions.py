@@ -60,6 +60,11 @@ class MutableMemoryAPI(MemoryAPI):
             row = self.objects[int(path.rstrip("/").split("/")[-1])]
             row.update(deepcopy(data))
             return row
+        if method == "POST" and path.startswith("taxonomy/types/") and path.endswith("/configure/"):
+            row = next(item for item in self.types if item["id"] == int(path.split("/")[2]))
+            row.update(deepcopy(data))
+            row["revision"] += 1
+            return row
         return super().request(path, method, data)
 
 
@@ -117,6 +122,21 @@ class DefinitionDiffTests(unittest.TestCase):
 
     def test_equal_profile_has_no_changes(self):
         self.assertEqual(self.diff(), [])
+
+    def test_existing_type_uses_are_preserved_when_applying_bundle(self):
+        target = MutableMemoryAPI(self.bundle)
+        target.types[0]["allowed_uses"].extend(["media_files", "object:999"])
+        target.types[0]["name"] = "Old name"
+        target.types[0]["revision"] = 1
+        changes = module.apply_bundle(target, {"id": 2}, self.bundle)["changes"]
+        self.assertIn(target.types[0]["key"], {c.get("classificationType") for c in changes})
+
+        module.apply_bundle(target, {"id": 2}, self.bundle, apply=True)
+        self.assertEqual(target.types[0]["name"], self.bundle["classification_types"][0]["name"])
+        self.assertIn("media_files", target.types[0]["allowed_uses"])
+        self.assertIn("object:999", target.types[0]["allowed_uses"])
+        changes = module.apply_bundle(target, {"id": 2}, self.bundle)["changes"]
+        self.assertNotIn(target.types[0]["key"], {c.get("classificationType") for c in changes})
 
     def test_reports_classification_configuration_and_term_changes(self):
         self.api.types[0]["description"] = "Changed in destination"

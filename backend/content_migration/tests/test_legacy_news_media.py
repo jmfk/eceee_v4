@@ -72,6 +72,27 @@ class LegacyNewsMediaImporterTests(TestCase):
         self.assertEqual(first.metadata["legacy_news_articles"], ["article-1", "article-2"])
 
     @patch("content_migration.legacy_news.media.storage")
+    def test_omit_unavailable_does_not_create_placeholder(self, mocked_storage):
+        with patch.object(self.importer, "_read_image", side_effect=ValueError("http-404")):
+            self.assertIsNone(self.importer.import_image("https://legacy.example/missing.jpg", omit_unavailable=True))
+        self.assertFalse(MediaFile.objects.exists())
+        mocked_storage.overwrite_file.assert_not_called()
+
+    @patch("content_migration.legacy_news.media.storage")
+    def test_omitted_old_placeholder_can_be_recovered_with_same_media_id(self, mocked_storage):
+        source_url = "https://legacy.example/recovered.jpg"
+        mocked_storage.overwrite_file.side_effect = lambda path, file: self._upload_result(file.read(), path)
+        mocked_storage.get_public_url.return_value = "https://media.example/recovered.jpg"
+        with patch.object(self.importer, "_read_image", side_effect=ValueError("http-404")):
+            placeholder = self.importer.import_image(source_url)
+        self.assertTrue(placeholder.delete(user=self.user))
+        with patch.object(self.importer, "_read_image", return_value=(b"recovered", "image/jpeg")):
+            restored = self.importer.import_image(source_url, resume=True, omit_unavailable=True)
+        self.assertEqual(restored.pk, placeholder.pk)
+        self.assertFalse(restored.is_deleted)
+        self.assertFalse(restored.metadata["migration_placeholder"])
+
+    @patch("content_migration.legacy_news.media.storage")
     def test_resume_replaces_placeholder_without_changing_media_id(self, mocked_storage):
         source_url = "https://legacy.example/retry.jpg"
         stable_path = self.importer._storage_path(source_url)

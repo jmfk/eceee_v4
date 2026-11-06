@@ -318,8 +318,8 @@ def apply_bundle(api, ns, bundle, apply=False):
             not old
             or old["name"] != item["name"]
             or old.get("description", "") != item.get("description", "")
-            or actual_objects != expected_objects
-            or actual_resources != set(item.get("resource_uses", []))
+            or not expected_objects.issubset(actual_objects)
+            or not set(item.get("resource_uses", [])).issubset(actual_resources)
         ):
             changes.append({"classificationType": item["key"], "fields": ["configuration"]})
     existing_terms = api.list("taxonomy/terms/?namespace=" + str(ns["id"]))
@@ -348,7 +348,9 @@ def apply_bundle(api, ns, bundle, apply=False):
         )
     existing_types = {t["key"]: t for t in api.list("taxonomy/types/?namespace=" + str(ns["id"]))}
     for item in bundle["classification_types"]:
-        uses = [f"object:{ids[name]}" for name in item["object_types"]] + item.get("resource_uses", [])
+        bundle_uses = [f"object:{ids[name]}" for name in item["object_types"]] + item.get("resource_uses", [])
+        t = existing_types.get(item["key"])
+        uses = list(dict.fromkeys([*(t["allowed_uses"] if t else []), *bundle_uses]))
         desired = {
             "namespace": ns["id"],
             "key": item["key"],
@@ -356,7 +358,6 @@ def apply_bundle(api, ns, bundle, apply=False):
             "description": item.get("description", ""),
             "allowed_uses": uses,
         }
-        t = existing_types.get(item["key"])
         if not t:
             t = api.request("taxonomy/types/", "POST", desired)
         elif (

@@ -79,12 +79,27 @@ class LegacyMediaImporter:
         alt: str = "",
         article_identity: str = "",
         resume: bool = False,
-    ) -> MediaFile:
+        omit_unavailable: bool = False,
+    ) -> Optional[MediaFile]:
         existing = (
             MediaFile.objects.filter(tenant=self.tenant, namespace=self.namespace)
             .filter(Q(metadata__legacy_source_url=source_url) | Q(metadata__legacy_source_urls__contains=[source_url]))
             .first()
         )
+        if existing is None and omit_unavailable:
+            existing = (
+                MediaFile.objects.with_deleted()
+                .filter(
+                    tenant=self.tenant,
+                    namespace=self.namespace,
+                    is_deleted=True,
+                    metadata__migration_placeholder=True,
+                )
+                .filter(
+                    Q(metadata__legacy_source_url=source_url) | Q(metadata__legacy_source_urls__contains=[source_url])
+                )
+                .first()
+            )
         is_placeholder = bool(existing and existing.metadata.get("migration_placeholder"))
         if existing and (not is_placeholder or not resume):
             self._record_article(existing, article_identity)
@@ -96,6 +111,8 @@ class LegacyMediaImporter:
             placeholder = False
             failure = ""
         except Exception as exc:  # the article import must survive remote media failure
+            if omit_unavailable:
+                return None
             failure = self._failure_category(exc)
             content = placeholder_png(source_url, failure)
             content_type = "image/png"
@@ -132,6 +149,9 @@ class LegacyMediaImporter:
                 "migration_placeholder": False,
                 "legacy_media_failure": "",
             }
+            existing.is_deleted = False
+            existing.deleted_at = None
+            existing.deleted_by = None
             existing.save()
             self._record_article(existing, article_identity)
             self._apply_tags(existing, placeholder=False)

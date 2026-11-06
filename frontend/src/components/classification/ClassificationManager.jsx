@@ -5,6 +5,7 @@ import './classification.css'
 import ClassificationTypeForm from './ClassificationTypeForm'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { taxonomyApi, classificationError } from '../../api/taxonomy'
+import { mediaTagsApi } from '../../api/media'
 import { getCurrentTenantId } from '../../utils/tenant'
 
 const inputClass = 'block w-full mt-1'
@@ -55,6 +56,7 @@ export default function ClassificationManager({ namespace } = {}) {
     const [page, setPage] = useState(1)
     const [proposalPage, setProposalPage] = useState(1)
     const [historyPage, setHistoryPage] = useState(1)
+    const [legacyMediaPage, setLegacyMediaPage] = useState(1)
     const [customPermissions, setCustomPermissions] = useState(['use', 'propose'])
     const [action, setAction] = useState('create')
     const [editTypeId, setEditTypeId] = useState('')
@@ -100,6 +102,14 @@ export default function ClassificationManager({ namespace } = {}) {
     const definition = types.data?.results?.find(type => type.id === typeId)
     const permissions = definition?.permissions || []
     const terms = useQuery({ queryKey: ['classification', tenant, 'terms', namespace, typeId, legacyTagType, search, page], queryFn: async () => await taxonomyApi.terms({ ...scope, classification_type: typeId, tag_type: legacyTagType, search, page, page_size: 50, ordering: 'name' }), enabled: view === 'terms' || !!typeId || (setupPending && ['terms', 'history'].includes(view)) })
+    const legacyMediaTags = useQuery({
+        queryKey: ['classification', tenant, 'legacyMediaTags', namespace, search, legacyMediaPage],
+        queryFn: async () => {
+            const request = await mediaTagsApi.list({ ...scope, search, page: legacyMediaPage, page_size: 50, ordering: 'name' })
+            return await request()
+        },
+        enabled: view === 'terms',
+    })
     const proposals = useQuery({ queryKey: ['classification', tenant, 'proposals', namespace, proposalPage], queryFn: async () => await taxonomyApi.proposals({ ...scope, page: proposalPage }), enabled: view === 'proposals' })
     const history = useQuery({ queryKey: ['classification', tenant, 'history', namespace, typeId, historyPage], queryFn: async () => await taxonomyApi.history({ ...scope, classification_type: typeId, page: historyPage }), enabled: view === 'history' && !!typeId })
     const grants = useQuery({ queryKey: ['classification', tenant, 'grants', typeId], queryFn: async () => await taxonomyApi.grants(typeId), enabled: view === 'rights' && permissions.includes('administer') })
@@ -168,6 +178,8 @@ export default function ClassificationManager({ namespace } = {}) {
     const filterOptions = hasTypes ? typeDefinitions : (legacyTypes.data || []).map(key => ({ id: key, name: key }))
     const activeFilter = hasTypes ? definition : filterOptions.find(type => type.id === legacyTagType)
     const visibleTerms = terms.data?.results || []
+    const unmigratedMediaTags = (legacyMediaTags.data?.results || []).filter(tag => !tag.classificationId)
+    const showExistingTerms = visibleTerms.length > 0 || ((search || legacyTagType || page > 1) && !legacyMediaTags.isPending && unmigratedMediaTags.length === 0)
     const showTypeColumn = !typeId && new Set(visibleTerms.map(term => term.classificationType)).size > 1
     const termActions = (selected?.status === 'archived' ? ['reactivate'] : selected?.status === 'approved' ? ['edit', 'move', 'merge', 'archive'] : [])
         .filter(item => permissions.includes(item === 'reactivate' ? 'restore' : item) || (item !== 'reactivate' && permissions.includes('propose')))
@@ -189,7 +201,7 @@ export default function ClassificationManager({ namespace } = {}) {
                         {activeFilter.name}<X size={12} aria-hidden="true" />
                     </button>}
                     <input id={searchId} type="search" placeholder=" " data-filled={String(search ?? '').length > 0} value={search}
-                        onChange={event => { setSearch(event.target.value); setPage(1) }} />
+                        onChange={event => { setSearch(event.target.value); setPage(1); setLegacyMediaPage(1) }} />
                     <button ref={filterButtonRef} type="button" className="classification-icon" title="Add filter" aria-label="Add filter"
                         aria-expanded={filterOpen} aria-controls={filterId} onClick={() => setFilterOpen(!filterOpen)}>
                         <ListFilterPlus size={18} aria-hidden="true" />
@@ -238,7 +250,7 @@ export default function ClassificationManager({ namespace } = {}) {
             </section>) : <>
                 {terms.isPending && <p role="status">Checking existing tags…</p>}
                 {terms.error && <p role="alert">{classificationError(terms.error)}</p>}
-                {terms.isSuccess && ((terms.data?.results || []).length > 0 || search || legacyTagType || page > 1 ? <section aria-label="Existing tags" className="space-y-4">
+                {terms.isSuccess && (showExistingTerms ? <section aria-label="Existing tags" className="space-y-4">
                     <div>
                         <h2 className="text-xl font-semibold">Existing tags</h2>
                         <p className="mt-2 text-gray-600">Tag setup is incomplete. A workspace owner needs to finish the migration before these tags can be edited here.</p>
@@ -255,12 +267,30 @@ export default function ClassificationManager({ namespace } = {}) {
                         {page > 1 && <button type="button" onClick={() => setPage(page - 1)}>Previous tags</button>}
                         {terms.data.next && <button type="button" onClick={() => setPage(page + 1)}>Next tags</button>}
                     </div>
-                </section> : <>
+                </section> : legacyMediaTags.isPending || unmigratedMediaTags.length ? null : <>
                     <p className="text-gray-600">No tag types yet. Add a type to start organizing your tags.</p>
                     <button type="button" className="user-tools-primary" onClick={() => { setView('types'); setTypeMode('new') }}>Add tag type</button>
                 </>)}
             </>}
         </div>}
+        {view === 'terms' && !types.isPending && <section aria-label="Existing media tags" className="space-y-3">
+            {legacyMediaTags.isPending && <p role="status">Loading existing media tags…</p>}
+            {legacyMediaTags.error && <p role="alert">{classificationError(legacyMediaTags.error)}</p>}
+            {unmigratedMediaTags.length > 0 && <>
+                <h2 className="text-lg font-semibold">Existing media tags</h2>
+                <p className="text-sm text-gray-600">These tags are attached to media files but are not yet in the shared tag register. They can be viewed here until migration is complete.</p>
+                <ul className="divide-y divide-gray-200">
+                    {unmigratedMediaTags.map(tag => <li key={tag.id} className="flex items-center justify-between gap-4 py-3">
+                        <span className="min-w-0 break-words font-medium" title={`ID: ${tag.id}`}>{tag.name}</span>
+                        <span className="shrink-0 text-xs text-gray-500">{tag.usageCount ?? 0} files</span>
+                    </li>)}
+                </ul>
+                <div className="flex gap-3 text-sm">
+                    {legacyMediaPage > 1 && <button type="button" onClick={() => setLegacyMediaPage(legacyMediaPage - 1)}>Previous media tags</button>}
+                    {legacyMediaTags.data?.next && <button type="button" onClick={() => setLegacyMediaPage(legacyMediaPage + 1)}>Next media tags</button>}
+                </div>
+            </>}
+        </section>}
         {notice && <p role="status" className="text-green-700">{notice} {undoId && <button type="button" disabled={busy} className="underline px-2 py-1" onClick={() => run(async () => { await taxonomyApi.undo(undoId); setUndoId(null); setNotice('Change undone.'); setSelected(null) })}>Undo</button>}</p>}
         {error && <p role="alert" className="text-red-700">{error}</p>}
         {view === 'types' && !types.isPending && !types.error && <div className="grid grid-cols-1 lg:grid-cols-[minmax(220px,1fr)_2fr] gap-4">

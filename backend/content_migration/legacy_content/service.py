@@ -24,7 +24,7 @@ from .term_plan import identity as term_identity
 from .term_plan import source_names
 from .transform import BlockedRecord, checksum, normalize
 
-PIPELINE_VERSION = "2"
+PIPELINE_VERSION = "4"
 TAXONOMY = {
     "types": "news_type",
     "categories": "news_category",
@@ -500,13 +500,15 @@ def apply_item(run, item, user, types, facets):
                 raise BlockedRecord("media_classification_must_be_list")
             media_ids = validate_media_selection(run.namespace, user, media_ids)
     importer = LegacyMediaImporter(namespace=run.namespace, tenant=run.tenant, user=user, classification_ids=media_ids)
-    media = {
-        url: importer.import_image(url, article_identity=f"{item.resource}:{item.source_id}", resume=True)
-        for url in payload["images"]
-    }
-    if previous_placeholders and all(
-        url in media and media[url].metadata.get("migration_placeholder") for url in previous_placeholders
-    ):
+    media = {}
+    for url in payload["images"]:
+        imported = importer.import_image(
+            url, article_identity=f"{item.resource}:{item.source_id}", resume=True, omit_unavailable=True
+        )
+        if imported is not None:
+            media[url] = imported
+    unavailable_images = [url for url in payload["images"] if url not in media]
+    if previous_placeholders and unavailable_images == previous_placeholders:
         # Retrying unavailable images is useful; another identical draft version is not.
         item.status = "unchanged"
         item.object_instance = obj
@@ -516,7 +518,7 @@ def apply_item(run, item, user, types, facets):
     working_row = deepcopy(row)
     working_row["attachments"] = _attachments(row, importer)
     payload = normalize(working_row, item.resource, author_ids=author_ids, media_by_url=media)
-    media_warnings = [url for url, m in media.items() if m.metadata.get("migration_placeholder")]
+    media_warnings = unavailable_images
     data = {k: v for k, v in payload["data"].items() if v is not None}
     # Serialized payload fields are camelCase; ObjectVersion data remains Python-owned snake_case.
     from object_storage.serializers import ObjectTypeDefinitionSerializer
