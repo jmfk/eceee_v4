@@ -1,6 +1,6 @@
 import React from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import ClassificationPicker from './ClassificationPicker'
 import { taxonomyApi } from '../../api/taxonomy'
@@ -49,6 +49,19 @@ describe('classification picker', () => {
         expect(name).toHaveAttribute('title', `ID: ${id}`)
         expect(screen.queryByText(id)).toBeNull()
         expect(screen.queryByRole('alert')).toBeNull()
+    })
+    it('distinguishes same-name selections by path when displaying and removing them', async () => {
+        const tags = {
+            general: { id: 'general', name: 'Energy', path: 'General / Energy', status: 'approved' },
+            topic: { id: 'topic', name: 'Energy', path: 'Topics / Energy', status: 'approved' },
+        }
+        taxonomyApi.term.mockImplementation(async id => tags[id])
+        const changed = renderPicker({ value: ['general', 'topic'] })
+        const selected = within(screen.getByRole('list', { name: 'Selected tags' }))
+        expect(await selected.findByText('General / Energy')).toBeInTheDocument()
+        expect(await selected.findByText('Topics / Energy')).toBeInTheDocument()
+        fireEvent.click(selected.getByRole('button', { name: 'Remove Topics / Energy' }))
+        expect(changed).toHaveBeenCalledWith(['general'])
     })
     it('allows pending terms in drafts and clearly labels them', async () => {
         const changed = renderPicker({ allowProposed: true })

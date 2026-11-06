@@ -290,9 +290,6 @@ class LegacyMediaImporter:
         from taxonomy.models import LegacyTagMapping
 
         ids = classification_ids(media)
-        if self.classification_ids is not None:
-            replace_assignments(media, list(dict.fromkeys(ids + self._required_tag_ids(placeholder))), self.user)
-            return
         if not placeholder:
             source_ids = [
                 str(pk)

@@ -179,7 +179,8 @@ export default function ClassificationManager({ namespace } = {}) {
     const activeFilter = hasTypes ? definition : filterOptions.find(type => type.id === legacyTagType)
     const visibleTerms = terms.data?.results || []
     const unmigratedMediaTags = (legacyMediaTags.data?.results || []).filter(tag => !tag.classificationId)
-    const showExistingTerms = visibleTerms.length > 0 || ((search || legacyTagType || page > 1) && !legacyMediaTags.isPending && unmigratedMediaTags.length === 0)
+    const showLegacyMediaTags = unmigratedMediaTags.length > 0 || Boolean(legacyMediaTags.data?.next) || legacyMediaPage > 1
+    const showExistingTerms = visibleTerms.length > 0 || ((search || legacyTagType || page > 1) && !legacyMediaTags.isPending && !showLegacyMediaTags)
     const showTypeColumn = !typeId && new Set(visibleTerms.map(term => term.classificationType)).size > 1
     const termActions = (selected?.status === 'archived' ? ['reactivate'] : selected?.status === 'approved' ? ['edit', 'move', 'merge', 'archive'] : [])
         .filter(item => permissions.includes(item === 'reactivate' ? 'restore' : item) || (item !== 'reactivate' && permissions.includes('propose')))
@@ -267,7 +268,7 @@ export default function ClassificationManager({ namespace } = {}) {
                         {page > 1 && <button type="button" onClick={() => setPage(page - 1)}>Previous tags</button>}
                         {terms.data.next && <button type="button" onClick={() => setPage(page + 1)}>Next tags</button>}
                     </div>
-                </section> : legacyMediaTags.isPending || unmigratedMediaTags.length ? null : <>
+                </section> : legacyMediaTags.isPending || showLegacyMediaTags ? null : <>
                     <p className="text-gray-600">No tag types yet. Add a type to start organizing your tags.</p>
                     <button type="button" className="user-tools-primary" onClick={() => { setView('types'); setTypeMode('new') }}>Add tag type</button>
                 </>)}
@@ -276,7 +277,7 @@ export default function ClassificationManager({ namespace } = {}) {
         {view === 'terms' && !types.isPending && <section aria-label="Existing media tags" className="space-y-3">
             {legacyMediaTags.isPending && <p role="status">Loading existing media tags…</p>}
             {legacyMediaTags.error && <p role="alert">{classificationError(legacyMediaTags.error)}</p>}
-            {unmigratedMediaTags.length > 0 && <>
+            {showLegacyMediaTags && <>
                 <h2 className="text-lg font-semibold">Existing media tags</h2>
                 <p className="text-sm text-gray-600">These tags are attached to media files but are not yet in the shared tag register. They can be viewed here until migration is complete.</p>
                 <ul className="divide-y divide-gray-200">
@@ -285,6 +286,7 @@ export default function ClassificationManager({ namespace } = {}) {
                         <span className="shrink-0 text-xs text-gray-500">{tag.usageCount ?? 0} files</span>
                     </li>)}
                 </ul>
+                {legacyMediaTags.isSuccess && unmigratedMediaTags.length === 0 && <p className="text-sm text-gray-600">No unmigrated media tags on this page.</p>}
                 <div className="flex gap-3 text-sm">
                     {legacyMediaPage > 1 && <button type="button" onClick={() => setLegacyMediaPage(legacyMediaPage - 1)}>Previous media tags</button>}
                     {legacyMediaTags.data?.next && <button type="button" onClick={() => setLegacyMediaPage(legacyMediaPage + 1)}>Next media tags</button>}
