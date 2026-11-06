@@ -325,7 +325,11 @@ def _version_sync_fingerprint(
     page_mappings: Optional[Dict[str, int]] = None,
 ) -> str:
     theme_source_id = payload.get("theme_source_id")
-    serialized_payload = json.dumps(payload, sort_keys=True, default=_json_default)
+    # Scheduling metadata is not content and must not introduce dependency matches.
+    reference_payload = {
+        key: value for key, value in payload.items() if key not in {"effective_date", "expiry_date", "created_at"}
+    }
+    serialized_payload = json.dumps(reference_payload, sort_keys=True, default=_json_default)
     media_dependencies = {}
     for source_id, metadata in (media_metadata or {}).items():
         references = (

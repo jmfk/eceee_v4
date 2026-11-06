@@ -1425,7 +1425,8 @@ class SitePackageServiceTests(TestCase):
         first_job.imported_root_page = imported_root
         first_job.save(update_fields=["status", "imported_root_page", "updated_at"])
 
-        effective_date = timezone.now() - timedelta(hours=1)
+        # Include a source page ID in the timestamp to catch false reference matches.
+        effective_date = (timezone.now() - timedelta(hours=1)).replace(microsecond=101000)
         publish_job = SitePackageJob.objects.create(
             kind=SitePackageJob.KIND_IMPORT,
             created_by=self.user,
@@ -1448,7 +1449,7 @@ class SitePackageServiceTests(TestCase):
 
         publish_job.status = SitePackageJob.STATUS_COMPLETED
         publish_job.save(update_fields=["status", "updated_at"])
-        expiry_date = timezone.now() + timedelta(days=1)
+        expiry_date = (timezone.now() + timedelta(days=1)).replace(microsecond=101000)
         expiry_job = SitePackageJob.objects.create(
             kind=SitePackageJob.KIND_IMPORT,
             created_by=self.user,
