@@ -3302,7 +3302,7 @@
     },
     "render-manifest": {
       "formatVersion": 2,
-      "sha256": "b4762e60ebe95599a205218908b548da599f5878f161d57f1d86242aeba7b15f",
+      "sha256": "184e6ebc5bf9dd941a44f72256ec506d192a3fc7695245863bbf0139e909e9a4",
       "types": [
         "easy_widgets.BannerWidget",
         "easy_widgets.BioWidget",
@@ -3317,6 +3317,7 @@
         "easy_widgets.NavbarWidget",
         "easy_widgets.NavigationWidget",
         "easy_widgets.NewsDetailWidget",
+        "easy_widgets.NewsFlashWidget",
         "easy_widgets.NewsListWidget",
         "easy_widgets.PathDebugWidget",
         "easy_widgets.SectionWidget",
