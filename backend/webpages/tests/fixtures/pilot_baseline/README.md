@@ -17,6 +17,10 @@ The initial capture used `9da0eb18451db16f5b8406f1c0c6c5a4f108483d`. Before merg
 
 Known reference issue: the metadata validation endpoint parses `headerLevel` as `header_level`, while `HeadlineConfig` names its field `headerLevel`. It silently returns the default `h1` for a nondefault requested value. The fixture characterizes this defect and the report names it; it does not approve copying the defect into a replacement. Fixing it requires a separate reviewed product change and explicit baseline diff. Invalid widget configurations currently return HTTP 200 with `isValid: false`; that existing API convention is also captured.
 
+## News Flash catalog extension
+
+PR #340 deliberately extends only the catalog observation at source commit `92d2ea8d0a28e5a4f74b8d6ee9b3d0ac9d37f520` (PRD-0044/0045, ADR-0062–0064). `reference.json` adds `easy_widgets.NewsFlashWidget` to the sorted type identities and updates the canonical manifest digest from `b4762e60ebe95599a205218908b548da599f5878f161d57f1d86242aeba7b15f` to `184e6ebc5bf9dd941a44f72256ec506d192a3fc7695245863bbf0139e909e9a4`. Removing only News Flash from the candidate manifest reproduces the previous digest exactly: all 25 existing catalog entries are unchanged. All 51 request cases, wire responses, case digest and runtime provenance remain frozen. This is an explicit extension for the new widget, not regeneration of the behavioral baseline.
+
 ## Run locally
 
 Requires Docker with the `orbstack` context, the existing backend dependency image and internet access for frontend `npm ci`. It does not require operator environment files, a running CMS, a shared database or published host ports.
