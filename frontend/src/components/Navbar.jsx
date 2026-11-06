@@ -48,6 +48,7 @@ const Navbar = () => {
   const primaryNavigation = visibleNavigation.filter((item) => primaryNames.includes(item.name))
   const overflowNavigation = visibleNavigation.filter((item) => !primaryNames.includes(item.name))
   const navigationHref = (item) => {
+    if (item.href === '/media' && user?.isDesignerOnly) return '/designer/media'
     if (item.href === '/profile') return profileHref
     if (item.href === '/settings') return supportSettingsOnly ? supportSettingsHref : settingsHref
     return item.href
@@ -59,6 +60,7 @@ const Navbar = () => {
   const desktopNavRef = useRef(null)
 
   const isActive = (path) => {
+    if (path === '/media' && user?.isDesignerOnly) return location.pathname.startsWith('/designer/media')
     if (path === '/settings') {
       return location.pathname.startsWith('/settings') || location.pathname.startsWith('/schemas')
     }
