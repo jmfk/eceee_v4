@@ -46,6 +46,7 @@ def display_date(row):
 def normalize(row, resource, *, author_ids=None, media_by_url=None):
     data = dict(row["data"])
     author_ids = author_ids or {}
+    omit_unavailable_images = media_by_url is not None
     media_by_url = media_by_url or {}
     title = row["title"].strip()
     if not title:
@@ -56,8 +57,15 @@ def normalize(row, resource, *, author_ids=None, media_by_url=None):
     soup = BeautifulSoup(body, "html.parser")
     for unwanted in soup.select("script,style,iframe,object,embed,.share-on-social,.social-share,aside"):
         unwanted.decompose()
+    # Legacy article HTML can include zero-size ad beacons. They are not editorial media.
+    for image in soup.find_all("img"):
+        if image.get("width") in {"0", "1"} or image.get("height") in {"0", "1"}:
+            image.decompose()
     _normalize_urls_and_attributes(soup, row["sourceUrl"])
     for image in soup.find_all("img", src=True):
+        if omit_unavailable_images and image["src"] not in media_by_url:
+            image.decompose()
+            continue
         images.append(image["src"])
     if resource in {"news", "columns"}:
         data = {k: v for k, v in data.items() if k in {"sourceDate", "externalUrl"}}

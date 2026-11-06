@@ -74,6 +74,19 @@ class EditorialTransformTests(SimpleTestCase):
         self.assertEqual(result["data"]["sourceDate"], "2019-12-31T12:15:00Z")
         self.assertTrue(result["data"]["presentationalPublishingDate"].startswith("2020-01-02"))
 
+    def test_ignores_zero_size_tracking_images(self):
+        row = record(content='<p>Text</p><img src="https://ads.example/lg.php" width="0" height="0">')
+        result = normalize(row, "news")
+        self.assertEqual(result["images"], ())
+        self.assertNotIn("lg.php", str(result["widgets"]))
+
+    def test_omits_unavailable_image_from_final_content(self):
+        row = record(content='<p>Text</p><img src="https://legacy.example/missing.jpg">')
+        self.assertEqual(normalize(row, "news")["images"], ("https://legacy.example/missing.jpg",))
+        result = normalize(row, "news", media_by_url={})
+        self.assertEqual(result["images"], ())
+        self.assertNotIn("missing.jpg", str(result["widgets"]))
+
     def test_columns_require_real_author_bindings(self):
         with self.assertRaisesRegex(BlockedRecord, "missing_columnist_dependency"):
             normalize(record("columns"), "columns")
@@ -451,7 +464,7 @@ class EditorialImportTests(TestCase):
             self.assertEqual(storage.overwrite_file.call_count, 2)
             connection.check_constraints()
 
-    def test_identical_source_retries_placeholder_without_duplicate_versions_until_recovered(self):
+    def test_identical_source_omits_unavailable_image_until_recovered(self):
         from file_manager.models import MediaFile
         from taxonomy.models import ClassificationRollout
 
@@ -483,20 +496,23 @@ class EditorialImportTests(TestCase):
             storage.overwrite_file.side_effect = upload
             storage.get_public_url.side_effect = lambda path: "https://media.example/" + path
             self.assertEqual(apply_run(self._media_run(row, config), self.user), {"imported": 1})
-            media = MediaFile.objects.get()
-            old_path, old_bytes = media.file_path, objects[media.file_path]
+            self.assertFalse(MediaFile.objects.exists())
             obj = EditorialImportBinding.objects.get().object_instance
+            self.assertNotIn("recover.png", str(obj.current_version.widgets))
+            self.assertEqual(
+                obj.current_version.workflow_metadata["legacy_editorial"]["placeholder_images"],
+                ["https://legacy.example/recover.png"],
+            )
             self.assertEqual(apply_run(self._media_run(row, config), self.user), {"unchanged": 1})
             self.assertEqual(obj.versions.count(), 1)
-            self.assertEqual(MediaFile.objects.get().pk, media.pk)
-            self.assertEqual(objects, {old_path: old_bytes})
+            self.assertFalse(MediaFile.objects.exists())
+            self.assertEqual(objects, {})
             self.assertEqual(apply_run(self._media_run(row, config), self.user), {"imported": 1})
-            media.refresh_from_db()
+            media = MediaFile.objects.get()
             obj.refresh_from_db()
             self.assertEqual(MediaFile.objects.count(), 1)
             self.assertFalse(media.metadata["migration_placeholder"])
-            self.assertNotEqual(media.file_path, old_path)
-            self.assertEqual(objects[old_path], old_bytes)
+            self.assertEqual(objects[media.file_path], b"recovered-image")
             self.assertEqual(obj.versions.count(), 2)
             self.assertIn(media.file_url, json.dumps(obj.current_version.widgets))
             self.assertEqual(obj.current_version.workflow_metadata["legacy_editorial"]["placeholder_images"], [])

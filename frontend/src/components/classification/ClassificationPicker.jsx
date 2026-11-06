@@ -8,7 +8,7 @@ import CompactSelect from './CompactSelect'
 import './classification.css'
 
 /** Controlled IDs belong to the editor's working copy, never to the live version. */
-export default function ClassificationPicker({ value = [], onChange, namespace, use, allowProposed = false, disabled = false }) {
+export default function ClassificationPicker({ value = [], selectedTerms = [], onChange, namespace, use, allowProposed = false, disabled = false }) {
     const id = useId()
     const [search, setSearch] = useState('')
     const [typeFilter, setTypeFilter] = useState('')
@@ -73,9 +73,10 @@ export default function ClassificationPicker({ value = [], onChange, namespace, 
         <legend className="sr-only">Tags</legend>
         <ul className="space-y-2" aria-label="Selected tags">
             {value.map(termId => {
-                const term = selected.data?.find(item => item.id === termId)
+                const term = selected.data?.find(item => String(item.id) === String(termId))
+                    || selectedTerms.find(item => String(item.classificationId || item.id) === String(termId))
                 return <li key={termId} className="flex items-center justify-between gap-2">
-                    <span className="min-w-0 flex-1 break-words">{term?.path || term?.name || termId}{term && term.status !== 'approved' ? ` (${term.status})` : ''}</span>
+                    <span className="min-w-0 flex-1 break-words" title={`ID: ${termId}`}>{term?.name || term?.path || 'Unknown tag'}{term?.status && term.status !== 'approved' ? ` (${term.status})` : ''}</span>
                     <button type="button" className="classification-selected-remove ml-auto shrink-0" aria-label={`Remove ${term?.name || termId}`}
                         title={`Remove ${term?.name || termId}`} onClick={() => onChange(value.filter(item => item !== termId))}>
                         <X size={14} aria-hidden="true" />
@@ -109,7 +110,7 @@ export default function ClassificationPicker({ value = [], onChange, namespace, 
         </div>
         {definitions.error && <p role="alert">{classificationError(definitions.error)}</p>}
         {terms.isPending && <p role="status">Loading tags…</p>}
-        {(terms.error || selected.error || defaultNamespace.error) && <p role="alert">{classificationError(terms.error || selected.error || defaultNamespace.error)}</p>}
+        {(terms.error || (selected.error && value.some(termId => !selectedTerms.some(item => String(item.classificationId || item.id) === String(termId)))) || defaultNamespace.error) && <p role="alert">{classificationError(terms.error || selected.error || defaultNamespace.error)}</p>}
         {!terms.isPending && !terms.error && choices.length === 0 && <p className="text-sm">No matching tags.</p>}
         <ul className="classification-results max-h-56 overflow-auto space-y-1">
             {choices.map(term => <li key={term.id}><button type="button" className="w-full justify-start px-2 py-2 text-left hover:bg-gray-100 focus-visible:outline" onClick={() => onChange([...value, term.id])}>

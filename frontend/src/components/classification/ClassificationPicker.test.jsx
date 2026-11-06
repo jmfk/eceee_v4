@@ -41,6 +41,15 @@ describe('classification picker', () => {
         fireEvent.click(remove)
         expect(changed).toHaveBeenCalledWith([])
     })
+    it('shows the provided tag name while its ID lookup is unavailable', async () => {
+        const id = 'f6b81810-1281-4615-8fa5-49132bf49158'
+        taxonomyApi.term.mockRejectedValue(new Error('Term unavailable'))
+        renderPicker({ value: [id], selectedTerms: [{ classificationId: id, name: 'Energy efficiency', status: 'approved' }] })
+        const name = await screen.findByText('Energy efficiency')
+        expect(name).toHaveAttribute('title', `ID: ${id}`)
+        expect(screen.queryByText(id)).toBeNull()
+        expect(screen.queryByRole('alert')).toBeNull()
+    })
     it('allows pending terms in drafts and clearly labels them', async () => {
         const changed = renderPicker({ allowProposed: true })
         fireEvent.click(await screen.findByRole('button', { name: 'Pending (pending approval)' }))
