@@ -27,6 +27,7 @@ import TwoColumnsWidget from './TwoColumnsWidget';
 import ThreeColumnsWidget from './ThreeColumnsWidget';
 import PathDebugWidget from './PathDebugWidget';
 import NewsListWidget from './NewsListWidget';
+import NewsFlashWidget from './NewsFlashWidget';
 import NewsDetailWidget from './NewsDetailWidget';
 import TopNewsPlugWidget from './TopNewsPlugWidget';
 import SidebarTopNewsWidget from './SidebarTopNewsWidget';
@@ -65,6 +66,7 @@ const initializeRegistry = () => {
         'easy_widgets.ThreeColumnsWidget': registerWidget(ThreeColumnsWidget, 'easy_widgets.ThreeColumnsWidget'),
         'easy_widgets.PathDebugWidget': registerWidget(PathDebugWidget, 'easy_widgets.PathDebugWidget'),
         'easy_widgets.NewsListWidget': registerWidget(NewsListWidget, 'easy_widgets.NewsListWidget'),
+        'easy_widgets.NewsFlashWidget': registerWidget(NewsFlashWidget, 'easy_widgets.NewsFlashWidget'),
         'easy_widgets.NewsDetailWidget': registerWidget(NewsDetailWidget, 'easy_widgets.NewsDetailWidget'),
         'easy_widgets.TopNewsPlugWidget': registerWidget(TopNewsPlugWidget, 'easy_widgets.TopNewsPlugWidget'),
         'easy_widgets.SidebarTopNewsWidget': registerWidget(SidebarTopNewsWidget, 'easy_widgets.SidebarTopNewsWidget'),

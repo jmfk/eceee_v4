@@ -1,3 +1,4 @@
+import { newsFlashItems } from './news-flash';
 import { compilePublisherStyles, defaultSpecialPages, widgetVariantClasses } from './theme';
 import { responsiveImageSources, type ResponsiveImageOptions } from './imgproxy';
 import type { ThemeLayoutDefinition, ThemeLayoutDocument, ThemeLayoutSlot, ThemeSpecialPage } from '../../frontend/src/rendering/types';
@@ -114,6 +115,7 @@ export interface PublishedObjectQuery {
   sortOrder: string;
   featuredFirst?: boolean;
   featuredOnly?: boolean;
+  newsPriorityOnly?: boolean;
   pinnedFirst?: boolean;
   includeHierarchy?: boolean;
   status?: 'draft' | 'archived';
@@ -754,7 +756,15 @@ async function resolvePublishedData(
     const prepared = config === widget.config ? widget : { ...widget, config };
     let items: PublishedObject[] | null = null;
     let item: PublishedObject | undefined;
-    if (widget.type === 'easy_widgets.NewsListWidget') {
+    if (widget.type === 'easy_widgets.NewsFlashWidget') {
+      const types = stringList(config.objectTypes ?? config.object_types ?? ['article']);
+      items = await newsFlashItems(reader, {
+        objectTypeIds: types.filter(type => /^\d+$/.test(type)),
+        objectTypeNames: types.filter(type => !/^\d+$/.test(type)),
+        classificationIds: stringList(config.classificationIds ?? config.classification_ids),
+        includeDescendants: (config.includeDescendants ?? config.include_descendants) !== false,
+      }, tenantId, at);
+    } else if (widget.type === 'easy_widgets.NewsListWidget') {
       const configuredTypes = config.objectTypes !== undefined ? config.objectTypes : config.object_types;
       const objectTypeIds = stringList(configuredTypes);
       items = await reader.publishedObjects({
@@ -838,7 +848,7 @@ async function resolvePublishedData(
       }
     }
     if (items) {
-      const usesObjectTypePath = widget.type === 'easy_widgets.TopNewsPlugWidget'
+      const usesObjectTypePath = widget.type === 'easy_widgets.NewsFlashWidget' || widget.type === 'easy_widgets.TopNewsPlugWidget'
         || widget.type === 'easy_widgets.SidebarTopNewsWidget';
       const configuredBase = String(config.newsPagePath ?? config.news_page_path ?? '/news/');
       const newsBase = configuredBase.startsWith('/') && !configuredBase.startsWith('//')

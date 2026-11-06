@@ -22,6 +22,12 @@ DEFINITIONS = {
         "Artiklar",
         {
             "summary": field("Ingress", "textarea"),
+            "newsPriority": field("Prioriterad nyhet", "boolean", default=False),
+            "newsPriorityUntil": field(
+                "Prioriterad till",
+                "datetime",
+                description="Lämna tomt för prioritet tills en nyare prioriterad nyhet publiceras.",
+            ),
             "presentationalPublishingDate": field("Visningsdatum", "datetime"),
             "sourceDate": field("Källdatum", "datetime"),
             "externalUrl": field("Extern källa", "url"),

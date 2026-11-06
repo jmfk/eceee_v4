@@ -24,6 +24,7 @@ from .three_columns import ThreeColumnsWidget
 from .section import SectionWidget
 from .path_debug import PathDebugWidget
 from .news_list import NewsListWidget
+from .news_flash import NewsFlashWidget
 from .news_detail import NewsDetailWidget
 from .top_news_plug import TopNewsPlugWidget
 from .sidebar_top_news import SidebarTopNewsWidget
@@ -49,6 +50,7 @@ __all__ = [
     "SectionWidget",
     "PathDebugWidget",
     "NewsListWidget",
+    "NewsFlashWidget",
     "NewsDetailWidget",
     "TopNewsPlugWidget",
     "SidebarTopNewsWidget",

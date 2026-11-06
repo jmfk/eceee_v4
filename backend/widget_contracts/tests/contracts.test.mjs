@@ -10,10 +10,10 @@ import { parseWire, renderWire, observeRequest } from '../transport.mjs'
 const type = name => `easy_widgets.${name}Widget`
 const form = { title: 'Another form', fields: [{ name: 'email', label: 'Email', type: 'email' }] }
 
-test('the complete manifest is deterministic, has 25 built-ins, and returns independent values', () => {
+test('the complete manifest is deterministic, has 26 built-ins, and returns independent values', () => {
     const first = buildRenderManifest()
     assert.equal(first.formatVersion, 2)
-    assert.equal(Object.keys(first.widgets).length, 25)
+    assert.equal(Object.keys(first.widgets).length, 26)
     assert.deepEqual(first.defaultSpecialPages.map(page => page.status_code), [403, 404, 500, 503])
     assert.ok(first.widgets['object_storage.ObjectDetailWidget'])
     assert.match(first.widgets[type('TwoColumns')].css, /grid-template-columns: 2fr 1fr/)

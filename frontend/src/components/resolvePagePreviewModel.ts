@@ -10,6 +10,7 @@ import { portableInternalHref } from '../utils/portableLinks'
 
 const dataDrivenNewsTypes = new Set([
     'easy_widgets.NewsListWidget',
+    'easy_widgets.NewsFlashWidget',
     'easy_widgets.NewsDetailWidget',
     'easy_widgets.TopNewsPlugWidget',
     'easy_widgets.SidebarTopNewsWidget',
@@ -133,7 +134,7 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
     let allWidgets = collectWidgets(Object.values(next.slots).flat())
     const newsRequests = new Map<string, Promise<any[]>>()
     const previewNews = (widget: RenderWidgetModel) => {
-        const configured = widget.config.objectTypes ?? widget.config.object_types ?? ['news']
+        const configured = widget.config.objectTypes ?? widget.config.object_types ?? [widget.type === 'easy_widgets.NewsFlashWidget' ? 'article' : 'news']
         const types = Array.isArray(configured) ? configured.map(String) : []
         if (!types.length) return Promise.resolve([])
         const params = new URLSearchParams()
@@ -142,8 +143,9 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
         const classifications = widget.config.classificationIds ?? widget.config.classification_ids ?? []
         if (Array.isArray(classifications)) classifications.forEach(id => params.append('classificationId', String(id)))
         params.set('includeDescendants', String((widget.config.includeDescendants ?? widget.config.include_descendants) !== false))
+        params.set('newsFlash', String(widget.type === 'easy_widgets.NewsFlashWidget'))
         params.set('featuredOnly', String(widget.type === 'easy_widgets.TopNewsPlugWidget'))
-        params.set('limit', String(widget.type === 'easy_widgets.TopNewsPlugWidget'
+        params.set('limit', String(widget.type === 'easy_widgets.NewsFlashWidget' ? 3 : widget.type === 'easy_widgets.TopNewsPlugWidget'
             ? (widget.config.layout === '1x3' ? 3 : 2)
             : Math.min(Math.max(Number(widget.config.limit) || 5, 1), 50)))
         const url = `${newsPreviewOrigin(next.context.siteHostnames || [])}/api/news-preview?${params}`
@@ -257,7 +259,7 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
         }
         if (!dataDrivenNewsTypes.has(widget.type)) return
         const objectTypes = widget.config.objectTypes || widget.config.object_types || []
-        if (widget.type === 'easy_widgets.TopNewsPlugWidget' || widget.type === 'easy_widgets.SidebarTopNewsWidget') {
+        if (widget.type === 'easy_widgets.NewsFlashWidget' || widget.type === 'easy_widgets.TopNewsPlugWidget' || widget.type === 'easy_widgets.SidebarTopNewsWidget') {
             try {
                 const items = await previewNews(widget)
                 widget.data = { status: items.length ? 'ready' : 'empty', items }

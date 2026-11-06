@@ -59,7 +59,7 @@ sys.meta_path.insert(0, NoDjango())
 sys.path.insert(0, sys.argv[1])
 from widget_contracts import build_render_manifest
 from widget_contracts.models import FormsConfig
-assert len(build_render_manifest()['widgets']) == 25
+assert len(build_render_manifest()['widgets']) == 26
 assert FormsConfig(title='Pure Python', fields=[dict(name='n', label='N', type='text')]).title == 'Pure Python'
 assert not any(name == 'django' or name.startswith('django.') for name in sys.modules)
 """

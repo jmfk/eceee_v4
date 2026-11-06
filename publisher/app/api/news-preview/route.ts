@@ -1,4 +1,5 @@
 import { database } from '@/src/db';
+import { newsFlashItems } from '../../../src/news-flash';
 import { contentHostname } from '../../../src/hostname';
 
 export const runtime = 'nodejs';
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
       if (!root || root.id !== siteId) return null;
       const at = new Date();
       if (!await reader.version(root.id, at)) return null;
-      return reader.publishedObjects({
+      const query = {
         objectTypeIds: types.filter(type => /^\d+$/.test(type)),
         objectTypeNames: types.filter(type => !/^\d+$/.test(type)),
         classificationIds: classifications,
@@ -40,7 +41,10 @@ export async function GET(request: Request) {
         activeTypeOnly: true,
         limit,
         sortOrder: '-publish_date',
-      }, root.tenant_id, at);
+      };
+      return params.get('newsFlash') === 'true'
+        ? newsFlashItems(reader, query, root.tenant_id, at)
+        : reader.publishedObjects(query, root.tenant_id, at);
     });
     if (!items) return Response.json({ error: 'Site not found.' }, { status: 404, headers: responseHeaders });
     return Response.json({ items: items.map(({ id, slug, title, objectType, data, publishDate, isFeatured }) => ({

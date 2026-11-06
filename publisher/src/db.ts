@@ -307,6 +307,7 @@ function reader(client: PoolClient): PageReader {
           AND ($5::text IS NULL OR object.slug = $5)
           AND ($9::text IS NULL OR object.status = $9)
           AND (NOT $14::boolean OR published.is_featured = true)
+          AND (NOT $15::boolean OR published.data @> '{"newsPriority": true}'::jsonb)
           AND (NOT ($10::boolean OR $11::boolean) OR (
             type.is_active = true
             AND (type.namespace_id IS NULL OR type_namespace.tenant_id = $1)
@@ -331,6 +332,7 @@ function reader(client: PoolClient): PageReader {
           classificationIds,
           query.includeDescendants !== false,
           Boolean(query.featuredOnly),
+          Boolean(query.newsPriorityOnly),
         ]);
       return result.rows;
     },
