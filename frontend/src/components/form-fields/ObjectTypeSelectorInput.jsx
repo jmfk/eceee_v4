@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { ChevronDown, X, Check, Database, Loader2, AlertCircle } from 'lucide-react'
-import { endpoints } from '../../api/endpoints'
+import { objectTypesApi } from '../../api/objectStorage'
 import FieldHelpText from './FieldHelpText'
 
 import OptimizedImage from '../media/OptimizedImage'
@@ -49,22 +49,9 @@ const ObjectTypeSelectorInput = ({
                 setLoading(true)
                 setError(null)
 
-                const params = new URLSearchParams()
-                if (filterActive) {
-                    params.append('is_active', 'true')
-                }
-
-                const url = `${endpoints.objectTypes.list}?${params}`
-                const response = await fetch(url, {
-                    credentials: 'include',
-                })
-
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch object types: ${response.statusText}`)
-                }
-
-                const data = await response.json()
-                setObjectTypes(data.results || data) // Handle paginated or non-paginated responses
+                const response = await objectTypesApi.list(filterActive ? { is_active: true } : {})
+                const data = response.data ?? response
+                setObjectTypes(data.results || data)
                 setLoading(false)
             } catch (err) {
                 console.error('Error fetching object types:', err)
@@ -76,11 +63,17 @@ const ObjectTypeSelectorInput = ({
         fetchObjectTypes()
     }, [filterActive])
 
+    useEffect(() => {
+        setSelectedIds(multiple ? (Array.isArray(value) ? value : []) : (value ?? null))
+    }, [value, multiple])
+
+    const matchesType = (type, id) => String(type.id) === String(id) || type.name === String(id)
+
     // Filter object types based on search term
     const filteredObjectTypes = searchTerm
         ? objectTypes.filter(ot =>
-            ot.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            ot.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (ot.label || ot.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (ot.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
             (ot.description && ot.description.toLowerCase().includes(searchTerm.toLowerCase()))
         )
         : objectTypes
@@ -118,10 +111,10 @@ const ObjectTypeSelectorInput = ({
         let newValue
 
         if (multiple) {
-            const isSelected = selectedIds.includes(objectTypeId)
+            const isSelected = selectedIds.some(id => matchesType(objectTypes.find(ot => ot.id === objectTypeId) || { id: objectTypeId }, id))
 
             if (isSelected) {
-                newValue = selectedIds.filter(id => id !== objectTypeId)
+                newValue = selectedIds.filter(id => !matchesType(objectTypes.find(ot => matchesType(ot, objectTypeId)) || { id: objectTypeId }, id))
             } else {
                 newValue = [...selectedIds, objectTypeId]
             }
@@ -139,7 +132,7 @@ const ObjectTypeSelectorInput = ({
         e.stopPropagation()
 
         if (multiple) {
-            const newValue = selectedIds.filter(id => id !== objectTypeId)
+            const newValue = selectedIds.filter(id => !matchesType(objectTypes.find(ot => matchesType(ot, objectTypeId)) || { id: objectTypeId }, id))
             setSelectedIds(newValue)
             onChange(newValue)
         } else {
@@ -152,14 +145,14 @@ const ObjectTypeSelectorInput = ({
         const ids = multiple ? selectedIds : (selectedIds ? [selectedIds] : [])
         // Map selected IDs to full object data, or create placeholder objects for IDs not yet loaded
         return ids.map(id => {
-            const found = objectTypes.find(ot => ot.id === id)
+            const found = objectTypes.find(ot => matchesType(ot, id))
             if (found) {
-                return found
+                return { ...found, id }
             }
             // Return placeholder while loading
             return {
                 id: id,
-                label: `Loading... (ID: ${id})`,
+                label: loading ? `Loading… (${id})` : `Unavailable type (${id})`,
                 name: `loading_${id}`,
                 isPlaceholder: true
             }
@@ -221,7 +214,7 @@ const ObjectTypeSelectorInput = ({
                                             : 'bg-blue-100 text-blue-800'
                                             }`}
                                     >
-                                        {ot.isPlaceholder ? (
+                                        {ot.isPlaceholder && loading ? (
                                             <Loader2 className="w-3 h-3 animate-spin" />
                                         ) : ot.iconImage ? (
                                             <div className="w-4 h-4 flex-shrink-0">
@@ -289,8 +282,8 @@ const ObjectTypeSelectorInput = ({
                             ) : (
                                 filteredObjectTypes.map(ot => {
                                     const isSelected = multiple
-                                        ? selectedIds.includes(ot.id)
-                                        : selectedIds === ot.id
+                                        ? selectedIds.some(id => matchesType(ot, id))
+                                        : matchesType(ot, selectedIds)
 
                                     return (
                                         <button

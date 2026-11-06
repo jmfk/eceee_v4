@@ -1,3 +1,4 @@
+import { newsFlashLayout, NEWS_FLASH_BATCH } from '../rendering/newsFlashLayout'
 import { api } from '../api/client'
 import { endpoints } from '../api/endpoints'
 import { mediaCollectionsApi } from '../api/media'
@@ -136,7 +137,7 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
     const previewNews = (widget: RenderWidgetModel) => {
         const configured = widget.config.objectTypes ?? widget.config.object_types ?? [widget.type === 'easy_widgets.NewsFlashWidget' ? 'article' : 'news']
         const types = Array.isArray(configured) ? configured.map(String) : []
-        if (!types.length) return Promise.resolve([])
+        if (!types.length || (widget.type === 'easy_widgets.NewsFlashWidget' && !newsFlashLayout(widget.config).total)) return Promise.resolve([])
         const params = new URLSearchParams()
         params.set('siteId', String(next.context.siteId || ''))
         types.forEach(type => params.append('type', type))
@@ -145,10 +146,11 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
         params.set('includeDescendants', String((widget.config.includeDescendants ?? widget.config.include_descendants) !== false))
         params.set('newsFlash', String(widget.type === 'easy_widgets.NewsFlashWidget'))
         params.set('featuredOnly', String(widget.type === 'easy_widgets.TopNewsPlugWidget'))
-        params.set('limit', String(widget.type === 'easy_widgets.NewsFlashWidget' ? 3 : widget.type === 'easy_widgets.TopNewsPlugWidget'
+        params.set('limit', String(widget.type === 'easy_widgets.NewsFlashWidget' ? Math.min(NEWS_FLASH_BATCH, newsFlashLayout(widget.config).total) || 1 : widget.type === 'easy_widgets.TopNewsPlugWidget'
             ? (widget.config.layout === '1x3' ? 3 : 2)
             : Math.min(Math.max(Number(widget.config.limit) || 5, 1), 50)))
         const url = `${newsPreviewOrigin(next.context.siteHostnames || [])}/api/news-preview?${params}`
+        if (widget.type === 'easy_widgets.NewsFlashWidget') widget.data = { status: 'loading', feedUrl: url }
         if (!newsRequests.has(url)) newsRequests.set(url, fetch(url, { credentials: 'omit' }).then(async response => {
             if (!response.ok) throw new Error(`News preview failed (${response.status}).`)
             const result = await response.json()
@@ -262,9 +264,9 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
         if (widget.type === 'easy_widgets.NewsFlashWidget' || widget.type === 'easy_widgets.TopNewsPlugWidget' || widget.type === 'easy_widgets.SidebarTopNewsWidget') {
             try {
                 const items = await previewNews(widget)
-                widget.data = { status: items.length ? 'ready' : 'empty', items }
+                widget.data = { ...widget.data, status: items.length ? 'ready' : 'empty', items }
             } catch (error: any) {
-                widget.data = { status: 'error', error: error?.message || 'Failed to load preview data.', items: [] }
+                widget.data = { ...widget.data, status: 'error', error: error?.message || 'Failed to load preview data.', items: [] }
             }
             return
         }
@@ -298,7 +300,7 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
                 }
                 widget.data = { status: 'ready', item: resolved }
             } catch (error: any) {
-                widget.data = { status: 'error', error: error?.message || 'Failed to load preview data.' }
+                widget.data = { ...widget.data, status: 'error', error: error?.message || 'Failed to load preview data.' }
             }
             return
         }
@@ -314,9 +316,9 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
                 include_descendants: (widget.config.includeDescendants ?? widget.config.include_descendants) !== false,
             }, tenantRequestConfig)
             const items = response?.results || response?.data?.results || []
-            widget.data = { status: items.length ? 'ready' : 'empty', items }
+            widget.data = { ...widget.data, status: items.length ? 'ready' : 'empty', items }
         } catch (error: any) {
-            widget.data = { status: 'error', error: error?.message || 'Failed to load preview data.', items: [] }
+            widget.data = { ...widget.data, status: 'error', error: error?.message || 'Failed to load preview data.', items: [] }
         }
     }))
 

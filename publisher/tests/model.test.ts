@@ -88,7 +88,21 @@ describe('public resolution', () => {
     expect(model?.slots.main[0].data?.items).toMatchObject([
       { id: '0', path: '/updates/story-0/' }, { id: '3', path: '/updates/story-3/' }, { id: '2', path: '/updates/story-2/' },
     ]);
-    expect(publishedObjects).toHaveBeenNthCalledWith(2, expect.objectContaining({ newsPriorityOnly: true, limit: 1 }), '7', expect.any(Date));
+    expect(publishedObjects).toHaveBeenNthCalledWith(1, expect.objectContaining({ newsPriorityOnly: true, limit: 1 }), '7', expect.any(Date));
+  });
+
+  it('preserves News Flash placeholder data if its optional feed fails', async () => {
+    const flashReader: PageReader = {
+      ...reader, publishedObjects: async () => { throw new Error('temporarily unavailable'); },
+      version: async (id, at) => id === child.id ? version({
+        id: '11', page_id: child.id, widgets: { main: [{
+          id: 'flash', type: 'easy_widgets.NewsFlashWidget', config: {},
+        }] },
+      }) : reader.version(id, at),
+    };
+    const model = await buildPublishedPageModel({ withSnapshot: async read => read(flashReader) },
+      'example.org', '/news', new Date('2026-06-01'));
+    expect(model?.slots.main[0].data).toEqual({ status: 'error', items: [] });
   });
 
   it('normalizes hosts', () => {

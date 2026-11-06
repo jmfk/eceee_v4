@@ -5,19 +5,17 @@ import NewsFlashWidget from '../NewsFlashWidget'
 import { newsHomeEditorSchema } from '../newsHomeSchema'
 
 describe('News Flash editor contract', () => {
-    it('is a distinct selectable widget with three stories by default', () => {
+    it('shows the configured layout directly in the slot editor', () => {
         expect(NewsFlashWidget.widgetType).toBe('easy_widgets.NewsFlashWidget')
-        expect(NewsFlashWidget.defaultConfig.limit).toBe(3)
-        render(<NewsFlashWidget mode="editor" />)
-        expect(screen.getByText('News Flash')).toBeInTheDocument()
+        render(<NewsFlashWidget config={{ fullWidthCount: 2, halfWidthCount: 0, thirdWidthCount: 3 }} />)
+        expect(screen.getAllByRole('article')).toHaveLength(5)
+        expect(screen.getAllByText('Published story')).toHaveLength(5)
     })
-
-    it('keeps three fixed stories without exposing other widgets’ layout controls', () => {
-        const schema = newsHomeEditorSchema('easy_widgets.NewsFlashWidget', { properties: { limit: { const: 3 }, objectTypes: { type: 'array' } } })
+    it('exposes all three nonnegative layout counts instead of a fixed limit', () => {
+        const schema = newsHomeEditorSchema('easy_widgets.NewsFlashWidget', { properties: { limit: { const: 3 } } })
         expect(schema?.properties.limit).toBeUndefined()
-        expect(schema?.properties.displayVariant).toBeUndefined()
-        expect(schema?.properties.layout).toBeUndefined()
-        expect(schema?.properties.newsPagePath).toBeDefined()
-        expect(schema?.properties.objectTypes).toBeDefined()
+        expect(schema?.properties.fullWidthCount).toMatchObject({ minimum: 0, default: 1 })
+        expect(schema?.properties.halfWidthCount).toMatchObject({ minimum: 0, default: 2 })
+        expect(schema?.properties.thirdWidthCount).toMatchObject({ minimum: 0, default: 0 })
     })
 })

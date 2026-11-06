@@ -307,6 +307,7 @@ function reader(client: PoolClient): PageReader {
           AND ($5::text IS NULL OR object.slug = $5)
           AND ($9::text IS NULL OR object.status = $9)
           AND (NOT $14::boolean OR published.is_featured = true)
+          AND NOT (object.id = ANY($17::bigint[]))
           AND (NOT $15::boolean OR published.data @> '{"newsPriority": true}'::jsonb)
           AND (NOT ($10::boolean OR $11::boolean) OR (
             type.is_active = true
@@ -317,7 +318,7 @@ function reader(client: PoolClient): PageReader {
               AND a.tag_id IN (SELECT id FROM matching)
           ))
         ORDER BY ${priority}${order}
-        LIMIT $6`, [
+        LIMIT $6 OFFSET $16`, [
           tenantId,
           typeIds,
           typeNames,
@@ -333,6 +334,8 @@ function reader(client: PoolClient): PageReader {
           query.includeDescendants !== false,
           Boolean(query.featuredOnly),
           Boolean(query.newsPriorityOnly),
+          Math.max(0, Math.trunc(query.offset ?? 0)),
+          query.excludeObjectIds ?? [],
         ]);
       return result.rows;
     },

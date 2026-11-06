@@ -4,6 +4,7 @@
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
+| ADR-0064 | [News Flash counted layouts and bounded progressive feed](active/0064-news-flash-progressive-layouts.md) | accepted | PRD-0045 |
 | ADR-0063 | [Published news priority with optional expiry](active/0063-news-flash-priority-fields.md) | accepted | PRD-0044 |
 | ADR-0062 | [TypeScript News Flash with existing CMS registration](active/0062-news-flash-typescript-rendering.md) | accepted | PRD-0044 |
 | ADR-0057 | [Risk-based CI cadence and exact-commit deployment evidence](archive/0057-risk-based-ci-and-deploy-evidence.md) | superseded | PRD-0041 |
