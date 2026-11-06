@@ -43,4 +43,4 @@ The web flow removes unnecessary production shell access while preserving the ex
 ## Links
 
 - Related PRDs: PRD-0015
-- Extends ADR-0008 without changing outbound credential encryption.
+- Extends ADR-0008 with browser-managed inbound keys and the application-secret fallback for outbound credential encryption.
