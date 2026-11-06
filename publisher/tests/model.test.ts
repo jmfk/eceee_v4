@@ -65,6 +65,32 @@ const reader: PageReader = {
 const db: ReadDb = { withSnapshot: async read => read(reader) };
 
 describe('public resolution', () => {
+  it('resolves News Flash priority and latest stories with the configured detail path', async () => {
+    const item = (id: string, priority = false): PublishedObject => ({
+      id, title: `Story ${id}`, slug: `story-${id}`,
+      objectType: { id: '8', name: 'article', label: 'Article', pluralLabel: 'Articles' },
+      data: { newsPriority: priority }, widgets: {}, metadata: {},
+      publishDate: '2026-05-01T00:00:00Z', isFeatured: false,
+    });
+    const publishedObjects = vi.fn(async (query: PublishedObjectQuery) => query.newsPriorityOnly
+      ? [item('0', true)] : [item('3'), item('2'), item('1')]);
+    const flashReader: PageReader = {
+      ...reader, publishedObjects,
+      version: async (id, at) => id === child.id ? version({
+        id: '11', page_id: child.id, widgets: { main: [{
+          id: 'flash', type: 'easy_widgets.NewsFlashWidget',
+          config: { objectTypes: ['article'], newsPagePath: '/updates/' },
+        }] },
+      }) : reader.version(id, at),
+    };
+    const model = await buildPublishedPageModel({ withSnapshot: async read => read(flashReader) },
+      'example.org', '/news', new Date('2026-06-01'));
+    expect(model?.slots.main[0].data?.items).toMatchObject([
+      { id: '0', path: '/updates/story-0/' }, { id: '3', path: '/updates/story-3/' }, { id: '2', path: '/updates/story-2/' },
+    ]);
+    expect(publishedObjects).toHaveBeenNthCalledWith(2, expect.objectContaining({ newsPriorityOnly: true, limit: 1 }), '7', expect.any(Date));
+  });
+
   it('normalizes hosts', () => {
     expect(normalizeHostname(' Example.ORG:8443 ')).toBe('example.org');
     expect(normalizeHostname('evil.org/path')).toBeNull();

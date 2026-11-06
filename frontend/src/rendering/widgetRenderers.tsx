@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { NewsFlashRender } from './NewsFlashRender'
 import type { RenderWidgetModel, WidgetRenderComponent, WidgetRenderProps } from './types'
 import { processNavigationItems } from '../utils/navigationItems'
 import { asArray, EmptyRender, formatDisplayDate, formatDisplayDateTime, imageUrl, ImageView, normalizeContentMediaHtml, PreviewLink, RenderFailure, SafeHtml, sanitizeHtml, TextWithBreaks, value } from './primitives'
@@ -838,6 +839,7 @@ export const RENDER_WIDGET_COMPONENTS: Record<string, WidgetRenderComponent> = {
     'easy_widgets.ThreeColumnsWidget': ThreeColumnsRender,
     'easy_widgets.PathDebugWidget': PathDebugRender,
     'easy_widgets.NewsListWidget': NewsListRender,
+    'easy_widgets.NewsFlashWidget': NewsFlashRender,
     'easy_widgets.NewsDetailWidget': NewsDetailRender,
     'easy_widgets.TopNewsPlugWidget': TopNewsPlugRender,
     'easy_widgets.SidebarTopNewsWidget': SidebarTopNewsRender,

@@ -540,6 +540,26 @@
       "name": "News Detail",
       "variants": []
     },
+    "easy_widgets.NewsFlashWidget": {
+      "css": ".news-flash-widget {\n    container-type: inline-size;\n    font-family: var(--body-font, inherit);\n    color: var(--text-color, #17212b);\n}\n.news-flash-widget .news-flash-grid {\n    display: grid;\n    grid-template-columns: minmax(0, 1fr);\n    gap: 1rem;\n}\n.news-flash-widget .news-flash-story {\n    position: relative;\n    display: flex;\n    min-width: 0;\n    min-height: 5rem;\n    border: 1px solid var(--news-flash-border, #c3c7ca);\n    background: var(--news-flash-background, #fff);\n}\n.news-flash-widget .news-flash-copy { flex: 1; min-width: 0; padding: 1rem; }\n.news-flash-widget .news-flash-title {\n    margin: 0;\n    font-family: var(--heading-font, inherit);\n    font-size: 1.125rem;\n    line-height: 1.3;\n    font-weight: 600;\n    overflow-wrap: anywhere;\n}\n.news-flash-widget .news-flash-title a { color: inherit; text-decoration: none; }\n.news-flash-widget .news-flash-title a::after { content: ''; position: absolute; inset: 0; }\n.news-flash-widget .news-flash-title a:focus-visible { outline: none; }\n.news-flash-widget .news-flash-title a:focus-visible::after { outline: 2px solid currentColor; outline-offset: 3px; }\n.news-flash-widget .news-flash-title a:hover { text-decoration: underline; }\n.news-flash-widget .news-flash-image { width: 5rem; flex: 0 0 5rem; }\n.news-flash-widget .news-flash-image img { display: block; width: 100%; height: 100%; object-fit: cover; }\n.news-flash-widget .news-flash-excerpt { margin: .65rem 0 0; line-height: 1.5; }\n.news-flash-widget .news-flash-story:not(.news-flash-lead) .news-flash-excerpt { display: none; }\n.news-flash-widget .news-flash-lead { flex-direction: column; min-height: 16rem; padding: 0 1rem 1rem; }\n.news-flash-widget .news-flash-lead .news-flash-copy { padding: 1rem 0; }\n.news-flash-widget .news-flash-lead .news-flash-title { font-size: clamp(1.35rem, 4cqi, 1.85rem); }\n.news-flash-widget .news-flash-lead .news-flash-image { width: 100%; height: 5.5rem; flex-basis: 5.5rem; }\n@container (min-width: 40rem) {\n    .news-flash-widget .news-flash-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }\n    .news-flash-widget .news-flash-lead { grid-column: 1 / -1; min-height: 11rem; flex-direction: row; gap: 1.5rem; padding: 1.25rem; }\n    .news-flash-widget .news-flash-lead .news-flash-copy { padding: 0; }\n    .news-flash-widget .news-flash-lead .news-flash-image { width: 38%; height: auto; flex: 0 0 38%; }\n    .news-flash-widget .news-flash-story:not(.news-flash-lead) { flex-direction: column; min-height: 10.5rem; padding-bottom: 1rem; }\n    .news-flash-widget .news-flash-story:not(.news-flash-lead) .news-flash-image { width: 43%; height: 4.75rem; flex-basis: 4.75rem; align-self: flex-end; margin-right: 1rem; }\n    .news-flash-widget .news-flash-story:not(.news-flash-lead) .news-flash-excerpt { display: block; }\n}\n",
+      "cssVariables": {},
+      "layoutParts": {
+        "news-flash-story": {
+          "relationship": "auto",
+          "selector": ".news-flash-story"
+        },
+        "news-flash-title": {
+          "relationship": "auto",
+          "selector": ".news-flash-title"
+        },
+        "news-flash-widget": {
+          "relationship": "auto",
+          "selector": ".news-flash-widget"
+        }
+      },
+      "name": "News Flash",
+      "variants": []
+    },
     "easy_widgets.NewsListWidget": {
       "css": "\n    .news-list-widget .news-excerpt {\n        margin: 0;\n    }\n    ",
       "cssVariables": {},

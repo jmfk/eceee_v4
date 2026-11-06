@@ -42,11 +42,22 @@ describe('database snapshot', () => {
       classificationIds: [term], includeDescendants: false,
     }, '7', new Date('2026-10-22')));
     const [sql, parameters] = mocks.query.mock.calls.find(([sql]) => sql.includes('WITH RECURSIVE resolved'))!;
-    expect(parameters.slice(11)).toEqual([[term], false, false]);
+    expect(parameters.slice(11)).toEqual([[term], false, false, false]);
     expect(sql).toContain('t.namespace_id=s.namespace_id AND t.tag_type=s.tag_type');
     expect(sql).toContain('a.object_version_id=published.id');
     expect(sql).toContain('a.tag_id IN (SELECT id FROM matching)');
     expect(sql.indexOf('a.object_version_id=published.id')).toBeLessThan(sql.lastIndexOf('LIMIT $6'));
+  });
+
+  it('filters News Flash priority on the live published data before limiting', async () => {
+    await database.withSnapshot(reader => reader.publishedObjects({
+      objectTypeNames: ['article'], limit: 1, sortOrder: '-publish_date', newsPriorityOnly: true,
+    }, '7', new Date('2026-11-06')));
+    const [sql, parameters] = mocks.query.mock.calls.find(([statement]) => statement.includes('FROM object_storage_objectinstance AS object'))!;
+    expect(sql).toContain('NOT $15::boolean OR published.data @>');
+    expect(sql).toContain('"newsPriority": true');
+    expect(parameters[14]).toBe(true);
+    expect(parameters[0]).toBe('7');
   });
 
   it('filters Featured on the live version before the publication-date limit', async () => {

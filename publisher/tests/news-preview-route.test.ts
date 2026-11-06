@@ -44,6 +44,19 @@ describe('public news preview route', () => {
     }] });
   });
 
+  it('uses the same prioritized News Flash selection within the host tenant', async () => {
+    mocks.publishedObjects.mockResolvedValueOnce([
+      { id: '3', title: 'Latest', slug: 'latest', data: {} },
+      { id: '2', title: 'Second', slug: 'second', data: {} },
+      { id: '1', title: 'Third', slug: 'third', data: {} },
+    ]).mockResolvedValueOnce([{ id: '0', title: 'Priority', slug: 'priority', data: { newsPriority: true } }]);
+    const response = await GET(request('siteId=85&type=article&limit=3&newsFlash=true'));
+    expect(response.status).toBe(200);
+    expect((await response.json()).items.map((item: { id: string }) => item.id)).toEqual(['0', '3', '2']);
+    expect(mocks.publishedObjects).toHaveBeenNthCalledWith(2,
+      expect.objectContaining({ newsPriorityOnly: true, limit: 1 }), 'tenant-a', expect.any(Date));
+  });
+
   it('denies a mismatched or unpublished site before querying news', async () => {
     expect((await GET(request('siteId=86&type=news&limit=2'))).status).toBe(404);
     mocks.version.mockResolvedValue(null);

@@ -4,9 +4,9 @@ One declarative source, with small Python and Node adapters. No new server or np
 
 | Source | Owns |
 | --- | --- |
-| `render_catalog.json`, format 1 | All 25 built-in widgets' names, CSS, variables, layout parts and variants; default special pages. |
+| `render_catalog.json`, format 1 | All 26 built-in widgets' names, CSS, variables, layout parts and variants; default special pages. |
 | `pilot_models.json`, format 1 | Headline, Banner, TwoColumns, Forms and nested FormField: explicit model names/aliases, annotations, defaults, descriptions, constraints and UI hints. |
-| Original non-pilot Python models | All other widget schemas and custom validators. |
+| Non-pilot Python models | All other widget schemas and custom validators. |
 
 Presentation metadata uses the existing render-manifest casing; model declarations explicitly bridge Python field names and frontend aliases. Full editor layout-part labels/properties are preserved alongside the selector/relationship subset exported to manifest format 2. Defaults, schemas and validation results are evaluated from definitions, not copied from baseline responses.
 

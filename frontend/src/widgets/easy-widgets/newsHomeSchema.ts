@@ -1,7 +1,7 @@
 type Schema = Record<string, any>
 
 export const newsHomeEditorSchema = (widgetType: string, source: Schema | null): Schema | null => {
-    if (!source || !['easy_widgets.TopNewsPlugWidget', 'easy_widgets.SidebarTopNewsWidget'].includes(widgetType)) return source
+    if (!source || !['easy_widgets.NewsFlashWidget', 'easy_widgets.TopNewsPlugWidget', 'easy_widgets.SidebarTopNewsWidget'].includes(widgetType)) return source
     const definition = source.schema || source
     if (!definition.properties) return source
     const properties = { ...definition.properties }
@@ -10,7 +10,9 @@ export const newsHomeEditorSchema = (widgetType: string, source: Schema | null):
         description: 'Path to the news detail page, for example /news/.',
         component: 'TextInput', group: 'Content',
     }
-    if (widgetType === 'easy_widgets.TopNewsPlugWidget') {
+    if (widgetType === 'easy_widgets.NewsFlashWidget') {
+        delete properties.limit
+    } else if (widgetType === 'easy_widgets.TopNewsPlugWidget') {
         properties.layout = {
             ...properties.layout,
             default: '1x2',
