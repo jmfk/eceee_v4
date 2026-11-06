@@ -20,3 +20,11 @@ Keep API loading in adapters and share only layout normalization and presentatio
 ## Consequences
 
 The legacy Django fallback remains presentation-only as recorded in ADR-0062. This supersedes the three-item restriction in PRD-0044, while retaining its default appearance and ADR-0063 priority semantics.
+
+## Owner-provided layout measurements (2026-11-06)
+
+Use a centered maximum outer width of 1280px, with 40px side insets and 30px gutters on wide widget containers. This gives a 1200px grid of six 175px modules: full-width stories span 1200px, half-width stories 585px and third-width stories 380px. Cards have a minimum height of 310px (two 140px units plus 30px); supporting images use a 175px by 140px module. Longer text may grow cards rather than clip content.
+
+The search/header area above the grid in the reference is outside News Flash. Apply 30px top/bottom grid spacing. Below an 800px widget-container width, stack stories with 16px insets/gaps and 140px compact supporting rows, retaining a 310px lead. Measurements and responsive rules are shared by editor placeholders and public cards through the render catalog.
+
+Chrome DOM measurements verified 1200/585/380px cards, 310px card heights, 175×140px supporting images, matching editor placeholders, and stacked 288px cards inside a 320px container with no horizontal overflow. Focused widget/registry checks and frontend build passed. Live published data was not rechecked for this CSS-only update.
