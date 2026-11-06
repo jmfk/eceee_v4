@@ -238,9 +238,10 @@ describe('Navbar', () => {
   })
 
   it('shows only Media and Designer for Designer-only users', () => {
-    useAuth.mockReturnValue({ user: { isDesignerOnly: true, permissions: ['theme.read', 'media.read'] } })
+    useAuth.mockReturnValue({ user: { isDesignerOnly: true, permissions: ['theme.read', 'site.read'] } })
     renderNavbar('/media')
     expect(screen.getByRole('link', { name: 'Media' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Media' })).toHaveAttribute('href', '/designer/media')
     expect(screen.getByRole('link', { name: 'Designer' })).toBeInTheDocument()
     for (const name of ['Pages', 'Publisher', 'Tags', 'Profile', 'Settings']) {
       expect(screen.queryByRole('link', { name })).not.toBeInTheDocument()

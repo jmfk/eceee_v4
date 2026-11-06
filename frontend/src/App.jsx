@@ -61,6 +61,7 @@ import StatusBar from './components/StatusBar'
 import SessionExpiredOverlay from './components/SessionExpiredOverlay'
 import AppVersionReloadGuard from './components/AppVersionReloadGuard'
 import DesignerThemesPage from './pages/DesignerThemesPage'
+import DesignerMediaPage from './pages/DesignerMediaPage'
 import DesignerThemeWorkspacePage from './pages/DesignerThemeWorkspacePage'
 import DesignerWidgetTypesPage from './pages/DesignerWidgetTypesPage'
 import DesignerLayoutWorkspacePage from './pages/DesignerLayoutWorkspacePage'
@@ -383,6 +384,7 @@ export const AppRoutes = () => {
             </div>
           </PrivateRoute>
         } />
+        <Route path="/designer/media" element={<DesignerRoute><DesignerMediaPage /></DesignerRoute>} />
         <Route path="/designer/themes" element={
           <DesignerRoute>
             <DesignerThemesPage />
