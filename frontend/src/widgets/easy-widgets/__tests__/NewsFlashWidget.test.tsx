@@ -21,18 +21,20 @@ describe('News Flash editor contract', () => {
         expect(url.hostname).toBe('eceee.localhost')
         expect(url.searchParams.get('siteId')).toBe('249')
         expect(url.searchParams.get('type')).toBe('article')
-        expect(screen.getAllByRole('article')).toHaveLength(3)
+        expect(screen.getAllByRole('article')).toHaveLength(1)
     })
 
-    it('shows the configured layout directly in the slot editor', () => {
+    it('does not fill an unavailable editor site with fictitious stories', () => {
         expect(NewsFlashWidget.widgetType).toBe('easy_widgets.NewsFlashWidget')
         render(<NewsFlashWidget config={{ fullWidthCount: 2, halfWidthCount: 0, thirdWidthCount: 3 }} />)
-        expect(screen.getAllByRole('article')).toHaveLength(5)
-        expect(screen.getAllByText('Published story')).toHaveLength(5)
+        expect(screen.queryByRole('article')).not.toBeInTheDocument()
     })
-    it('uses the selected shape for editor placeholders, including saved snake-case config', () => {
-        const { container } = render(<NewsFlashWidget config={{ image_shape: 'square' }} />)
+    it('retains the selected image shape on failed-loading placeholders', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+        const { container } = render(<NewsFlashWidget config={{ image_shape: 'square' }} context={{ webpageData: { id: 249, hostnames: ['eceee.localhost'] } }} />)
+        await screen.findByRole('button', { name: 'Retry loading news' })
         expect(container.querySelectorAll('.news-flash-image-square')).toHaveLength(3)
+        expect(screen.getAllByText('News unavailable')).toHaveLength(3)
     })
 
     it('exposes all three nonnegative layout counts instead of a fixed limit', () => {

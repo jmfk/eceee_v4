@@ -17,7 +17,7 @@ describe('News Flash presentation', () => {
         expect(container.querySelectorAll('.news-flash-half')).toHaveLength(2)
         expect(screen.getByRole('link', { name: 'News 3 — What happens next' })).toHaveAttribute('href', '/news/third-story/')
     })
-    it.each(['loading', 'empty', 'error'] as const)('retains every visible configured position in the %s state', status => {
+    it.each(['loading', 'error'] as const)('retains every visible configured position in the %s state', status => {
         render(<NewsFlashRender widget={{ ...fixture, data: { status, items: [] } }} context={context} />)
         expect(screen.getAllByRole('article')).toHaveLength(3)
         expect(screen.getByRole('article', { name: 'News 3 placeholder' })).toBeInTheDocument()
@@ -29,22 +29,33 @@ describe('News Flash presentation', () => {
         expect(container.querySelectorAll('.news-flash-half')).toHaveLength(4)
         expect(container.querySelectorAll('.news-flash-third')).toHaveLength(3)
     })
-    it('does not allocate an entire very large placeholder list', () => {
-        render(<NewsFlashRender widget={{ ...fixture, config: { fullWidthCount: 0, halfWidthCount: 0, thirdWidthCount: 100000 }, data: { status: 'empty', items: [] } }} context={context} />)
-        expect(screen.getAllByRole('article')).toHaveLength(12)
-        fireEvent.click(screen.getByRole('button'))
-        expect(screen.getAllByRole('article')).toHaveLength(24)
+    it('renders no unused cards or loading controls for an empty completed feed', () => {
+        render(<NewsFlashRender widget={{ ...fixture, config: { halfWidthCount: 100000 }, data: { status: 'empty', items: [] } }} context={{ ...context, siteId: 85 }} />)
+        expect(screen.queryByRole('article')).not.toBeInTheDocument()
+        expect(screen.queryByRole('button')).not.toBeInTheDocument()
     })
-    it('can progressively reveal every missing position during an outage without retrying requests', () => {
+    it('bounds outage placeholders to the current batch and offers retry', () => {
         const fetchNews = vi.fn()
         vi.stubGlobal('fetch', fetchNews)
-        render(<NewsFlashRender widget={{ ...fixture, config: { fullWidthCount: 0, halfWidthCount: 25 }, data: { status: 'error', items: [] } }} context={{ ...context, siteId: 85 }} />)
-        fireEvent.click(screen.getByRole('button', { name: 'Show more news placeholders' }))
-        expect(screen.getAllByRole('article')).toHaveLength(24)
-        fireEvent.click(screen.getByRole('button', { name: 'Show more news placeholders' }))
-        expect(screen.getAllByRole('article')).toHaveLength(25)
+        render(<NewsFlashRender widget={{ ...fixture, config: { fullWidthCount: 0, halfWidthCount: 100000 }, data: { status: 'error', items: [] } }} context={{ ...context, siteId: 85 }} />)
+        expect(screen.getAllByRole('article')).toHaveLength(12)
         expect(fetchNews).not.toHaveBeenCalled()
         expect(screen.getByRole('button', { name: 'Retry loading news' })).toBeInTheDocument()
+        expect(screen.queryByText('Show more news placeholders')).not.toBeInTheDocument()
+    })
+    it.each([0, 2])('stops after a final batch of %i articles and removes pending placeholders', async count => {
+        let finish: (response: unknown) => void
+        const fetchNews = vi.fn(() => new Promise(resolve => { finish = resolve }))
+        vi.stubGlobal('fetch', fetchNews)
+        render(<NewsFlashRender widget={{ ...fixture, config: { fullWidthCount: 0, halfWidthCount: 100 }, data: { status: 'ready', items: stories(1, 12) } }} context={{ ...context, siteId: 85 }} />)
+        fireEvent.click(screen.getByRole('button', { name: 'Load more news' }))
+        expect(screen.getByRole('article', { name: 'News 24 placeholder' })).toBeInTheDocument()
+        const { act } = await import('@testing-library/react')
+        await act(async () => finish!({ ok: true, json: async () => ({ items: stories(13, count) }) }))
+        await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(12 + count))
+        expect(screen.queryByRole('button')).not.toBeInTheDocument()
+        expect(screen.queryByLabelText(/placeholder/)).not.toBeInTheDocument()
+        expect(fetchNews).toHaveBeenCalledTimes(1)
     })
 
     it.each(['square', 'landscape'])('uses the %s image shape below the full-width headline', imageShape => {
