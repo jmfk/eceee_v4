@@ -1,3 +1,4 @@
+import { themeColorValue } from '../../rendering/themeColorValue'
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Sparkles, Layers } from 'lucide-react'
 import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure'
@@ -126,9 +127,9 @@ const HeroWidget = ({
 
     // Build inline styles with CSS variables
     const heroStyle = {
-        '--hero-text-color': textColor,
-        '--hero-decor-color': decorColor,
-        '--hero-bg-color': backgroundColor,
+        '--hero-text-color': themeColorValue(textColor),
+        '--hero-decor-color': themeColorValue(decorColor),
+        '--hero-bg-color': themeColorValue(backgroundColor),
         minHeight: '310px',
         maxHeight: '310px',
         flexShrink: 0,
@@ -296,7 +297,7 @@ const HeroWidget = ({
     // Editor mode: show content
     if (mode === 'editor') {
         return (
-            <div className="hero-widget relative group" style={heroStyle}>
+            <div className={`hero-widget relative group${(config.plainHeader ?? config.plain_header) ? ' hero-plain-header' : ''}`} style={heroStyle}>
                 {imageLoading && (
                     <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded shadow-lg z-10">
                         Optimizing image...
@@ -351,7 +352,7 @@ const HeroWidget = ({
 
     // Preview mode
     return (
-        <div className="hero-widget" style={heroStyle}>
+        <div className={`hero-widget${(config.plainHeader ?? config.plain_header) ? ' hero-plain-header' : ''}`} style={heroStyle}>
             <div className="hero-content">
                 {beforeText && (
                     <p className="hero-before-text before-text">

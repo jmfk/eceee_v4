@@ -5,6 +5,27 @@ import { createPageRenderModel } from '../adapters'
 import { getRenderFixture, RENDER_WIDGET_FIXTURES } from '../fixtures'
 
 describe('PageRenderer', () => {
+    it('opts into boxed articles and compact related lists without changing ordinary widgets', () => {
+        const model = createPageRenderModel({ widgets: { main: [
+            { id: 'detail', type: 'easy_widgets.NewsDetailWidget', config: { boxed: true, showMetadata: false, showObjectType: false }, data: { status: 'ready', item: { id: '1', title: 'Selected story', data: { content: '<p>Body</p>' } } } },
+            { id: 'related', type: 'easy_widgets.SidebarTopNewsWidget', config: { related_to_current_article: true, widgetTitle: 'Related News', showDates: false, showThumbnails: false }, data: { status: 'ready', items: [{ id: '2', title: 'Related story', slug: 'related' }] } },
+        ] } })
+        const { container } = render(<PageRenderer model={model} />)
+        expect(container.querySelector('.news-detail-boxed h1')).toHaveTextContent('Selected story')
+        expect(container.querySelector('.variant-related .news-title')).toHaveTextContent('Related story')
+        expect(container.querySelector('.news-metadata')).toBeNull()
+    })
+
+    it('uses theme palette colors and the plain Hero option in public rendering', () => {
+        const { container } = render(<PageRenderer model={createPageRenderModel({ widgets: { main: [
+            { id: 'hero', type: 'easy_widgets.HeroWidget', config: { header: 'eceee news', plainHeader: true, backgroundColor: 'teal3', textColor: '#fff' } },
+        ] } })} />)
+        const hero = container.querySelector<HTMLElement>('.hero-widget')!
+        expect(hero).toHaveClass('hero-plain-header')
+        expect(hero.style.getPropertyValue('--hero-bg-color')).toBe('var(--teal3, teal3)')
+        expect(hero.style.getPropertyValue('--hero-text-color')).toBe('#fff')
+    })
+
     it.each(Object.keys(RENDER_WIDGET_FIXTURES))('renders %s without editor chrome', (type) => {
         const fixture = getRenderFixture(type)!
         const model = createPageRenderModel({ layout: 'main_layout', widgets: { main: [fixture] } })

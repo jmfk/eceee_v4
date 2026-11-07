@@ -56,7 +56,20 @@ describe('database snapshot', () => {
     const [sql, parameters] = mocks.query.mock.calls.find(([statement]) => statement.includes('FROM object_storage_objectinstance AS object'))!;
     expect(sql).toContain('NOT (object.id = ANY($17::bigint[]))');
     expect(sql).toContain('LIMIT $6 OFFSET $16');
-    expect(parameters.slice(15)).toEqual([11, ['99']]);
+    expect(parameters.slice(15)).toEqual([11, ['99'], [], null]);
+  });
+
+  it('matches related tags and Article kind on the published tenant version', async () => {
+    const tag = '11111111-1111-4111-8111-111111111111';
+    await database.withSnapshot(reader => reader.publishedObjects({
+      objectTypeIds: ['8'], relatedTagIds: [tag], articleKind: 'news', excludeObjectIds: ['99'], limit: 5, sortOrder: '-publish_date',
+    }, '7', new Date('2026-11-07')));
+    const [sql, parameters] = mocks.query.mock.calls.find(([statement]) => statement.includes('FROM object_storage_objectinstance AS object'))!;
+    expect(parameters.slice(17)).toEqual([[tag], 'news']);
+    expect(sql).toContain('related.object_version_id=published.id');
+    expect(sql).toContain('tag.tenant_id=$1');
+    expect(sql).toContain("kind.tag_type='article_kind'");
+    expect(sql).toContain("kind.slug='press-release'");
   });
 
   it('filters News Flash priority on the live published data before limiting', async () => {

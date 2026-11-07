@@ -30,6 +30,13 @@ class HeroConfig(BaseModel):
         },
     )
 
+    plain_header: bool = Field(
+        default=False,
+        title="Plain color header",
+        description="Use a solid-color banner without the headline overlay",
+        json_schema_extra={"component": "BooleanInput", "variant": "toggle", "group": "Content"},
+    )
+
     before_text: Optional[str] = Field(
         None,
         description="Text displayed before the header",
