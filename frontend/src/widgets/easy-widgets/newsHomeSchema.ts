@@ -12,10 +12,7 @@ export const newsHomeEditorSchema = (widgetType: string, source: Schema | null):
     }
     if (widgetType === 'easy_widgets.NewsFlashWidget') {
         delete properties.limit
-        properties.imageShape = {
-            type: 'string', title: 'Image shape', default: 'landscape', group: 'Layout', component: 'SelectInput',
-            options: [{ value: 'square', label: 'Square (1:1)' }, { value: 'landscape', label: 'Landscape (7:4)' }],
-        }
+        delete properties.imageShape // Real image shapes follow their source dimensions.
         for (const [key, title, fallback] of [
             ['fullWidthCount', 'Full-width stories', 1], ['halfWidthCount', 'Half-width stories', 2], ['thirdWidthCount', 'Third-width stories', 0],
         ] as const) properties[key] = { type: 'integer', title, default: fallback, minimum: 0, component: 'NumberInput', min: 0, step: 1, group: 'Layout' }

@@ -4,6 +4,7 @@
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
+| ADR-0067 | [Source-shaped focal crops for news images](active/0067-source-shaped-focal-news-images.md) | accepted | PRD-0045, PRD-0047 |
 | ADR-0066 | [News page layout with contextual sidebar lists](active/0066-news-page-composition-and-related-stories.md) | accepted | PRD-0047 |
 | ADR-0065 | [Derived widget resolution and slot policies](active/0065-derived-widget-slot-policies.md) | accepted | PRD-0046 |
 | ADR-0064 | [News Flash counted layouts and bounded progressive feed](active/0064-news-flash-progressive-layouts.md) | accepted | PRD-0045 |

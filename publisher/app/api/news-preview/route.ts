@@ -1,5 +1,5 @@
 import { database } from '@/src/db';
-import { newsFlashPage } from '../../../src/news-flash';
+import { newsFlashPage, withNewsImages } from '../../../src/news-flash';
 import { newsArticleKind, relatedNewsItems, selectedNewsArticle } from '../../../src/related-news';
 import { contentHostname } from '../../../src/hostname';
 
@@ -63,7 +63,7 @@ export async function GET(request: Request) {
       }
       return flash
         ? newsFlashPage(reader, query, root.tenant_id, at, { limit, offset, priorityId: priorityId === 'none' ? null : priorityId })
-        : { items: await reader.publishedObjects(query, root.tenant_id, at) };
+        : { items: await withNewsImages(await reader.publishedObjects(query, root.tenant_id, at), reader, root.tenant_id) };
     });
     if (!page) return Response.json({ error: 'Site not found.' }, { status: 404, headers: responseHeaders });
     return Response.json({ ...(flash ? { priorityId: 'priorityId' in page ? page.priorityId : null } : {}), items: page.items.map(({ id, slug, title, objectType, data, publishDate, isFeatured }) => ({

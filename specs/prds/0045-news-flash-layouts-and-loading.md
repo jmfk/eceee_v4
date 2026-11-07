@@ -5,6 +5,7 @@ status: completed
 locked: true
 created: 2026-11-06
 related_adrs:
+  - ADR-0067
   - ADR-0064
 ---
 

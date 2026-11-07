@@ -23,6 +23,15 @@ describe('database snapshot', () => {
     delete process.env.PUBLISHER_MEDIA_BASE_URL;
   });
 
+  it('reads only public tenant-scoped image dimensions and focal metadata', async () => {
+    await database.withSnapshot(reader => reader.publicMedia(['11111111-1111-4111-8111-111111111111'], [], '7'));
+    const [sql, parameters] = mocks.query.mock.calls.find(([statement]) => statement.includes('FROM file_manager_mediafile AS media'))!;
+    expect(sql).toContain(`media.metadata->'focal_point' AS "focalPoint"`);
+    expect(sql).toContain('media.width, media.height');
+    expect(sql).toContain("media.access_level = 'public' AND media.is_deleted = false");
+    expect(parameters[1]).toBe('7');
+  });
+
   it('uses published title snapshots for Objects and their hierarchy', async () => {
     await database.withSnapshot(reader => reader.publishedObjects({
       objectTypeNames: ['article'], limit: 5, sortOrder: 'title', includeHierarchy: true,

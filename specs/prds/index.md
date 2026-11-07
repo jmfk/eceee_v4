@@ -2,9 +2,9 @@
 
 | ID | Title | Status | Related ADRs |
 | --- | --- | --- | --- |
-| PRD-0047 | [News page composition and related stories](0047-news-page-and-related-stories.md) | started | ADR-0066 |
+| PRD-0047 | [News page composition and related stories](0047-news-page-and-related-stories.md) | started | ADR-0066, ADR-0067 |
 | PRD-0046 | [Derived widgets with single-level inheritance and slot restrictions](0046-derived-widgets-and-slot-restrictions.md) | started | [ADR-0065](../adrs/active/0065-derived-widget-slot-policies.md) |
-| PRD-0045 | [Configurable News Flash layouts and progressive loading](0045-news-flash-layouts-and-loading.md) | completed | ADR-0064 |
+| PRD-0045 | [Configurable News Flash layouts and progressive loading](0045-news-flash-layouts-and-loading.md) | completed | ADR-0064, ADR-0067 |
 | PRD-0044 | [Responsive homepage News Flash widget](0044-news-flash-widget.md) | completed | ADR-0062, ADR-0063 |
 | PRD-0041 | [Risk-based test selection and CI-backed deployment](0041-risk-based-ci-and-deploy-evidence.md) | completed | ADR-0057 |
 | PRD-0038 | [Apple and Google sign-in with optional MFA](0038-social-login-and-mfa.md) | in-progress | [ADR-0053](../adrs/active/0053-browser-sessions-social-login-and-mfa.md), [ADR-0054](../adrs/active/0054-postmark-authentication-email-backend.md), [ADR-0055](../adrs/active/0055-explicit-email-verification-before-mfa.md) |

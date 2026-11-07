@@ -123,7 +123,7 @@ describe('News Flash real article images', () => {
     const db = { publishedObjects: vi.fn(async q => q.newsPriorityOnly ? [] : [article]), publicMedia: vi.fn(async () => ({ files: [], collections: {} })) } as unknown as PageReader;
     expect((await newsFlashItems(db, query, 'tenant-7', at))[0].data.featuredImage).toBeNull();
     expect(db.publicMedia).toHaveBeenCalledExactlyOnceWith([id], [], 'tenant-7');
-    vi.mocked(db.publicMedia).mockResolvedValue({ files: [{ id, type: 'image', url: 'https://public.example/image.jpg' } as PublicMediaItem], collections: {} });
-    expect((await newsFlashItems(db, query, 'tenant-7', at))[0].data.featuredImage).toMatchObject({ url: 'https://public.example/image.jpg' });
+    vi.mocked(db.publicMedia).mockResolvedValue({ files: [{ id, type: 'image', url: 'https://public.example/image.jpg', width: 400, height: 800, focalPoint: { x: 0.2, y: 0.9 } } as PublicMediaItem], collections: {} });
+    expect((await newsFlashItems(db, query, 'tenant-7', at))[0].data.featuredImage).toMatchObject({ url: 'https://public.example/image.jpg', width: 400, height: 800, focalPoint: { x: 0.2, y: 0.9 } });
   });
 });

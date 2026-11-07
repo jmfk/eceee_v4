@@ -1,4 +1,4 @@
-import { newsFlashPage } from './news-flash';
+import { newsFlashPage, withNewsImages } from './news-flash';
 import { newsArticleKind, relatedNewsItems, selectedNewsArticle } from './related-news';
 import { newsFlashLayout, NEWS_FLASH_BATCH } from '../../frontend/src/rendering/newsFlashLayout';
 import { compilePublisherStyles, defaultSpecialPages, widgetVariantClasses } from './theme';
@@ -140,6 +140,7 @@ export interface PublicMediaItem {
   width: number | null;
   height: number | null;
   thumbnailUrl: string;
+  focalPoint?: { x: number; y: number } | null;
   src?: string;
   srcSet?: string;
   displayWidth?: number;
@@ -875,6 +876,9 @@ async function resolvePublishedData(
       }
     }
     if (items) {
+      if (['easy_widgets.NewsListWidget', 'easy_widgets.TopNewsPlugWidget', 'easy_widgets.SidebarTopNewsWidget'].includes(widget.type)) {
+        items = await withNewsImages(items, reader, tenantId);
+      }
       const usesObjectTypePath = widget.type === 'easy_widgets.NewsFlashWidget' || widget.type === 'easy_widgets.TopNewsPlugWidget'
         || widget.type === 'easy_widgets.SidebarTopNewsWidget';
       const configuredBase = String(config.newsPagePath ?? config.news_page_path ?? '/news/');

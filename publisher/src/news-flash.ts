@@ -34,8 +34,8 @@ function bodyImage(value: unknown): unknown {
   }
 }
 
-async function withNewsImages(items: PublishedObject[], reader: PageReader, tenantId: DbId): Promise<PublishedObject[]> {
-  const candidates = items.map(item => item.data.featuredImage || item.data.featured_image || bodyImage(item.widgets));
+export async function withNewsImages(items: PublishedObject[], reader: PageReader, tenantId: DbId): Promise<PublishedObject[]> {
+  const candidates = items.map(item => item.data?.featuredImage || item.data?.featured_image || bodyImage(item.widgets));
   const ids = candidates.flatMap(image => {
     const id = typeof image === 'string' ? image : (image as { id?: string })?.id;
     return id && uuid.test(id) ? [id.toLowerCase()] : [];
