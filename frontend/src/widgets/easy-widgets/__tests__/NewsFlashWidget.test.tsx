@@ -40,7 +40,7 @@ describe('News Flash editor contract', () => {
     it('exposes all three nonnegative layout counts instead of a fixed limit', () => {
         const schema = newsHomeEditorSchema('easy_widgets.NewsFlashWidget', { properties: { limit: { const: 3 } } })
         expect(schema?.properties.limit).toBeUndefined()
-        expect(schema?.properties.imageShape.options.map(option => option.value)).toEqual(['square', 'landscape'])
+        expect(schema?.properties.imageShape).toBeUndefined()
         expect(schema?.properties.fullWidthCount).toMatchObject({ minimum: 0, default: 1 })
         expect(schema?.properties.halfWidthCount).toMatchObject({ minimum: 0, default: 2 })
         expect(schema?.properties.thirdWidthCount).toMatchObject({ minimum: 0, default: 0 })

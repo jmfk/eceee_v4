@@ -67,12 +67,26 @@ describe('News Flash presentation', () => {
         expect(card.querySelector('.news-flash-body .news-flash-excerpt')).toBeInTheDocument()
     })
 
-    it('keeps an image placeholder when a real published story has no image', () => {
+    it.each([[800, 400, 'landscape'], [400, 400, 'square'], [300, 800, 'square']])('uses source dimensions %i × %i for the %s frame', (width, height, shape) => {
+        const { container } = render(<NewsFlashRender widget={{ ...fixture, config: { imageShape: shape === 'square' ? 'landscape' : 'square' }, data: { status: 'ready', items: [{ id: 1, title: 'Story', data: { featuredImage: { url: '/photo.jpg', width, height } } }] } }} context={context} />)
+        expect(container.querySelector('.news-flash-story')).toHaveClass(`news-flash-image-${shape}`)
+    })
+    it('uses loaded natural dimensions when an external image has no metadata', () => {
+        const { container } = render(<NewsFlashRender widget={{ ...fixture, data: { status: 'ready', items: [{ id: 1, title: 'Story', data: { featuredImage: '/photo.jpg' } }] } }} context={context} />)
+        const image = container.querySelector('img')!
+        Object.defineProperties(image, { naturalWidth: { value: 300 }, naturalHeight: { value: 800 } })
+        fireEvent.load(image)
+        expect(container.querySelector('.news-flash-story')).toHaveClass('news-flash-image-square')
+    })
+
+    it('lets a real story without an image use the full text width', () => {
         const { container } = render(<NewsFlashRender widget={{ ...fixture, data: { status: 'ready', items: [{ id: 1, title: 'Published story', slug: 'story' }] } }} context={context} />)
         expect(screen.getByRole('link', { name: 'Published story' })).toHaveAttribute('href', '/news/story/')
-        const imageArea = container.querySelector('[data-object-id="1"] .news-flash-placeholder-image')
-        expect(imageArea).toHaveAttribute('aria-hidden', 'true')
-        expect(imageArea?.querySelector('img')).toBeNull()
+        const card = container.querySelector('[data-object-id="1"]')
+        expect(card).toHaveClass('no-image')
+        expect(card).not.toHaveClass('has-image')
+        expect(card?.querySelector('.news-flash-image')).toBeNull()
+        expect(card?.querySelector('.news-flash-placeholder-image')).toBeNull()
     })
 
     it('supports all-zero counts', () => {

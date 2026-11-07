@@ -1,5 +1,5 @@
 import type { DbId, PageReader, PublishedObject, PublishedObjectQuery } from './model';
-import { newsFlashItems } from './news-flash';
+import { newsFlashItems, withNewsImages } from './news-flash';
 
 type NewsTypes = Pick<PublishedObjectQuery, 'objectTypeIds' | 'objectTypeNames'>;
 export const newsArticleKind = (value: unknown): 'all' | 'news' | 'column' => value === 'news' || value === 'column' ? value : 'all';
@@ -15,6 +15,6 @@ export async function relatedNewsItems(reader: PageReader, types: NewsTypes, ten
   slug: string | undefined, kind: 'all' | 'news' | 'column', limit: number): Promise<PublishedObject[]> {
   const current = await selectedNewsArticle(reader, types, tenantId, at, slug);
   if (!current?.relatedTagIds?.length) return [];
-  return reader.publishedObjects({ ...types, relatedTagIds: current.relatedTagIds, excludeObjectIds: [current.id],
-    articleKind: kind, activeTypeOnly: true, sortOrder: '-publish_date', limit }, tenantId, at);
+  return withNewsImages(await reader.publishedObjects({ ...types, relatedTagIds: current.relatedTagIds, excludeObjectIds: [current.id],
+    articleKind: kind, activeTypeOnly: true, sortOrder: '-publish_date', limit }, tenantId, at), reader, tenantId);
 }

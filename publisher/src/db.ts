@@ -134,7 +134,7 @@ function reader(client: PoolClient): PageReader {
         CASE WHEN media.file_type = 'video' THEN 'video' ELSE 'image' END AS type,
         COALESCE(media.title, '') AS "altText", COALESCE(media.description, '') AS caption,
         COALESCE(media.metadata->>'annotation', '') AS annotation, COALESCE(media.title, '') AS title,
-        media.width, media.height, COALESCE(media.file_url, '') AS "thumbnailUrl"`;
+        media.width, media.height, media.metadata->'focal_point' AS "focalPoint", COALESCE(media.file_url, '') AS "thumbnailUrl"`;
       const files = mediaIds.length ? await client.query<PublicMediaRow>(`
         SELECT ${mediaFields}
         FROM file_manager_mediafile AS media

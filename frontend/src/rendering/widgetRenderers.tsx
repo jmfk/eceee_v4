@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { NewsFlashRender } from './NewsFlashRender'
+import { NewsImageFrame } from './NewsImage'
 import { newsDetailPresentation } from './newsDetailPresentation'
 import type { RenderWidgetModel, WidgetRenderComponent, WidgetRenderProps } from './types'
 import { processNavigationItems } from '../utils/navigationItems'
@@ -792,7 +793,7 @@ const TopNewsPlugRender: WidgetRenderComponent = ({ widget }) => {
         const excerptSource = data.summary || data.excerpt || data.description || data.content || fields.excerpt
         const excerpt = truncateExcerpt(excerptSource, value(widget.config, 'excerptLength', 'excerpt_length') ?? 100, true)
         return <article className={`news-card${item.isFeatured || item.is_featured ? ' pinned' : ''}`} data-object-id={item.id} key={item.id || index}>
-            {fields.image && <div className="news-image"><ImageView source={fields.image} alt="" /></div>}
+            {fields.image && <NewsImageFrame className="news-image" source={fields.image} />}
             <div className="news-body"><div className="news-meta">{showType && <span className="news-type-badge">{fields.objectType.label || fields.objectType.name}</span>}{showDate && fields.publishDate && <time className="news-date" dateTime={fields.publishDate}>{formatDisplayDate(fields.publishDate, 'short')}</time>}</div>
                 <h3 className="news-title"><PreviewLink href={configuredNewsPath(item, widget.config)}>{item.title || `Article ${index + 1}`}</PreviewLink></h3>
                 {showExcerpt && excerpt && <p className="news-excerpt">{excerpt}</p>}
@@ -817,7 +818,7 @@ const SidebarTopNewsRender: WidgetRenderComponent = ({ widget }) => {
             const excerptSource = data.summary || data.excerpt || data.description || fields.excerpt
             const excerpt = truncateExcerpt(excerptSource, value(widget.config, 'excerptLength', 'excerpt_length') ?? 120, true)
             return <li className="news-item" data-object-id={item.id} key={item.id || index}>
-                {!header && showThumbnails && fields.thumbnail && <div className="news-thumbnail"><ImageView source={fields.thumbnail} alt="" /></div>}
+                {!header && showThumbnails && fields.thumbnail && <NewsImageFrame className="news-thumbnail" source={fields.thumbnail} />}
                 <div className="news-content"><div className="news-meta">{!header && showType && <span className="news-type-badge">{fields.objectType.label || fields.objectType.name}</span>}{!header && showDates && fields.publishDate && <time className="news-date" dateTime={fields.publishDate}>{formatDisplayDate(fields.publishDate, 'short')}</time>}</div>
                     <h4 className="news-title"><PreviewLink href={configuredNewsPath(item, widget.config)}>{item.title || `Article ${index + 1}`}</PreviewLink></h4>
                     {!header && showExcerpt && excerpt && <p className="news-excerpt">{excerpt}</p>}

@@ -3302,7 +3302,7 @@
     },
     "render-manifest": {
       "formatVersion": 2,
-      "sha256": "1bfb6c87bb457cef94a32d27cbb80f6c925ee5c1cb87c87eac3140f5b24dd6dc",
+      "sha256": "0d9ac233380e6bd18a462ec1ffa5395fd93775aa367da36766ea07b56d9383b9",
       "types": [
         "easy_widgets.BannerWidget",
         "easy_widgets.BioWidget",
