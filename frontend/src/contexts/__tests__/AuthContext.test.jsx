@@ -88,7 +88,8 @@ describe('AuthProvider workspace synchronization', () => {
     it('rejects interrupted delegated writes instead of queueing them for administrator reauthentication', async () => {
         vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, json: async () => ({ id: 7, username: 'reader', userPerspective: { username: 'reader' } }) })
         const reject = vi.fn()
-        render(<AuthProvider><AuthState /></AuthProvider>)
+        // Finish bootstrap effects, including the delegated session listener, before interrupting it.
+        await act(async () => { render(<AuthProvider><AuthState /></AuthProvider>) })
         await screen.findByText('reader')
         act(() => window.dispatchEvent(new CustomEvent('session-expired', { detail: {
             config: { method: 'post', url: '/protected-write/' }, reject, resolve: vi.fn(),
