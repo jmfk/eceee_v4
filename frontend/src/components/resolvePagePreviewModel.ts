@@ -22,7 +22,11 @@ const imgproxyBatchSize = 50
 const pageLookupBatchSize = 500
 
 const newsPreviewOrigin = (hostnames: string[]) => {
-    const hostname = hostnames.find(value => /^[a-z0-9][a-z0-9.-]*$/i.test(value) && !value.includes('..'))
+    const candidates = hostnames.filter(value => /^[a-z0-9][a-z0-9.-]*$/i.test(value) && !value.includes('..'))
+    const localAdmin = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        || window.location.hostname.endsWith('.localhost')
+    const hostname = (localAdmin ? candidates.find(value => value === 'localhost' || value.endsWith('.localhost')) : undefined)
+        || candidates[0]
     if (!hostname) throw new Error('No public site hostname is configured for this preview.')
     const local = hostname === 'localhost' || hostname.endsWith('.localhost')
     const adminPort = Number(window.location.port)

@@ -56,6 +56,14 @@ describe('News Flash presentation', () => {
         expect(card.querySelector('.news-flash-body .news-flash-excerpt')).toBeInTheDocument()
     })
 
+    it('keeps an image placeholder when a real published story has no image', () => {
+        const { container } = render(<NewsFlashRender widget={{ ...fixture, data: { status: 'ready', items: [{ id: 1, title: 'Published story', slug: 'story' }] } }} context={context} />)
+        expect(screen.getByRole('link', { name: 'Published story' })).toHaveAttribute('href', '/news/story/')
+        const imageArea = container.querySelector('[data-object-id="1"] .news-flash-placeholder-image')
+        expect(imageArea).toHaveAttribute('aria-hidden', 'true')
+        expect(imageArea?.querySelector('img')).toBeNull()
+    })
+
     it('supports all-zero counts', () => {
         render(<NewsFlashRender widget={{ ...fixture, config: { fullWidthCount: 0, halfWidthCount: 0, thirdWidthCount: 0 } }} context={context} />)
         expect(screen.queryByRole('article')).not.toBeInTheDocument()
