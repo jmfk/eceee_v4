@@ -1,10 +1,29 @@
 import React from 'react'
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import NewsFlashWidget from '../NewsFlashWidget'
 import { newsHomeEditorSchema } from '../newsHomeSchema'
 
 describe('News Flash editor contract', () => {
+    afterEach(() => vi.unstubAllGlobals())
+    it('loads real published articles and images for the edited site', async () => {
+        const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ priorityId: null, items: [{
+            id: '1161', title: 'Nuclear nostalgia and dangerous distractions', slug: 'nuclear-nostalgia',
+            data: { summary: 'Real article summary', featuredImage: { url: 'https://media.example/photo.jpg' } },
+        }] }) })
+        vi.stubGlobal('fetch', fetcher)
+        render(<NewsFlashWidget context={{ webpageData: { id: 249, hostnames: ['eceee.localhost'] } }} />)
+        expect(await screen.findByText('Nuclear nostalgia and dangerous distractions')).toBeInTheDocument()
+        expect(screen.getByText('Real article summary')).toBeInTheDocument()
+        expect(document.querySelector('.news-flash-image img')).toHaveAttribute('src', 'https://media.example/photo.jpg')
+        expect(fetcher).toHaveBeenCalledTimes(1)
+        const url = new URL(fetcher.mock.calls[0][0])
+        expect(url.hostname).toBe('eceee.localhost')
+        expect(url.searchParams.get('siteId')).toBe('249')
+        expect(url.searchParams.get('type')).toBe('article')
+        expect(screen.getAllByRole('article')).toHaveLength(3)
+    })
+
     it('shows the configured layout directly in the slot editor', () => {
         expect(NewsFlashWidget.widgetType).toBe('easy_widgets.NewsFlashWidget')
         render(<NewsFlashWidget config={{ fullWidthCount: 2, halfWidthCount: 0, thirdWidthCount: 3 }} />)

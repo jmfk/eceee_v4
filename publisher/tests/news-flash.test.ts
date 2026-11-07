@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { newsFlashItems, newsFlashPage } from '../src/news-flash';
-import type { PageReader, PublishedObject } from '../src/model';
+import type { PageReader, PublishedObject, PublicMediaItem } from '../src/model';
 
 const at = new Date('2026-11-06T12:00:00Z');
 const story = (id: string, data: Record<string, unknown> = {}) => ({ id, data }) as PublishedObject;
@@ -71,5 +71,35 @@ describe('News Flash published selection', () => {
   it('honors an expiry with an explicit timezone', async () => {
     const priority = story('priority', { newsPriority: true, newsPriorityUntil: '2026-11-06T14:00:00+01:00' });
     expect((await newsFlashItems(reader(priority), query, 'tenant-7', at))[0]).toEqual(priority);
+  });
+});
+
+
+describe('News Flash real article images', () => {
+  it('uses the first published body image without exposing the body in the feed', async () => {
+    const article = { ...story('7'), widgets: { main: [{ type: 'easy_widgets.ContentWidget', config: {
+      content: '<p>Article</p><img src="https://media.example.org/photo.jpg?a=1&amp;b=2" alt="Photograph">',
+    } }] } };
+    const db = { publishedObjects: vi.fn(async q => q.newsPriorityOnly ? [] : [article]) } as unknown as PageReader;
+    const result = await newsFlashItems(db, query, 'tenant-7', at);
+    expect(result[0].data.featuredImage).toEqual({ url: 'https://media.example.org/photo.jpg?a=1&b=2', altText: 'Photograph' });
+    expect(article.data.featuredImage).toBeUndefined();
+  });
+
+  it('prefers an explicit featured image over an embedded image', async () => {
+    const article = { ...story('7', { featuredImage: { url: 'https://media.example.org/featured.jpg' } }),
+      widgets: { main: [{ config: { content: '<img src="https://media.example.org/body.jpg">' } }] } };
+    const db = { publishedObjects: vi.fn(async q => q.newsPriorityOnly ? [] : [article]) } as unknown as PageReader;
+    expect((await newsFlashItems(db, query, 'tenant-7', at))[0].data.featuredImage).toEqual(article.data.featuredImage);
+  });
+
+  it('resolves media IDs only through the current tenant public media lookup', async () => {
+    const id = '233960cb-1e17-4583-a65f-e6430be98bb6';
+    const article = { ...story('7'), widgets: { main: [{ config: { content: `<img data-media-id="${id}" src="https://stale.example/private.jpg">` } }] } };
+    const db = { publishedObjects: vi.fn(async q => q.newsPriorityOnly ? [] : [article]), publicMedia: vi.fn(async () => ({ files: [], collections: {} })) } as unknown as PageReader;
+    expect((await newsFlashItems(db, query, 'tenant-7', at))[0].data.featuredImage).toBeNull();
+    expect(db.publicMedia).toHaveBeenCalledExactlyOnceWith([id], [], 'tenant-7');
+    vi.mocked(db.publicMedia).mockResolvedValue({ files: [{ id, type: 'image', url: 'https://public.example/image.jpg' } as PublicMediaItem], collections: {} });
+    expect((await newsFlashItems(db, query, 'tenant-7', at))[0].data.featuredImage).toMatchObject({ url: 'https://public.example/image.jpg' });
   });
 });

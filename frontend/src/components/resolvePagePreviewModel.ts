@@ -1,3 +1,4 @@
+import { newsPreviewOrigin } from '../utils/newsPreviewOrigin'
 import { newsFlashLayout, NEWS_FLASH_BATCH } from '../rendering/newsFlashLayout'
 import { api } from '../api/client'
 import { endpoints } from '../api/endpoints'
@@ -21,20 +22,6 @@ const linkTypes = new Set(['internal', 'external', 'email', 'phone', 'anchor', '
 const imgproxyBatchSize = 50
 const pageLookupBatchSize = 500
 
-const newsPreviewOrigin = (hostnames: string[]) => {
-    const candidates = hostnames.filter(value => /^[a-z0-9][a-z0-9.-]*$/i.test(value) && !value.includes('..'))
-    const localAdmin = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        || window.location.hostname.endsWith('.localhost')
-    const hostname = (localAdmin ? candidates.find(value => value === 'localhost' || value.endsWith('.localhost')) : undefined)
-        || candidates[0]
-    if (!hostname) throw new Error('No public site hostname is configured for this preview.')
-    const local = hostname === 'localhost' || hostname.endsWith('.localhost')
-    const adminPort = Number(window.location.port)
-    const fallbackPort = Number.isInteger(adminPort) && adminPort > 0
-        ? Math.floor(adminPort / 100) * 100 + 15 : 10115
-    const port = local ? `:${import.meta.env.VITE_PUBLISHER_PORT || fallbackPort}` : ''
-    return `${local ? 'http:' : 'https:'}//${hostname}${port}`
-}
 
 const collectionFileToMediaItem = (file: any) => {
     const url = file.imgproxyBaseUrl || file.imgproxy_base_url || file.fileUrl || file.file_url || file.url || ''

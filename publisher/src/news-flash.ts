@@ -1,5 +1,45 @@
 import type { DbId, PageReader, PublishedObject, PublishedObjectQuery } from './model';
 
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const attribute = (tag: string, name: string) => new RegExp(`(?:^|\\s)${name}\\s*=\\s*(["'])(.*?)\\1`, 'i').exec(tag)?.[2]?.replaceAll('&amp;', '&');
+
+/** Legacy articles keep their lead photograph in the published body. */
+function bodyImage(value: unknown): unknown {
+  if (typeof value === 'string') {
+    const tag = /<img\b[^>]*>/i.exec(value)?.[0];
+    if (!tag) return undefined;
+    const id = attribute(tag, 'data-media-id');
+    return id && uuid.test(id) ? { id, type: 'image' } : { url: attribute(tag, 'src'), altText: attribute(tag, 'alt') || '' };
+  }
+  if (!value || typeof value !== 'object') return undefined;
+  const item = value as Record<string, unknown>;
+  if (item.type === 'easy_widgets.ImageWidget') {
+    const config = item.config as Record<string, unknown> | undefined;
+    const images = config?.mediaItems ?? config?.media_items;
+    if (Array.isArray(images) && images[0]) return images[0];
+  }
+  for (const child of Object.values(item)) {
+    const image = bodyImage(child);
+    if (image) return image;
+  }
+}
+
+async function withNewsImages(items: PublishedObject[], reader: PageReader, tenantId: DbId): Promise<PublishedObject[]> {
+  const candidates = items.map(item => item.data.featuredImage || item.data.featured_image || bodyImage(item.widgets));
+  const ids = candidates.flatMap(image => {
+    const id = typeof image === 'string' ? image : (image as { id?: string })?.id;
+    return id && uuid.test(id) ? [id.toLowerCase()] : [];
+  });
+  const files = ids.length ? (await reader.publicMedia([...new Set(ids)], [], tenantId)).files : [];
+  return items.map((item, index) => {
+    const candidate = candidates[index];
+    if (!candidate) return item;
+    const id = typeof candidate === 'string' ? candidate : (candidate as { id?: string })?.id;
+    const image = id && uuid.test(id) ? files.find(file => String(file.id).toLowerCase() === id.toLowerCase()) ?? null : candidate;
+    return { ...item, data: { ...item.data, featuredImage: image, featured_image: undefined } };
+  });
+}
+
 type NewsFlashPage = { limit?: number; offset?: number; priorityId?: DbId | null };
 
 /** Keep the first page's promotion decision while continuing a live feed. */
@@ -29,7 +69,7 @@ export async function newsFlashPage(
     ...selection, excludeObjectIds: priorityId ? [priorityId] : [],
     offset: Math.max(0, offset - (priorityId ? 1 : 0)), limit: limit - lead.length,
   }, tenantId, at) : [];
-  return { items: [...lead, ...latest.filter(item => item.id !== priorityId)].slice(0, limit), priorityId };
+  return { items: await withNewsImages([...lead, ...latest.filter(item => item.id !== priorityId)].slice(0, limit), reader, tenantId), priorityId };
 }
 
 export async function newsFlashItems(
