@@ -102,7 +102,7 @@ def theme_type_metadata(request, active_only=True):
     for item in theme.widget_types["items"]:
         version = item.get("active_version", len(item.get("releases", [])))
         if version and (not active_only or item.get("status", "active") == "active"):
-            result.append(ThemeWidget(item, item["releases"][version - 1]).to_dict())
+            result.append(ThemeWidget(item, item["releases"][version - 1], theme.widget_types).to_dict())
     return result
 
 

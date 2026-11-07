@@ -475,6 +475,9 @@ class PageTheme(models.Model):
         validate_theme_layouts(self.layouts)
         previous_widgets = persisted.widget_types if persisted else None
         validate_widget_types(self.widget_types, previous=previous_widgets)
+        from webpages.theme_layouts import validate_layout_policy_types
+
+        validate_layout_policy_types(self.layouts, self.widget_types)
         if persisted and persisted.is_default and persisted.is_active and (not self.is_default or not self.is_active):
             validate_default_theme_change(None, previous_theme=persisted)
         validate_default_theme_change(self)

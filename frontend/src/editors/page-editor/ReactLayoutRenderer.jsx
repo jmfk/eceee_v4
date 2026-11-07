@@ -20,6 +20,7 @@ import { useClipboard } from '../../contexts/ClipboardContext';
 import { regenerateWidgetIds } from '../../utils/widgetIdentity';
 import WidgetSlot from '../../layouts/easy-layouts/WidgetSlot';
 import { normalizeLayoutDefinition, ThemeLayoutRender } from '../../rendering/themeLayoutRenderer';
+import { isWidgetAllowedInSlot } from '../../utils/widgetSlotPolicy';
 
 // Helper function to filter valid widgets
 const filterValidWidgets = (widgets) => {
@@ -126,18 +127,7 @@ export const validateSlotWidgetAddition = (policy = {}, currentCount, addedWidge
     if (maximum != null && currentCount - removedCount + addedWidgets.length > maximum) {
         return `This slot allows at most ${maximum} widget${maximum === 1 ? '' : 's'}.`;
     }
-    const allowed = policy.allowed_widget_types || policy.allowedWidgetTypes;
-    const disallowed = policy.disallowed_widget_types || policy.disallowedWidgetTypes || [];
-    const matches = (type, patterns = []) => {
-        const widgetType = String(type || '');
-        return patterns.some((pattern) => (
-            pattern === '*' || widgetType === pattern
-            || (pattern.endsWith('.*') && widgetType.startsWith(pattern.slice(0, -1)))
-        ));
-    };
-    const invalid = addedWidgets.find((widget) => (
-        (allowed?.length && !matches(widget.type, allowed)) || matches(widget.type, disallowed)
-    ));
+    const invalid = addedWidgets.find((widget) => !isWidgetAllowedInSlot(widget.type, policy));
     return invalid ? `Widget type “${invalid.type}” is not allowed in this slot.` : null;
 };
 
@@ -834,7 +824,10 @@ const ReactLayoutRenderer = forwardRef(({
     // Widget modal handlers
     const handleShowWidgetModal = useCallback((slotName, slotMetadata = null, replacementInfo = null) => {
         setSelectedSlotForModal(slotName);
-        setSelectedSlotMetadata(slotMetadata);
+        const explicit = slotMetadata?.widgetPolicy;
+        setSelectedSlotMetadata(explicit?.mode === 'allow' || explicit?.mode === 'none'
+            ? { ...slotMetadata, allowedWidgetTypes: explicit.mode === 'allow' ? explicit.allowed_widget_types : [], disallowedWidgetTypes: null }
+            : slotMetadata);
         setReplacementContext(replacementInfo);
         setWidgetModalOpen(true);
     }, []);
@@ -1723,6 +1716,7 @@ const ReactLayoutRenderer = forwardRef(({
                                 behavior={{
                                     allowedWidgetTypes: policy.allowed_widget_types || policy.allowedWidgetTypes || ['*'],
                                     disallowedWidgetTypes: policy.disallowed_widget_types || policy.disallowedWidgetTypes || null,
+                                    widgetPolicy: policy.widget_policy || policy.widgetPolicy,
                                     maxWidgets: Object.hasOwn(policy, 'max_widgets') ? policy.max_widgets : policy.maxWidgets,
                                     required: Boolean(policy.required),
                                     slotType: inheritanceAllowed ? 'inherited' : 'content',

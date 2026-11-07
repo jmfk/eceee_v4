@@ -1,4 +1,6 @@
-type SlotPolicy = {
+export type SlotPolicy = {
+    mode?: 'inherit' | 'allow' | 'none'
+    widget_policy?: { mode: 'inherit' | 'allow' | 'none'; allowed_widget_types?: string[] }
     allowed_widget_types?: string[]
     allowedWidgetTypes?: string[]
     disallowed_widget_types?: string[]
@@ -12,6 +14,9 @@ const matches = (type: string, patterns: string[]) => patterns.some((pattern) =>
 )
 
 export const isWidgetAllowedInSlot = (type: string, policy: SlotPolicy = {}) => {
+    const explicit = policy.widget_policy || (policy.mode ? policy : null)
+    if (explicit?.mode === 'none') return false
+    if (explicit?.mode === 'allow' && !(explicit.allowed_widget_types || []).includes(type)) return false
     const allowed = policy.allowed_widget_types || policy.allowedWidgetTypes || []
     const disallowed = policy.disallowed_widget_types || policy.disallowedWidgetTypes || []
     return (!allowed.length || matches(type, allowed)) && !matches(type, disallowed)

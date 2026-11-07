@@ -1462,6 +1462,7 @@ def build_workspace(theme: PageTheme, include_tenant_content=False):
     theme_config = PageThemeSerializer(theme).data
     theme_config["designer_preview"] = normalized_designer_preview(theme)
     from content.models import Namespace
+    from webpages.widget_registry import widget_type_registry
 
     media_namespace = Namespace.get_or_create_theme_media(theme.tenant, created_by=theme.created_by).slug
     return {
@@ -1479,6 +1480,10 @@ def build_workspace(theme: PageTheme, include_tenant_content=False):
         "assets": assets,
         "breakpoints": theme.get_breakpoints(),
         "widgetTypes": copy.deepcopy(theme.widget_types),
+        "widgetSchemas": {
+            widget.type: widget.configuration_model.model_json_schema()
+            for widget in widget_type_registry.list_widget_types(active_only=True)
+        },
         "layouts": copy.deepcopy(theme.layouts),
         "layoutUsage": theme_layout_usage(theme),
         "catalog": catalog,

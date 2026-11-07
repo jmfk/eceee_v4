@@ -12,10 +12,14 @@ export const sanitizeThemeWidgetHtml = (html: string) => String(DOMPurify.saniti
 
 export interface ThemeWidgetRelease {
     version: number
-    schema: { type: string; properties: Record<string, any>; required?: string[] }
-    template: string
-    css: string
-    compiled_css: string
+    kind?: 'derived'
+    base_type?: string
+    base_version?: number | null
+    slot_policies?: Record<string, { mode: 'inherit' | 'allow' | 'none'; allowed_widget_types?: string[] }>
+    schema?: { type: string; properties: Record<string, any>; required?: string[] }
+    template?: string
+    css?: string
+    compiled_css?: string
     defaults: Record<string, any>
 }
 
@@ -39,13 +43,20 @@ export const findThemeWidget = (document: ThemeWidgetDocument | undefined, type:
     const release = Number.isInteger(version) ? item?.releases?.find(candidate => candidate.version === version) : undefined
     return item && release ? { item, release } : null
 }
+export const resolveThemeWidget = (document: ThemeWidgetDocument | undefined, release: ThemeWidgetRelease) => {
+    if (release.kind !== 'derived') return release
+    if (!release.base_type?.startsWith('theme_widgets.')) return release
+    return findThemeWidget(document, release.base_type, release.base_version ?? undefined)?.release || null
+}
 export const themeWidgetTypes = (document: ThemeWidgetDocument) => document.items.flatMap(item => {
     const release = item.releases.find(candidate => candidate.version === item.active_version)
+    const resolved = release && resolveThemeWidget(document, release)
     return item.status !== 'archived' && release ? [{
         type: `theme_widgets.${item.id}`, name: item.name, description: item.description || '',
         isActive: true, typeVersion: release.version, latestVersion: item.active_version,
-        defaultConfig: release.defaults, defaults: release.defaults, schema: release.schema,
-        configurationSchema: release.schema, category: 'theme',
+        defaultConfig: { ...(resolved?.defaults || {}), ...release.defaults }, defaults: { ...(resolved?.defaults || {}), ...release.defaults },
+        schema: resolved?.schema, configurationSchema: resolved?.schema,
+        baseType: release.base_type, slotPolicies: release.slot_policies, category: 'theme',
     }] : []
 })
 
@@ -71,7 +82,7 @@ export const normalizeAuthoredWidgetSchema = (schema: any) => ({
 })
 
 export const themeWidgetData = (release: ThemeWidgetRelease, config: Record<string, any>) => Object.fromEntries(
-    Object.entries(release.schema.properties).map(([key, field]) => {
+    Object.entries(release.schema?.properties || {}).map(([key, field]) => {
         let value = config[key] ?? field.default ?? ''
         if (field.format === 'rich-text' || field.fieldType === 'rich_text') value = sanitizeThemeWidgetHtml(String(value))
         if (field.format === 'media') value = value ? { ...value, url: imageUrl(value), alt: value.alt || value.altText || value.alt_text || '' } : null

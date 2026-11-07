@@ -541,6 +541,7 @@ const SlotAccordionItem = ({
                         onClearSlot={onClearSlot}
                         allowedWidgetTypes={layoutPolicy?.allowed_widget_types || layoutPolicy?.allowedWidgetTypes || slotMetadata.allowedWidgetTypes || ['*']}
                         disallowedWidgetTypes={layoutPolicy?.disallowed_widget_types || layoutPolicy?.disallowedWidgetTypes || null}
+                        widgetPolicy={layoutPolicy?.widget_policy || layoutPolicy?.widgetPolicy}
                         publicVisibilityWarning={!isCurrent ? 'This slot is not used by the current layout.' : null}
                         maxWidgets={layoutPolicy?.max_widgets ?? layoutPolicy?.maxWidgets ?? slotMetadata.max_widgets ?? 20}
                         slotType="content"

@@ -1,10 +1,11 @@
 ---
 id: PRD-0046
 title: Derived widgets with single-level inheritance and slot restrictions
-status: draft
-locked: false
+status: started
+locked: true
 created: 2026-11-07
-related_adrs: []
+related_adrs:
+  - ADR-0065
 ---
 
 # PRD-0046: Derived Widgets and Slot Restrictions
@@ -115,15 +116,17 @@ Copying a widget's implementation for each purpose would duplicate behavior and 
 
 ## Implementation Notes
 
-- Draft specification only. No implementation, migration, content conversion or deployment is authorized by this document.
-- Before implementation, record the concrete inheritance-resolution and shared slot-policy contract in an ADR, including compatibility with existing allow/deny and wildcard semantics.
+- Implementation started on 2026-11-07. The existing Django page/object write validation remains authoritative and requires compatible changes alongside TypeScript editor and renderer work.
+- The inheritance-resolution and shared slot-policy contract is recorded in ADR-0065.
 
 ## Linked ADRs
 
-- No new ADR yet; implementation decisions remain pending.
+- [ADR-0065: Derived widget resolution and slot policies](../adrs/active/0065-derived-widget-slot-policies.md).
 - Existing constraints: [ADR-0040: Theme-owned widget releases](../adrs/active/0040-theme-widget-revisions.md) and [ADR-0041: Shared widget contracts](../adrs/active/0041-shared-widget-contract-source.md).
 - Related prior scope: [PRD-0029: Theme-owned versioned widget types](0029-theme-widget-types.md).
 
 ## Completion Evidence
 
-- Not implemented.
+- Derived widget drafts/releases, exact base resolution, slot policies, Designer controls, editor filtering and public rendering are implemented on the `codex/derived-widget-slot-policies` branch.
+- Focused contract checks: 57 database-free Django tests, 49 Designer/rendering Vitest tests and 26 slot interaction Vitest tests passed; frontend production build and TypeScript check passed.
+- The database-backed Designer workspace API test and the backend-test target's 89 taxonomy governance checks passed on PostgreSQL. Page/object write and transfer integration tests remain for the PR review gate.

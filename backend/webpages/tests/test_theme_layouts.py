@@ -25,6 +25,7 @@ from webpages.theme_layouts import (
     default_theme_layouts,
     legacy_compatibility_layout,
     theme_layout_usage,
+    validate_layout_policy_types,
     validate_layout_compatibility,
     validate_layout_widgets,
     validate_theme_layouts,
@@ -552,6 +553,31 @@ class ThemeLayoutValidationTests(SimpleTestCase):
         document["items"].append(legacy_compatibility_layout("article_layout", {"lead", "main"}))
 
         self.assertIs(validate_theme_layouts(document), document)
+
+    def test_explicit_layout_policy_matches_exact_derived_identity(self):
+        theme = SimpleNamespace(layouts=default_theme_layouts())
+        derived = "theme_widgets.62b20cc6-d904-4118-a9b4-c1addf4479e6"
+        main = next(item for item in theme.layouts["items"] if item["key"] == "mainLayout")
+        main["slots"]["main"]["widget_policy"] = {"mode": "allow", "allowed_widget_types": [derived]}
+        allowed = {"main": [{"id": "derived", "type": derived}]}
+        self.assertEqual(validate_layout_widgets(theme, "mainLayout", allowed), allowed)
+        with self.assertRaisesMessage(ValidationError, "rejects widget type 'easy_widgets.TwoColumnsWidget'"):
+            validate_layout_widgets(
+                theme, "mainLayout", {"main": [{"id": "base", "type": "easy_widgets.TwoColumnsWidget"}]}
+            )
+        main["slots"]["main"]["widget_policy"] = {"mode": "none"}
+        with self.assertRaisesMessage(ValidationError, "rejects widget type"):
+            validate_layout_widgets(theme, "mainLayout", allowed)
+
+    def test_explicit_layout_policy_rejects_unavailable_theme_type(self):
+        layouts = default_theme_layouts()
+        main = next(item for item in layouts["items"] if item["key"] == "mainLayout")
+        main["slots"]["main"]["widget_policy"] = {
+            "mode": "allow",
+            "allowed_widget_types": ["theme_widgets.62b20cc6-d904-4118-a9b4-c1addf4479e6"],
+        }
+        with self.assertRaisesMessage(ValidationError, "references unavailable widget type"):
+            validate_layout_policy_types(layouts, {"version": 1, "items": []})
 
     def test_widget_policies_allow_disallowed_types_on_save_and_enforce_finite_limits(self):
         theme = SimpleNamespace(layouts=default_theme_layouts())

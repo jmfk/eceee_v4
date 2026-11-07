@@ -16,7 +16,7 @@ const id = '2bf85f1b-26cc-4801-8cfa-bb680f93e256'
 const release = { version: 1, schema: { type: 'object', properties: { title: { type: 'string', default: 'Example' } } }, defaults: { title: 'Example' }, template: '<p>{{title}}</p>', css: '', compiled_css: '' }
 const workspace = { id: 7, name: 'Theme', draftVersion: 1, themeConfig: {}, widgetTypes: { version: 1, items: [{ id, name: 'Fact box', active_version: 1, releases: [release] }] } }
 
-const mount = () => render(<QueryClientProvider client={new QueryClient()}><MemoryRouter initialEntries={[`/designer/themes/7/widgets/${id}`]}><Routes><Route path="/designer/themes/:themeId/widgets/:widgetTypeId" element={<DesignerWidgetTypesPage />} /></Routes></MemoryRouter></QueryClientProvider>)
+const mount = (path = `/designer/themes/7/widgets/${id}`) => render(<QueryClientProvider client={new QueryClient()}><MemoryRouter initialEntries={[path]}><Routes><Route path="/designer/themes/:themeId/widgets/:widgetTypeId?" element={<DesignerWidgetTypesPage />} /></Routes></MemoryRouter></QueryClientProvider>)
 
 describe('Designer widget authoring', () => {
     beforeEach(() => {
@@ -50,5 +50,27 @@ describe('Designer widget authoring', () => {
         expect(input).toHaveValue('Fact box')
         expect(screen.queryByRole('alert')).toBeNull()
         expect(api.save).toHaveBeenCalledTimes(1)
+    })
+    it('creates a derived Two Columns draft with independent slot policies', async () => {
+        let current = { ...workspace, catalog: { widgetSlots: [{ widgetType: 'easy_widgets.TwoColumnsWidget', slots: [{ name: 'left' }, { name: 'right' }] }] },
+            widgetSchemas: { 'easy_widgets.TwoColumnsWidget': { type: 'object', properties: {} } } }
+        api.workspace.mockImplementation(async () => current)
+        api.save.mockImplementation(async (_themeId, patch) => {
+            current = { ...current, widgetTypes: patch.widgetTypes, draftVersion: current.draftVersion + 1 }
+            return current
+        })
+        mount('/designer/themes/7/widgets')
+        const base = await screen.findByLabelText('Create from existing widget')
+        fireEvent.change(base, { target: { value: 'easy_widgets.TwoColumnsWidget' } })
+        fireEvent.click(await screen.findByRole('link', { name: 'New derived widget' }))
+        expect(await screen.findByText('Inherited slots')).toBeInTheDocument()
+        expect(screen.getByText('left')).toBeInTheDocument()
+        expect(screen.getByText('right')).toBeInTheDocument()
+        const modes = screen.getAllByLabelText('Allowed children')
+        fireEvent.change(modes[0], { target: { value: 'none' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))
+        await waitFor(() => expect(api.save).toHaveBeenCalledTimes(2))
+        const derived = api.save.mock.calls[1][1].widgetTypes.items.at(-1).working
+        expect(derived).toMatchObject({ kind: 'derived', base_type: 'easy_widgets.TwoColumnsWidget', slot_policies: { left: { mode: 'none' } } })
     })
 })
