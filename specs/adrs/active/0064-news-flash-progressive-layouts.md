@@ -83,3 +83,9 @@ Chrome verified all three real cards at exactly 310px in the editor and public p
 The owner supplied a separate mobile News Flash reference, superseding identical 310px stacked mobile cards. Below an 800px widget width, full-width stories become square leads with 6.25% insets and a bottom-aligned 3:1 image. Half/third-width stories become compact rows at a 3.4:1 card ratio (minimum 88px high), with a 32%-wide image flush to the right/top/bottom edge. Mobile summaries are hidden and titles retain two-line ellipsis. The configured desktop square/landscape image choice remains in effect on desktop; mobile image geometry follows the new reference. Named container queries isolate the mobile layout from individual desktop cards.
 
 Chrome verified a 330×330px lead with a 288.75×96.25px inset image and 330×97.05px supporting rows with edge-aligned thumbnails, without horizontal overflow. Desktop full/half cards remain 310px high.
+
+## Review corrections before release
+
+Read IDs from saved div/figure media-insert wrappers before resolving a thumbnail; never fall back to their cached child image URL when the referenced media is unavailable to the tenant public-media lookup. Reuse the established imageWidgetMediaItems adapter for canonical config.image and legacy imageUrl/image_url references. Skip source-less img tags when finding the first usable body image. Regression tests reproduce both media findings and pass after the fixes.
+
+Final local review covers P0–P3 with no verified remaining findings (highest fixed: P1). Publisher suite: 129 passed, 3 database-dependent tests deferred to Full CI; frontend focused preview/editor/render/registry: 39 passed. Publisher lint/typecheck/build and frontend lint/build passed (existing frontend lint warnings retained). Browser evidence for the real editor/public site and compact/full card geometry is recorded above. No Article content or production data was rewritten.

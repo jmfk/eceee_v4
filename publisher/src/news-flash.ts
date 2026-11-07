@@ -1,3 +1,4 @@
+import { imageWidgetMediaItems } from '../../frontend/src/utils/imageWidgetMedia';
 import type { DbId, PageReader, PublishedObject, PublishedObjectQuery } from './model';
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -6,17 +7,26 @@ const attribute = (tag: string, name: string) => new RegExp(`(?:^|\\s)${name}\\s
 /** Legacy articles keep their lead photograph in the published body. */
 function bodyImage(value: unknown): unknown {
   if (typeof value === 'string') {
-    const tag = /<img\b[^>]*>/i.exec(value)?.[0];
-    if (!tag) return undefined;
-    const id = attribute(tag, 'data-media-id');
-    return id && uuid.test(id) ? { id, type: 'image' } : { url: attribute(tag, 'src'), altText: attribute(tag, 'alt') || '' };
+    // Media inserts own their ID on the wrapper, rather than the child img.
+    const images = /<(?:div|figure)\b[^>]*\bdata-media-id\s*=\s*(["'])(.*?)\1[^>]*>[\s\S]*?<img\b[^>]*>|<img\b[^>]*>/gi;
+    for (const match of value.matchAll(images)) {
+      const tag = match[0];
+      const id = attribute(tag, 'data-media-id');
+      if (id) {
+        if (uuid.test(id)) return { id, type: 'image' };
+        continue; // Never use a stale URL to bypass an invalid media reference.
+      }
+      const url = attribute(tag, 'src');
+      if (url) return { url, altText: attribute(tag, 'alt') || '' };
+    }
+    return undefined;
   }
   if (!value || typeof value !== 'object') return undefined;
   const item = value as Record<string, unknown>;
   if (item.type === 'easy_widgets.ImageWidget') {
     const config = item.config as Record<string, unknown> | undefined;
-    const images = config?.mediaItems ?? config?.media_items;
-    if (Array.isArray(images) && images[0]) return images[0];
+    const image = imageWidgetMediaItems(config).find(candidate => candidate.type === 'image');
+    if (image) return image;
   }
   for (const child of Object.values(item)) {
     const image = bodyImage(child);

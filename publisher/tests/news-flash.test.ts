@@ -93,6 +93,30 @@ describe('News Flash real article images', () => {
     expect((await newsFlashItems(db, query, 'tenant-7', at))[0].data.featuredImage).toEqual(article.data.featuredImage);
   });
 
+  it.each(['div', 'figure'])('validates the media ID on an embedded %s before using a saved URL', async tag => {
+    const id = '233960cb-1e17-4583-a65f-e6430be98bb6';
+    const article = { ...story('7'), widgets: { main: [{ config: { content: `<${tag} data-media-id="${id}"><img src="https://stale.example/private.jpg"></${tag}>` } }] } };
+    const db = { publishedObjects: vi.fn(async q => q.newsPriorityOnly ? [] : [article]), publicMedia: vi.fn(async () => ({ files: [], collections: {} })) } as unknown as PageReader;
+    expect((await newsFlashItems(db, query, 'tenant-7', at))[0].data.featuredImage).toBeNull();
+    expect(db.publicMedia).toHaveBeenCalledExactlyOnceWith([id], [], 'tenant-7');
+  });
+
+  it.each([
+    { image: { url: 'https://media.example/photo.jpg', type: 'image' } },
+    { imageUrl: 'https://media.example/photo.jpg' },
+    { image_url: 'https://media.example/photo.jpg' },
+  ])('uses the existing Image widget configuration contract: %j', async config => {
+    const article = { ...story('7'), widgets: { main: [{ type: 'easy_widgets.ImageWidget', config }] } };
+    const db = { publishedObjects: vi.fn(async q => q.newsPriorityOnly ? [] : [article]) } as unknown as PageReader;
+    expect((await newsFlashItems(db, query, 'tenant-7', at))[0].data.featuredImage).toMatchObject({ url: 'https://media.example/photo.jpg' });
+  });
+
+  it('finds a valid image after an image tag without a source', async () => {
+    const article = { ...story('7'), widgets: { main: [{ config: { content: '<img alt="empty"><img src="https://media.example/photo.jpg">' } }] } };
+    const db = { publishedObjects: vi.fn(async q => q.newsPriorityOnly ? [] : [article]) } as unknown as PageReader;
+    expect((await newsFlashItems(db, query, 'tenant-7', at))[0].data.featuredImage).toMatchObject({ url: 'https://media.example/photo.jpg' });
+  });
+
   it('resolves media IDs only through the current tenant public media lookup', async () => {
     const id = '233960cb-1e17-4583-a65f-e6430be98bb6';
     const article = { ...story('7'), widgets: { main: [{ config: { content: `<img data-media-id="${id}" src="https://stale.example/private.jpg">` } }] } };
