@@ -314,13 +314,31 @@ class WebPageRenderer:
             )
             if definition is None:
                 return format_html('<div role="alert">Missing widget revision: {}</div>', widget_type_name)
+            if definition.release.get("kind") == "derived" and not is_theme_widget(definition.release["base_type"]):
+                base_type = definition.release["base_type"]
+                base_data = {**widget_data, "type": base_type, "widget_type": base_type}
+                return format_html(
+                    '<div data-derived-widget="{}:{}">{}</div>',
+                    definition.item["id"],
+                    definition.release["version"],
+                    self.render_widget_json(base_data, context),
+                )
             from django.utils.safestring import mark_safe
+
+            base_release = (
+                definition.base_definition()[3] if definition.release.get("kind") == "derived" else definition.release
+            )
+            css_owner = (
+                definition.release["base_type"][len("theme_widgets.") :]
+                if definition.release.get("kind") == "derived"
+                else definition.item["id"]
+            )
 
             return format_html(
                 '<div data-theme-widget="{}:{}"><style>{}</style>{}</div>',
-                definition.item["id"],
-                definition.release["version"],
-                mark_safe(definition.release["compiled_css"]),
+                css_owner,
+                base_release["version"],
+                mark_safe(base_release["compiled_css"]),
                 mark_safe(definition.render(widget_data.get("config", {}))),
             )
         widget_type = widget_type_registry.get_widget_type_flexible(widget_type_name) if widget_type_name else None

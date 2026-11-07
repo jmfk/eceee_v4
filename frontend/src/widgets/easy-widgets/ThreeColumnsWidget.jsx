@@ -15,6 +15,7 @@ import { useTheme } from '../../hooks/useTheme';
 import ComponentStyleRenderer from '../../components/ComponentStyleRenderer';
 import { renderMustache, prepareComponentContext } from '../../utils/mustacheRenderer';
 import PropTypes from 'prop-types';
+import { isWidgetAllowedInSlot } from '../../utils/widgetSlotPolicy';
 
 const ThreeColumnsWidget = ({
     config = {},
@@ -39,6 +40,7 @@ const ThreeColumnsWidget = ({
     // Paste mode props
     pasteModeActive = false,
     onPasteAtPosition,
+    slotPolicies = {},
     ...props
 }) => {
     // Create this widget's own UDC componentId
@@ -59,6 +61,7 @@ const ThreeColumnsWidget = ({
     const [slotsData, setSlotsData] = useState(() => {
         return config.slots || { left: [], center: [], right: [] };
     });
+    const [slotPolicyError, setSlotPolicyError] = useState('');
 
     // Track the widget ID to detect when we're rendering a different widget
     const previousWidgetIdRef = useRef(widgetId);
@@ -146,6 +149,12 @@ const ThreeColumnsWidget = ({
 
     // Handle slot changes
     const handleSlotChange = useCallback(async (slotName, widgets) => {
+        const rejected = widgets.find(widget => !isWidgetAllowedInSlot(widget.type, slotPolicies[slotName] || { mode: 'inherit' }));
+        if (rejected) {
+            setSlotPolicyError(`Slot ${slotName} does not allow ${rejected.type}. Content was kept.`);
+            return;
+        }
+        setSlotPolicyError('');
         setSlotsData(prevSlots => {
             const updatedSlots = {
                 ...prevSlots,
@@ -172,10 +181,12 @@ const ThreeColumnsWidget = ({
 
             return updatedSlots;
         });
-    }, [config, publishUpdate, componentId, widgetId, contextType, props.slotName, parentComponentId, widgetPath]);
+    }, [config, publishUpdate, componentId, widgetId, contextType, props.slotName, parentComponentId, widgetPath, slotPolicies]);
 
     // Get filtered widget types for slots
     const filteredWidgetTypes = getFilteredWidgetTypes();
+    const typesForSlot = (name) => filteredWidgetTypes.filter(widget =>
+        isWidgetAllowedInSlot(widget.type, slotPolicies[name] || { mode: 'inherit' }));
 
     // Get grid classes based on layout style
     const getGridClasses = useCallback((layoutStyle) => {
@@ -234,6 +245,7 @@ const ThreeColumnsWidget = ({
         const gridClasses = getGridClasses(layoutStyle)
         return (
             <div className="three-columns-widget-editor">
+                {slotPolicyError && <p role="alert" className="text-sm text-red-700">{slotPolicyError}</p>}
                 <div className={`columns-grid grid grid-cols-1 ${gridClasses} gap-4`}>
                     <div className="p-4 text-center text-gray-500">Loading...</div>
                     <div className="p-4 text-center text-gray-500">Loading...</div>
@@ -269,7 +281,7 @@ const ThreeColumnsWidget = ({
                         slotName="left"
                         slotLabel="Left Column"
                         widgets={slotsData.left || []}
-                        availableWidgetTypes={filteredWidgetTypes}
+                        availableWidgetTypes={typesForSlot('left')}
                         parentWidgetId={widgetId}
                         contextType={contextType}
                         onWidgetEdit={onWidgetEdit}
@@ -305,7 +317,7 @@ const ThreeColumnsWidget = ({
                         slotName="center"
                         slotLabel="Center Column"
                         widgets={slotsData.center || []}
-                        availableWidgetTypes={filteredWidgetTypes}
+                        availableWidgetTypes={typesForSlot('center')}
                         parentWidgetId={widgetId}
                         contextType={contextType}
                         onWidgetEdit={onWidgetEdit}
@@ -341,7 +353,7 @@ const ThreeColumnsWidget = ({
                         slotName="right"
                         slotLabel="Right Column"
                         widgets={slotsData.right || []}
-                        availableWidgetTypes={filteredWidgetTypes}
+                        availableWidgetTypes={typesForSlot('right')}
                         parentWidgetId={widgetId}
                         contextType={contextType}
                         onWidgetEdit={onWidgetEdit}

@@ -287,6 +287,90 @@ def compile_definition(definition, type_id, version):
     }
 
 
+def _derived_base(document, base_type, base_version):
+    """Resolve only exact, locally available non-derived bases."""
+    if is_theme_widget(base_type):
+        item = next((value for value in document["items"] if PREFIX + value["id"] == base_type), None)
+        if item is None or type(base_version) is not int or base_version < 1:
+            raise ValidationError(f"Missing published base widget revision: {base_type} v{base_version}.")
+        release = next((value for value in item.get("releases", []) if value.get("version") == base_version), None)
+        if release is None or release.get("kind") == "derived":
+            raise ValidationError("A derived widget needs an existing non-derived base release.")
+        return release["schema"], release["defaults"], {}, release
+    if base_version is not None:
+        raise ValidationError("Built-in widget bases do not have a theme release number.")
+    from webpages.widget_registry import widget_type_registry
+
+    base = widget_type_registry.get_widget_type_by_type(base_type) if isinstance(base_type, str) else None
+    if base is None or not base.is_active:
+        raise ValidationError(f"Unknown or inaccessible base widget: {base_type}.")
+    return (
+        base.configuration_model.model_json_schema(),
+        base.get_configuration_defaults(),
+        base.get_slot_definitions() or {},
+        base,
+    )
+
+
+def compile_derived_definition(definition, type_id, version, document):
+    from webpages.slot_policies import permits_widget, validate_explicit_policy
+
+    if not isinstance(definition, dict) or definition.get("kind") != "derived":
+        raise ValidationError("Derived widget definition must be an object with kind derived.")
+    if set(definition) - {"version", "kind", "base_type", "base_version", "defaults", "slot_policies"}:
+        raise ValidationError("Derived widgets cannot replace the base schema, slots or renderer.")
+    base_type = definition.get("base_type")
+    if base_type == PREFIX + type_id:
+        raise ValidationError("A widget cannot derive from itself.")
+    base_version = definition.get("base_version")
+    schema, base_defaults, slots, base = _derived_base(document, base_type, base_version)
+    defaults = definition.get("defaults", {})
+    if not isinstance(defaults, dict) or "slots" in defaults or set(defaults) - set(schema.get("properties", {})):
+        raise ValidationError("Derived defaults must use inherited configuration fields.")
+    combined = {**copy.deepcopy(base_defaults), **defaults}
+    if is_theme_widget(base_type):
+        errors = list(jsonschema.Draft7Validator(schema).iter_errors(combined))
+        if errors:
+            raise ValidationError(f"Invalid inherited defaults: {errors[0].message}")
+    else:
+        valid, errors = base.validate_configuration(combined)
+        if not valid:
+            raise ValidationError(f"Invalid inherited defaults: {errors[0]}")
+    policies = definition.get("slot_policies", {})
+    if not isinstance(policies, dict) or set(policies) - set(slots):
+        raise ValidationError("Derived slot policies must name inherited base slots.")
+    for slot_name, policy in policies.items():
+        validate_explicit_policy(
+            policy, path=f"slot_policies.{slot_name}", required=slots[slot_name].get("required", False)
+        )
+        if policy["mode"] == "allow":
+            for selected in policy["allowed_widget_types"]:
+                if not _available_child_type(document, selected):
+                    raise ValidationError(f"Unknown widget type '{selected}' in slot '{slot_name}'.")
+                if not permits_widget(slots[slot_name], selected):
+                    raise ValidationError(f"Slot '{slot_name}' cannot allow '{selected}' outside the base policy.")
+    return {
+        "version": version,
+        "kind": "derived",
+        "base_type": base_type,
+        "base_version": base_version,
+        "defaults": copy.deepcopy(defaults),
+        "slot_policies": copy.deepcopy(policies),
+    }
+
+
+def _available_child_type(document, widget_type):
+    if is_theme_widget(widget_type):
+        return any(
+            PREFIX + item["id"] == widget_type and item.get("status", "active") == "active" and item.get("releases")
+            for item in document["items"]
+        )
+    from webpages.widget_registry import widget_type_registry
+
+    available = widget_type_registry.get_widget_type_by_type(widget_type) if isinstance(widget_type, str) else None
+    return available is not None and available.is_active
+
+
 def validate_widget_types(document, *, previous=None, draft=False):
     if (
         not isinstance(document, dict)
@@ -322,19 +406,49 @@ def validate_widget_types(document, *, previous=None, draft=False):
         for number, release in enumerate(releases, 1):
             if not isinstance(release, dict) or type(release.get("version")) is not int:
                 raise ValidationError("Release version must be an integer.")
-            if release != compile_definition(release, type_id, number):
+            compiled = (
+                compile_derived_definition(release, type_id, number, document)
+                if release.get("kind") == "derived"
+                else compile_definition(release, type_id, number)
+            )
+            if release != compiled:
                 raise ValidationError("Released widget definition or compiled CSS is invalid.")
         old = previous_items.get(type_id, {})
         old_releases = old.get("releases", [])
         if releases[: len(old_releases)] != old_releases:
             raise ValidationError("Published widget revisions cannot be changed or removed.")
+        if old_releases and releases:
+            first_base = old_releases[0].get("base_type")
+            if any(release.get("base_type") != first_base for release in releases):
+                raise ValidationError("A released widget's base identity cannot change.")
         active = item.get("active_version", len(releases))
         if type(active) is not int or (releases and not 1 <= active <= len(releases)) or (not releases and active != 0):
             raise ValidationError("Invalid active widget revision.")
         if "working" in item:
             if not draft:
                 raise ValidationError("Unpublished definitions belong in the Designer draft.")
-            compile_definition(item["working"], type_id, len(releases) + 1)
+            working = item["working"]
+            if not isinstance(working, dict):
+                raise ValidationError("Working widget definition must be an object.")
+            if working.get("kind") == "derived":
+                if releases and working.get("base_type") != releases[0].get("base_type"):
+                    raise ValidationError("A released widget's base identity cannot change.")
+                if not releases and is_theme_widget(working.get("base_type")):
+                    base_item = next(
+                        (
+                            candidate
+                            for candidate in document["items"]
+                            if PREFIX + candidate["id"] == working["base_type"]
+                        ),
+                        None,
+                    )
+                    if base_item is None or base_item.get("status", "active") != "active":
+                        raise ValidationError("New derived widgets need an available, active base type.")
+                compile_derived_definition(working, type_id, len(releases) + 1, document)
+            else:
+                if releases and releases[0].get("kind") == "derived":
+                    raise ValidationError("A released derived widget cannot become a standalone widget.")
+                compile_definition(working, type_id, len(releases) + 1)
     for key, item in previous_items.items():
         if item.get("releases") and key not in seen:
             raise ValidationError("Published widget types must be archived rather than removed.")
@@ -348,7 +462,11 @@ def publish_widget_types(document, previous):
         working = item.pop("working", None)
         releases = item.setdefault("releases", [])
         if working is not None:
-            release = compile_definition(working, item["id"], len(releases) + 1)
+            release = (
+                compile_derived_definition(working, item["id"], len(releases) + 1, document)
+                if working.get("kind") == "derived"
+                else compile_definition(working, item["id"], len(releases) + 1)
+            )
             comparable = {key: value for key, value in release.items() if key not in {"version", "compiled_css"}}
             last = releases[-1] if releases else {}
             if comparable != {key: value for key, value in last.items() if key not in {"version", "compiled_css"}}:
@@ -365,15 +483,20 @@ def find_definition(theme, widget_type, version=None):
             if type(number) is not int or number < 1:
                 return None
             return next(
-                (ThemeWidget(item, release) for release in item.get("releases", []) if release["version"] == number),
+                (
+                    ThemeWidget(item, release, (getattr(theme, "widget_types", None) or empty_widget_types()))
+                    for release in item.get("releases", [])
+                    if release["version"] == number
+                ),
                 None,
             )
     return None
 
 
 class ThemeWidget:
-    def __init__(self, item, release):
+    def __init__(self, item, release, document=None):
         self.item, self.release = item, release
+        self.document = document or empty_widget_types()
         self.type = PREFIX + item["id"]
         self.slug = self.type
         self.name = item["name"]
@@ -382,12 +505,28 @@ class ThemeWidget:
         self.variants = []
 
     def get_configuration_defaults(self):
+        if self.release.get("kind") == "derived":
+            _, base_defaults, _, _ = self.base_definition()
+            return {**copy.deepcopy(base_defaults), **copy.deepcopy(self.release["defaults"])}
         return copy.deepcopy(self.release["defaults"])
+
+    def base_definition(self):
+        return _derived_base(self.document, self.release["base_type"], self.release.get("base_version"))
+
+    def get_slot_definitions(self):
+        if self.release.get("kind") != "derived":
+            return None
+        _, _, slots, _ = self.base_definition()
+        return {
+            name: {**slot, "widget_policy": self.release["slot_policies"].get(name, {"mode": "inherit"})}
+            for name, slot in slots.items()
+        }
 
     def get_active_variants(self, config):
         return []
 
     def to_dict(self, **kwargs):
+        schema = self.base_definition()[0] if self.release.get("kind") == "derived" else self.release["schema"]
         return {
             "type": self.type,
             "name": self.name,
@@ -395,9 +534,12 @@ class ThemeWidget:
             "is_active": self.is_active,
             "type_version": self.release["version"],
             "latest_version": self.item.get("active_version", len(self.item["releases"])),
-            "configuration_schema": self.release["schema"],
-            "schema": self.release["schema"],
+            "configuration_schema": schema,
+            "schema": schema,
             "defaults": self.get_configuration_defaults(),
+            "base_type": self.release.get("base_type"),
+            "base_version": self.release.get("base_version"),
+            "slot_policies": self.release.get("slot_policies", {}),
             "variants": [],
             "category": "theme",
         }
@@ -406,6 +548,14 @@ class ThemeWidget:
         errors = {}
         if not isinstance(config, dict):
             return {"_general": ["Widget configuration must be an object."]}
+        if self.release.get("kind") == "derived":
+            schema, _, _, base = self.base_definition()
+            if is_theme_widget(self.release["base_type"]):
+                for error in jsonschema.Draft7Validator(schema).iter_errors(config):
+                    errors.setdefault(str(next(iter(error.path), "_general")), []).append(error.message)
+                return errors
+            valid, messages = base.validate_configuration(config)
+            return {} if valid else {"_general": messages}
         # Reverse generic parser casing only for known frontend-owned schema keys.
         for name in self.release["schema"].get("properties", {}):
             legacy = re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
@@ -443,6 +593,11 @@ class ThemeWidget:
     def render(self, config):
         import chevron
 
+        if self.release.get("kind") == "derived":
+            _, _, _, base = self.base_definition()
+            if is_theme_widget(self.release["base_type"]):
+                return clean_html(chevron.render(base["template"], presentation_data(base["schema"], config)))
+            raise ValidationError("Built-in derived widgets must render through their base renderer.")
         context = presentation_data(self.release["schema"], config)
         return clean_html(chevron.render(self.release["template"], context))
 
@@ -499,6 +654,71 @@ def iter_widgets(value):
                 yield from iter_widgets(child)
 
 
+def validate_derived_slots(theme, widgets):
+    """Check direct children against each pinned derived container policy."""
+    from webpages.slot_policies import permits_widget
+
+    def visit(widget):
+        if not isinstance(widget, dict):
+            raise ValidationError("Widget slot children must be objects.")
+        widget_type = widget.get("type") or widget.get("widget_type")
+        config = widget.get("config", {})
+        slots = config.get("slots", {}) if isinstance(config, dict) else {}
+        if not isinstance(slots, dict):
+            raise ValidationError(f"Widget '{widget_type}' slots must be an object.")
+        definition = (
+            find_definition(theme, widget_type, widget.get("type_version", widget.get("typeVersion")))
+            if is_theme_widget(widget_type)
+            else None
+        )
+        if definition and definition.release.get("kind") == "derived":
+            policies = definition.get_slot_definitions()
+            if set(slots) - set(policies):
+                raise ValidationError(f"Widget '{widget_type}' contains an unknown inherited slot.")
+            for slot_name, children in slots.items():
+                if not isinstance(children, list):
+                    raise ValidationError(f"Widget '{widget_type}' slot '{slot_name}' must contain a list.")
+                policy = policies[slot_name]
+                maximum = policy.get("max_widgets")
+                if maximum is not None and len(children) > maximum:
+                    raise ValidationError(
+                        f"Widget '{widget_type}' slot '{slot_name}' allows at most {maximum} widgets."
+                    )
+                if policy.get("required") and not children:
+                    raise ValidationError(f"Widget '{widget_type}' slot '{slot_name}' requires content.")
+                for child in children:
+                    child_type = child.get("type") if isinstance(child, dict) else None
+                    child_version = (
+                        child.get("type_version", child.get("typeVersion")) if isinstance(child, dict) else None
+                    )
+                    available = (
+                        find_definition(theme, child_type, child_version)
+                        if is_theme_widget(child_type)
+                        else _available_child_type(theme.widget_types, child_type)
+                    )
+                    if not available:
+                        raise ValidationError(f"Unknown widget type '{child_type}' in slot '{slot_name}'.")
+                    if not permits_widget(policy, child_type):
+                        raise ValidationError(
+                            f"Widget '{widget_type}' slot '{slot_name}' rejects widget type '{child_type}'."
+                        )
+        for children in slots.values():
+            if isinstance(children, list):
+                for child in children:
+                    visit(child)
+
+    if isinstance(widgets, dict):
+        roots = widgets.values()
+    elif isinstance(widgets, list):
+        roots = [widgets]
+    else:
+        return
+    for children in roots:
+        if isinstance(children, list):
+            for widget in children:
+                visit(widget)
+
+
 def validate_instances(theme, widgets, *, previous_theme=None, previous_widgets=None, warnings=None):
     errors = []
     previous_references = (
@@ -539,6 +759,8 @@ def validate_instances(theme, widgets, *, previous_theme=None, previous_widgets=
             warnings.extend(errors)
         else:
             raise ValidationError(errors)
+    if theme is not None:
+        validate_derived_slots(theme, widgets)
 
 
 def resolve_widget(theme, widget_type, version=None):
@@ -652,7 +874,7 @@ def proposed_page_theme(instance, at):
 
 
 def validate_version_widgets(instance):
-    if not any(iter_widgets(instance.widgets)):
+    if not instance.widgets:
         return
     from webpages.models import PageTheme
 
@@ -682,6 +904,26 @@ def validate_version_widgets(instance):
         previous_widgets=previous.widgets if hasattr(instance, "page_id") and previous else None,
     )
     if hasattr(instance, "page_id"):
+        from webpages.theme_layouts import validate_layout_widgets
+
+        layout_key = instance.layout_key or instance.code_layout
+        current = instance.page.parent
+        while not layout_key and current:
+            parent_version = (
+                current.get_latest_version()
+                if instance.effective_date is None
+                else current.get_current_published_version(now=instance.effective_date)
+            )
+            layout_key = (parent_version.layout_key or parent_version.code_layout) if parent_version else None
+            current = current.parent
+        if not layout_key and theme:
+            layout_key = (theme.layouts or {}).get("default_layout_key")
+        validate_layout_widgets(
+            theme,
+            layout_key,
+            instance.widgets,
+            previous_widgets=previous.widgets if previous else None,
+        )
         for at in version_theme_boundaries(instance):
             future_theme = version_widget_theme(instance, at=at)
             if getattr(future_theme, "pk", None) != getattr(theme, "pk", None):

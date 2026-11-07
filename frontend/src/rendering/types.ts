@@ -110,6 +110,7 @@ export interface ThemeLayoutSlot {
     required?: boolean
     max_widgets?: number | null
     allowed_widget_types?: string[]
+    widget_policy?: { mode: 'inherit' | 'allow' | 'none'; allowed_widget_types?: string[] }
     disallowed_widget_types?: string[]
     allows_inheritance?: boolean
     allow_merge?: boolean

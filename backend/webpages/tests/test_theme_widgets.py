@@ -3,6 +3,7 @@
 import copy
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
 
@@ -14,6 +15,7 @@ from webpages.theme_widgets import (
     publish_widget_types,
     retain_released_history,
     validate_instances,
+    validate_version_widgets,
     validate_widget_types,
 )
 
@@ -45,6 +47,145 @@ def working_document():
 
 
 class ThemeWidgetContractTests(unittest.TestCase):
+    def test_page_write_enforces_layout_policy_for_builtin_only_content(self):
+        from webpages.theme_layouts import default_theme_layouts
+
+        layouts = default_theme_layouts()
+        main = next(item for item in layouts["items"] if item["key"] == "mainLayout")
+        main["slots"]["main"]["widget_policy"] = {"mode": "none"}
+        theme = SimpleNamespace(tenant_id=1, layouts=layouts, widget_types=empty_widget_types())
+        page = SimpleNamespace(parent=None, tenant_id=1, get_latest_version=lambda: None)
+        version = SimpleNamespace(
+            widgets={"main": [{"id": "content", "type": "easy_widgets.ContentWidget", "config": {}}]},
+            page_id=1,
+            page=page,
+            pk=None,
+            layout_key="mainLayout",
+            code_layout="mainLayout",
+            effective_date=None,
+        )
+        with (
+            patch("webpages.theme_widgets.version_widget_theme", return_value=theme),
+            patch("webpages.theme_widgets.version_theme_boundaries", return_value=[]),
+        ):
+            with self.assertRaisesRegex(ValidationError, "rejects widget type 'easy_widgets.ContentWidget'"):
+                validate_version_widgets(version)
+
+    def test_derived_builtin_versions_keep_exact_base_and_slot_policies(self):
+        derived_id = "62b20cc6-d904-4118-a9b4-c1addf4479e6"
+        derived_type = f"theme_widgets.{derived_id}"
+        document = {
+            "version": 1,
+            "items": [
+                {
+                    "id": derived_id,
+                    "name": "Article columns",
+                    "active_version": 0,
+                    "releases": [],
+                    "working": {
+                        "kind": "derived",
+                        "base_type": "easy_widgets.TwoColumnsWidget",
+                        "base_version": None,
+                        "defaults": {},
+                        "slot_policies": {
+                            "left": {"mode": "allow", "allowed_widget_types": ["easy_widgets.ContentWidget"]},
+                            "right": {"mode": "none"},
+                        },
+                    },
+                }
+            ],
+        }
+        published = publish_widget_types(document, empty_widget_types())
+        theme = SimpleNamespace(widget_types=published)
+        definition = find_definition(theme, derived_type, 1)
+        self.assertEqual(definition.get_slot_definitions()["left"]["widget_policy"]["mode"], "allow")
+        self.assertEqual(definition.to_dict()["base_type"], "easy_widgets.TwoColumnsWidget")
+        allowed = {"id": "content", "type": "easy_widgets.ContentWidget", "config": {}}
+        validate_instances(
+            theme,
+            {
+                "main": [
+                    {
+                        "id": "columns",
+                        "type": derived_type,
+                        "type_version": 1,
+                        "config": {"slots": {"left": [allowed], "right": []}},
+                    }
+                ]
+            },
+        )
+        rejected = {"id": "image", "type": "easy_widgets.ImageWidget", "config": {}}
+        with self.assertRaisesRegex(ValidationError, "slot 'left' rejects widget type 'easy_widgets.ImageWidget'"):
+            validate_instances(
+                theme,
+                {
+                    "main": [
+                        {
+                            "id": "columns",
+                            "type": derived_type,
+                            "type_version": 1,
+                            "config": {"slots": {"left": [rejected]}},
+                        }
+                    ]
+                },
+            )
+        second = copy.deepcopy(published)
+        second["items"][0]["working"] = {
+            **document["items"][0]["working"],
+            "slot_policies": {"left": {"mode": "none"}, "right": {"mode": "none"}},
+        }
+        upgraded = publish_widget_types(second, published)
+        self.assertEqual(len(upgraded["items"][0]["releases"]), 2)
+        validate_instances(
+            SimpleNamespace(widget_types=upgraded),
+            {
+                "main": [
+                    {"id": "columns", "type": derived_type, "type_version": 1, "config": {"slots": {"left": [allowed]}}}
+                ]
+            },
+        )
+
+    def test_derived_widget_cannot_change_base_or_derive_from_derived(self):
+        derived_id = "62b20cc6-d904-4118-a9b4-c1addf4479e6"
+        document = {
+            "version": 1,
+            "items": [
+                {
+                    "id": derived_id,
+                    "name": "Columns",
+                    "releases": [],
+                    "active_version": 0,
+                    "working": {
+                        "kind": "derived",
+                        "base_type": "easy_widgets.TwoColumnsWidget",
+                        "base_version": None,
+                        "defaults": {},
+                        "slot_policies": {},
+                    },
+                }
+            ],
+        }
+        published = publish_widget_types(document, empty_widget_types())
+        changed = copy.deepcopy(published)
+        changed["items"][0]["working"] = {**document["items"][0]["working"], "base_type": "easy_widgets.ContentWidget"}
+        with self.assertRaisesRegex(ValidationError, "base identity cannot change"):
+            validate_widget_types(changed, previous=published, draft=True)
+        child = {
+            "id": "e5bb670a-4ca6-4751-9ffc-9896c3ce6130",
+            "name": "Child",
+            "releases": [],
+            "active_version": 0,
+            "working": {
+                "kind": "derived",
+                "base_type": f"theme_widgets.{derived_id}",
+                "base_version": 1,
+                "defaults": {},
+                "slot_policies": {},
+            },
+        }
+        with self.assertRaisesRegex(ValidationError, "non-derived base"):
+            validate_widget_types({"version": 1, "items": [*published["items"], child]}, draft=True)
+
     def test_rejects_external_schema_references_and_unsupported_field_controls(self):
         for schema in [
             {"type": "object", "additionalProperties": {"$ref": "https://example.test/schema"}},

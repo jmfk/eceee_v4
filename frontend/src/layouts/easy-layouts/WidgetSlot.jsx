@@ -32,6 +32,7 @@ const WidgetSlot = ({
     // Legacy props for backward compatibility
     allowedWidgetTypes = ['*'],
     disallowedWidgetTypes = null,
+    widgetPolicy = null,
     maxWidgets = 20, // Increased default
     required = false,
     onShowWidgetModal,
@@ -65,6 +66,7 @@ const WidgetSlot = ({
     const {
         allowedWidgetTypes: behaviorAllowedTypes = allowedWidgetTypes,
         disallowedWidgetTypes: behaviorDisallowedTypes = disallowedWidgetTypes,
+        widgetPolicy: behaviorWidgetPolicy = widgetPolicy,
         maxWidgets: behaviorMaxWidgets = maxWidgets,
         required: behaviorRequired = required,
         slotType: behaviorSlotType = slotType,
@@ -288,10 +290,13 @@ const WidgetSlot = ({
                 disallowedTypes = slotRules.disallowedTypes;
             }
 
+            const explicit = behaviorWidgetPolicy;
+            if (explicit?.mode === 'allow') allowedTypes = explicit.allowed_widget_types || [];
+            if (explicit?.mode === 'none') allowedTypes = [];
             onShowWidgetModal(name, {
                 label,
                 allowedWidgetTypes: allowedTypes,
-                disallowedWidgetTypes: disallowedTypes,
+                disallowedWidgetTypes: explicit?.mode === 'allow' || explicit?.mode === 'none' ? null : disallowedTypes,
                 maxWidgets: finalMaxWidgets
             });
         } else {
@@ -316,6 +321,7 @@ const WidgetSlot = ({
             !isWidgetAllowedInSlot(widget.type, {
                 allowedWidgetTypes: finalAllowedWidgetTypes,
                 disallowedWidgetTypes: finalDisallowedWidgetTypes,
+                widget_policy: behaviorWidgetPolicy,
             }) ? 'This widget type is not allowed in this slot.' : null
         );
 
@@ -386,6 +392,7 @@ const WidgetSlot = ({
                             label,
                             allowedWidgetTypes: allowedTypes,
                             disallowedWidgetTypes: disallowedTypes,
+                            widgetPolicy: behaviorWidgetPolicy,
                             maxWidgets: finalMaxWidgets
                         }}
                         // Path variables for dynamic content

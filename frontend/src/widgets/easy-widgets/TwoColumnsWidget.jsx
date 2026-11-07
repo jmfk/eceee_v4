@@ -15,6 +15,7 @@ import { useTheme } from '../../hooks/useTheme';
 import ComponentStyleRenderer from '../../components/ComponentStyleRenderer';
 import { renderMustache, prepareComponentContext } from '../../utils/mustacheRenderer';
 import PropTypes from 'prop-types';
+import { isWidgetAllowedInSlot } from '../../utils/widgetSlotPolicy';
 
 const TwoColumnsWidget = ({
     config = {},
@@ -39,6 +40,7 @@ const TwoColumnsWidget = ({
     // Paste mode props
     pasteModeActive = false,
     onPasteAtPosition,
+    slotPolicies = {},
     ...props
 }) => {
     // Create this widget's own UDC componentId
@@ -60,6 +62,7 @@ const TwoColumnsWidget = ({
     const [slotsData, setSlotsData] = useState(() => {
         return config.slots || { left: [], right: [] };
     });
+    const [slotPolicyError, setSlotPolicyError] = useState('');
 
     // Track the widget ID to detect when we're rendering a different widget
     const previousWidgetIdRef = useRef(widgetId);
@@ -162,6 +165,12 @@ const TwoColumnsWidget = ({
 
     // Handle slot changes - update local state first, then publish to UDC
     const handleSlotChange = useCallback(async (slotName, widgets) => {
+        const rejected = widgets.find(widget => !isWidgetAllowedInSlot(widget.type, slotPolicies[slotName] || { mode: 'inherit' }));
+        if (rejected) {
+            setSlotPolicyError(`Slot ${slotName} does not allow ${rejected.type}. Content was kept.`);
+            return;
+        }
+        setSlotPolicyError('');
         // Update local state immediately for fast UI
         setSlotsData(prevSlots => {
             const updatedSlots = {
@@ -193,10 +202,12 @@ const TwoColumnsWidget = ({
 
             return updatedSlots;
         });
-    }, [config, publishUpdate, componentId, widgetId, contextType, props.slotName, parentComponentId, widgetPath]);
+    }, [config, publishUpdate, componentId, widgetId, contextType, props.slotName, parentComponentId, widgetPath, slotPolicies]);
 
     // Get filtered widget types for slots
     const filteredWidgetTypes = getFilteredWidgetTypes();
+    const typesForSlot = (name) => filteredWidgetTypes.filter(widget =>
+        isWidgetAllowedInSlot(widget.type, slotPolicies[name] || { mode: 'inherit' }));
 
     // Get grid classes based on layout style
     const getGridClasses = useCallback((layoutStyle) => {
@@ -289,12 +300,13 @@ const TwoColumnsWidget = ({
 
         return (
             <div className={`grid grid-cols-1 ${gridClasses} gap-4 w-full mb-4`}>
+                {slotPolicyError && <p role="alert" className="col-span-full text-sm text-red-700">{slotPolicyError}</p>}
                 <div className="two-col-slot left min-h-[50px]" data-slot="left" data-widget-slot="left" data-owner-widget-type="easy_widgets.TwoColumnsWidget">
                     <SlotEditor
                         slotName="left"
                         slotLabel="Left Column"
                         widgets={slotsData.left || []}
-                        availableWidgetTypes={filteredWidgetTypes}
+                        availableWidgetTypes={typesForSlot('left')}
                         parentWidgetId={widgetId}
                         contextType={contextType}
                         onWidgetEdit={onWidgetEdit}
@@ -332,7 +344,7 @@ const TwoColumnsWidget = ({
                         slotName="right"
                         slotLabel="Right Column"
                         widgets={slotsData.right || []}
-                        availableWidgetTypes={filteredWidgetTypes}
+                        availableWidgetTypes={typesForSlot('right')}
                         parentWidgetId={widgetId}
                         contextType={contextType}
                         onWidgetEdit={onWidgetEdit}

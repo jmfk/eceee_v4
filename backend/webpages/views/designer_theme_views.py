@@ -1310,7 +1310,7 @@ class DesignerWidgetPreviewView(APIView):
     def post(self, request, theme_id):
         from uuid import UUID
 
-        from webpages.theme_widgets import compile_definition
+        from webpages.theme_widgets import compile_definition, compile_derived_definition
 
         theme = _theme(request, theme_id)
         try:
@@ -1318,7 +1318,14 @@ class DesignerWidgetPreviewView(APIView):
             definition = request.data.get("definition", {})
             item = next((item for item in theme.widget_types["items"] if item["id"] == type_id), None)
             version = len(item["releases"]) + 1 if item else 1
-            compiled = compile_definition(definition, type_id, version)
+            document = request.data.get("widgetTypes") or theme.widget_types
+            if not isinstance(document, dict) or not isinstance(document.get("items"), list):
+                raise DjangoValidationError("Widget types must contain an items array.")
+            compiled = (
+                compile_derived_definition(definition, type_id, version, document)
+                if definition.get("kind") == "derived"
+                else compile_definition(definition, type_id, version)
+            )
         except (DjangoValidationError, ValueError, TypeError, AttributeError) as exc:
             raise ValidationError(getattr(exc, "messages", [str(exc)])) from exc
         return Response({"definition": compiled})

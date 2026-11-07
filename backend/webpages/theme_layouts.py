@@ -654,6 +654,12 @@ def validate_theme_layouts(document):
                     _validate_string_list(slot[list_field], f"{slot_path}.{list_field}")
             if "allowed_widget_types" in slot and "disallowed_widget_types" in slot:
                 raise ValidationError(f"{slot_path} cannot define both allowed and disallowed widget types.")
+            if "widget_policy" in slot:
+                from webpages.slot_policies import validate_explicit_policy
+
+                validate_explicit_policy(
+                    slot["widget_policy"], path=f"{slot_path}.widget_policy", required=slot.get("required", False)
+                )
             if slot.get("collapse_behavior", "never") not in COLLAPSE_BEHAVIORS:
                 raise ValidationError(f"{slot_path}.collapse_behavior is invalid.")
             maximum = slot.get("max_widgets")
@@ -820,8 +826,8 @@ def validate_theme_layouts(document):
             maximum = slots[slot_key].get("max_widgets")
             if maximum is not None and len(slot_widgets) > maximum:
                 raise ValidationError(f"{path}.widgets.{slot_key} allows at most {maximum} widgets.")
-            allowed = slots[slot_key].get("allowed_widget_types")
-            disallowed = slots[slot_key].get("disallowed_widget_types") or []
+            from webpages.slot_policies import permits_widget
+
             for widget_index, widget in enumerate(slot_widgets):
                 widget_path = f"{path}.widgets.{slot_key}[{widget_index}]"
                 if not isinstance(widget, dict):
@@ -831,9 +837,7 @@ def validate_theme_layouts(document):
                 widget_type = widget.get("type")
                 if not isinstance(widget_type, str) or not widget_type:
                     raise ValidationError(f"{widget_path}.type must be text.")
-                if allowed and not _widget_type_matches(widget_type, allowed):
-                    raise ValidationError(f"Widget type '{widget_type}' is not allowed in slot '{slot_key}'.")
-                if disallowed and _widget_type_matches(widget_type, disallowed):
+                if not permits_widget(slots[slot_key], widget_type):
                     raise ValidationError(f"Widget type '{widget_type}' is not allowed in slot '{slot_key}'.")
                 if not isinstance(widget.get("config", {}), dict):
                     raise ValidationError(f"{widget_path}.config must be an object.")
@@ -848,10 +852,9 @@ def validate_theme_layouts(document):
 
 
 def _widget_type_matches(widget_type, patterns):
-    return any(
-        pattern == "*" or widget_type == pattern or (pattern.endswith(".*") and widget_type.startswith(pattern[:-1]))
-        for pattern in patterns
-    )
+    from webpages.slot_policies import matches_widget_type
+
+    return matches_widget_type(widget_type, patterns)
 
 
 def validate_layout_widgets(theme, layout_key, widgets, *, previous_widgets=None, warnings=None):
@@ -925,11 +928,38 @@ def validate_layout_widgets(theme, layout_key, widgets, *, previous_widgets=None
                 warnings.append(f"Slot '{slot_key}' displays at most {maximum} widgets publicly.")
             elif len(items) > previous_count or not all(existing):
                 errors.append(f"Slot '{slot_key}' allows at most {maximum} widgets.")
-        # Slot policy controls editor annotation and public rendering. Keeping a
-        # disallowed widget in a draft does not need save-time acknowledgement.
+        if "widget_policy" in policy:
+            from webpages.slot_policies import permits_widget
+
+            for widget, was_here in zip(items, existing):
+                widget_type = widget.get("type") if isinstance(widget, dict) else None
+                if widget_type and not permits_widget(policy, widget_type) and not was_here:
+                    errors.append(f"Slot '{slot_key}' rejects widget type '{widget_type}' under its widget policy.")
     if errors:
         raise ValidationError(errors)
     return widgets
+
+
+def validate_layout_policy_types(layouts, widget_types):
+    """Resolve explicit layout selections against the owning theme's published types."""
+    from webpages.theme_widgets import _available_child_type
+    from webpages.slot_policies import permits_widget
+
+    for layout in layouts.get("items", []):
+        for slot_name, slot in layout.get("slots", {}).items():
+            policy = slot.get("widget_policy", {})
+            if policy.get("mode") != "allow":
+                continue
+            for widget_type in policy.get("allowed_widget_types", []):
+                if not _available_child_type(widget_types, widget_type):
+                    raise ValidationError(
+                        f"Layout '{layout.get('key')}' slot '{slot_name}' references unavailable widget type '{widget_type}'."
+                    )
+                base = {key: value for key, value in slot.items() if key != "widget_policy"}
+                if not permits_widget(base, widget_type):
+                    raise ValidationError(
+                        f"Layout '{layout.get('key')}' slot '{slot_name}' cannot allow '{widget_type}' outside its existing policy."
+                    )
 
 
 def theme_layout_usage(theme):
@@ -1064,15 +1094,10 @@ def validate_layout_compatibility(theme, updated_document):
                     f"Slot '{old_key}.{slot_key}' already contains up to {details['max_widget_count']} widgets "
                     f"and cannot be limited to {maximum}."
                 )
-            allowed = policy.get("allowed_widget_types")
-            disallowed = policy.get("disallowed_widget_types") or []
+            from webpages.slot_policies import permits_widget
+
             for widget_type in details["widget_types"]:
-                if allowed and not _widget_type_matches(widget_type, allowed):
-                    errors.append(
-                        f"Slot '{old_key}.{slot_key}' already contains widget type '{widget_type}', "
-                        "which the new policy disallows."
-                    )
-                elif disallowed and _widget_type_matches(widget_type, disallowed):
+                if not permits_widget(policy, widget_type):
                     errors.append(
                         f"Slot '{old_key}.{slot_key}' already contains widget type '{widget_type}', "
                         "which the new policy disallows."

@@ -5,6 +5,7 @@ import { ThemeWidgetRender } from '../ThemeWidgetRender'
 import { PageRenderer } from '../PageRenderer'
 import { createPageRenderModel } from '../adapters'
 import { themeWidgetTypes } from '../themeWidgets'
+import { isWidgetAllowedInSlot } from '../../utils/widgetSlotPolicy'
 
 const id = '2bf85f1b-26cc-4801-8cfa-bb680f93e256'
 const type = `theme_widgets.${id}`
@@ -13,6 +14,32 @@ const release = (version: number) => ({ version, schema: { type: 'object', prope
 const document = { version: 1, items: [{ id, name: 'Person card', active_version: 2, releases: [release(1), release(2)] }] }
 
 describe('Theme widget rendering', () => {
+    it('renders a derived built-in container while keeping its identity for slot policy matching', () => {
+        const derivedId = '62b20cc6-d904-4118-a9b4-c1addf4479e6'
+        const derivedType = `theme_widgets.${derivedId}`
+        const derivedDocument = { version: 1, items: [{ id: derivedId, name: 'Article columns', active_version: 1,
+            releases: [{ version: 1, kind: 'derived' as const, base_type: 'easy_widgets.TwoColumnsWidget',
+                base_version: null, defaults: {}, slot_policies: { left: { mode: 'allow' as const, allowed_widget_types: ['easy_widgets.HeadlineWidget'] } } }] }] }
+        const model = createPageRenderModel({ layout: 'main_layout', context: { themeWidgetTypes: derivedDocument },
+            widgets: { main: [{ id: 'article-columns', type: derivedType, type_version: 1, config: { slots: {
+                left: [{ id: 'heading', type: 'easy_widgets.HeadlineWidget', config: { content: 'Inside' } }], right: [],
+            } } }] } })
+        const { container } = render(<PageRenderer model={model} />)
+        expect(container.querySelector(`[data-widget-type="${derivedType}"]`)).not.toBeNull()
+        expect(screen.getByText('Inside')).toBeInTheDocument()
+        expect(isWidgetAllowedInSlot(derivedType, { widget_policy: { mode: 'allow', allowed_widget_types: [derivedType] } })).toBe(true)
+        expect(isWidgetAllowedInSlot('easy_widgets.TwoColumnsWidget', { widget_policy: { mode: 'allow', allowed_widget_types: [derivedType] } })).toBe(false)
+    })
+    it('pins a derived theme widget to the exact base release', () => {
+        const derivedId = '62b20cc6-d904-4118-a9b4-c1addf4479e6'
+        const derivedType = `theme_widgets.${derivedId}`
+        const derivedDocument = { ...document, items: [...document.items, { id: derivedId, name: 'Derived card', active_version: 1,
+            releases: [{ version: 1, kind: 'derived' as const, base_type: type, base_version: 1, defaults: {}, slot_policies: {} }] }] }
+        const { container } = render(<ThemeWidgetRender widget={{ id: 'derived', type: derivedType, typeVersion: 1, config: { personName: 'Pinned' } }}
+            context={{ preview: false, themeWidgetTypes: derivedDocument }} renderWidgets={() => null} />)
+        expect(container.querySelector('.person-v1')).toHaveTextContent('Pinned')
+        expect(container.querySelector('.person-v2')).toBeNull()
+    })
     it('renders the pinned release while new selections use the active release', () => {
         const { container } = render(<ThemeWidgetRender widget={{ id: 'person', type, typeVersion: 1, config: { personName: 'Alex' } }} context={{ preview: false, themeWidgetTypes: document }} renderWidgets={() => null} />)
         expect(container.querySelector('.person-v1')).not.toBeNull()

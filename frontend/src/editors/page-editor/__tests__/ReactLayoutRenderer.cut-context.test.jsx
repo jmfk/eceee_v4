@@ -164,6 +164,14 @@ describe('database layout slot policy', () => {
         expect(validateSlotWidgetAddition({ max_widgets: 1 }, 1, [contentWidget])).toContain('at most 1')
     })
 
+    it('matches explicit layout selections by exact type identity', () => {
+        const derived = 'theme_widgets.62b20cc6-d904-4118-a9b4-c1addf4479e6'
+        const policy = { widget_policy: { mode: 'allow', allowed_widget_types: [derived] } }
+        expect(validateSlotWidgetAddition(policy, 0, [{ type: derived }])).toBeNull()
+        expect(validateSlotWidgetAddition(policy, 0, [{ type: 'easy_widgets.TwoColumnsWidget' }])).toContain('not allowed')
+        expect(validateSlotWidgetAddition({ widget_policy: { mode: 'none' } }, 0, [{ type: derived }])).toContain('not allowed')
+    })
+
     it('allows a same-slot cut to replace the widgets removed from a full slot', () => {
         expect(validateSlotWidgetAddition({ max_widgets: 1 }, 1, [contentWidget], 1)).toBeNull()
     })

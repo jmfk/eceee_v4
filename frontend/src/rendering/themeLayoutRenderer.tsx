@@ -68,6 +68,7 @@ export const normalizeLayoutDefinition = (layout: any): ThemeLayoutDefinition | 
         ...value,
         max_widgets: value?.max_widgets ?? value?.maxWidgets,
         allowed_widget_types: value?.allowed_widget_types || value?.allowedWidgetTypes,
+        widget_policy: value?.widget_policy || value?.widgetPolicy,
         disallowed_widget_types: value?.disallowed_widget_types || value?.disallowedWidgetTypes,
         allows_inheritance: value?.allows_inheritance ?? value?.allowsInheritance,
         allow_merge: value?.allow_merge ?? value?.allowMerge,

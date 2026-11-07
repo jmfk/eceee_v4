@@ -735,11 +735,20 @@ def _read_theme_transfer_package(encoded_package: str):
 
 def validate_theme_transfer_package(encoded_package: str):
     """Validate a package before its caller mutates theme records."""
-    package, _data = _read_theme_transfer_package(encoded_package)
+    package, data = _read_theme_transfer_package(encoded_package)
     try:
         with package:
             if package.testzip() is not None:
                 raise ValueError("Invalid theme transfer package.")
+            from webpages.theme_layouts import validate_layout_policy_types, validate_theme_layouts
+            from webpages.theme_widgets import validate_widget_types
+
+            widget_types = data.get("widget_types", {"version": 1, "items": []})
+            validate_widget_types(widget_types)
+            layouts = data.get("layouts")
+            if layouts:
+                validate_theme_layouts(layouts)
+                validate_layout_policy_types(layouts, widget_types)
     except zipfile.BadZipFile as exc:
         raise ValueError("Invalid theme transfer package.") from exc
 
