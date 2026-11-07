@@ -128,6 +128,8 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
     const previewNews = (widget: RenderWidgetModel) => {
         const configured = widget.config.objectTypes ?? widget.config.object_types ?? [widget.type === 'easy_widgets.NewsFlashWidget' ? 'article' : 'news']
         const types = Array.isArray(configured) ? configured.map(String) : []
+        if (widget.type === 'easy_widgets.SidebarTopNewsWidget' && (widget.config.relatedToCurrentArticle ?? widget.config.related_to_current_article) === true
+            && types.length === 1 && types[0] === 'news') types[0] = 'article'
         if (!types.length || (widget.type === 'easy_widgets.NewsFlashWidget' && !newsFlashLayout(widget.config).total)) return Promise.resolve({ items: [] })
         const params = new URLSearchParams()
         params.set('siteId', String(next.context.siteId || ''))
@@ -294,8 +296,20 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
                     widget.data = { status: 'empty' }
                     return
                 }
-                const item: any = await objectInstancesApi.get(match.id, tenantRequestConfig)
-                const resolved = item?.data || item
+                let resolved: any
+                if (!slug && fallback) {
+                    const response: any = await objectInstancesApi.getCurrentPublishedVersion(match.id, tenantRequestConfig)
+                    const published = response?.data?.data
+                    if (!published) {
+                        widget.data = { status: 'empty' }
+                        return
+                    }
+                    resolved = { ...match, title: published.title || match.title, data: published.data || {}, widgets: published.widgets || {},
+                        publishDate: published.effectiveDate, isFeatured: published.isFeatured }
+                } else {
+                    const item: any = await objectInstancesApi.get(match.id, tenantRequestConfig)
+                    resolved = item?.data || item
+                }
                 const resolvedType = resolved?.objectType?.id || resolved?.object_type?.id
                 if (Array.isArray(objectTypes) && objectTypes.length && resolvedType && !objectTypes.map(String).includes(String(resolvedType))) {
                     widget.data = { status: 'empty' }

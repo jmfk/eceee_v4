@@ -1146,6 +1146,26 @@ describe('public resolution', () => {
     expect((model?.slots.main[2].data?.items as LinkedObject[])[0].path).toBe('/breaking/');
   });
 
+  it('uses Article for the related sidebar default without altering custom types', async () => {
+    const queries: PublishedObjectQuery[] = [];
+    const relatedReader: PageReader = {
+      ...reader,
+      version: async (id, at) => {
+        const selected = await reader.version(id, at);
+        if (id !== root.id || !selected) return selected;
+        return version({ ...selected, widgets: { main: [
+          { id: 'related', type: 'easy_widgets.SidebarTopNewsWidget', config: { relatedToCurrentArticle: true, objectTypes: ['news'] } },
+          { id: 'custom', type: 'easy_widgets.SidebarTopNewsWidget', config: { relatedToCurrentArticle: true, objectTypes: ['custom'] } },
+        ] } });
+      },
+      publishedObjects: async query => { queries.push(query); return []; },
+    };
+    await buildPublishedPageModel({ withSnapshot: async read => read(relatedReader) }, 'example.org', '/', new Date('2026-06-01'));
+    expect(queries.some(query => query.objectTypeNames?.includes('article'))).toBe(true);
+    expect(queries.some(query => query.objectTypeNames?.includes('custom'))).toBe(true);
+    expect(queries.some(query => query.objectTypeNames?.includes('news'))).toBe(false);
+  });
+
   it('keeps Featured priority out of latest-news queries', async () => {
     const queries: PublishedObjectQuery[] = [];
     const newsReader: PageReader = {
@@ -1161,7 +1181,7 @@ describe('public resolution', () => {
     };
     await buildPublishedPageModel({ withSnapshot: async read => read(newsReader) }, 'example.org', '/', new Date('2026-06-01'));
     expect(queries).toHaveLength(1);
-    expect(queries[0]).toMatchObject({ limit: 4, sortOrder: '-publish_date', featuredOnly: false });
+    expect(queries[0]).toMatchObject({ objectTypeNames: ['news'], limit: 4, sortOrder: '-publish_date', featuredOnly: false });
     expect(queries[0].featuredFirst).toBeUndefined();
     expect(queries[0].pinnedFirst).toBeUndefined();
   });

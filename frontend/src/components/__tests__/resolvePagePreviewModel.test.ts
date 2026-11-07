@@ -23,24 +23,39 @@ describe('page preview model resolution', () => {
     it('resolves related lists by slug and falls back to the public selected Article on the index', async () => {
         const fetchNews = vi.fn(async () => ({ ok: true, json: async () => ({ items: [{ id: '1', objectType: { id: '8' } }] }) }))
         vi.stubGlobal('fetch', fetchNews)
-        objectApi.get.mockResolvedValue({ id: '1', title: 'Selected', objectType: { id: '8' }, widgets: {} })
+        objectApi.get.mockResolvedValue({ data: { title: 'Unpublished draft' } })
+        objectApi.getCurrentPublishedVersion.mockResolvedValue({ data: { data: { title: 'Published title', data: { summary: 'Published summary' }, widgets: {} } } })
         const model = createPageRenderModel({ widgets: { main: [
             { id: 'detail', type: 'easy_widgets.NewsDetailWidget', config: { fallbackToLatest: true, objectTypes: [8] } },
             { id: 'related', type: 'easy_widgets.SidebarTopNewsWidget', config: { relatedToCurrentArticle: true, articleKind: 'column', objectTypes: [8] } },
         ] }, context: { siteId: 249, siteHostnames: ['eceee.localhost'] } })
         const resolved = await resolvePagePreviewModel(model)
         expect(resolved.slots.main[0].data?.status).toBe('ready')
+        expect(resolved.slots.main[0].data?.item).toMatchObject({ title: 'Published title', data: { summary: 'Published summary' } })
+        expect(objectApi.get).not.toHaveBeenCalled()
         expect(fetchNews.mock.calls.some(([url]) => new URL(url).searchParams.get('latestArticle') === 'true')).toBe(true)
         expect(fetchNews.mock.calls.some(([url]) => new URL(url).searchParams.get('articleKind') === 'column' && new URL(url).searchParams.get('related') === 'true')).toBe(true)
+    })
+
+    it.each([null, { title: '', data: {}, widgets: {} }])('handles a disappeared or untitled published index version', async published => {
+        vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ items: [{ id: '1', title: 'Public title' }] }) })))
+        objectApi.getCurrentPublishedVersion.mockResolvedValue({ data: { data: published } })
+        const resolved = await resolvePagePreviewModel(createPageRenderModel({ widgets: { main: [
+            { id: 'detail', type: 'easy_widgets.NewsDetailWidget', config: { fallbackToLatest: true, objectTypes: [8] } },
+        ] }, context: { siteId: 249, siteHostnames: ['eceee.localhost'] } }))
+        expect(resolved.slots.main[0].data?.status).toBe(published ? 'ready' : 'empty')
+        if (published) expect(resolved.slots.main[0].data?.item).toMatchObject({ title: 'Public title' })
+        expect(objectApi.get).not.toHaveBeenCalled()
     })
 
     it('passes the editor camel-case news slug to the shared related endpoint', async () => {
         const fetchNews = vi.fn(async () => ({ ok: true, json: async () => ({ items: [] }) }))
         vi.stubGlobal('fetch', fetchNews)
         await resolvePagePreviewModel(createPageRenderModel({ widgets: { main: [
-            { id: 'related', type: 'easy_widgets.SidebarTopNewsWidget', config: { relatedToCurrentArticle: true, objectTypes: [8] } },
+            { id: 'related', type: 'easy_widgets.SidebarTopNewsWidget', config: { relatedToCurrentArticle: true, objectTypes: ['news'] } },
         ] }, context: { siteId: 249, siteHostnames: ['eceee.localhost'], pathVariables: { newsSlug: 'selected-story' } } }))
         expect(new URL(fetchNews.mock.calls[0][0]).searchParams.get('slug')).toBe('selected-story')
+        expect(new URL(fetchNews.mock.calls[0][0]).searchParams.getAll('type')).toEqual(['article'])
     })
 
     it('bounds the first News Flash batch for a large configured layout', async () => {
