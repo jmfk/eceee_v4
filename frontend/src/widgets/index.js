@@ -8,6 +8,8 @@
 import widgetRegistryManager from './WidgetRegistryManager';
 import ThemeWidgetEditor from './ThemeWidgetEditor';
 import { isThemeWidget } from '../rendering/themeWidgets';
+import { ObjectListWidget, ObjectDetailWidget } from './EditorialObjectWidgets';
+import { registerWidget } from './easy-widgets/registry';
 import { EASY_WIDGET_REGISTRY } from './easy-widgets';
 
 // Register easy widgets registry
@@ -16,6 +18,11 @@ widgetRegistryManager.registerRegistry(
     widgetRegistryManager.priorities.THIRD_PARTY,
     'easy-widgets'
 );
+
+widgetRegistryManager.registerRegistry({
+    'object_storage.ObjectListWidget': registerWidget(ObjectListWidget, 'object_storage.ObjectListWidget'),
+    'object_storage.ObjectDetailWidget': registerWidget(ObjectDetailWidget, 'object_storage.ObjectDetailWidget'),
+}, widgetRegistryManager.priorities.DEFAULT, 'object-widgets');
 
 // Export eceeasyee widgets
 export * from './easy-widgets';

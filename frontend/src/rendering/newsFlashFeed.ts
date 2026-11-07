@@ -11,6 +11,11 @@ export const newsFlashFeedUrl = (widget: RenderWidgetModel, context: RenderConte
     const types = config.objectTypes ?? config.object_types ?? ['article']
     if (!Array.isArray(types) || !types.length) return null
     types.forEach(type => params.append('type', String(type)))
+    if ((config.currentColumnist ?? config.current_columnist) === true) {
+        const slug = context.pathVariables?.member_slug || context.pathVariables?.memberSlug
+        if (!slug) return null
+        params.set('columnist', slug)
+    }
     const classifications = config.classificationIds ?? config.classification_ids ?? []
     if (Array.isArray(classifications)) classifications.forEach(id => params.append('classificationId', String(id)))
     params.set('includeDescendants', String((config.includeDescendants ?? config.include_descendants) !== false))

@@ -44,6 +44,18 @@ describe('public news preview route', () => {
     }] });
   });
 
+  it('scopes columnist feeds to their published profile and column classification', async () => {
+    mocks.publishedObjects.mockResolvedValueOnce([{ id: '976' }]).mockResolvedValue([]);
+    const response = await GET(request('siteId=85&type=article&limit=12&newsFlash=true&columnist=jane'));
+    expect(response.status).toBe(200);
+    expect(mocks.publishedObjects).toHaveBeenNthCalledWith(1, expect.objectContaining({ objectTypeNames: ['columnist'], slug: 'jane', activeTypeOnly: true }), 'tenant-a', expect.any(Date));
+    expect(mocks.publishedObjects).toHaveBeenNthCalledWith(2, expect.objectContaining({ authorId: '976', articleKind: 'column' }), 'tenant-a', expect.any(Date));
+    mocks.publishedObjects.mockClear().mockResolvedValue([]);
+    const missing = await GET(request('siteId=85&type=article&limit=12&newsFlash=true&columnist=missing'));
+    expect((await missing.json()).items).toEqual([]);
+    expect(mocks.publishedObjects).toHaveBeenCalledTimes(1);
+  });
+
   it('uses the same prioritized News Flash selection within the host tenant', async () => {
     mocks.publishedObjects.mockImplementation(async (query: { newsPriorityOnly?: boolean }) => query.newsPriorityOnly
       ? [{ id: '0', title: 'Priority', slug: 'priority', data: { newsPriority: true } }]

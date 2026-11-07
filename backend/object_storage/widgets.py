@@ -53,8 +53,8 @@ class ObjectListConfig(BaseModel):
     limit: int = Field(
         default=5,
         ge=1,
-        le=50,
-        description="Maximum number of objects to display",
+        le=5000,
+        description="Maximum number of objects to display (directories load in small batches)",
         json_schema_extra={"group": "Content"},
     )
     order_by: str = Field(
@@ -68,7 +68,41 @@ class ObjectListConfig(BaseModel):
         json_schema_extra={"group": "Content"},
     )
     show_hierarchy: bool = Field(default=False, description="Show hierarchical structure with indentation")
-    display_template: str = Field(default="card", description="Display template: 'card', 'list', 'minimal'")
+    hide_on_detail_view: bool = Field(
+        default=True,
+        description="Hide directory on detail routes",
+        json_schema_extra={"component": "BooleanInput", "variant": "toggle"},
+    )
+    event_group: str = Field(
+        default="all",
+        description="Event group",
+        json_schema_extra={
+            "component": "SelectInput",
+            "options": [
+                {"value": "all", "label": "All events"},
+                {"value": "eceee", "label": "Eceee events"},
+                {"value": "other", "label": "Other events"},
+            ],
+        },
+    )
+    detail_page_path: str = Field(default="", description="Directory detail page path")
+    display_template: str = Field(
+        default="card",
+        description="Display template",
+        json_schema_extra={
+            "component": "SelectInput",
+            "options": [
+                {"value": key, "label": label}
+                for key, label in [
+                    ("card", "Cards"),
+                    ("list", "List"),
+                    ("minimal", "Minimal"),
+                    ("columnists", "Columnists"),
+                    ("events", "Events"),
+                ]
+            ],
+        },
+    )
     show_excerpt: bool = Field(default=True, description="Show excerpt from object data")
     excerpt_field: Optional[str] = Field(
         default=None,
@@ -123,7 +157,23 @@ class ObjectDetailConfig(BaseModel):
         description="Object slug for lookup (alternative to object_id)",
         json_schema_extra={"group": "Content"},
     )
-    display_template: str = Field(default="full", description="Display template: 'full', 'summary', 'minimal'")
+    display_template: str = Field(
+        default="full",
+        description="Display template",
+        json_schema_extra={
+            "component": "SelectInput",
+            "options": [
+                {"value": key, "label": label}
+                for key, label in [
+                    ("full", "Full"),
+                    ("summary", "Summary"),
+                    ("minimal", "Minimal"),
+                    ("columnists", "Columnist profile"),
+                    ("events", "Event detail"),
+                ]
+            ],
+        },
+    )
     show_metadata: bool = Field(default=False, description="Show object metadata and technical details")
     show_hierarchy: bool = Field(default=True, description="Show parent/child relationships")
     show_widgets: bool = Field(default=True, description="Render object's widget slots")

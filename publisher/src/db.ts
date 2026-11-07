@@ -172,6 +172,8 @@ function reader(client: PoolClient): PageReader {
       const relatedTagIds = query.relatedTagIds ?? [];
       if (relatedTagIds.some(value => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value))) return [];
       if (query.articleKind && !['all', 'news', 'column'].includes(query.articleKind)) return [];
+      if (query.authorId !== undefined && (!/^\d{1,19}$/.test(query.authorId) || BigInt(query.authorId) > 9_223_372_036_854_775_807n)) return [];
+      if (query.eventGroup && !['all', 'eceee', 'other'].includes(query.eventGroup)) return [];
       const status = query.status === 'draft' || query.status === 'archived' ? query.status : null;
       if (!objectIds.length && !typeIds.length && !typeNames.length && !query.allActiveTypes) return [];
       const sortOrders: Record<string, string> = {
@@ -326,6 +328,8 @@ function reader(client: PoolClient): PageReader {
             WHERE related.object_version_id=published.id AND tag.id=ANY($18::uuid[])
               AND tag.tag_type IN ('news_topic','news_category','news_keyword')
           ))
+          AND ($20::text IS NULL OR COALESCE(published.data->'authors', '[]'::jsonb) @> jsonb_build_array($20::bigint))
+          AND ($21::text IS NULL OR COALESCE(NULLIF(published.data->>'eventGroup', ''), 'other') = $21::text)
           AND ($19::text IS NULL OR EXISTS (
             SELECT 1 FROM taxonomy_objectversiontag kind_assignment
             JOIN taxonomy_tag kind ON kind.id=kind_assignment.tag_id AND kind.tenant_id=$1
@@ -358,6 +362,8 @@ function reader(client: PoolClient): PageReader {
           query.excludeObjectIds ?? [],
           relatedTagIds,
           query.articleKind && query.articleKind !== 'all' ? query.articleKind : null,
+          query.authorId ?? null,
+          query.eventGroup && query.eventGroup !== 'all' ? query.eventGroup : null,
         ]);
       return result.rows;
     },

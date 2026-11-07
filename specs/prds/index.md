@@ -2,6 +2,7 @@
 
 | ID | Title | Status | Related ADRs |
 | --- | --- | --- | --- |
+| PRD-0048 | [Columnist and event directory pages](0048-columnist-and-event-pages.md) | completed | ADR-0068, ADR-0069 |
 | PRD-0047 | [News page composition and related stories](0047-news-page-and-related-stories.md) | started | ADR-0066, ADR-0067 |
 | PRD-0046 | [Derived widgets with single-level inheritance and slot restrictions](0046-derived-widgets-and-slot-restrictions.md) | started | [ADR-0065](../adrs/active/0065-derived-widget-slot-policies.md) |
 | PRD-0045 | [Configurable News Flash layouts and progressive loading](0045-news-flash-layouts-and-loading.md) | completed | ADR-0064, ADR-0067 |

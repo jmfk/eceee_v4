@@ -1,3 +1,4 @@
+import { EditorialListRender, EditorialDetailRender, editorialTemplate } from './EditorialRender'
 import React, { useEffect, useState } from 'react'
 import { NewsFlashRender } from './NewsFlashRender'
 import { NewsImageFrame } from './NewsImage'
@@ -726,7 +727,9 @@ const NewsDetailRender: WidgetRenderComponent = ({ widget, context, renderWidget
         {externalUrl && <div className="news-external-source"><PreviewLink href={externalUrl} rel="noopener noreferrer">Read the original source</PreviewLink></div>}
     </article>
 }
-const ObjectListRender: WidgetRenderComponent = ({ widget }) => {
+const ObjectListRender: WidgetRenderComponent = props => editorialTemplate(props.widget) ? <EditorialListRender {...props} /> : <GenericObjectListRender {...props} />
+const ObjectDetailRender: WidgetRenderComponent = props => editorialTemplate(props.widget) ? <EditorialDetailRender {...props} /> : <GenericObjectDetailRender {...props} />
+const GenericObjectListRender: WidgetRenderComponent = ({ widget }) => {
     const state = newsState(widget)
     if (!Array.isArray(state)) return <section className="object-list-widget" data-widget-type="object-list">{state}</section>
     const showExcerpt = configEnabled(widget.config, true, 'showExcerpt', 'show_excerpt')
@@ -746,7 +749,7 @@ const ObjectListRender: WidgetRenderComponent = ({ widget }) => {
         </article>
     })}</div></section>
 }
-const ObjectDetailRender: WidgetRenderComponent = ({ widget, renderWidgets }) => {
+const GenericObjectDetailRender: WidgetRenderComponent = ({ widget, renderWidgets }) => {
     const item: any = widget.data?.item
     if (!item) return <div className="object-detail-widget" data-widget-type="object-detail"><div className="widget-empty"><p>Object not found.</p></div></div>
     const fields = newsFields(item)

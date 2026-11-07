@@ -1,0 +1,449 @@
+{
+  "id": "0fc0aa7c-37eb-4644-bc7f-4968440bccdc",
+  "key": "editorialPage",
+  "root": {
+    "id": "323c96c6-3bac-4d32-81bc-ef2485188aa4",
+    "type": "container",
+    "label": "Viewport background",
+    "styles": {
+      "base": {
+        "display": "flex",
+        "min_height": "100vh",
+        "flex_direction": "column",
+        "background_color": "#9ca3af"
+      }
+    },
+    "children": [
+      {
+        "id": "49a83508-2e58-41ad-88ef-010200d79864",
+        "type": "container",
+        "label": "Page surface",
+        "styles": {
+          "base": {
+            "width": "100%",
+            "margin": "0 auto",
+            "display": "flex",
+            "flex_grow": "1",
+            "max_width": "1280px",
+            "flex_direction": "column",
+            "background_color": "#ffffff"
+          }
+        },
+        "children": [
+          {
+            "id": "ea2b84b9-bf2e-49c2-acf4-a8c13310e9b0",
+            "type": "container",
+            "label": "Header wrapper",
+            "styles": {
+              "base": {
+                "display": "flex",
+                "flex_direction": "column"
+              }
+            },
+            "children": [
+              {
+                "id": "ab8f930b-08c2-4abb-8755-174b20980fd9",
+                "type": "slot",
+                "label": "Header",
+                "styles": {
+                  "base": {}
+                },
+                "children": [],
+                "slot_key": "header",
+                "class_names": [
+                  "layout-slot",
+                  "slot-header"
+                ]
+              },
+              {
+                "id": "ebf8bb19-7389-4217-af4f-f7f819403ad7",
+                "type": "slot",
+                "label": "Navbar",
+                "styles": {
+                  "base": {}
+                },
+                "children": [],
+                "slot_key": "navbar",
+                "class_names": [
+                  "layout-slot",
+                  "slot-navbar"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "5f33d0fb-49b8-4c3d-91f1-dfa94880b7d1",
+            "tag": "main",
+            "type": "semantic",
+            "label": "Main content",
+            "styles": {
+              "base": {
+                "display": "flex",
+                "flex_grow": "1",
+                "min_width": "0",
+                "flex_direction": "column"
+              }
+            },
+            "children": [
+              {
+                "id": "c98bb8f0-253c-4565-a2b1-244d15415220",
+                "type": "slot",
+                "label": "Hero",
+                "styles": {
+                  "lg": {
+                    "padding": "30px 40px 0"
+                  },
+                  "base": {
+                    "padding": "24px 16px 0"
+                  }
+                },
+                "children": [],
+                "slot_key": "hero",
+                "class_names": [
+                  "layout-slot",
+                  "slot-hero"
+                ]
+              },
+              {
+                "id": "82629445-5a5d-43e3-ba5a-18756e8cbfa0",
+                "type": "grid",
+                "label": "Content grid",
+                "styles": {
+                  "lg": {
+                    "padding": "0 40px",
+                    "grid_template_columns": "1fr"
+                  },
+                  "base": {
+                    "gap": "30px",
+                    "display": "grid",
+                    "padding": "0 16px",
+                    "flex_grow": "0",
+                    "min_height": "0",
+                    "grid_template_columns": "1fr"
+                  }
+                },
+                "children": [
+                  {
+                    "id": "64f7e386-f6cc-4338-9525-1137653b66aa",
+                    "type": "container",
+                    "label": "Content column",
+                    "styles": {
+                      "lg": {
+                        "grid_column": "span 1"
+                      },
+                      "xl": {
+                        "margin": "0",
+                        "max_width": "none"
+                      },
+                      "base": {
+                        "width": "100%",
+                        "margin": "0",
+                        "padding": "0",
+                        "max_width": "none",
+                        "min_width": "0"
+                      }
+                    },
+                    "children": [
+                      {
+                        "id": "e6e76d30-75b4-4059-b5c8-69dfe58cddb0",
+                        "type": "slot",
+                        "label": "Main",
+                        "styles": {
+                          "base": {}
+                        },
+                        "children": [],
+                        "slot_key": "main",
+                        "class_names": [
+                          "layout-slot",
+                          "slot-main"
+                        ]
+                      }
+                    ],
+                    "class_names": [
+                      "main-layout-main"
+                    ]
+                  }
+                ],
+                "class_names": [
+                  "main-layout-grid"
+                ]
+              },
+              {
+                "id": "51111bec-cc39-4bfd-805e-3a1970a531f3",
+                "type": "container",
+                "label": "More news",
+                "styles": {
+                  "lg": {
+                    "padding": "30px 40px"
+                  },
+                  "base": {
+                    "padding": "30px 16px"
+                  }
+                },
+                "children": [
+                  {
+                    "id": "dc58fef2-6c0e-49cf-b204-391119080de6",
+                    "type": "slot",
+                    "label": "Listing",
+                    "styles": {
+                      "base": {}
+                    },
+                    "children": [],
+                    "slot_key": "listing",
+                    "class_names": [
+                      "layout-slot",
+                      "slot-editorial-listing"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "9f818aed-2ec0-44e0-8eaa-61b033118745",
+            "type": "container",
+            "label": "Footer wrapper",
+            "styles": {
+              "base": {
+                "margin": "auto 0 0",
+                "display": "flex",
+                "min_height": "310px",
+                "flex_direction": "column"
+              }
+            },
+            "children": [
+              {
+                "id": "eac99ea4-1dc9-4b5c-a9b4-e4998ffb091e",
+                "type": "slot",
+                "label": "Footer",
+                "styles": {
+                  "base": {
+                    "display": "flex",
+                    "flex_grow": "1",
+                    "min_height": "310px",
+                    "flex_direction": "column",
+                    "justify_content": "flex-end"
+                  }
+                },
+                "children": [],
+                "slot_key": "footer",
+                "class_names": [
+                  "layout-slot",
+                  "slot-footer"
+                ]
+              }
+            ],
+            "class_names": [
+              "main-layout-footer"
+            ]
+          }
+        ],
+        "class_names": [
+          "main-layout-wrapper"
+        ]
+      }
+    ],
+    "class_names": [
+      "main-layout-container"
+    ]
+  },
+  "label": "Editorial Directory",
+  "slots": {
+    "hero": {
+      "label": "Hero",
+      "order": 30,
+      "dimensions": {
+        "mobile": {
+          "width": 640,
+          "height": 28
+        },
+        "tablet": {
+          "width": 1024,
+          "height": 28
+        },
+        "desktop": {
+          "width": 1280,
+          "height": 28
+        }
+      },
+      "allow_merge": false,
+      "description": "The Hero space",
+      "max_widgets": 1,
+      "default_widgets": [
+        {
+          "type": "hero",
+          "config": {}
+        }
+      ],
+      "collapse_behavior": "any",
+      "inheritable_types": [
+        "easy_widgets.HeroWidget"
+      ],
+      "allows_inheritance": true,
+      "allowed_widget_types": [
+        "easy_widgets.HeroWidget"
+      ]
+    },
+    "main": {
+      "label": "Main Content",
+      "order": 50,
+      "dimensions": {
+        "mobile": {
+          "width": 640,
+          "height": null
+        },
+        "tablet": {
+          "width": 1024,
+          "height": null
+        },
+        "desktop": {
+          "width": 1280,
+          "height": null
+        }
+      },
+      "allow_merge": false,
+      "description": "Primary page content area",
+      "max_widgets": null,
+      "default_widgets": [],
+      "collapse_behavior": "never",
+      "allows_inheritance": false,
+      "disallowed_widget_types": [
+        "easy_widgets.FooterWidget",
+        "easy_widgets.NavbarWidget",
+        "easy_widgets.HeaderWidget"
+      ]
+    },
+    "footer": {
+      "label": "Footer",
+      "order": 1000,
+      "dimensions": {
+        "mobile": {
+          "width": 640,
+          "height": null
+        },
+        "tablet": {
+          "width": 1024,
+          "height": null
+        },
+        "desktop": {
+          "width": 1280,
+          "height": null
+        }
+      },
+      "allow_merge": false,
+      "description": "Page footer content",
+      "max_widgets": 1,
+      "default_widgets": [
+        {
+          "type": "footer"
+        }
+      ],
+      "collapse_behavior": "any",
+      "inheritable_types": [
+        "easy_widgets.FooterWidget"
+      ],
+      "allows_inheritance": true,
+      "allowed_widget_types": [
+        "easy_widgets.FooterWidget"
+      ]
+    },
+    "header": {
+      "label": "Header",
+      "order": 10,
+      "dimensions": {
+        "mobile": {
+          "width": 640,
+          "height": 112
+        },
+        "tablet": {
+          "width": 1024,
+          "height": 112
+        },
+        "desktop": {
+          "width": 1280,
+          "height": 112
+        }
+      },
+      "allow_merge": false,
+      "description": "Page header content",
+      "max_widgets": 1,
+      "default_widgets": [
+        {
+          "type": "header"
+        }
+      ],
+      "collapse_behavior": "any",
+      "inheritable_types": [
+        "easy_widgets.HeaderWidget"
+      ],
+      "allows_inheritance": true,
+      "allowed_widget_types": [
+        "easy_widgets.HeaderWidget"
+      ]
+    },
+    "navbar": {
+      "label": "Navigation Bar",
+      "order": 20,
+      "dimensions": {
+        "mobile": {
+          "width": 640,
+          "height": 28
+        },
+        "tablet": {
+          "width": 1024,
+          "height": 28
+        },
+        "desktop": {
+          "width": 1280,
+          "height": 28
+        }
+      },
+      "allow_merge": false,
+      "description": "Main navigation menu",
+      "max_widgets": 1,
+      "default_widgets": [
+        {
+          "type": "navbar"
+        }
+      ],
+      "collapse_behavior": "any",
+      "inheritable_types": [
+        "easy_widgets.NavbarWidget"
+      ],
+      "allows_inheritance": true,
+      "allowed_widget_types": [
+        "easy_widgets.NavbarWidget"
+      ]
+    },
+    "listing": {
+      "label": "Directory or columns",
+      "order": 70,
+      "dimensions": {
+        "mobile": {
+          "width": 640,
+          "height": null
+        },
+        "tablet": {
+          "width": 1024,
+          "height": null
+        },
+        "desktop": {
+          "width": 1280,
+          "height": null
+        }
+      },
+      "allow_merge": false,
+      "max_widgets": null,
+      "default_widgets": [],
+      "collapse_behavior": "any",
+      "allows_inheritance": false,
+      "allowed_widget_types": [
+        "object_storage.ObjectListWidget",
+        "easy_widgets.NewsFlashWidget",
+        "easy_widgets.ContentWidget"
+      ]
+    }
+  },
+  "status": "active",
+  "description": "Editable hero and content, followed by a full-width directory."
+}
