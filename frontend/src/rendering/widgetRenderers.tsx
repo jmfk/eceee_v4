@@ -710,7 +710,7 @@ const NewsDetailRender: WidgetRenderComponent = ({ widget, context, renderWidget
     return <article className="news-detail-widget" data-widget-type="news-detail" data-object-id={item.id}>
         <header className="news-header">
             {configEnabled(widget.config, true, 'showObjectType', 'show_object_type') && <div className="news-type-badge">{fields.objectType.label || fields.objectType.name}</div>}
-            <h1 className="news-title">{item.title}</h1>
+            {presentation.showHeadline && <h1 className="news-title">{item.title}</h1>}
             {configEnabled(widget.config, true, 'showMetadata', 'show_metadata') && <div className="news-metadata">
                 {fields.publishDate && <div className="news-metadata-item"><span className="news-metadata-label">Published:</span> <time dateTime={fields.publishDate}>{formatDisplayDate(fields.publishDate)}</time></div>}
                 {fields.metadata.author && <div className="news-metadata-item"><span className="news-metadata-label">Author:</span> <span>{fields.metadata.author}</span></div>}

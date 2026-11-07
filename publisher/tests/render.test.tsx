@@ -21,9 +21,13 @@ const model: PublishedPageModel = {
 };
 
 describe('public renderer', () => {
-  it('deduplicates a news headline and introduction during server rendering without mutating the article', () => {
+  it.each([false, true])('deduplicates news during server rendering with split body %s without mutating the article', split => {
     const item = { id: 'article', title: 'Energy & security', data: { summary: 'Energy & security Our introduction.' },
-      widgets: { main: [{ id: 'body', type: 'easy_widgets.ContentWidget', config: {
+      widgets: { main: split ? [
+        { id: 'title', type: 'easy_widgets.ContentWidget', config: { content: '<h1>Energy &amp; security</h1>' } },
+        { id: 'intro', type: 'easy_widgets.ContentWidget', config: { content: '<p>Our introduction.</p>' } },
+        { id: 'body', type: 'easy_widgets.ContentWidget', config: { content: '<p>The rest of the article.</p>' } },
+      ] : [{ id: 'body', type: 'easy_widgets.ContentWidget', config: {
         content: '<h1>Energy &amp; security</h1><p>Our introduction.</p><p>The rest of the article.</p>',
       } }] } };
     const before = JSON.stringify(item);

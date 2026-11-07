@@ -6,6 +6,32 @@ import { createPageRenderModel } from '../adapters'
 import { newsDetailPresentation } from '../newsDetailPresentation'
 
 describe('News detail presentation', () => {
+    it('deduplicates an introduction split across imported content widgets', () => {
+        const slots = { main: [
+            { id: 'title', type: 'easy_widgets.ContentWidget', config: { content: '<h1>Energy</h1>' } },
+            { id: 'intro', type: 'easy_widgets.ContentWidget', config: { content: '<p>Our introduction.</p>' } },
+            { id: 'body', type: 'easy_widgets.ContentWidget', config: { content: '<p>Further reporting.</p>' } },
+        ] }
+        const before = JSON.stringify(slots)
+        const result = newsDetailPresentation('Energy', 'Energy Our introduction.', '', slots, true)
+        expect(result.summary).toBe('')
+        expect(result.slots.main[1]).toBe(slots.main[1])
+        expect(JSON.stringify(slots)).toBe(before)
+    })
+
+    it('keeps a rich body headline and hides only the repeated page title', () => {
+        const html = '<h1 id="article-title"><a href="/source/">Energy</a><img src="/photo.jpg" alt="Photograph"></h1><p>Our introduction.</p>'
+        const item = { title: 'Energy', data: { summary: 'Our introduction.', content: html } }
+        const model = createPageRenderModel({ widgets: { main: [{ id: 'detail', type: 'easy_widgets.NewsDetailWidget',
+            config: { renderObjectWidgets: false }, data: { status: 'ready', item } }] } })
+        const { container } = render(<PageRenderer model={model} />)
+        expect(container.querySelectorAll('h1')).toHaveLength(1)
+        expect(container.querySelector('#article-title')).toBeInTheDocument()
+        expect(screen.getByRole('link', { name: 'Energy' })).toHaveAttribute('href', '/source/')
+        expect(screen.getByRole('img', { name: 'Photograph' })).toHaveAttribute('src', '/photo.jpg')
+        expect(container.querySelector('.news-summary')).toBeNull()
+    })
+
     it.each([true, false])('shows the title and introduction once with structured body %s', structured => {
         const html = '<h1>Energy &amp; security</h1><p>Our shared introduction.</p><h2>Next steps</h2><p>Further reporting with <a href="https://example.org">a source</a>.</p>'
         const item = { id: 1, title: 'Energy & security', data: { summary: 'Energy & security Our shared introduction.', content: html },
