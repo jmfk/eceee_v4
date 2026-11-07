@@ -2,11 +2,11 @@
 <section class="news-flash-widget" aria-label="News Flash" data-widget-type="news-flash">
     <div class="news-flash-grid">
         {% for item in news_items %}
-            <article class="news-flash-story news-flash-image-{{ config.image_shape|default:'landscape' }}{% if forloop.counter0 < config.full_width_count %} news-flash-full news-flash-lead{% elif forloop.counter0 < config.full_width_count|add:config.half_width_count %} news-flash-half{% else %} news-flash-third{% endif %}{% if item.featured_image_url %} has-image{% endif %}" data-object-id="{{ item.id }}">
+            <article class="news-flash-story news-flash-image-{{ config.image_shape|default:'landscape' }}{% if forloop.counter0 < config.full_width_count %} news-flash-full news-flash-lead{% elif forloop.counter0 < config.full_width_count|add:config.half_width_count %} news-flash-half{% else %} news-flash-third{% endif %} has-image" data-object-id="{{ item.id }}">
                 <h3 class="news-flash-title"><a href="{{ item.path }}">{{ item.title }}</a></h3>
                 <div class="news-flash-body">
                     <div class="news-flash-copy">{% if config.show_excerpts and item.excerpt_text %}<p class="news-flash-excerpt">{{ item.excerpt_text }}</p>{% endif %}</div>
-                    {% if item.featured_image_url %}<div class="news-flash-image"><img src="{{ item.featured_image_url }}" alt=""></div>{% endif %}
+                    <div class="news-flash-image{% if not item.featured_image_url %} news-flash-placeholder-image{% endif %}">{% if item.featured_image_url %}<img src="{{ item.featured_image_url }}" alt="">{% endif %}</div>
                 </div>
             </article>
         {% endfor %}

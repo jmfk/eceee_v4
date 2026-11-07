@@ -31,6 +31,19 @@ describe('page preview model resolution', () => {
         expect(resolved.slots.main[0].data?.feedUrl).toBe(fetchNews.mock.calls[0][0])
     })
 
+    it('prefers the local publisher alias over external hosts when editing in local dev', async () => {
+        const fetchNews = vi.fn(async () => ({ ok: true, json: async () => ({ items: [] }) }))
+        vi.stubGlobal('fetch', fetchNews)
+        const model = createPageRenderModel({ widgets: { main: [
+            { id: 'flash', type: 'easy_widgets.NewsFlashWidget', config: {} },
+        ] }, context: { siteId: 249, siteHostnames: ['eceee.eeee.org', 'eceee-test.colliberty.com', 'eceee.localhost'] } })
+        await resolvePagePreviewModel(model)
+        const request = new URL(fetchNews.mock.calls[0][0])
+        expect(request.hostname).toBe('eceee.localhost')
+        expect(request.protocol).toBe('http:')
+        expect(request.searchParams.get('siteId')).toBe('249')
+    })
+
     it('requests exactly three News Flash stories using the shared priority endpoint', async () => {
         const fetchNews = vi.fn(async () => ({ ok: true, json: async () => ({ priorityId: '1', items: [{ id: 1, slug: 'priority', data: { newsPriority: true } }] }) }))
         vi.stubGlobal('fetch', fetchNews)
