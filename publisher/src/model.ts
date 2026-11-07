@@ -812,7 +812,8 @@ async function resolvePublishedData(
     } else if (widget.type === 'easy_widgets.TopNewsPlugWidget' || widget.type === 'easy_widgets.SidebarTopNewsWidget') {
       const configuredTypes = config.objectTypes !== undefined ? config.objectTypes : config.object_types;
       const related = widget.type === 'easy_widgets.SidebarTopNewsWidget' && (config.relatedToCurrentArticle ?? config.related_to_current_article) === true;
-      const selectedTypes = stringList(configuredTypes === undefined ? [related ? 'article' : 'news'] : configuredTypes);
+      const selectedTypes = stringList(configuredTypes === undefined ? ['news'] : configuredTypes);
+      if (related && selectedTypes.length === 1 && selectedTypes[0] === 'news') selectedTypes[0] = 'article';
       const selectedTypesQuery = {
         objectTypeIds: selectedTypes.filter(type => /^\d+$/.test(type)),
         objectTypeNames: selectedTypes.filter(type => !/^\d+$/.test(type)),
