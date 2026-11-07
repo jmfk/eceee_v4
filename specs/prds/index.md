@@ -2,6 +2,7 @@
 
 | ID | Title | Status | Related ADRs |
 | --- | --- | --- | --- |
+| PRD-0046 | [Derived widgets with single-level inheritance and slot restrictions](0046-derived-widgets-and-slot-restrictions.md) | draft | - |
 | PRD-0045 | [Configurable News Flash layouts and progressive loading](0045-news-flash-layouts-and-loading.md) | completed | ADR-0064 |
 | PRD-0044 | [Responsive homepage News Flash widget](0044-news-flash-widget.md) | completed | ADR-0062, ADR-0063 |
 | PRD-0041 | [Risk-based test selection and CI-backed deployment](0041-risk-based-ci-and-deploy-evidence.md) | completed | ADR-0057 |
