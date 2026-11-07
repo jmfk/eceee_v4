@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { NewsFlashRender } from './NewsFlashRender'
+import { newsDetailPresentation } from './newsDetailPresentation'
 import type { RenderWidgetModel, WidgetRenderComponent, WidgetRenderProps } from './types'
 import { processNavigationItems } from '../utils/navigationItems'
 import { asArray, EmptyRender, formatDisplayDate, formatDisplayDateTime, imageUrl, ImageView, normalizeContentMediaHtml, PreviewLink, RenderFailure, SafeHtml, sanitizeHtml, TextWithBreaks, value } from './primitives'
@@ -701,7 +702,10 @@ const NewsDetailRender: WidgetRenderComponent = ({ widget, context, renderWidget
     const slots: Record<string, unknown> = item.widgets && typeof item.widgets === 'object' ? item.widgets : {}
     const renderObjectWidgets = configEnabled(widget.config, true, 'renderObjectWidgets', 'render_object_widgets')
     const hasStructuredWidgets = renderObjectWidgets && Object.keys(slots).length > 0
-    const summary = data.summary || item.summary || ''
+    const presentation = newsDetailPresentation(String(item.title || ''), String(data.summary || item.summary || ''),
+        String(data.content || data.body || data.text || item.content || ''),
+        Object.fromEntries(Object.entries(slots).map(([slot, widgets]) => [slot, asArray<any>(widgets).map((nested, index) => normalizeWidget(nested, `${slot}-${index}`))])), hasStructuredWidgets)
+    const summary = presentation.summary
     const externalUrl = data.externalUrl || data.external_url || ''
     return <article className="news-detail-widget" data-widget-type="news-detail" data-object-id={item.id}>
         <header className="news-header">
@@ -714,8 +718,8 @@ const NewsDetailRender: WidgetRenderComponent = ({ widget, context, renderWidget
         </header>
         {configEnabled(widget.config, true, 'showFeaturedImage', 'show_featured_image') && <div className="news-featured-image"><ImageView source={fields.image} alt={item.title || ''} /></div>}
         {summary && <p className="news-summary">{summary}</p>}
-        {!hasStructuredWidgets && <SafeHtml className="news-content" html={data.content || data.body || data.text || item.content} />}
-        {hasStructuredWidgets && <div className="news-object-widgets">{Object.entries(slots).map(([slotName, widgets]) => <div className={`news-widget-slot news-widget-slot-${slotName}`} data-slot={slotName} data-widget-slot={slotName} data-owner-widget-type={widget.type} key={slotName}>{renderWidgets(asArray<any>(widgets).map((nested, index) => normalizeWidget(nested, `${slotName}-${index}`)), item.themeWidgetTypes || item.theme_widget_types || emptyThemeWidgets())}</div>)}</div>}
+        {!hasStructuredWidgets && <SafeHtml className="news-content" html={presentation.html} />}
+        {hasStructuredWidgets && <div className="news-object-widgets">{Object.entries(presentation.slots).map(([slotName, widgets]) => <div className={`news-widget-slot news-widget-slot-${slotName}`} data-slot={slotName} data-widget-slot={slotName} data-owner-widget-type={widget.type} key={slotName}>{renderWidgets(widgets, item.themeWidgetTypes || item.theme_widget_types || emptyThemeWidgets())}</div>)}</div>}
         {externalUrl && <div className="news-external-source"><PreviewLink href={externalUrl} rel="noopener noreferrer">Read the original source</PreviewLink></div>}
     </article>
 }

@@ -21,6 +21,21 @@ const model: PublishedPageModel = {
 };
 
 describe('public renderer', () => {
+  it('deduplicates a news headline and introduction during server rendering without mutating the article', () => {
+    const item = { id: 'article', title: 'Energy & security', data: { summary: 'Energy & security Our introduction.' },
+      widgets: { main: [{ id: 'body', type: 'easy_widgets.ContentWidget', config: {
+        content: '<h1>Energy &amp; security</h1><p>Our introduction.</p><p>The rest of the article.</p>',
+      } }] } };
+    const before = JSON.stringify(item);
+    const html = renderToStaticMarkup(<PublishedPage model={{ ...model, slots: { main: [{
+      id: 'detail', type: 'easy_widgets.NewsDetailWidget', config: {}, data: { status: 'ready', item },
+    }] } }} />);
+    expect(html.match(/<h1\b/g)).toHaveLength(1);
+    expect(html.match(/Our introduction\./g)).toHaveLength(1);
+    expect(html).toContain('The rest of the article.');
+    expect(JSON.stringify(item)).toBe(before);
+  });
+
   it('server-renders the shared widget registry and sanitizes rich HTML', () => {
     const html = renderToStaticMarkup(<PublishedPage model={model} />);
     expect(html).toContain('Server rendered');
