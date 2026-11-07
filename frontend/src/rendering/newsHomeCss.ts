@@ -3,7 +3,8 @@ export const NEWS_HOME_CSS = `
 [data-widget-type="top-news-plug"].layout-1x3 .news-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 [data-widget-type="top-news-plug"] .news-card{min-width:0;min-height:260px;border:1px solid #d4dce2;border-radius:0;background:#fff;box-shadow:none;display:flex;flex-direction:column}
 [data-widget-type="top-news-plug"] .news-card:hover{transform:none;box-shadow:none}
-[data-widget-type="top-news-plug"] .news-image{order:2;margin-top:auto;align-self:flex-end;width:44%;height:105px;overflow:hidden}
+[data-widget-type="top-news-plug"] .news-image{order:2;margin-top:auto;align-self:flex-end;width:44%;height:auto;aspect-ratio:7 / 4;overflow:hidden}
+[data-widget-type="top-news-plug"] .news-image.news-image-square{width:min(44%,105px);aspect-ratio:1}
 [data-widget-type="top-news-plug"] .news-image img{width:100%;height:100%;object-fit:cover}
 [data-widget-type="top-news-plug"] .news-body{display:contents}
 [data-widget-type="top-news-plug"] .news-meta,[data-widget-type="top-news-plug"] .news-title,[data-widget-type="top-news-plug"] .news-excerpt,[data-widget-type="top-news-plug"] .news-footer{margin:0 16px}
@@ -18,6 +19,7 @@ export const NEWS_HOME_CSS = `
 [data-widget-type="sidebar-top-news"] .news-item{min-width:0}
 [data-widget-type="sidebar-top-news"] .news-title{margin:0;font-size:1rem;line-height:1.3}
 [data-widget-type="sidebar-top-news"] .news-thumbnail{width:72px;height:72px;float:right;margin-left:10px}
+[data-widget-type="sidebar-top-news"] .news-thumbnail.news-image-landscape{width:126px;height:72px}
 [data-widget-type="sidebar-top-news"] .news-thumbnail img{width:100%;height:100%;object-fit:cover}
 [data-widget-type="sidebar-top-news"] .news-meta{font-size:.75rem;color:#596b78}
 [data-widget-type="sidebar-top-news"].variant-header{display:flex;align-items:center;gap:12px;min-width:0;padding:0;border:0;border-radius:0;background:transparent}

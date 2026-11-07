@@ -25,8 +25,7 @@ export const NewsImage = ({ source, alt = '', onDimensions }: { source: any; alt
         const element = ref.current?.parentElement
         if (!element) return
         const measure = () => {
-            const rect = element.getBoundingClientRect()
-            setFrame({ width: rect.width || element.clientWidth, height: rect.height || element.clientHeight })
+            setFrame({ width: element.clientWidth, height: element.clientHeight })
         }
         measure()
         const image = ref.current
@@ -36,7 +35,11 @@ export const NewsImage = ({ source, alt = '', onDimensions }: { source: any; alt
             onDimensions?.(size)
         }
         if (typeof ResizeObserver !== 'undefined') {
-            const observer = new ResizeObserver(measure)
+            const observer = new ResizeObserver(entries => {
+                const rect = entries[0]?.contentRect
+                if (rect) setFrame({ width: rect.width, height: rect.height })
+                else measure()
+            })
             observer.observe(element)
             return () => observer.disconnect()
         }

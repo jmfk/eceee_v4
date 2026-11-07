@@ -17,6 +17,13 @@ describe('news focal cropping', () => {
         const { container } = render(<div><NewsImage source={{ url: '/portrait.jpg', width: 400, height: 800, focal_point: { x: 0.5, y: 1 } }} /></div>)
         expect(container.querySelector('img')).toHaveStyle({ width: '140px', height: '280px', left: '0px', top: '-140px' })
     })
+    it('uses unscaled layout measurements inside a scaled preview', () => {
+        vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(140)
+        vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(140)
+        vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 70, height: 70 } as DOMRect)
+        const { container } = render(<div style={{ transform: 'scale(.5)' }}><NewsImage source={{ url: '/wide.jpg', width: 800, height: 400 }} /></div>)
+        expect(container.querySelector('img')).toHaveStyle({ width: '280px', height: '140px' })
+    })
     it('normalizes source dimensions and invalid/missing focal points', () => {
         expect(newsImageDimensions({ original_width: 400, original_height: 800 })).toEqual({ width: 400, height: 800 })
         expect(newsImageDimensions({ width: -1, height: 800 })).toBeNull()

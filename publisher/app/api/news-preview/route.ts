@@ -56,7 +56,7 @@ export async function GET(request: Request) {
         sortOrder: '-publish_date',
       };
       const articleTypes = { objectTypeIds: query.objectTypeIds, objectTypeNames: query.objectTypeNames };
-      if (related) return { items: await relatedNewsItems(reader, articleTypes, root.tenant_id, at, slug, newsArticleKind(kind), limit) };
+      if (related) return { items: await withNewsImages(await relatedNewsItems(reader, articleTypes, root.tenant_id, at, slug, newsArticleKind(kind), limit), reader, root.tenant_id) };
       if (latestArticle) {
         const item = await selectedNewsArticle(reader, articleTypes, root.tenant_id, at, slug);
         return { items: item ? [item] : [] };
