@@ -65,3 +65,9 @@ The slot editor now reads the same host/site-scoped published News Flash feed as
 For imported Articles, an explicit featured image takes precedence; otherwise the first image in the published article body or Image widget supplies the card photograph. Referenced media IDs resolve through the current tenant's public-media lookup; missing/private media stays unavailable. Article records and content are not rewritten. The local import has seven Articles with embedded photos; the three currently selected Articles have no saved photo and therefore retain their decorative image placeholders.
 
 Verified actual page 249 content in Chrome, a twelve-item public feed containing an imported photograph, and HTTP 200 image delivery. Focused editor/preview/render tests and publisher feed/route tests passed, along with publisher typecheck/lint and frontend build.
+
+## Follow-up: supplied typography source
+
+The owner supplied `eceee 2025_web_Full_651_Typo_SOURCE.pdf` (1280px design). Its named news style supersedes the earlier regular 40px headline: Source Sans 3 semibold 600 at 41px with 44px leading. Body text is light 300 at 16px with 22px leading. Keep the existing theme-supplied Source Sans 3 font, 30px card insets/gutters, outside outline and parent-owned outer spacing. Reserve 88px for a two-line headline and 22px before the body, retaining the 310px minimum card height. Compact cards use 22px/26px headings and their existing 16px side insets.
+
+Chrome computed styles match on page 249 in the slot editor and public local homepage. At a 390px viewport the cards are 330px wide with no content overflow. Twenty focused editor/render/registry tests and the unchanged 51-case contract comparison pass.
