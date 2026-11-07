@@ -77,3 +77,9 @@ Chrome computed styles match on page 249 in the slot editor and public local hom
 The owner clarified that 310px is a fixed card height, superseding the previous minimum-height/growing-content behavior. Constrain grid tracks so long text cannot expand a card. Headlines reserve two lines and use CSS line clamping; body text uses six 22px desktop lines with ellipsis, or one line in compact stacked-image cards so the image remains contained. Full text remains in the document and stored Article content is unchanged. Outside outlines and focus treatment remain.
 
 Chrome verified all three real cards at exactly 310px in the editor and public page, visible summary ellipses, and 330px-wide compact cards with contained images and no horizontal overflow.
+
+## Follow-up: mobile lead and compact rows
+
+The owner supplied a separate mobile News Flash reference, superseding identical 310px stacked mobile cards. Below an 800px widget width, full-width stories become square leads with 6.25% insets and a bottom-aligned 3:1 image. Half/third-width stories become compact rows at a 3.4:1 card ratio (minimum 88px high), with a 32%-wide image flush to the right/top/bottom edge. Mobile summaries are hidden and titles retain two-line ellipsis. The configured desktop square/landscape image choice remains in effect on desktop; mobile image geometry follows the new reference. Named container queries isolate the mobile layout from individual desktop cards.
+
+Chrome verified a 330×330px lead with a 288.75×96.25px inset image and 330×97.05px supporting rows with edge-aligned thumbnails, without horizontal overflow. Desktop full/half cards remain 310px high.
