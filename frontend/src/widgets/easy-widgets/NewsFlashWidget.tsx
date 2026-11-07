@@ -31,12 +31,12 @@ const NewsFlashWidget = ({ widgetId, config = emptyConfig, context = emptyContex
         if ((event.target as HTMLElement).closest('a')) event.preventDefault()
     }}>
         <style>{manifest.widgets['easy_widgets.NewsFlashWidget'].css}</style>
-        <section className="news-flash-widget" aria-label="News Flash" aria-busy={feed.busy}>
+        <section className="news-flash-widget" aria-label="News Flash" aria-busy={feed.loading}>
             <div className="news-flash-grid">{Array.from({ length: feed.visible }, (_, index) => feed.items[index]
                 ? <NewsFlashCard key={index} item={feed.items[index] as Record<string, any>} size={layout.size(index)} imageShape={newsFlashImageShape(config)} base={base} showExcerpts={(config.showExcerpts ?? config.show_excerpts) !== false} />
-                : <NewsFlashPlaceholder key={index} index={index} size={layout.size(index)} imageShape={newsFlashImageShape(config)} loading={feed.busy} editor={!siteId} />)}</div>
+                : <NewsFlashPlaceholder key={index} index={index} size={layout.size(index)} imageShape={newsFlashImageShape(config)} loading={feed.loading} />)}</div>
             {feed.error && <p role="status">News could not be loaded.</p>}
-            {feed.canLoad && <div ref={feed.sentinel} className="news-flash-more"><button type="button" disabled={feed.busy} onClick={() => void feed.load()}>{feed.busy ? 'Loading news…' : feed.error ? 'Retry loading news' : feed.exhausted ? 'Show more news placeholders' : 'Load more news'}</button></div>}
+            {feed.canLoad && <div ref={feed.sentinel} className="news-flash-more"><button type="button" disabled={feed.busy} onClick={() => void feed.load()}>{feed.busy ? 'Loading news…' : feed.error ? 'Retry loading news' : 'Load more news'}</button></div>}
         </section>
     </div>
 }

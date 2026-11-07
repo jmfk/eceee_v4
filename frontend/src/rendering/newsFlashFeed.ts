@@ -36,11 +36,7 @@ export const useNewsFlashFeed = (widget: RenderWidgetModel, context: RenderConte
     }, [widget.data, source, total]) // resolved data is replaced when the preview changes
     const load = useCallback(async () => {
         if (busy.current) return
-        if (!source || state.exhausted) {
-            setState(previous => ({ ...previous, visible: Math.min(total, previous.visible + NEWS_FLASH_BATCH) }))
-            return
-        }
-        if (state.offset >= total) return
+        if (!source || state.exhausted || state.offset >= total) return
         busy.current = true
         const requestGeneration = generation.current
         const limit = Math.min(NEWS_FLASH_BATCH, total - state.offset)
@@ -69,16 +65,17 @@ export const useNewsFlashFeed = (widget: RenderWidgetModel, context: RenderConte
     useEffect(() => {
         if (!widget.data && source && !state.offset && !state.busy && !state.error && !state.exhausted) void load()
     }, [widget.data, source, state.offset, state.busy, state.error, state.exhausted, load])
-    const reveal = useCallback(() => {
-        setState(previous => ({ ...previous, visible: Math.min(total, previous.visible + NEWS_FLASH_BATCH) }))
-    }, [total])
     const sentinel = useRef<HTMLDivElement>(null)
-    const canLoad = state.visible < total || (Boolean(source) && !state.exhausted && state.offset < total)
+    const canLoad = Boolean(source) && !state.exhausted && state.offset < total
     useEffect(() => {
-        if (!canLoad || state.busy || (state.error && state.visible >= total) || !sentinel.current || typeof IntersectionObserver === 'undefined') return
-        const observer = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) { if (state.error) reveal(); else void load() } }, { rootMargin: '200px' })
+        if (!canLoad || state.busy || state.error || !sentinel.current || typeof IntersectionObserver === 'undefined') return
+        const observer = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) void load() }, { rootMargin: '200px' })
         observer.observe(sentinel.current)
         return () => observer.disconnect()
-    }, [canLoad, state.error, state.busy, state.visible, total, load, reveal])
-    return { ...state, canLoad, load, reveal, sentinel }
+    }, [canLoad, state.error, state.busy, load])
+    const loading = state.busy || (!state.exhausted && !state.error && (widget.data?.status === 'loading'
+        || (!widget.data && Boolean(source) && state.offset === 0)))
+    // Counts cap the layout; a completed feed only renders articles that exist.
+    const visible = loading || state.error ? state.visible : Math.min(state.visible, state.items.length)
+    return { ...state, visible, loading, canLoad, load, sentinel }
 }
