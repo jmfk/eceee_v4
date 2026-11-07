@@ -1,3 +1,4 @@
+import { columnistId } from '../../../src/editorial';
 import { database } from '@/src/db';
 import { newsFlashPage, withNewsImages } from '../../../src/news-flash';
 import { newsArticleKind, relatedNewsItems, selectedNewsArticle } from '../../../src/related-news';
@@ -26,6 +27,7 @@ export async function GET(request: Request) {
   const related = params.get('related') === 'true';
   const latestArticle = params.get('latestArticle') === 'true';
   const slug = params.get('slug') || undefined;
+  const authorSlug = params.get('columnist');
   const kind = params.get('articleKind') || 'all';
   if (!validId(siteId) || !types.length || types.length > 20 || types.some(type => !validType(type))
       || classifications.length > 20 || classifications.some(id => !validClassification(id))
@@ -33,6 +35,7 @@ export async function GET(request: Request) {
       || (flash && offset > 0 && (priorityId === null || (priorityId !== 'none' && !validId(priorityId))))
       || !Number.isInteger(limit) || limit < 1 || limit > 50
       || !['all', 'news', 'column'].includes(kind)
+      || (authorSlug !== null && !/^[\p{L}\p{N}_.-]{1,200}$/u.test(authorSlug))
       || (slug !== undefined && !/^[\p{L}\p{N}_.-]{1,200}$/u.test(slug))) {
     return Response.json({ error: 'Invalid news query.' }, { status: 400, headers: responseHeaders });
   }
@@ -44,14 +47,17 @@ export async function GET(request: Request) {
       if (!root || root.id !== siteId) return null;
       const at = new Date();
       if (!await reader.version(root.id, at)) return null;
+      const authorId = authorSlug ? await columnistId(reader, root.tenant_id, at, authorSlug) : null;
+      if (authorSlug && !authorId) return { items: [], priorityId: null };
       const query = {
+        ...(authorId ? { authorId, articleKind: 'column' as const } : {}),
         objectTypeIds: types.filter(type => /^\d+$/.test(type)),
         objectTypeNames: types.filter(type => !/^\d+$/.test(type)),
         classificationIds: classifications,
         includeDescendants: params.get('includeDescendants') !== 'false',
         featuredOnly: params.get('featuredOnly') === 'true',
         activeTypeOnly: true,
-        ...(kind !== 'all' ? { articleKind: newsArticleKind(kind) } : {}),
+        ...(!authorId && kind !== 'all' ? { articleKind: newsArticleKind(kind) } : {}),
         limit,
         sortOrder: '-publish_date',
       };

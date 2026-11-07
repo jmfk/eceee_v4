@@ -1,3 +1,4 @@
+import { editorialFeedUrl, editorialTemplate } from '../rendering/EditorialRender'
 import { newsPreviewOrigin } from '../utils/newsPreviewOrigin'
 import { newsFlashLayout, NEWS_FLASH_BATCH } from '../rendering/newsFlashLayout'
 import { api } from '../api/client'
@@ -134,6 +135,11 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
         const params = new URLSearchParams()
         params.set('siteId', String(next.context.siteId || ''))
         types.forEach(type => params.append('type', type))
+        if ((widget.config.currentColumnist ?? widget.config.current_columnist) === true) {
+            const slug = next.context.pathVariables?.member_slug || next.context.pathVariables?.memberSlug
+            if (!slug) return Promise.resolve({ items: [] })
+            params.set('columnist', slug)
+        }
         const classifications = widget.config.classificationIds ?? widget.config.classification_ids ?? []
         if (Array.isArray(classifications)) classifications.forEach(id => params.append('classificationId', String(id)))
         params.set('includeDescendants', String((widget.config.includeDescendants ?? widget.config.include_descendants) !== false))
@@ -261,6 +267,22 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
             } catch {
                 widget.config.mediaItems = []
             }
+        }
+        if (['object_storage.ObjectListWidget', 'object_storage.ObjectDetailWidget'].includes(widget.type) && editorialTemplate(widget)) {
+            const detail = widget.type === 'object_storage.ObjectDetailWidget'
+            const path = editorialFeedUrl(widget, next.context, detail)
+            if (!path) { widget.data = { status: 'empty', items: [] }; return }
+            const url = `${newsPreviewOrigin(next.context.siteHostnames || [])}${path}`
+            try {
+                const request = new URL(url)
+                request.searchParams.set('limit', String(Math.min(12, Math.max(1, Number(widget.config.limit) || 50))))
+                const response = await fetch(request, { credentials: 'omit' })
+                if (!response.ok) throw new Error('Content could not be loaded.')
+                const result = await response.json()
+                const items = Array.isArray(result.items) ? result.items : []
+                widget.data = { status: items.length ? 'ready' : 'empty', ...(detail ? { item: items[0] } : { items, feedUrl: url }) }
+            } catch { widget.data = { status: 'error', items: [], feedUrl: url } }
+            return
         }
         if (!dataDrivenNewsTypes.has(widget.type)) return
         const objectTypes = widget.config.objectTypes || widget.config.object_types || []

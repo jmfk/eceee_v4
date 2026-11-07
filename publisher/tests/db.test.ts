@@ -65,7 +65,17 @@ describe('database snapshot', () => {
     const [sql, parameters] = mocks.query.mock.calls.find(([statement]) => statement.includes('FROM object_storage_objectinstance AS object'))!;
     expect(sql).toContain('NOT (object.id = ANY($17::bigint[]))');
     expect(sql).toContain('LIMIT $6 OFFSET $16');
-    expect(parameters.slice(15)).toEqual([11, ['99'], [], null]);
+    expect(parameters.slice(15, 19)).toEqual([11, ['99'], [], null]);
+  });
+
+  it('filters authors and event groups on the published version before pagination', async () => {
+    await database.withSnapshot(reader => reader.publishedObjects({ objectTypeNames: ['article'], authorId: '976',
+      articleKind: 'column', eventGroup: 'other', limit: 12, sortOrder: '-publish_date' }, '7', new Date(0)));
+    const [sql, parameters] = mocks.query.mock.calls.find(([statement]) => statement.includes('FROM object_storage_objectinstance AS object'))!;
+    expect(sql).toContain("published.data->'authors'");
+    expect(sql).toContain('jsonb_build_array($20::bigint)');
+    expect(sql).toContain("published.data->>'eventGroup'");
+    expect(parameters.slice(19)).toEqual(['976', 'other']);
   });
 
   it('matches related tags and Article kind on the published tenant version', async () => {
@@ -74,7 +84,7 @@ describe('database snapshot', () => {
       objectTypeIds: ['8'], relatedTagIds: [tag], articleKind: 'news', excludeObjectIds: ['99'], limit: 5, sortOrder: '-publish_date',
     }, '7', new Date('2026-11-07')));
     const [sql, parameters] = mocks.query.mock.calls.find(([statement]) => statement.includes('FROM object_storage_objectinstance AS object'))!;
-    expect(parameters.slice(17)).toEqual([[tag], 'news']);
+    expect(parameters.slice(17, 19)).toEqual([[tag], 'news']);
     expect(sql).toContain('related.object_version_id=published.id');
     expect(sql).toContain('tag.tenant_id=$1');
     expect(sql).toContain("kind.tag_type='article_kind'");

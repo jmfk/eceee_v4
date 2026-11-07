@@ -18,11 +18,11 @@ const NewsFlashWidget = ({ widgetId, config = emptyConfig, context = emptyContex
         const model = { id: widgetId || 'news-flash', type: 'easy_widgets.NewsFlashWidget', config }
         if (!siteId || !hostnames?.length) return { ...model, data: { status: 'empty' as const, items: [] } }
         try {
-            const path = newsFlashFeedUrl(model, { siteId, preview: true })
+            const path = newsFlashFeedUrl(model, { siteId, preview: true, pathVariables: context.pathVariables || context.path_variables || {} })
             return path ? { ...model, data: undefined, feedUrl: `${newsPreviewOrigin(hostnames)}${path}` } : model
         } catch { return { ...model, data: { status: 'error' as const, items: [] } } }
-    }, [widgetId, config, siteId, hostnames])
-    const feedContext = useMemo(() => ({ siteId, preview: true }), [siteId])
+    }, [widgetId, config, siteId, hostnames, context.pathVariables, context.path_variables])
+    const feedContext = useMemo(() => ({ siteId, preview: true, pathVariables: context.pathVariables || context.path_variables || {} }), [siteId, context.pathVariables, context.path_variables])
     const feed = useNewsFlashFeed(widget, feedContext, 'feedUrl' in widget ? widget.feedUrl as string : undefined)
     const layout = newsFlashLayout(config)
     const path = config.newsPagePath ?? config.news_page_path ?? '/news/'

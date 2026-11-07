@@ -23,6 +23,11 @@ class NewsFlashConfig(BaseModel):
         json_schema_extra={"component": "ClassificationSelectorInput"},
     )
     include_descendants: bool = Field(default=True, description="Include descendant classifications")
+    current_columnist: bool = Field(
+        default=False,
+        description="Only columns by the URL-selected columnist",
+        json_schema_extra={"component": "BooleanInput", "variant": "toggle"},
+    )
     news_page_path: str = Field(default="/news/", description="Path to the news detail page")
     image_shape: Literal["square", "landscape"] = Field(
         default="landscape", title="Image shape", json_schema_extra={"group": "Layout"}

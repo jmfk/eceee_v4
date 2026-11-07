@@ -1,3 +1,4 @@
+import { editorialItems, editorialKind, columnistId, editorialPublicData, withLatestColumn } from './editorial';
 import { newsFlashPage, withNewsImages } from './news-flash';
 import { newsArticleKind, relatedNewsItems, selectedNewsArticle } from './related-news';
 import { newsFlashLayout, NEWS_FLASH_BATCH } from '../../frontend/src/rendering/newsFlashLayout';
@@ -107,6 +108,8 @@ export interface PublishedObjectLink {
 }
 
 export interface PublishedObjectQuery {
+  authorId?: DbId;
+  eventGroup?: 'all' | 'eceee' | 'other';
   relatedTagIds?: string[];
   articleKind?: 'all' | 'news' | 'column';
   classificationIds?: string[];
@@ -346,6 +349,13 @@ export function normalizeWidgets(input: unknown, at = new Date()): Record<string
     Array.isArray(items)
       ? items.map((item, index) => normalizeWidget(object(item), `${slot}-${index}`, null, 0, at)).filter((item): item is Widget => item !== null)
       : [],
+  ]));
+}
+
+/** The same publication windows apply to object bodies and their public previews. */
+export function publishedObjectWidgets(input: unknown, at: Date): Record<string, Widget[]> {
+  return Object.fromEntries(Object.entries(object(input)).map(([slot, widgets]) => [
+    slot, normalizeNestedWidgets(widgets, at, `published-object-${slot}`),
   ]));
 }
 
@@ -769,7 +779,11 @@ async function resolvePublishedData(
       try {
         const types = stringList(config.objectTypes ?? config.object_types ?? ['article']);
         const total = newsFlashLayout(config).total;
-        const page = total ? await newsFlashPage(reader, {
+        const authorSlug = (config.currentColumnist ?? config.current_columnist) === true ? pathVariables.member_slug : undefined;
+        const authorId = authorSlug ? await columnistId(reader, tenantId, at, authorSlug) : null;
+        const scopedAuthor = (config.currentColumnist ?? config.current_columnist) === true;
+        const page = total && (!scopedAuthor || authorId) ? await newsFlashPage(reader, {
+          ...(scopedAuthor ? { authorId: authorId!, articleKind: 'column' as const } : {}),
           objectTypeIds: types.filter(type => /^\d+$/.test(type)),
           objectTypeNames: types.filter(type => !/^\d+$/.test(type)),
           classificationIds: stringList(config.classificationIds ?? config.classification_ids),
@@ -795,20 +809,31 @@ async function resolvePublishedData(
         activeTypeOnly: true,
       }, tenantId, at);
     } else if (widget.type === 'object_storage.ObjectListWidget') {
-      const objectType = String(config.objectType ?? config.object_type ?? '');
-      if (objectType) {
-        const showHierarchy = (config.showHierarchy ?? config.show_hierarchy) === true;
-        const statusFilter = String(config.statusFilter ?? config.status_filter ?? 'published');
-        items = await reader.publishedObjects({
-          objectTypeNames: [objectType],
-          limit: positiveLimit(config.limit, 5),
-          sortOrder: String(config.orderBy ?? config.order_by ?? '-created_at'),
-          includeHierarchy: showHierarchy,
-          status: statusFilter === 'draft' || statusFilter === 'archived' ? statusFilter : undefined,
-          activeTypeOnly: true,
-        }, tenantId, at);
+      const kind = editorialKind(config);
+      if (kind) {
+        try {
+          items = await editorialItems(reader, kind, tenantId, at, { limit: Math.min(12, positiveLimit(config.limit, 50)),
+            eventGroup: ['eceee', 'other'].includes(String(config.eventGroup ?? config.event_group))
+              ? (config.eventGroup ?? config.event_group) as 'eceee' | 'other' : 'all' });
+        } catch {
+          return { ...prepared, data: { status: 'error', items: [] } };
+        }
       } else {
-        items = [];
+        const objectType = String(config.objectType ?? config.object_type ?? '');
+        if (objectType) {
+          const showHierarchy = (config.showHierarchy ?? config.show_hierarchy) === true;
+          const statusFilter = String(config.statusFilter ?? config.status_filter ?? 'published');
+          items = await reader.publishedObjects({
+            objectTypeNames: [objectType],
+            limit: positiveLimit(config.limit, 5),
+            sortOrder: String(config.orderBy ?? config.order_by ?? '-created_at'),
+            includeHierarchy: showHierarchy,
+            status: statusFilter === 'draft' || statusFilter === 'archived' ? statusFilter : undefined,
+            activeTypeOnly: true,
+          }, tenantId, at);
+        } else {
+          items = [];
+        }
       }
     } else if (widget.type === 'easy_widgets.TopNewsPlugWidget' || widget.type === 'easy_widgets.SidebarTopNewsWidget') {
       const configuredTypes = config.objectTypes !== undefined ? config.objectTypes : config.object_types;
@@ -851,7 +876,8 @@ async function resolvePublishedData(
     } else if (widget.type === 'object_storage.ObjectDetailWidget') {
       const configuredSlug = config.objectSlug ?? config.object_slug;
       const objectId = String(config.objectId ?? config.object_id ?? (configuredSlug ? '' : pathVariables.id) ?? '');
-      const objectType = String(config.objectType ?? config.object_type ?? '');
+      const detailKind = editorialKind(config);
+      const objectType = detailKind ? detailKind === 'events' ? 'event' : 'columnist' : String(config.objectType ?? config.object_type ?? '');
       const slug = String(configuredSlug
         ?? pathVariables.news_slug ?? pathVariables.event_slug ?? pathVariables.library_slug
         ?? pathVariables.member_slug ?? pathVariables.date_slug ?? pathVariables.slug
@@ -874,6 +900,17 @@ async function resolvePublishedData(
           activeTypeOnly: true,
         }, tenantId, at);
       }
+    }
+    if (item && widget.type === 'object_storage.ObjectDetailWidget' && editorialKind(config)) {
+      const expected = editorialKind(config) === 'events' ? 'event' : 'columnist';
+      if (item.objectType.name !== expected) item = undefined;
+    }
+    if (item && widget.type === 'object_storage.ObjectDetailWidget' && editorialKind(config)) {
+      item = { ...item, widgets: publishedObjectWidgets(item.widgets, at) };
+      const [enriched] = await withNewsImages([{ ...item, data: { ...item.data,
+        featuredImage: editorialKind(config) === 'columnists' ? item.data.photo || item.data.photoUrl || item.data.photo_url : item.data.featuredImage } }], reader, tenantId);
+      const profile = editorialKind(config) === 'columnists' ? await withLatestColumn(enriched, reader, tenantId, at) : enriched;
+      item = { ...profile, data: editorialPublicData(profile, editorialKind(config)!, true) };
     }
     if (items) {
       if (['easy_widgets.NewsListWidget', 'easy_widgets.TopNewsPlugWidget', 'easy_widgets.SidebarTopNewsWidget'].includes(widget.type)) {
@@ -1015,6 +1052,24 @@ async function buildSpecialPageModel(
     description: '',
     matchedPath: normalizedPath,
     remainingPath: '',
+  };
+}
+
+/** Prepare published directory bodies with the same links and public-media rules as pages. */
+export async function prepareEditorialWidgets(reader: PageReader, root: Page, version: Version, widgets: unknown, at: Date) {
+  const slots = publishedObjectWidgets(widgets, at);
+  const pageIds = new Set<DbId>();
+  const mediaIds = new Set<DbId>();
+  const collectionIds = new Set<DbId>();
+  collectReferences(slots, pageIds, mediaIds, collectionIds);
+  const references = await reader.publishedPageReferences([...pageIds], root.tenant_id, root.id, at);
+  const media = await reader.publicMedia([...mediaIds], [...collectionIds], root.tenant_id);
+  const defaultTheme = await reader.defaultTheme(root.tenant_id);
+  const theme = version.theme_id ? await reader.theme(version.theme_id, root.tenant_id) : defaultTheme;
+  return {
+    widgets: prepareWidgets(slots, new Map(references.map(reference => [String(reference.id), reference.cached_path])),
+      media.files, media.collections, theme, [root], []),
+    themeWidgetTypes: defaultTheme?.widget_types ?? { version: 1 as const, items: [] },
   };
 }
 

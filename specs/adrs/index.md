@@ -4,6 +4,8 @@
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
+| ADR-0069 | [Columnist card metadata and profile reading columns](active/0069-columnist-card-metadata-and-profile-columns.md) | accepted | PRD-0048 |
+| ADR-0068 | [Editorial directory templates on existing object widgets](active/0068-editorial-directory-templates.md) | accepted | PRD-0048 |
 | ADR-0067 | [Source-shaped focal crops for news images](active/0067-source-shaped-focal-news-images.md) | accepted | PRD-0045, PRD-0047 |
 | ADR-0066 | [News page layout with contextual sidebar lists](active/0066-news-page-composition-and-related-stories.md) | accepted | PRD-0047 |
 | ADR-0065 | [Derived widget resolution and slot policies](active/0065-derived-widget-slot-policies.md) | accepted | PRD-0046 |

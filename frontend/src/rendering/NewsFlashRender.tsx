@@ -5,7 +5,12 @@ import { newsFlashLayout, newsFlashImageShape } from './newsFlashLayout'
 import { useNewsFlashFeed } from './newsFlashFeed'
 import type { WidgetRenderComponent } from './types'
 
-export const NewsFlashRender: WidgetRenderComponent = ({ widget, context }) => {
+export const NewsFlashRender: WidgetRenderComponent = props => {
+    if (value(props.widget.config, 'currentColumnist', 'current_columnist') === true
+        && !(props.context.pathVariables?.member_slug || props.context.pathVariables?.memberSlug)) return null
+    return <NewsFlashContent {...props} />
+}
+const NewsFlashContent: WidgetRenderComponent = ({ widget, context }) => {
     const layout = newsFlashLayout(widget.config)
     const feed = useNewsFlashFeed(widget, context)
     const configuredPath = value(widget.config, 'newsPagePath', 'news_page_path') ?? '/news/'

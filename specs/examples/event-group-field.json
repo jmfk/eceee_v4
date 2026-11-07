@@ -1,0 +1,24 @@
+{
+  "type": "string",
+  "title": "Event group",
+  "description": "Choose Eceee events or Other events for the public event listing. Unset events appear under Other events.",
+  "component": "choice",
+  "componentType": "choice",
+  "fieldType": "choice",
+  "enum": [
+    "eceee",
+    "other"
+  ],
+  "default": "other",
+  "options": [
+    {
+      "value": "eceee",
+      "label": "Eceee events"
+    },
+    {
+      "value": "other",
+      "label": "Other events"
+    }
+  ],
+  "field_type": "choice"
+}
