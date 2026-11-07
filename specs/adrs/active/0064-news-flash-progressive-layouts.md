@@ -71,3 +71,9 @@ Verified actual page 249 content in Chrome, a twelve-item public feed containing
 The owner supplied `eceee 2025_web_Full_651_Typo_SOURCE.pdf` (1280px design). Its named news style supersedes the earlier regular 40px headline: Source Sans 3 semibold 600 at 41px with 44px leading. Body text is light 300 at 16px with 22px leading. Keep the existing theme-supplied Source Sans 3 font, 30px card insets/gutters, outside outline and parent-owned outer spacing. Reserve 88px for a two-line headline and 22px before the body, retaining the 310px minimum card height. Compact cards use 22px/26px headings and their existing 16px side insets.
 
 Chrome computed styles match on page 249 in the slot editor and public local homepage. At a 390px viewport the cards are 330px wide with no content overflow. Twenty focused editor/render/registry tests and the unchanged 51-case contract comparison pass.
+
+## Follow-up: fixed card height and ellipsis
+
+The owner clarified that 310px is a fixed card height, superseding the previous minimum-height/growing-content behavior. Constrain grid tracks so long text cannot expand a card. Headlines reserve two lines and use CSS line clamping; body text uses six 22px desktop lines with ellipsis, or one line in compact stacked-image cards so the image remains contained. Full text remains in the document and stored Article content is unchanged. Outside outlines and focus treatment remain.
+
+Chrome verified all three real cards at exactly 310px in the editor and public page, visible summary ellipses, and 330px-wide compact cards with contained images and no horizontal overflow.
