@@ -68,7 +68,7 @@ const Session = forwardRef(function ThemeWidgetInstanceSession({ widgetData, the
         const nextBase = resolveThemeWidget(document, release)
         const nextSchema = nextBase?.schema || builtinSchema
         const keys = Object.keys(nextSchema?.properties || {})
-        setRemoved(Object.entries(widget.config).filter(([key]) => !keys.includes(key)))
+        setRemoved(Object.entries(widget.config).filter(([key]) => !keys.includes(key) && key !== 'slots'))
         setWidget(current => ({ ...current, typeVersion: release.version, config: {
             ...release.defaults, ...Object.fromEntries(Object.entries(current.config).filter(([key]) => keys.includes(key) || key === 'slots')),
         } }))

@@ -14,6 +14,7 @@ from webpages.theme_widgets import (
     find_definition,
     publish_widget_types,
     retain_released_history,
+    validate_derived_slots,
     validate_instances,
     validate_version_widgets,
     validate_widget_types,
@@ -47,6 +48,73 @@ def working_document():
 
 
 class ThemeWidgetContractTests(unittest.TestCase):
+    def test_archiving_child_keeps_existing_derived_release_valid(self):
+        document = publish_widget_types(working_document(), empty_widget_types())
+        document["items"].append(
+            {
+                "id": "62b20cc6-d904-4118-a9b4-c1addf4479e6",
+                "name": "Columns",
+                "active_version": 0,
+                "releases": [],
+                "working": {
+                    "kind": "derived",
+                    "base_type": "easy_widgets.TwoColumnsWidget",
+                    "base_version": None,
+                    "defaults": {},
+                    "slot_policies": {"left": {"mode": "allow", "allowed_widget_types": [TYPE]}},
+                },
+            }
+        )
+        published = publish_widget_types(document, document)
+        archived = copy.deepcopy(published)
+        archived["items"][0]["status"] = "archived"
+        validate_widget_types(archived, previous=published)
+
+    def test_derived_theme_base_keeps_url_validation(self):
+        document = working_document()
+        document["items"][0]["working"]["schema"] = {
+            "type": "object",
+            "properties": {"link": {"type": "string", "format": "uri"}},
+        }
+        document = publish_widget_types(document, empty_widget_types())
+        document["items"].append(
+            {
+                "id": "62b20cc6-d904-4118-a9b4-c1addf4479e6",
+                "name": "Linked person card",
+                "active_version": 0,
+                "releases": [],
+                "working": {
+                    "kind": "derived",
+                    "base_type": TYPE,
+                    "base_version": 1,
+                    "defaults": {},
+                    "slot_policies": {},
+                },
+            }
+        )
+        published = publish_widget_types(document, document)
+        derived_type = "theme_widgets.62b20cc6-d904-4118-a9b4-c1addf4479e6"
+        definition = find_definition(SimpleNamespace(widget_types=published), derived_type, 1)
+        self.assertIn("link", definition.errors({"link": "javascript:alert(1)"}))
+        unsafe_defaults = copy.deepcopy(document)
+        unsafe_defaults["items"][1]["working"]["defaults"] = {"link": "javascript:alert(1)"}
+        with self.assertRaisesRegex(ValidationError, "Invalid inherited defaults"):
+            publish_widget_types(unsafe_defaults, document)
+
+    def test_derived_required_slot_cannot_be_omitted(self):
+        definition = SimpleNamespace(
+            release={"kind": "derived"},
+            get_slot_definitions=lambda: {"main": {"required": True}},
+        )
+        widget = {
+            "type": "theme_widgets.62b20cc6-d904-4118-a9b4-c1addf4479e6",
+            "type_version": 1,
+            "config": {},
+        }
+        with patch("webpages.theme_widgets.find_definition", return_value=definition):
+            with self.assertRaisesRegex(ValidationError, "slot 'main' requires content"):
+                validate_derived_slots(SimpleNamespace(widget_types=empty_widget_types()), [widget])
+
     def test_page_write_enforces_layout_policy_for_builtin_only_content(self):
         from webpages.theme_layouts import default_theme_layouts
 

@@ -312,7 +312,7 @@ def _derived_base(document, base_type, base_version):
     )
 
 
-def compile_derived_definition(definition, type_id, version, document):
+def compile_derived_definition(definition, type_id, version, document, *, historical=False):
     from webpages.slot_policies import permits_widget, validate_explicit_policy
 
     if not isinstance(definition, dict) or definition.get("kind") != "derived":
@@ -329,9 +329,10 @@ def compile_derived_definition(definition, type_id, version, document):
         raise ValidationError("Derived defaults must use inherited configuration fields.")
     combined = {**copy.deepcopy(base_defaults), **defaults}
     if is_theme_widget(base_type):
-        errors = list(jsonschema.Draft7Validator(schema).iter_errors(combined))
+        base_item = next(item for item in document["items"] if PREFIX + item["id"] == base_type)
+        errors = ThemeWidget(base_item, base, document).errors(copy.deepcopy(combined))
         if errors:
-            raise ValidationError(f"Invalid inherited defaults: {errors[0].message}")
+            raise ValidationError(f"Invalid inherited defaults: {errors}")
     else:
         valid, errors = base.validate_configuration(combined)
         if not valid:
@@ -345,7 +346,7 @@ def compile_derived_definition(definition, type_id, version, document):
         )
         if policy["mode"] == "allow":
             for selected in policy["allowed_widget_types"]:
-                if not _available_child_type(document, selected):
+                if not _available_child_type(document, selected, include_archived=historical):
                     raise ValidationError(f"Unknown widget type '{selected}' in slot '{slot_name}'.")
                 if not permits_widget(slots[slot_name], selected):
                     raise ValidationError(f"Slot '{slot_name}' cannot allow '{selected}' outside the base policy.")
@@ -359,10 +360,12 @@ def compile_derived_definition(definition, type_id, version, document):
     }
 
 
-def _available_child_type(document, widget_type):
+def _available_child_type(document, widget_type, *, include_archived=False):
     if is_theme_widget(widget_type):
         return any(
-            PREFIX + item["id"] == widget_type and item.get("status", "active") == "active" and item.get("releases")
+            PREFIX + item["id"] == widget_type
+            and (include_archived or item.get("status", "active") == "active")
+            and item.get("releases")
             for item in document["items"]
         )
     from webpages.widget_registry import widget_type_registry
@@ -407,7 +410,7 @@ def validate_widget_types(document, *, previous=None, draft=False):
             if not isinstance(release, dict) or type(release.get("version")) is not int:
                 raise ValidationError("Release version must be an integer.")
             compiled = (
-                compile_derived_definition(release, type_id, number, document)
+                compile_derived_definition(release, type_id, number, document, historical=True)
                 if release.get("kind") == "derived"
                 else compile_definition(release, type_id, number)
             )
@@ -549,11 +552,12 @@ class ThemeWidget:
         if not isinstance(config, dict):
             return {"_general": ["Widget configuration must be an object."]}
         if self.release.get("kind") == "derived":
-            schema, _, _, base = self.base_definition()
+            _, _, _, base = self.base_definition()
             if is_theme_widget(self.release["base_type"]):
-                for error in jsonschema.Draft7Validator(schema).iter_errors(config):
-                    errors.setdefault(str(next(iter(error.path), "_general")), []).append(error.message)
-                return errors
+                base_item = next(
+                    item for item in self.document["items"] if PREFIX + item["id"] == self.release["base_type"]
+                )
+                return ThemeWidget(base_item, base, self.document).errors(config)
             valid, messages = base.validate_configuration(config)
             return {} if valid else {"_general": messages}
         # Reverse generic parser casing only for known frontend-owned schema keys.
@@ -675,10 +679,10 @@ def validate_derived_slots(theme, widgets):
             policies = definition.get_slot_definitions()
             if set(slots) - set(policies):
                 raise ValidationError(f"Widget '{widget_type}' contains an unknown inherited slot.")
-            for slot_name, children in slots.items():
+            for slot_name, policy in policies.items():
+                children = slots.get(slot_name, [])
                 if not isinstance(children, list):
                     raise ValidationError(f"Widget '{widget_type}' slot '{slot_name}' must contain a list.")
-                policy = policies[slot_name]
                 maximum = policy.get("max_widgets")
                 if maximum is not None and len(children) > maximum:
                     raise ValidationError(
