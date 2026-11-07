@@ -56,3 +56,12 @@ When editing on localhost, news preview prefers an explicitly configured `.local
 Real published stories without an image retain the same decorative blue image area instead of dropping the image column. Title links explicitly inherit their heading font so generic theme link rules cannot shrink a real headline relative to the editor placeholder. The three currently selected local published articles contain no image fields; no Article content was changed to fill that gap.
 
 Verified the actual page 249 Content and Preview screens and `http://eceee.localhost:11615/`: Content has white solid-outline cards with blue image areas; Preview and the public site resolve the same three published stories; real headline links compute to 40px and image areas to 245×140px. The published-news endpoint returns HTTP 200 for site 249. Focused tests (including mixed-host preview and missing story image regressions), typecheck, frontend build, manifest/spec checks and the strict 51-case comparison pass.
+
+
+## Follow-up: real content in the slot editor
+
+The slot editor now reads the same host/site-scoped published News Flash feed as preview and public rendering. It shows real Article titles, summaries and images, retaining placeholders for missing stories and suppressing article navigation inside editing. Designer fixtures without a page/site context retain deterministic placeholders. Shared presentation and the feed adapter remain independent of editor state.
+
+For imported Articles, an explicit featured image takes precedence; otherwise the first image in the published article body or Image widget supplies the card photograph. Referenced media IDs resolve through the current tenant's public-media lookup; missing/private media stays unavailable. Article records and content are not rewritten. The local import has seven Articles with embedded photos; the three currently selected Articles have no saved photo and therefore retain their decorative image placeholders.
+
+Verified actual page 249 content in Chrome, a twelve-item public feed containing an imported photograph, and HTTP 200 image delivery. Focused editor/preview/render tests and publisher feed/route tests passed, along with publisher typecheck/lint and frontend build.

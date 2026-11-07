@@ -17,9 +17,9 @@ export const newsFlashFeedUrl = (widget: RenderWidgetModel, context: RenderConte
     return `/api/news-preview?${params}`
 }
 
-export const useNewsFlashFeed = (widget: RenderWidgetModel, context: RenderContext) => {
+export const useNewsFlashFeed = (widget: RenderWidgetModel, context: RenderContext, sourceOverride?: string) => {
     const total = newsFlashLayout(widget.config).total
-    const source = newsFlashFeedUrl(widget, context)
+    const source = sourceOverride ?? newsFlashFeedUrl(widget, context)
     const initial = Array.isArray(widget.data?.items) ? widget.data.items : []
     const [state, setState] = useState({ items: initial, visible: Math.min(total, NEWS_FLASH_BATCH),
         offset: initial.length, priorityId: widget.data?.priorityId as string | null | undefined, busy: false, error: widget.data?.status === 'error',
@@ -66,6 +66,9 @@ export const useNewsFlashFeed = (widget: RenderWidgetModel, context: RenderConte
             if (requestGeneration === generation.current) busy.current = false
         }
     }, [source, state.offset, state.priorityId, state.exhausted, total])
+    useEffect(() => {
+        if (!widget.data && source && !state.offset && !state.busy && !state.error && !state.exhausted) void load()
+    }, [widget.data, source, state.offset, state.busy, state.error, state.exhausted, load])
     const reveal = useCallback(() => {
         setState(previous => ({ ...previous, visible: Math.min(total, previous.visible + NEWS_FLASH_BATCH) }))
     }, [total])
