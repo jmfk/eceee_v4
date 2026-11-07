@@ -25,8 +25,8 @@ from webpages.theme_layouts import (
     default_theme_layouts,
     legacy_compatibility_layout,
     theme_layout_usage,
-    validate_layout_policy_types,
     validate_layout_compatibility,
+    validate_layout_policy_types,
     validate_layout_widgets,
     validate_theme_layouts,
 )
@@ -578,6 +578,20 @@ class ThemeLayoutValidationTests(SimpleTestCase):
         }
         with self.assertRaisesMessage(ValidationError, "references unavailable widget type"):
             validate_layout_policy_types(layouts, {"version": 1, "items": []})
+
+    def test_archived_type_remains_valid_in_existing_layout_policy(self):
+        layouts = default_theme_layouts()
+        main = next(item for item in layouts["items"] if item["key"] == "mainLayout")
+        widget_id = "62b20cc6-d904-4118-a9b4-c1addf4479e6"
+        main["slots"]["main"]["widget_policy"] = {
+            "mode": "allow",
+            "allowed_widget_types": [f"theme_widgets.{widget_id}"],
+        }
+        widget_types = {
+            "version": 1,
+            "items": [{"id": widget_id, "status": "archived", "releases": [{"version": 1}]}],
+        }
+        validate_layout_policy_types(layouts, widget_types)
 
     def test_widget_policies_allow_disallowed_types_on_save_and_enforce_finite_limits(self):
         theme = SimpleNamespace(layouts=default_theme_layouts())

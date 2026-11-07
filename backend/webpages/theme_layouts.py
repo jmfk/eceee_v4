@@ -942,8 +942,8 @@ def validate_layout_widgets(theme, layout_key, widgets, *, previous_widgets=None
 
 def validate_layout_policy_types(layouts, widget_types):
     """Resolve explicit layout selections against the owning theme's published types."""
-    from webpages.theme_widgets import _available_child_type
     from webpages.slot_policies import permits_widget
+    from webpages.theme_widgets import _available_child_type
 
     for layout in layouts.get("items", []):
         for slot_name, slot in layout.get("slots", {}).items():
@@ -951,15 +951,12 @@ def validate_layout_policy_types(layouts, widget_types):
             if policy.get("mode") != "allow":
                 continue
             for widget_type in policy.get("allowed_widget_types", []):
-                if not _available_child_type(widget_types, widget_type):
-                    raise ValidationError(
-                        f"Layout '{layout.get('key')}' slot '{slot_name}' references unavailable widget type '{widget_type}'."
-                    )
+                location = f"Layout '{layout.get('key')}' slot '{slot_name}'"
+                if not _available_child_type(widget_types, widget_type, include_archived=True):
+                    raise ValidationError(f"{location} references unavailable widget type '{widget_type}'.")
                 base = {key: value for key, value in slot.items() if key != "widget_policy"}
                 if not permits_widget(base, widget_type):
-                    raise ValidationError(
-                        f"Layout '{layout.get('key')}' slot '{slot_name}' cannot allow '{widget_type}' outside its existing policy."
-                    )
+                    raise ValidationError(f"{location} cannot allow '{widget_type}' outside its existing policy.")
 
 
 def theme_layout_usage(theme):
