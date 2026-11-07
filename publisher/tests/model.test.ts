@@ -1166,6 +1166,28 @@ describe('public resolution', () => {
     expect(queries.some(query => query.objectTypeNames?.includes('news'))).toBe(false);
   });
 
+  it('does not repeat related enrichment before shared-reference hydration', async () => {
+    const mediaId = '11111111-1111-4111-8111-111111111111';
+    const current: PublishedObject = { id: '1', title: 'Current', slug: 'current', objectType: { id: '8', name: 'article', label: 'Article', pluralLabel: 'Articles' }, data: {}, widgets: {}, metadata: {}, publishDate: '2026-05-01', isFeatured: false, relatedTagIds: ['tag'] };
+    const related: PublishedObject = { ...current, id: '2', slug: 'related', data: { featuredImage: { id: mediaId } } };
+    const publicMedia = vi.fn<PageReader['publicMedia']>().mockResolvedValue({ files: [{ id: mediaId, url: '/image.jpg', type: 'image', altText: '', caption: '', annotation: '', title: '', width: 400, height: 800, thumbnailUrl: '/image.jpg' }], collections: {} });
+    const relatedReader: PageReader = {
+      ...reader, publicMedia,
+      version: async (id, at) => {
+        const selected = await reader.version(id, at);
+        if (id !== root.id || !selected) return selected;
+        return version({ ...selected, widgets: { main: [
+          { id: 'related', type: 'easy_widgets.SidebarTopNewsWidget', config: { relatedToCurrentArticle: true } },
+        ] } });
+      },
+      publishedObjects: async query => query.newsPriorityOnly ? [] : query.relatedTagIds ? [related] : [current],
+    };
+    const model = await buildPublishedPageModel({ withSnapshot: async read => read(relatedReader) }, 'example.org', '/', new Date('2026-06-01'));
+    // One enrichment plus the page builder's existing shared-reference hydration.
+    expect(publicMedia.mock.calls.filter(([ids]) => ids.includes(mediaId))).toHaveLength(2);
+    expect((model?.slots.main[0].data?.items as PublishedObject[])[0].data.featuredImage).toMatchObject({ width: 400, height: 800 });
+  });
+
   it('keeps Featured priority out of latest-news queries', async () => {
     const queries: PublishedObjectQuery[] = [];
     const newsReader: PageReader = {
