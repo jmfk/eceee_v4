@@ -83,3 +83,7 @@ To revise the reference deliberately, use `run --observe-only --output <new-dire
 ## Shared contract candidate
 
 The [framework-independent package](../../../../widget_contracts/README.md) consumes the same case inputs. Run `python3 scripts/pilot_baseline.py run --candidate-contracts --output <new-directory>` to evaluate Node contracts and then verify Django persistence plus desktop/mobile rendering. `contractCandidate` reports this limited comparison separately; `candidateParity` still refers to a complete replacement backend and remains `not_supplied`. No frozen reference is changed by candidate runs.
+
+### News Flash outside-outline correction
+
+The follow-up to deployed source `b36e361792f69fc2758171e9fe04efe3262a93a6` changes only News Flash CSS to match Banner’s outside-outline box treatment and the owner’s updated reference. The catalog digest changes from `184e6ebc5bf9dd941a44f72256ec506d192a3fc7695245863bbf0139e909e9a4` to `daa1582a14e55d29ef9d0bc042bbabfb38fc883671761c682f4785c7e9e004bb`. All 51 behavior cases, type identities and the other 25 widget entries remain unchanged; the strict candidate comparison still passes.

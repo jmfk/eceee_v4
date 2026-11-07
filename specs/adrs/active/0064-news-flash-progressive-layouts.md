@@ -40,3 +40,9 @@ Chrome verified square 140×140px and landscape 245×140px images inside 585×31
 ## Review correction: stable priority decision during progressive loading
 
 The first resolved page now carries its promoted priority ID (or null for none). Subsequent host/site-validated public feed requests must carry that decision with their offset. They exclude the same ID and preserve the promotion offset even if its priority expires or is replaced during scrolling. This prevents a deterministic skipped ordinary story at an expiry boundary. Every batch still queries currently published versions; the decision does not grant access to expired, future or cross-tenant content. Reloading the feed reevaluates priority. The general feed remains live, so other publishing changes between batches can reorder ordinary stories, with client deduplication retained.
+
+## Banner-aligned outside border (2026-11-07)
+
+Use Banner's 1px outside outline and zero border width for each News Flash card, preserving the full content-box dimensions and slot alignment. Keep square corners and no shadow. Cards use 30px inner padding; the headline retains its two-line area with a regular weight and the image/summary row aligns to the bottom inside that padding. The compact-slot padding rule remains. Placeholder cards use a dashed outside outline. Page/slot outer padding stays owned by the surrounding layout.
+
+Verified in Chrome against the real Banner renderer: both boxes have a 1px rgba(0,0,0,0.3) outline, zero border width and identical left alignment. News Flash remains 585×310px with a 245×140px image inset 30px from the right and bottom, and a 40px regular headline. The 280px narrow view and editor placeholders remain contained. Focused widget/registry tests, the unchanged 51-case contract comparison, manifest/spec validation and frontend build passed.
