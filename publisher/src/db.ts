@@ -169,6 +169,9 @@ function reader(client: PoolClient): PageReader {
       const typeNames = (query.objectTypeNames ?? []).filter(value => /^[a-z0-9_-]+$/i.test(value));
       const classificationIds = query.classificationIds ?? [];
       if (classificationIds.some(value => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value))) return [];
+      const relatedTagIds = query.relatedTagIds ?? [];
+      if (relatedTagIds.some(value => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value))) return [];
+      if (query.articleKind && !['all', 'news', 'column'].includes(query.articleKind)) return [];
       const status = query.status === 'draft' || query.status === 'archived' ? query.status : null;
       if (!objectIds.length && !typeIds.length && !typeNames.length && !query.allActiveTypes) return [];
       const sortOrders: Record<string, string> = {
@@ -209,6 +212,10 @@ function reader(client: PoolClient): PageReader {
         SELECT object.id::text, COALESCE(NULLIF(published.title, ''), object.title) AS title, object.slug,
           jsonb_build_object('id', type.id::text, 'name', type.name, 'label', type.label, 'pluralLabel', type.plural_label) AS "objectType",
           published.data, published.widgets, object.metadata,
+          ARRAY(SELECT tag.id::text FROM taxonomy_objectversiontag assignment
+            JOIN taxonomy_tag tag ON tag.id=assignment.tag_id AND tag.tenant_id=$1
+            WHERE assignment.object_version_id=published.id AND tag.status='approved'
+              AND tag.tag_type IN ('news_topic','news_category','news_keyword')) AS "relatedTagIds",
           published.effective_date::text AS "publishDate", published.is_featured AS "isFeatured",
           object.created_at::text AS "createdAt", object.updated_at::text AS "updatedAt", object.level,
           CASE WHEN $8::boolean THEN (
@@ -313,6 +320,19 @@ function reader(client: PoolClient): PageReader {
             type.is_active = true
             AND (type.namespace_id IS NULL OR type_namespace.tenant_id = $1)
           ))
+          AND (cardinality($18::uuid[])=0 OR EXISTS (
+            SELECT 1 FROM taxonomy_objectversiontag related
+            JOIN taxonomy_tag tag ON tag.id=related.tag_id AND tag.tenant_id=$1 AND tag.status='approved'
+            WHERE related.object_version_id=published.id AND tag.id=ANY($18::uuid[])
+              AND tag.tag_type IN ('news_topic','news_category','news_keyword')
+          ))
+          AND ($19::text IS NULL OR EXISTS (
+            SELECT 1 FROM taxonomy_objectversiontag kind_assignment
+            JOIN taxonomy_tag kind ON kind.id=kind_assignment.tag_id AND kind.tenant_id=$1
+            WHERE kind_assignment.object_version_id=published.id AND kind.status='approved'
+              AND kind.tag_type='article_kind'
+              AND (kind.slug=$19 OR ($19='news' AND kind.slug='press-release'))
+          ))
           AND (cardinality($12::uuid[])=0 OR EXISTS (
             SELECT 1 FROM taxonomy_objectversiontag a WHERE a.object_version_id=published.id
               AND a.tag_id IN (SELECT id FROM matching)
@@ -336,6 +356,8 @@ function reader(client: PoolClient): PageReader {
           Boolean(query.newsPriorityOnly),
           Math.max(0, Math.trunc(query.offset ?? 0)),
           query.excludeObjectIds ?? [],
+          relatedTagIds,
+          query.articleKind && query.articleKind !== 'all' ? query.articleKind : null,
         ]);
       return result.rows;
     },

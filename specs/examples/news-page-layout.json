@@ -1,0 +1,518 @@
+{
+  "id": "7957226d-07f1-4291-91b4-178368710e81",
+  "key": "newsPage",
+  "root": {
+    "id": "69efbf47-a83b-4b3a-989c-e5ab01439f30",
+    "type": "container",
+    "label": "Viewport background",
+    "styles": {
+      "base": {
+        "display": "flex",
+        "min_height": "100vh",
+        "flex_direction": "column",
+        "background_color": "#9ca3af"
+      }
+    },
+    "children": [
+      {
+        "id": "2a705644-3a5b-4589-bd33-7892a348156d",
+        "type": "container",
+        "label": "Page surface",
+        "styles": {
+          "base": {
+            "width": "100%",
+            "margin": "0 auto",
+            "display": "flex",
+            "flex_grow": "1",
+            "max_width": "1280px",
+            "flex_direction": "column",
+            "background_color": "#ffffff"
+          }
+        },
+        "children": [
+          {
+            "id": "3b1a6d48-cdf5-469c-aa39-5bc932cdf411",
+            "type": "container",
+            "label": "Header wrapper",
+            "styles": {
+              "base": {
+                "display": "flex",
+                "flex_direction": "column"
+              }
+            },
+            "children": [
+              {
+                "id": "3b69b1af-6d22-4fa3-928c-b56b4d116877",
+                "type": "slot",
+                "label": "Header",
+                "styles": {
+                  "base": {}
+                },
+                "children": [],
+                "slot_key": "header",
+                "class_names": [
+                  "layout-slot",
+                  "slot-header"
+                ]
+              },
+              {
+                "id": "4e2cc87e-bf6b-47a9-a085-36b89c8f76d0",
+                "type": "slot",
+                "label": "Navbar",
+                "styles": {
+                  "base": {}
+                },
+                "children": [],
+                "slot_key": "navbar",
+                "class_names": [
+                  "layout-slot",
+                  "slot-navbar"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "280cc296-7b5c-46a9-8269-8b5c54dc29af",
+            "tag": "main",
+            "type": "semantic",
+            "label": "Main content",
+            "styles": {
+              "base": {
+                "display": "flex",
+                "flex_grow": "1",
+                "min_width": "0",
+                "flex_direction": "column"
+              }
+            },
+            "children": [
+              {
+                "id": "bb7d6eaa-87ea-4e00-acf1-9dd15c3ccb36",
+                "type": "slot",
+                "label": "Hero",
+                "styles": {
+                  "base": {
+                    "padding": "24px 16px 0"
+                  },
+                  "lg": {
+                    "padding": "30px 40px 0"
+                  }
+                },
+                "children": [],
+                "slot_key": "hero",
+                "class_names": [
+                  "layout-slot",
+                  "slot-hero"
+                ]
+              },
+              {
+                "id": "5ce46bb3-68fa-4351-acd2-ff047346863c",
+                "type": "grid",
+                "label": "Content grid",
+                "styles": {
+                  "lg": {
+                    "grid_template_columns": "repeat(3, minmax(0, 1fr))",
+                    "padding": "30px 40px"
+                  },
+                  "base": {
+                    "gap": "30px",
+                    "display": "grid",
+                    "padding": "30px 16px",
+                    "flex_grow": "1",
+                    "min_height": "300px",
+                    "grid_template_columns": "1fr"
+                  }
+                },
+                "children": [
+                  {
+                    "id": "6bcde234-ed13-40aa-8d20-0c41ab0f1b87",
+                    "type": "container",
+                    "label": "Content column",
+                    "styles": {
+                      "lg": {
+                        "grid_column": "span 2"
+                      },
+                      "xl": {
+                        "margin": "0",
+                        "max_width": "790px"
+                      },
+                      "base": {
+                        "width": "100%",
+                        "margin": "0",
+                        "padding": "0",
+                        "max_width": "none",
+                        "min_width": "0"
+                      }
+                    },
+                    "children": [
+                      {
+                        "id": "a6d4ab3a-5898-4e67-aa85-e3a2db7e6b9e",
+                        "type": "slot",
+                        "label": "Main",
+                        "styles": {
+                          "base": {}
+                        },
+                        "children": [],
+                        "slot_key": "main",
+                        "class_names": [
+                          "layout-slot",
+                          "slot-main"
+                        ]
+                      }
+                    ],
+                    "class_names": [
+                      "main-layout-main"
+                    ]
+                  },
+                  {
+                    "id": "514a7966-ab5a-4218-94b0-803ef68267d9",
+                    "tag": "aside",
+                    "type": "semantic",
+                    "label": "Sidebar",
+                    "styles": {
+                      "lg": {
+                        "grid_column": "span 1",
+                        "grid_template_columns": "1fr"
+                      },
+                      "md": {
+                        "grid_template_columns": "repeat(2, minmax(0, 1fr))"
+                      },
+                      "base": {
+                        "gap": "30px",
+                        "display": "grid",
+                        "min_height": "0",
+                        "grid_template_columns": "1fr",
+                        "align_items": "start"
+                      }
+                    },
+                    "children": [
+                      {
+                        "id": "a50ce64f-b425-4ca6-9d54-f2f5abdf3680",
+                        "type": "slot",
+                        "label": "Sidebar",
+                        "styles": {
+                          "base": {}
+                        },
+                        "children": [],
+                        "slot_key": "sidebar",
+                        "class_names": [
+                          "layout-slot",
+                          "slot-sidebar"
+                        ]
+                      }
+                    ],
+                    "class_names": [
+                      "main-layout-aside"
+                    ]
+                  }
+                ],
+                "class_names": [
+                  "main-layout-grid"
+                ]
+              },
+              {
+                "id": "962a394f-cc59-4a96-b3e7-b81abc3b27a0",
+                "type": "container",
+                "label": "More news",
+                "styles": {
+                  "base": {
+                    "padding": "0 16px 30px"
+                  },
+                  "lg": {
+                    "padding": "0 40px 30px"
+                  }
+                },
+                "children": [
+                  {
+                    "id": "7efae1fd-0d00-49a0-bd0b-29866aeb3b4f",
+                    "type": "slot",
+                    "label": "More News",
+                    "slot_key": "moreNews",
+                    "styles": {
+                      "base": {}
+                    },
+                    "children": [],
+                    "class_names": [
+                      "layout-slot",
+                      "slot-more-news"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "944908b2-c275-4ce0-bdbc-98c7c58e4493",
+            "type": "container",
+            "label": "Footer wrapper",
+            "styles": {
+              "base": {
+                "margin": "auto 0 0",
+                "display": "flex",
+                "min_height": "310px",
+                "flex_direction": "column"
+              }
+            },
+            "children": [
+              {
+                "id": "637934f0-2e22-4d1c-a8af-047a9ac3e09f",
+                "type": "slot",
+                "label": "Footer",
+                "styles": {
+                  "base": {
+                    "display": "flex",
+                    "flex_grow": "1",
+                    "min_height": "310px",
+                    "flex_direction": "column",
+                    "justify_content": "flex-end"
+                  }
+                },
+                "children": [],
+                "slot_key": "footer",
+                "class_names": [
+                  "layout-slot",
+                  "slot-footer"
+                ]
+              }
+            ],
+            "class_names": [
+              "main-layout-footer"
+            ]
+          }
+        ],
+        "class_names": [
+          "main-layout-wrapper"
+        ]
+      }
+    ],
+    "class_names": [
+      "main-layout-container"
+    ]
+  },
+  "label": "News Page",
+  "slots": {
+    "hero": {
+      "label": "Hero",
+      "order": 30,
+      "dimensions": {
+        "mobile": {
+          "width": 640,
+          "height": 28
+        },
+        "tablet": {
+          "width": 1024,
+          "height": 28
+        },
+        "desktop": {
+          "width": 1280,
+          "height": 28
+        }
+      },
+      "allow_merge": false,
+      "description": "The Hero space",
+      "max_widgets": 1,
+      "default_widgets": [
+        {
+          "type": "hero",
+          "config": {}
+        }
+      ],
+      "collapse_behavior": "any",
+      "inheritable_types": [
+        "easy_widgets.HeroWidget"
+      ],
+      "allows_inheritance": true,
+      "allowed_widget_types": [
+        "easy_widgets.HeroWidget"
+      ]
+    },
+    "main": {
+      "label": "Main Content",
+      "order": 50,
+      "dimensions": {
+        "mobile": {
+          "width": 640,
+          "height": null
+        },
+        "tablet": {
+          "width": 1024,
+          "height": null
+        },
+        "desktop": {
+          "width": 1280,
+          "height": null
+        }
+      },
+      "allow_merge": false,
+      "description": "Primary page content area",
+      "max_widgets": null,
+      "default_widgets": [],
+      "collapse_behavior": "never",
+      "allows_inheritance": false,
+      "disallowed_widget_types": [
+        "easy_widgets.FooterWidget",
+        "easy_widgets.NavbarWidget",
+        "easy_widgets.HeaderWidget"
+      ]
+    },
+    "footer": {
+      "label": "Footer",
+      "order": 1000,
+      "dimensions": {
+        "mobile": {
+          "width": 640,
+          "height": null
+        },
+        "tablet": {
+          "width": 1024,
+          "height": null
+        },
+        "desktop": {
+          "width": 1280,
+          "height": null
+        }
+      },
+      "allow_merge": false,
+      "description": "Page footer content",
+      "max_widgets": 1,
+      "default_widgets": [
+        {
+          "type": "footer"
+        }
+      ],
+      "collapse_behavior": "any",
+      "inheritable_types": [
+        "easy_widgets.FooterWidget"
+      ],
+      "allows_inheritance": true,
+      "allowed_widget_types": [
+        "easy_widgets.FooterWidget"
+      ]
+    },
+    "header": {
+      "label": "Header",
+      "order": 10,
+      "dimensions": {
+        "mobile": {
+          "width": 640,
+          "height": 112
+        },
+        "tablet": {
+          "width": 1024,
+          "height": 112
+        },
+        "desktop": {
+          "width": 1280,
+          "height": 112
+        }
+      },
+      "allow_merge": false,
+      "description": "Page header content",
+      "max_widgets": 1,
+      "default_widgets": [
+        {
+          "type": "header"
+        }
+      ],
+      "collapse_behavior": "any",
+      "inheritable_types": [
+        "easy_widgets.HeaderWidget"
+      ],
+      "allows_inheritance": true,
+      "allowed_widget_types": [
+        "easy_widgets.HeaderWidget"
+      ]
+    },
+    "navbar": {
+      "label": "Navigation Bar",
+      "order": 20,
+      "dimensions": {
+        "mobile": {
+          "width": 640,
+          "height": 28
+        },
+        "tablet": {
+          "width": 1024,
+          "height": 28
+        },
+        "desktop": {
+          "width": 1280,
+          "height": 28
+        }
+      },
+      "allow_merge": false,
+      "description": "Main navigation menu",
+      "max_widgets": 1,
+      "default_widgets": [
+        {
+          "type": "navbar"
+        }
+      ],
+      "collapse_behavior": "any",
+      "inheritable_types": [
+        "easy_widgets.NavbarWidget"
+      ],
+      "allows_inheritance": true,
+      "allowed_widget_types": [
+        "easy_widgets.NavbarWidget"
+      ]
+    },
+    "sidebar": {
+      "label": "Sidebar",
+      "order": 60,
+      "dimensions": {
+        "mobile": {
+          "width": 640,
+          "height": null
+        },
+        "tablet": {
+          "width": 1024,
+          "height": null
+        },
+        "desktop": {
+          "width": 1280,
+          "height": null
+        }
+      },
+      "allow_merge": true,
+      "description": "Complementary content and widgets",
+      "max_widgets": null,
+      "default_widgets": [],
+      "collapse_behavior": "all",
+      "inheritable_types": [],
+      "allows_inheritance": false,
+      "disallowed_widget_types": [
+        "easy_widgets.FooterWidget",
+        "easy_widgets.NavbarWidget",
+        "easy_widgets.HeaderWidget"
+      ]
+    },
+    "moreNews": {
+      "label": "More News",
+      "order": 70,
+      "allow_merge": false,
+      "default_widgets": [],
+      "collapse_behavior": "any",
+      "allows_inheritance": false,
+      "allowed_widget_types": [
+        "easy_widgets.NewsFlashWidget"
+      ],
+      "max_widgets": 1,
+      "dimensions": {
+        "mobile": {
+          "width": 640,
+          "height": null
+        },
+        "tablet": {
+          "width": 1024,
+          "height": null
+        },
+        "desktop": {
+          "width": 1280,
+          "height": null
+        }
+      }
+    }
+  },
+  "status": "active",
+  "description": "Selected article, related stories and a full-width news grid."
+}

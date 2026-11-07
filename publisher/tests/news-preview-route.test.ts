@@ -55,6 +55,18 @@ describe('public news preview route', () => {
       expect.objectContaining({ newsPriorityOnly: true, limit: 1 }), 'tenant-a', expect.any(Date));
   });
 
+  it('returns tag-related columns without exposing article widgets or tag internals', async () => {
+    mocks.publishedObjects.mockResolvedValueOnce([{ id: '1', relatedTagIds: ['tag'] }])
+      .mockResolvedValueOnce([{ id: '2', title: 'Related column', data: {}, relatedTagIds: ['tag'], widgets: { private: true } }]);
+    const response = await GET(request('siteId=85&type=article&limit=5&related=true&slug=story&articleKind=column'));
+    expect(response.status).toBe(200);
+    expect(mocks.publishedObjects).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      relatedTagIds: ['tag'], excludeObjectIds: ['1'], articleKind: 'column', limit: 5,
+    }), 'tenant-a', expect.any(Date));
+    const result = await response.json();
+    expect(result.items[0]).toEqual({ id: '2', title: 'Related column', data: {} });
+  });
+
   it('requires and preserves the initial priority decision on continuation requests', async () => {
     expect((await GET(request('siteId=85&type=article&newsFlash=true&limit=12&offset=12'))).status).toBe(400);
     expect((await GET(request('siteId=85&type=article&newsFlash=true&limit=12&offset=12&priorityId=bad'))).status).toBe(400);

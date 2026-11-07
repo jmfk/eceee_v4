@@ -1,5 +1,6 @@
 import { database } from '@/src/db';
 import { newsFlashPage } from '../../../src/news-flash';
+import { newsArticleKind, relatedNewsItems, selectedNewsArticle } from '../../../src/related-news';
 import { contentHostname } from '../../../src/hostname';
 
 export const runtime = 'nodejs';
@@ -22,11 +23,17 @@ export async function GET(request: Request) {
   const offset = Number(params.get('offset') || 0);
   const flash = params.get('newsFlash') === 'true';
   const priorityId = params.get('priorityId');
+  const related = params.get('related') === 'true';
+  const latestArticle = params.get('latestArticle') === 'true';
+  const slug = params.get('slug') || undefined;
+  const kind = params.get('articleKind') || 'all';
   if (!validId(siteId) || !types.length || types.length > 20 || types.some(type => !validType(type))
       || classifications.length > 20 || classifications.some(id => !validClassification(id))
       || !Number.isSafeInteger(offset) || offset < 0
       || (flash && offset > 0 && (priorityId === null || (priorityId !== 'none' && !validId(priorityId))))
-      || !Number.isInteger(limit) || limit < 1 || limit > 50) {
+      || !Number.isInteger(limit) || limit < 1 || limit > 50
+      || !['all', 'news', 'column'].includes(kind)
+      || (slug !== undefined && !/^[\p{L}\p{N}_.-]{1,200}$/u.test(slug))) {
     return Response.json({ error: 'Invalid news query.' }, { status: 400, headers: responseHeaders });
   }
 
@@ -44,9 +51,16 @@ export async function GET(request: Request) {
         includeDescendants: params.get('includeDescendants') !== 'false',
         featuredOnly: params.get('featuredOnly') === 'true',
         activeTypeOnly: true,
+        ...(kind !== 'all' ? { articleKind: newsArticleKind(kind) } : {}),
         limit,
         sortOrder: '-publish_date',
       };
+      const articleTypes = { objectTypeIds: query.objectTypeIds, objectTypeNames: query.objectTypeNames };
+      if (related) return { items: await relatedNewsItems(reader, articleTypes, root.tenant_id, at, slug, newsArticleKind(kind), limit) };
+      if (latestArticle) {
+        const item = await selectedNewsArticle(reader, articleTypes, root.tenant_id, at, slug);
+        return { items: item ? [item] : [] };
+      }
       return flash
         ? newsFlashPage(reader, query, root.tenant_id, at, { limit, offset, priorityId: priorityId === 'none' ? null : priorityId })
         : { items: await reader.publishedObjects(query, root.tenant_id, at) };

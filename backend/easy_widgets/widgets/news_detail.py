@@ -40,6 +40,17 @@ class NewsDetailConfig(BaseModel):
         },
     )
 
+    fallback_to_latest: bool = Field(
+        default=False,
+        description="Show the priority/latest article when the URL has no article slug",
+        json_schema_extra={"component": "BooleanInput", "variant": "toggle", "group": "Content"},
+    )
+    boxed: bool = Field(
+        default=False,
+        description="Use the boxed news-page article presentation",
+        json_schema_extra={"component": "BooleanInput", "variant": "toggle"},
+    )
+
     show_metadata: bool = Field(
         default=True,
         description="Show publish date, author, and other metadata",

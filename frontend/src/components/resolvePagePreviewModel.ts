@@ -137,7 +137,16 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
         params.set('includeDescendants', String((widget.config.includeDescendants ?? widget.config.include_descendants) !== false))
         params.set('newsFlash', String(widget.type === 'easy_widgets.NewsFlashWidget'))
         params.set('featuredOnly', String(widget.type === 'easy_widgets.TopNewsPlugWidget'))
-        params.set('limit', String(widget.type === 'easy_widgets.NewsFlashWidget' ? Math.min(NEWS_FLASH_BATCH, newsFlashLayout(widget.config).total) || 1 : widget.type === 'easy_widgets.TopNewsPlugWidget'
+        if (widget.type === 'easy_widgets.SidebarTopNewsWidget') {
+            params.set('articleKind', String(widget.config.articleKind ?? widget.config.article_kind ?? 'all'))
+            if ((widget.config.relatedToCurrentArticle ?? widget.config.related_to_current_article) === true) {
+                params.set('related', 'true')
+                const selectedSlug = next.context.pathVariables?.news_slug || next.context.pathVariables?.newsSlug
+                if (selectedSlug) params.set('slug', selectedSlug)
+            }
+        }
+        if (widget.type === 'easy_widgets.NewsDetailWidget') params.set('latestArticle', 'true')
+        params.set('limit', String(widget.type === 'easy_widgets.NewsDetailWidget' ? 1 : widget.type === 'easy_widgets.NewsFlashWidget' ? Math.min(NEWS_FLASH_BATCH, newsFlashLayout(widget.config).total) || 1 : widget.type === 'easy_widgets.TopNewsPlugWidget'
             ? (widget.config.layout === '1x3' ? 3 : 2)
             : Math.min(Math.max(Number(widget.config.limit) || 5, 1), 50)))
         const url = `${newsPreviewOrigin(next.context.siteHostnames || [])}/api/news-preview?${params}`
@@ -267,15 +276,16 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
             const variableName = widget.config.slugVariableName || widget.config.slug_variable_name || 'news_slug'
             const camelVariableName = variableName.replace(/_([a-z])/g, (_match: string, letter: string) => letter.toUpperCase())
             const slug = next.context.pathVariables?.[variableName] || next.context.pathVariables?.[camelVariableName]
-            if (!slug) {
+            const fallback = (widget.config.fallbackToLatest ?? widget.config.fallback_to_latest) === true
+            if (!slug && !fallback) {
                 widget.data = { status: 'empty' }
                 return
             }
             try {
-                const searchResponse: any = await objectInstancesApi.search(slug, {}, tenantRequestConfig)
-                const candidates = searchResponse?.results || searchResponse?.data?.results || searchResponse?.data || []
+                const searchResponse: any = slug ? await objectInstancesApi.search(slug, {}, tenantRequestConfig) : await previewNews(widget)
+                const candidates = searchResponse?.items || searchResponse?.results || searchResponse?.data?.results || searchResponse?.data || []
                 const configuredTypeIds = Array.isArray(objectTypes) ? objectTypes.map(String) : []
-                const exactMatches = (Array.isArray(candidates) ? candidates : []).filter((candidate: any) => candidate.slug === slug)
+                const exactMatches = (Array.isArray(candidates) ? candidates : []).filter((candidate: any) => !slug || candidate.slug === slug)
                 const match = exactMatches.find((candidate: any) => {
                     const candidateTypeId = candidate.objectType?.id || candidate.object_type?.id
                     return !configuredTypeIds.length || configuredTypeIds.includes(String(candidateTypeId))

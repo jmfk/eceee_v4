@@ -20,6 +20,29 @@ describe('page preview model resolution', () => {
     })
     afterEach(() => vi.unstubAllGlobals())
 
+    it('resolves related lists by slug and falls back to the public selected Article on the index', async () => {
+        const fetchNews = vi.fn(async () => ({ ok: true, json: async () => ({ items: [{ id: '1', objectType: { id: '8' } }] }) }))
+        vi.stubGlobal('fetch', fetchNews)
+        objectApi.get.mockResolvedValue({ id: '1', title: 'Selected', objectType: { id: '8' }, widgets: {} })
+        const model = createPageRenderModel({ widgets: { main: [
+            { id: 'detail', type: 'easy_widgets.NewsDetailWidget', config: { fallbackToLatest: true, objectTypes: [8] } },
+            { id: 'related', type: 'easy_widgets.SidebarTopNewsWidget', config: { relatedToCurrentArticle: true, articleKind: 'column', objectTypes: [8] } },
+        ] }, context: { siteId: 249, siteHostnames: ['eceee.localhost'] } })
+        const resolved = await resolvePagePreviewModel(model)
+        expect(resolved.slots.main[0].data?.status).toBe('ready')
+        expect(fetchNews.mock.calls.some(([url]) => new URL(url).searchParams.get('latestArticle') === 'true')).toBe(true)
+        expect(fetchNews.mock.calls.some(([url]) => new URL(url).searchParams.get('articleKind') === 'column' && new URL(url).searchParams.get('related') === 'true')).toBe(true)
+    })
+
+    it('passes the editor camel-case news slug to the shared related endpoint', async () => {
+        const fetchNews = vi.fn(async () => ({ ok: true, json: async () => ({ items: [] }) }))
+        vi.stubGlobal('fetch', fetchNews)
+        await resolvePagePreviewModel(createPageRenderModel({ widgets: { main: [
+            { id: 'related', type: 'easy_widgets.SidebarTopNewsWidget', config: { relatedToCurrentArticle: true, objectTypes: [8] } },
+        ] }, context: { siteId: 249, siteHostnames: ['eceee.localhost'], pathVariables: { newsSlug: 'selected-story' } } }))
+        expect(new URL(fetchNews.mock.calls[0][0]).searchParams.get('slug')).toBe('selected-story')
+    })
+
     it('bounds the first News Flash batch for a large configured layout', async () => {
         const fetchNews = vi.fn(async () => ({ ok: true, json: async () => ({ items: [] }) }))
         vi.stubGlobal('fetch', fetchNews)

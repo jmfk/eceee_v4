@@ -1,4 +1,5 @@
 import { newsFlashPage } from './news-flash';
+import { newsArticleKind, relatedNewsItems, selectedNewsArticle } from './related-news';
 import { newsFlashLayout, NEWS_FLASH_BATCH } from '../../frontend/src/rendering/newsFlashLayout';
 import { compilePublisherStyles, defaultSpecialPages, widgetVariantClasses } from './theme';
 import { responsiveImageSources, type ResponsiveImageOptions } from './imgproxy';
@@ -85,6 +86,7 @@ export interface PublishedObject {
   widgets: Record<string, unknown>;
   themeWidgetTypes?: import("../../frontend/src/rendering/themeWidgets").ThemeWidgetDocument;
   metadata: Record<string, unknown>;
+  relatedTagIds?: string[];
   publishDate: string;
   isFeatured: boolean;
   createdAt?: string;
@@ -105,6 +107,8 @@ export interface PublishedObjectLink {
 }
 
 export interface PublishedObjectQuery {
+  relatedTagIds?: string[];
+  articleKind?: 'all' | 'news' | 'column';
   classificationIds?: string[];
   includeDescendants?: boolean;
   objectIds?: DbId[];
@@ -807,10 +811,16 @@ async function resolvePublishedData(
       }
     } else if (widget.type === 'easy_widgets.TopNewsPlugWidget' || widget.type === 'easy_widgets.SidebarTopNewsWidget') {
       const configuredTypes = config.objectTypes !== undefined ? config.objectTypes : config.object_types;
-      const selectedTypes = stringList(configuredTypes === undefined ? ['news'] : configuredTypes);
-      items = await reader.publishedObjects({
+      const related = widget.type === 'easy_widgets.SidebarTopNewsWidget' && (config.relatedToCurrentArticle ?? config.related_to_current_article) === true;
+      const selectedTypes = stringList(configuredTypes === undefined ? [related ? 'article' : 'news'] : configuredTypes);
+      const selectedTypesQuery = {
         objectTypeIds: selectedTypes.filter(type => /^\d+$/.test(type)),
         objectTypeNames: selectedTypes.filter(type => !/^\d+$/.test(type)),
+      };
+      items = related ? await relatedNewsItems(reader, selectedTypesQuery, tenantId, at, pathVariables.news_slug,
+        newsArticleKind(config.articleKind ?? config.article_kind), positiveLimit(config.limit, 5)) : await reader.publishedObjects({
+        ...selectedTypesQuery,
+        ...((config.articleKind ?? config.article_kind) ? { articleKind: newsArticleKind(config.articleKind ?? config.article_kind) } : {}),
         limit: widget.type === 'easy_widgets.TopNewsPlugWidget'
           ? topNewsLimit(config.layout)
           : positiveLimit(config.limit ?? config.maxItems ?? config.max_items, 5),
@@ -831,6 +841,10 @@ async function resolvePublishedData(
           sortOrder: '-publish_date',
           activeTypeOnly: true,
         }, tenantId, at);
+      } else if ((config.fallbackToLatest ?? config.fallback_to_latest) === true) {
+        const types = stringList(config.objectTypes ?? config.object_types);
+        item = await selectedNewsArticle(reader, { objectTypeIds: types.filter(type => /^\d+$/.test(type)),
+          objectTypeNames: types.filter(type => !/^\d+$/.test(type)) }, tenantId, at);
       }
     } else if (widget.type === 'object_storage.ObjectDetailWidget') {
       const configuredSlug = config.objectSlug ?? config.object_slug;

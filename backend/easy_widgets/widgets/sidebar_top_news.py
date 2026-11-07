@@ -2,7 +2,7 @@
 Sidebar Top News Widget - Compact vertical list for sidebar placement
 """
 
-from typing import List, Type
+from typing import List, Literal, Type, Union
 
 from django.db.models import BooleanField, Case, Q, Value, When
 from django.utils import timezone
@@ -21,11 +21,12 @@ class SidebarTopNewsConfig(BaseModel):
         populate_by_name=True,
     )
 
-    object_types: List[str] = Field(
+    object_types: List[Union[str, int]] = Field(
         default=["news"],
         description="Select ObjectType(s) to display",
         json_schema_extra={
-            "component": "MultiSelectInput",
+            "component": "ObjectTypeSelectorInput",
+            "multiple": True,
             "placeholder": "Select object types...",
             "group": "Content",
         },
@@ -39,6 +40,25 @@ class SidebarTopNewsConfig(BaseModel):
         json_schema_extra={
             "component": "NumberInput",
             "group": "Content",
+        },
+    )
+
+    related_to_current_article: bool = Field(
+        default=False,
+        description="Show articles sharing topic, category or keyword tags with the selected article",
+        json_schema_extra={"component": "BooleanInput", "variant": "toggle", "group": "Content"},
+    )
+    article_kind: Literal["all", "news", "column"] = Field(
+        default="all",
+        description="Article kind",
+        json_schema_extra={
+            "component": "SelectInput",
+            "group": "Content",
+            "options": [
+                {"value": "all", "label": "News and columns"},
+                {"value": "news", "label": "News"},
+                {"value": "column", "label": "Columns"},
+            ],
         },
     )
 

@@ -8,6 +8,7 @@ import { imageWidgetMediaItems, isImageCollectionReference } from '../utils/imag
 import { getBannerPresentationStyle } from '../utils/bannerConfig'
 import { normalizeWidget } from './adapters'
 import { emptyThemeWidgets } from './themeWidgets'
+import { themeColorValue } from './themeColorValue'
 
 const ContentRender: WidgetRenderComponent = ({ widget }) => <div>
     <SafeHtml className={`content-widget${value(widget.config, 'variantClasses') ? ` ${value(widget.config, 'variantClasses')}` : ''}${value(widget.config, 'showBorder', 'show_border') ? ' border-enabled' : ''}`} html={normalizeContentMediaHtml(value(widget.config, 'content', 'html'))} />
@@ -96,10 +97,10 @@ const FooterRender: WidgetRenderComponent = ({ widget, renderWidgets }) => (
 const HeroRender: WidgetRenderComponent = ({ widget }) => {
     const background = value(widget.config, 'backgroundImageUrl', 'background_image_url') || imageUrl(value(widget.config, 'image', 'backgroundImage', 'background_image'))
     const background2x = value(widget.config, 'backgroundImageUrl2x', 'background_image_url_2x')
-    return <div className="hero-widget cms-content" style={{
-        '--hero-text-color': value(widget.config, 'textColor', 'text_color') || '#ffffff',
-        '--hero-decor-color': value(widget.config, 'decorColor', 'decor_color') || '#cccccc',
-        '--hero-bg-color': value(widget.config, 'backgroundColor', 'background_color') || '#000000',
+    return <div className={`hero-widget cms-content${configEnabled(widget.config, false, 'plainHeader', 'plain_header') ? ' hero-plain-header' : ''}`} style={{
+        '--hero-text-color': themeColorValue(value(widget.config, 'textColor', 'text_color') || '#ffffff'),
+        '--hero-decor-color': themeColorValue(value(widget.config, 'decorColor', 'decor_color') || '#cccccc'),
+        '--hero-bg-color': themeColorValue(value(widget.config, 'backgroundColor', 'background_color') || '#000000'),
         backgroundImage: background2x ? `image-set(url('${background}') 1x, url('${background2x}') 2x)` : background ? `url('${background}')` : undefined,
     } as React.CSSProperties}>
         <div className="hero-content">
@@ -707,7 +708,8 @@ const NewsDetailRender: WidgetRenderComponent = ({ widget, context, renderWidget
         Object.fromEntries(Object.entries(slots).map(([slot, widgets]) => [slot, asArray<any>(widgets).map((nested, index) => normalizeWidget(nested, `${slot}-${index}`))])), hasStructuredWidgets)
     const summary = presentation.summary
     const externalUrl = data.externalUrl || data.external_url || ''
-    return <article className="news-detail-widget" data-widget-type="news-detail" data-object-id={item.id}>
+    const boxed = configEnabled(widget.config, false, 'boxed')
+    return <article className={`news-detail-widget${boxed ? ' news-detail-boxed' : ''}`} data-widget-type="news-detail" data-object-id={item.id}>
         <header className="news-header">
             {configEnabled(widget.config, true, 'showObjectType', 'show_object_type') && <div className="news-type-badge">{fields.objectType.label || fields.objectType.name}</div>}
             {presentation.showHeadline && <h1 className="news-title">{item.title}</h1>}
@@ -800,13 +802,14 @@ const TopNewsPlugRender: WidgetRenderComponent = ({ widget }) => {
     })}</div></section>
 }
 const SidebarTopNewsRender: WidgetRenderComponent = ({ widget }) => {
-    const state = newsState(widget)
+    const related = configEnabled(widget.config, false, 'relatedToCurrentArticle', 'related_to_current_article')
+    const state = related && widget.data?.status === 'empty' ? <p className="related-news-empty">No related articles available.</p> : newsState(widget)
     const header = value(widget.config, 'displayVariant', 'display_variant') === 'header'
     const showThumbnails = configEnabled(widget.config, true, 'showThumbnails', 'show_thumbnails')
     const showDates = configEnabled(widget.config, true, 'showDates', 'show_dates')
     const showType = configEnabled(widget.config, false, 'showObjectType', 'show_object_type')
     const showExcerpt = configEnabled(widget.config, false, 'showExcerpts', 'show_excerpts')
-    return <aside className={`sidebar-top-news-widget variant-${header ? 'header' : 'content'}`} data-widget-type="sidebar-top-news">
+    return <aside className={`sidebar-top-news-widget variant-${related ? 'related' : header ? 'header' : 'content'}`} data-widget-type="sidebar-top-news">
         {value(widget.config, 'widgetTitle', 'widget_title') && <h3 className="widget-title">{value(widget.config, 'widgetTitle', 'widget_title')}</h3>}
         {Array.isArray(state) ? <ul className="news-list">{state.map((item, index) => {
             const fields = newsFields(item)

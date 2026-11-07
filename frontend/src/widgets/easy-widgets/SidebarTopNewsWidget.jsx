@@ -20,7 +20,7 @@ const SidebarTopNewsWidget = ({
                     <Sidebar className="w-12 h-12 mx-auto mb-2 text-gray-400" />
                     <div className="text-lg font-semibold text-gray-700 mb-2">Latest news</div>
                     <div className="text-sm text-gray-500 mb-4">
-                        Latest published stories in the header or page content
+                        {(config.relatedToCurrentArticle ?? config.related_to_current_article) ? 'Articles sharing tags with the selected story' : 'Latest published stories in the header or page content'}
                     </div>
                     <div className="text-xs text-gray-400 space-y-1">
                         {(config.widgetTitle || config.widget_title) && <p>Title: {config.widgetTitle || config.widget_title}</p>}
