@@ -47,6 +47,15 @@ class ProvisionPublisherRolesTests(SimpleTestCase):
         self.assertIn("tenant_id, page_id, widget_id, submitted_at", statements)
         self.assertIn("form_title, data, submitted_at", statements)
         self.assertIn("ALL ROUTINES IN SCHEMA", statements)
+        # Public object queries filter deleted instances and types, including on empty feeds.
+        for table in ("object_storage_objectinstance", "object_storage_objecttypedefinition"):
+            grants = [
+                repr(call.args[0])
+                for call in cursor.execute.call_args_list
+                if "GRANT SELECT (" in repr(call.args[0]) and f"Identifier('{table}')" in repr(call.args[0])
+            ]
+            self.assertEqual(len(grants), 1)
+            self.assertIn("is_deleted", grants[0])
 
     @patch("webpages.management.commands.provision_publisher_roles.transaction.atomic")
     @patch("webpages.management.commands.provision_publisher_roles.connection")
