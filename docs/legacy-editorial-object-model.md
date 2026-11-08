@@ -1,8 +1,8 @@
 # Objektmodell för ECEEE:s redaktionella legacyimport
 
-Detta är en fristående målbeskrivning att ge ett annat projekt. Skapa **fyra objekttyper** för den aktuella importen: `article`, `columnist`, `event` och `organization`. De fem källresurserna är `news`, `columns`, `columnists`, `events` och `organizations`. Både nyheter och krönikor blir `article`. Den befintliga typen `library_item` får finnas kvar i ECEEE v4, men ingen publikation eller `ReportPage` ska skapas/importeras inom detta uppdrag.
+Detta är en fristående målbeskrivning att ge ett annat projekt. Skapa **fem objekttyper** för det kommande lokala helprovet: `article`, `columnist`, `event`, `library_item` och `organization`. De sju källresurserna är `news`, `columns`, `columnists`, `events`, `organizations`, `publications` och `reports` (`ReportPage`). Både nyheter och krönikor blir `article`; de två sista publikationsresurserna blir `library_item`.
 
-Visa alla fyra importerade objekttyper på huvudnivån i objektöversikten. `columnist` är en egen huvudtyp även om artiklar refererar till krönikörer som författare.
+Visa alla fem importerade objekttyper på huvudnivån i objektöversikten. `columnist` är en egen huvudtyp även om artiklar refererar till krönikörer som författare.
 
 | Källresurs | Måltyp | Redaktionell benämning |
 | --- | --- | --- |
@@ -10,6 +10,8 @@ Visa alla fyra importerade objekttyper på huvudnivån i objektöversikten. `col
 | `columns` | `article` | Krönika |
 | `columnists` | `columnist` | Krönikör |
 | `events` | `event` | Evenemang |
+| `publications` | `library_item` | Publikation |
+| `reports` | `library_item` | Rapportsida som publikationskandidat |
 | `organizations` | `organization` | Organisation |
 
 ## Gemensam objektstruktur
@@ -62,6 +64,20 @@ Krönikörer är innehållsobjekt, inte användarkonton. Importens porträttval 
 
 Ofullständiga eller motsägande datum blockeras i importen; den hittar inte på dag eller tid. `eventType` och `eventCategories` i legacy blir klassificeringar med identitet baserad på **site + fältnamn + exakt valvärde**.
 
+## `library_item` – Publikation
+
+| Fält | Typ | Betydelse |
+| --- | --- | --- |
+| `summary` | flerradig text | Källans publika beskrivning. |
+| `document` | mediareferens, valfri | Huvuddokument väljs senare; importen gissar inte bland bilagor. |
+| `externalUrl` | URL, valfri | `ReportPage.report_url` för rapportsidor. |
+| `main` | ordnat innehåll | Publik text och ordnade länkar till bilagor. |
+
+`EceeeLibraryItem` och `ReportPage` behåller skilda källbindningar. Filer och
+externa referenser samt möjlig överlappning mellan resurserna granskas före
+publicering. Rapportsidornas kategorier kräver en uppdaterad granskad termkarta;
+de får inte automatiskt omklassificeras till en nyhetstyp.
+
 ## `organization` – Organisation
 
 | Fält | Typ | Betydelse |
@@ -85,17 +101,18 @@ Klassificeringarna är **typade, flervärda tilldelningar med hierarkiska termer
 | `news_type` | Nyhetstyp | Artikel |
 | `news_category` | Nyhetskategori | Artikel |
 | `news_source` | Källa | Artikel |
-| `news_topic` | Ämne | Artikel och Evenemang i denna import |
+| `news_topic` | Ämne | Artikel, Evenemang och Publikation när källtermerna har granskats |
 | `news_keyword` | Nyckelord | Artikel, Krönikör, Evenemang, Organisation |
-| `general` | Allmänt | Alla fyra; används bland annat för grenen Legacy navigation |
+| `general` | Allmänt | Alla fem; används bland annat för grenen Legacy navigation |
 | `event_type` | Evenemangstyp | Evenemang |
 | `event_category` | Evenemangskategori | Evenemang |
+| `publication_category` | Publikationskategori | Publikation |
 | `organization_affiliation` | Organisationstillhörighet | Organisation |
 | `organization_category` | Organisationskategori | Definitionen finns, men inga använda källtermer ingår i den granskade site-2-kartan |
 
 Ämne har sex temagrenar: Climate & environment, Energy, Buildings, Transport, Policy & society samt Industry & technology. Ett fåtal ämnen ligger i roten; COP24–COP31 ligger under UN climate conferences. Nyckelord och Källa är i huvudsak platta. Nyhetstyp, Nyhetskategori, Evenemangstyp, Evenemangskategori och Organisationstillhörighet har de uttryckligt beslutade grenarna. Allmänt innehåller Legacy navigation för fem äldre navigationskategorier. Den **fullständiga** termförteckningen, alla föräldrar, alias och beslutade sammanslagningar ska hämtas ur `site2_terms.json` + `site2_decisions.json` via `scripts/compile_legacy_terms.py --review ...`; dessa grupperingsrubriker ersätter inte termkartan.
 
-ECEEE v4:s befintliga profil innehåller även `library_item` och `publication_category`. Ett annat projekt behöver inte skapa dem för denna import. Om det projektet redan har sådana definitioner ska de lämnas orörda.
+Den äldre femresurskartan innehåller ännu inga inventerade publikations- eller rapportsidetermer. Förbered en uppdaterad termkarta från den faktiska site-2-källan innan helprovet körs.
 
 ## Portabelt underlag
 
@@ -105,4 +122,4 @@ ECEEE v4:s befintliga profil innehåller även `library_item` och `publication_c
 python3 scripts/compile_legacy_terms.py --bundle /secure/path/site2-bundle.json --mapping /secure/path/site2-map.json --review /secure/path/site2-review.json
 ```
 
-Det andra projektet bör behandla profilens fyra aktiva typer och relationer som målkontraktet och använda den radvisa granskningsvyn för termmappningen. Råa legacyinnehållsposter, målmiljöns UUID:n och hemligheter ingår inte i detta dokument.
+Det andra projektet bör behandla profilens fem typer och relationer som målkontraktet och använda den radvisa granskningsvyn för termmappningen. Råa legacyinnehållsposter, målmiljöns UUID:n och hemligheter ingår inte i detta dokument.

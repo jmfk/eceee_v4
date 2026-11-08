@@ -16,6 +16,11 @@ related_adrs:
 
 # PLAN-0005: Omkartläggning av legacyinnehåll
 
+> Urvalet ändrades 2026-11-07 genom ADR-0067: `publications` och `ReportPage`
+> ingår i det kommande lokala helprovet. Den granskade termkartan nedan gäller
+> fortfarande bara de fem tidigare resurserna och måste kompletteras efter en
+> ny källinventering. Äldre urvalstext nedan beskriver det tidigare beslutet.
+
 Den granskade mappningen för källsite 2 är implementerad som versionsstyrt inventarium (`backend/content_migration/legacy_content/site2_terms.json`), uttryckliga beslut (`site2_decisions.json`) och validerande kompilator (`term_plan.py`). De 698 använda identiteterna blir 703 portabla måltermer inklusive tre innehållsslag. Den godkända termmodellen, alla ämnes-ID:n och sammanslagningar följer den beslutade genomförandeplanen i denna session. Inga källhierarkier observerades. Nya källtermer eller ändrade källnamn stoppar stage tills beslutsfilen granskats på nytt.
 
 `news`, `columns`, `columnists`, `events` och `organizations` är standardurvalet. `publications` och `ReportPage` ingår inte; `library_item` behålls som måltyp. Nyckelord kan användas av Artikel, Krönikör, Evenemang och Organisation. Importen skapar inga termer när den granskade kartan används. En separat portabel termberedning går via taxonomins rättighetskontrollerade API. Importmanifestet innehåller kartans digest, målterm-UUID:n och en fingerprint för termrevisioner. Full import kräver ett accepterat devprov med samma karta och termtillstånd.

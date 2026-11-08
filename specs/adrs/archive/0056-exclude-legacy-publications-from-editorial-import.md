@@ -1,12 +1,13 @@
 ---
 id: ADR-0056
 title: Uteslut legacybibliotek och rapportsidor från aktuell innehållsimport
-status: accepted
+status: superseded
 date: 2026-10-27
 related_prds:
   - PRD-0034
 supersedes: []
-superseded_by: []
+superseded_by:
+  - ADR-0067
 ---
 
 # ADR-0056: Uteslut legacybibliotek och rapportsidor från aktuell innehållsimport

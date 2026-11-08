@@ -13,7 +13,7 @@
 | ADR-0063 | [Published news priority with optional expiry](active/0063-news-flash-priority-fields.md) | accepted | PRD-0044 |
 | ADR-0062 | [TypeScript News Flash with existing CMS registration](active/0062-news-flash-typescript-rendering.md) | accepted | PRD-0044 |
 | ADR-0057 | [Risk-based CI cadence and exact-commit deployment evidence](archive/0057-risk-based-ci-and-deploy-evidence.md) | superseded | PRD-0041 |
-| ADR-0056 | [Uteslut legacybibliotek och rapportsidor från aktuell innehållsimport](active/0056-exclude-legacy-publications-from-editorial-import.md) | accepted | PRD-0034 |
+| ADR-0067 | [Include legacy publications and report pages in the local import trial](active/0067-include-legacy-publications-and-reports-in-local-import.md) | accepted | PRD-0034 |
 | ADR-0055 | [Explicit email verification before optional MFA](active/0055-explicit-email-verification-before-mfa.md) | accepted | PRD-0038 |
 | ADR-0054 | [Compatible Postmark delivery for authentication email](active/0054-postmark-authentication-email-backend.md) | accepted | PRD-0038 |
 | ADR-0053 | [Browser sessions, explicit social identities and optional MFA](active/0053-browser-sessions-social-login-and-mfa.md) | accepted | PRD-0038 |
@@ -72,6 +72,7 @@
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
+| ADR-0056 | [Uteslut legacybibliotek och rapportsidor från aktuell innehållsimport](archive/0056-exclude-legacy-publications-from-editorial-import.md) | superseded | PRD-0034 |
 | ADR-0022 | [Serialize legacy News imports and use replayable media keys](archive/0022-replayable-legacy-news-media-imports.md) | superseded | PRD-0012 |
 | ADR-0034 | [Banner presentation overrides](archive/0034-banner-presentation-overrides.md) | superseded | PRD-0026 |
 | ADR-0006 | [Immutable theme snapshots with request-scoped remote credentials](archive/0006-theme-version-lineage.md) | superseded | PRD-0005 |

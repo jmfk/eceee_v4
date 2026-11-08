@@ -1,8 +1,8 @@
 # Redaktionell legacyimport: site 2
 
-Importen omfattar `news`, `columns`, `columnists`, `events` och `organizations`. De ger Artikel, Krönikör, Evenemang och Organisation. `publications` och `ReportPage` ingår inte; måltypen `library_item` finns kvar. Importkommandot skapar utkast; publicering sker genom objektens befintliga versionsarbetsflöde efter kontroll.
+Det kommande lokala helprovet omfattar `news`, `columns`, `columnists`, `events`, `organizations`, `publications` och `reports` (`ReportPage`). De ger Artikel, Krönikör, Evenemang, Organisation och Publikation. Importkommandot skapar utkast; publicering sker genom objektens befintliga versionsarbetsflöde efter kontroll.
 
-Ett uttryckligt `--resources publications` avvisas också. Äldre manifest som innehåller resursen kan läsas för rapportering men körs inte igen.
+Detta utökar det tidigare femresursurvalet enligt ADR-0067. Legacy-API:t måste exponera `reports` innan en sju-resursinventering och ett komplett prov kan köras. Den äldre site-2-inventeringen gav noll `publications`; det antalet kontrolleras på nytt. Nya källtermer och möjliga dubbletter mellan de två publikationsresurserna granskas innan importen accepteras.
 
 Den fristående [objektmodellen](legacy-editorial-object-model.md) beskriver exakt vilka typer, fält, relationer och klassificeringar ett annat projekt behöver bygga för denna import.
 
@@ -18,9 +18,10 @@ de alltid kopplas till rätt tenant och tillåten objekttyp.
 | Artikel | Ingress | Publiceringsdatum, skapad, avpubliceringsdatum, krönikör, källdatum; innehållsslag, nyhetstyp, nyhetskategori, källa, ämne, nyckelord |
 | Krönikör | Förnamn, efternamn, organisationstillhörighet | Skapad, organisationstillhörighet, nyckelord |
 | Evenemang | Arrangör, plats, fokusområde | Start- och slutdatum, publiceringsdatum, arrangör; evenemangstyp, evenemangskategori, ämne, nyckelord |
+| Publikation | Sammanfattning | Skapad, avpubliceringsdatum; publikationskategori, ämne |
 | Organisation | Publikt namn, land | Land, internationell ja/nej, skapad; organisationskategori, organisationstillhörighet, nyckelord |
 
-`library_item` behålls utan importanpassade förval. Sök- och filterinställningarna kan
+`library_item` har ännu inga importanpassade förval i startprofilen. Sök- och filterinställningarna kan
 ändras i webben utan att importprofilen eller källtermkartan ändras.
 En exporterad definitionsbundle tar med valda listfält och använder klassificeringens
 stabila nyckel för taggfilter; målmiljön löser nyckeln till sitt eget termtyps-ID.
@@ -28,6 +29,19 @@ stabila nyckel för taggfilter; målmiljön löser nyckeln till sitt eget termty
 ## Granskad termkarta
 
 `backend/content_migration/legacy_content/site2_terms.json` innehåller de 698 använda källidentiteterna med originalnamn och användningsantal. `site2_decisions.json` innehåller de beslutade grenarna, barnrelationerna, namnen och sammanslagningarna. `term_plan.py` validerar täckning, identiteter, sammanslagningar och föräldragraf och kompilerar ett portabelt paket med 703 måltermer inklusive de tre innehållsslagen. Källidentitet är site, dimension, modell och ID; evenemangens textval använder site, fältnamn och exakt värde. En ny, omdöpt eller omföräldrad källterm stoppar den berörda stage-körningen. Källorna med tomt namn respektive `external-resource` är uttryckligen mappade till Okänd källa.
+
+Denna karta granskades för det tidigare femresursurvalet. Innan `publications` och
+`reports` får ingå i ett fullständigt manifest måste deras faktiska kategorier
+inventeras och eventuella nya termer mappas uttryckligen. Saknade termer stoppar
+stage-körningen; importen hittar inte på en klassificering.
+
+Efter att legacy-API:t exponerar båda resurserna ger följande läsande kontroll
+antal och en termlista med identitet, namn, användning och förekomster utan att
+exportera innehållsposternas text:
+
+```sh
+python manage.py migrate_legacy_editorial preflight --tenant eceee-production-copy --inventory --term-inventory
+```
 
 ```sh
 python3 scripts/compile_legacy_terms.py --bundle /secure/path/site2-bundle.json --mapping /secure/path/site2-map.json --review /secure/path/site2-review.json
@@ -100,9 +114,41 @@ python manage.py migrate_legacy_editorial apply --tenant TARGET_TENANT --run RUN
 python manage.py migrate_legacy_editorial report --tenant TARGET_TENANT --run RUN_ID
 ```
 
+`apply` kan köras igen med **samma** `RUN_ID` efter avbrott. Varje färdig post
+committas separat och behåller sin status; väntande och felade poster provas igen.
+Kör `report` när som helst, även om processen dog mitt i körningen. En sådan
+körning kan fortfarande stå som `running` i databasen, men rapportens `pending`
+visar det återstående arbetet. Manifestet måste ha stageats färdigt innan `apply`
+startar. Om själva källhämtningen under `stage` avbryts skapas ingen partiell
+körning; starta då om `stage` med ett färskt källurval.
+
+För ett **fullständigt lokalt prov** efter att ett komplett devprov har granskats
+och accepterats med `accept-sample`, använd den granskade site-2-kartan och
+`--preset all`. Gör en ny källinventering först och jämför antalen med det
+stageade manifestet. `stage` kontrollerar också att antal publicerade poster per
+resurs stämmer med inventeringen både före och efter hämtningen; en ändring eller
+ofullständig hämtning stoppar körningen innan manifestet sparas. Den lokala
+måltenanten är `eceee-production-copy`.
+
+```sh
+python manage.py migrate_legacy_editorial preflight --tenant eceee-production-copy --inventory
+python manage.py migrate_legacy_editorial stage --tenant eceee-production-copy --preset all --mapping /secure/path/site2-map.json --accepted-sample-run ACCEPTED_RUN_ID
+python manage.py migrate_legacy_editorial apply --tenant eceee-production-copy --run FULL_RUN_ID --report-file /secure/path/full-import-report.json
+python manage.py migrate_legacy_editorial report --tenant eceee-production-copy --run FULL_RUN_ID --report-file /secure/path/full-import-report.json
+```
+
+Rapportfilen skrivs atomärt med läsrättighet enbart för ägaren. JSON-rapporten
+innehåller totalt antal, behandlade, lyckade och uppmärksamhetskrävande poster,
+status per resurs, antal per felorsak samt käll-ID för varje blockerad, misslyckad
+eller konfliktande post. Väntande poster räknas men listas inte individuellt.
+`--include-items` lägger till samtliga manifestposter när en fullständig
+avstämningslista behövs. Ett misslyckande i
+`apply` behöver ingen ny stage-körning: åtgärda orsaken och kör samma `apply`
+igen. Importen skapar utkast och publicerar inte objekten.
+
 `stage` fryser källposter, kartans hash, uppslagna mål-UUID:n och måltermrevisioner i manifestet. `apply` kontrollerar dem igen, använder ett importlås per tenant/namespace och arbetar per post. Ändrade eller saknade måltermer blockerar körningen. Beständiga källbindningar gör återkörning idempotent; redaktionellt ändrade målobjekt skrivs inte över. Pressmeddelande styrs bara av NewsType modell+ID 4 på site 2. Evenemangens val mappas med exakt fältbundet värde. Ingen term skapas under importen.
 
-Efter manuell granskning kan ett komplett devprov accepteras med `accept-sample --run RUN_ID --confirm-manifest EXACT_MANIFEST_HASH`. En ändrad karta, definition eller målterm ogiltigförklarar acceptansen för en full körning. Full import och produktion ingår inte i denna fas; de kräver färsk källavstämning, eget prov och separata miljö-/ägargates.
+Efter manuell granskning kan ett komplett devprov accepteras med `accept-sample --run RUN_ID --confirm-manifest EXACT_MANIFEST_HASH`. En ändrad karta, definition eller målterm ogiltigförklarar acceptansen för en full körning. Det fullständiga lokala provet är förberett men ännu inte genomfört. Produktionsimport kräver en separat miljö- och ägarprövning.
 
 ## Verifiering
 

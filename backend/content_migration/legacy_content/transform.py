@@ -116,7 +116,11 @@ def normalize(row, resource, *, author_ids=None, media_by_url=None):
             images.append(logo)
         data["logo"] = str(media_by_url[logo].pk) if logo in media_by_url else None
     else:
-        data = {"summary": row.get("summary", ""), "externalUrl": "", "document": None}
+        data = {
+            "summary": row.get("summary", ""),
+            "externalUrl": row["data"].get("reportUrl", "") if resource == "reports" else "",
+            "document": None,
+        }
     # Attachment metadata retains exact order; body download links remain editable in the existing UI.
     attachments = []
     for attachment in row.get("attachments", []):
