@@ -1,7 +1,10 @@
 import hashlib
 import json
+import os
+import tempfile
 from datetime import timedelta
 from io import StringIO
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
@@ -14,6 +17,7 @@ from rest_framework.exceptions import ValidationError
 
 from content.models import Namespace
 from content_migration.legacy_content.profile import CLASSIFICATIONS, initial_bundle
+from content_migration.legacy_content.report import build_report
 from content_migration.legacy_content.service import apply_item, apply_run, preflight, stage
 from content_migration.legacy_content.source import validate_record
 from content_migration.legacy_content.term_plan import identity
@@ -35,6 +39,7 @@ def record(resource="news", pk=1, **updates):
         "columnists": "eceeecolumnists.eceeecolumnist",
         "events": "eceeecalendar.eceeecalenderevent",
         "publications": "eceeelibrary.eceeelibraryitem",
+        "reports": "eceeebase.reportpage",
         "organizations": "eceeememberforum.eceeememberorganization",
     }
     data = (
@@ -392,19 +397,19 @@ class EditorialImportTests(TestCase):
             configuration=configuration,
         )
 
-    def test_publications_cannot_be_staged(self):
-        with self.assertRaisesRegex(BlockedRecord, "resource_not_in_editorial_import"):
-            self.stage([("publications", record("publications"))])
-        self.assertFalse(ObjectInstance.objects.exists())
-
-    def test_existing_publication_manifest_cannot_be_applied(self):
-        run = self.stage([("news", record())])
-        item = run.items.get()
-        item.resource = "publications"
-        item.save(update_fields=["resource"])
-        with self.assertRaisesRegex(BlockedRecord, "resource_not_in_editorial_import"):
-            apply_run(run, self.user)
-        self.assertFalse(ObjectInstance.objects.exists())
+    def test_publications_and_reports_import_as_distinct_library_items(self):
+        run = self.stage(
+            [
+                ("publications", record("publications", pk=1)),
+                ("reports", record("reports", pk=1, data={"reportUrl": "https://example.org/report"})),
+            ]
+        )
+        self.assertEqual(apply_run(run, self.user), {"imported": 2})
+        self.assertEqual(ObjectInstance.objects.filter(object_type=self.types["library_item"]).count(), 2)
+        report = EditorialImportBinding.objects.get(resource="reports").object_instance
+        self.assertEqual(report.current_version.data["external_url"], "https://example.org/report")
+        self.assertEqual(apply_run(run, self.user), {"imported": 2})
+        self.assertEqual(ObjectInstance.objects.count(), 2)
 
     def test_canonical_images_and_attachments_use_reviewed_terms_and_preserve_existing_assignments(self):
         from file_manager.models import MediaFile
@@ -852,9 +857,77 @@ class EditorialImportTests(TestCase):
         result = json.loads(output.getvalue())
         self.assertEqual(set(result["inventory"]), set(DEFAULT_RESOURCES))
         self.assertEqual(result["inventory"]["columns"]["excludedUnpublished"], 3)
-        self.assertEqual(request.call_count, 6)
+        self.assertEqual(request.call_count, 1 + len(DEFAULT_RESOURCES))
         self.assertFalse(EditorialImportBinding.objects.exists())
         self.assertFalse(ObjectInstance.objects.exists())
+
+    @patch("content_migration.management.commands.migrate_legacy_editorial.stage")
+    @patch("content_migration.management.commands.migrate_legacy_editorial.EditorialSource")
+    @patch("content_migration.management.commands.migrate_legacy_editorial.NewsCommand._legacy_api_config")
+    def test_full_stage_rejects_changed_source_inventory(self, config, source_class, staged):
+        from content_migration.legacy_content.source import DEFAULT_RESOURCES
+
+        config.return_value = {"base_url": "https://legacy.example/api/migration/v1/", "token": "test-only"}
+        source = source_class.return_value
+        source.health.return_value = {}
+        source.available.return_value = set(DEFAULT_RESOURCES)
+        summary = {"sourceSite": 2, "total": 1, "published": 1, "excludedUnpublished": 0}
+        source.content_summary.side_effect = [
+            *[summary for _ in DEFAULT_RESOURCES],
+            *[{**summary, "published": 2, "total": 2} if name == "events" else summary for name in DEFAULT_RESOURCES],
+        ]
+        source.iter_content.side_effect = lambda resource, **kwargs: iter([record(resource)])
+        with tempfile.TemporaryDirectory() as directory:
+            mapping = os.path.join(directory, "mapping.json")
+            with open(mapping, "w", encoding="utf-8") as mapping_file:
+                json.dump({"format": "eceee-reviewed-legacy-term-map"}, mapping_file)
+            with self.assertRaisesRegex(CommandError, "inventory changed"):
+                call_command(
+                    "migrate_legacy_editorial",
+                    "stage",
+                    tenant=self.tenant.identifier,
+                    user=self.user.username,
+                    preset="all",
+                    mapping=Path(mapping),
+                    accepted_sample_run="sample",
+                )
+        staged.assert_not_called()
+
+    @patch("content_migration.management.commands.migrate_legacy_editorial.EditorialSource")
+    @patch("content_migration.management.commands.migrate_legacy_editorial.NewsCommand._legacy_api_config")
+    def test_preflight_can_inventory_new_report_terms_without_importing(self, config, source_class):
+        from content_migration.legacy_content.source import DEFAULT_RESOURCES
+
+        config.return_value = {"base_url": "https://legacy.example/api/migration/v1/", "token": "test-only"}
+        source = source_class.return_value
+        source.health.return_value = {}
+        source.available.return_value = set(DEFAULT_RESOURCES)
+        source.iter_content.side_effect = lambda resource: iter(
+            [
+                record(
+                    resource,
+                    taxonomy={
+                        "reportCategories": [
+                            {"model": "eceeebase.category", "id": 7, "name": "Report", "parentId": None}
+                        ]
+                    },
+                )
+            ]
+            if resource == "reports"
+            else []
+        )
+        output = StringIO()
+        call_command(
+            "migrate_legacy_editorial",
+            "preflight",
+            tenant=self.tenant.identifier,
+            user=self.user.username,
+            term_inventory=True,
+            stdout=output,
+        )
+        result = json.loads(output.getvalue())
+        self.assertEqual(result["termInventory"]["2:reportCategories:eceeebase.category:7"]["count"], 1)
+        self.assertFalse(EditorialImportBinding.objects.exists())
 
     def test_old_news_compatibility_sample_cannot_be_accepted_for_full_import(self):
         run = stage(
@@ -963,6 +1036,50 @@ class EditorialImportTests(TestCase):
         run = self.stage([("news", record()), ("events", record("events", data={"eventStartDate": "2020"}))])
         self.assertEqual(apply_run(run, self.user), {"imported": 1, "blocked": 1})
         self.assertEqual(run.items.get(resource="events").error_category, "incomplete_event_date")
+        report = build_report(run)
+        self.assertEqual((report["total"], report["successful"], report["needsAttention"]), (2, 1, 1))
+        self.assertEqual(report["byResource"]["news"]["counts"], {"imported": 1})
+        self.assertEqual(report["reasons"], {"events": {"incomplete_event_date": 1}})
+        self.assertEqual(
+            report["attention"],
+            [{"resource": "events", "sourceId": "1", "status": "blocked", "reason": "incomplete_event_date"}],
+        )
+
+    def test_report_after_interruption_and_resume(self):
+        run = self.stage([("news", record(pk=1)), ("news", record(pk=2, slug="second"))])
+        original = apply_item
+        count = 0
+
+        def interrupt(*args, **kwargs):
+            nonlocal count
+            count += 1
+            if count == 2:
+                raise KeyboardInterrupt
+            return original(*args, **kwargs)
+
+        with patch("content_migration.legacy_content.service.apply_item", side_effect=interrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                apply_run(run, self.user)
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "report.json")
+            output = StringIO()
+            call_command(
+                "migrate_legacy_editorial",
+                "report",
+                tenant=self.tenant.identifier,
+                user=self.user.username,
+                run=str(run.pk),
+                report_file=Path(path),
+                stdout=output,
+            )
+            with open(path, encoding="utf-8") as report_file:
+                report = json.load(report_file)
+            self.assertEqual(report["report"]["counts"], {"imported": 1, "pending": 1})
+            self.assertEqual(report["report"]["processed"], 1)
+            self.assertEqual(report["report"]["attention"], [])
+            self.assertEqual(os.stat(path).st_mode & 0o777, 0o600)
+        self.assertEqual(apply_run(run, self.user), {"imported": 2})
+        self.assertEqual(build_report(run)["needsAttention"], 0)
 
     def test_an_interruption_after_first_committed_item_can_resume(self):
         from content_migration.legacy_content import service

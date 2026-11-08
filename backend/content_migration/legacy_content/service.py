@@ -1,7 +1,6 @@
 """One-item transactions, stable source bindings and draft-only editorial import."""
 
 import hashlib
-from collections import Counter
 from contextlib import contextmanager
 from copy import deepcopy
 
@@ -18,6 +17,7 @@ from taxonomy.models import ClassificationRollout, ClassificationType, Tag
 from taxonomy.services import require
 
 from .profile import OBJECT_TYPES, PROFILE
+from .report import build_report
 from .source import DEFAULT_RESOURCES, validate_record
 from .term_plan import RESOURCE_TARGETS, compile_plan
 from .term_plan import identity as term_identity
@@ -33,6 +33,7 @@ TAXONOMY = {
     "keywords": "news_keyword",
     "eceeeCategories": "general",
     "publicationCategories": "publication_category",
+    "reportCategories": "general",
     "organizationCategories": "organization_category",
     "affiliations": "organization_affiliation",
 }
@@ -644,11 +645,7 @@ def apply_run(run, user):
                     item.status = "failed"
                     item.error_category = error.__class__.__name__
                     item.save(update_fields=["status", "error_category", "updated_at"])
-        run.report = dict(Counter(run.items.values_list("status", flat=True)))
-        run.status = (
-            "needs_attention"
-            if any(run.report.get(k) for k in ("failed", "blocked", "conflict", "pending"))
-            else "complete"
-        )
+        run.report = build_report(run)
+        run.status = "needs_attention" if run.report["needsAttention"] else "complete"
         run.save(update_fields=["report", "status", "updated_at"])
-    return run.report
+    return run.report["counts"]

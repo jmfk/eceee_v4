@@ -21,6 +21,8 @@ RESOURCE_TARGETS = {
     "columnists": "columnist",
     "events": "event",
     "organizations": "organization",
+    "publications": "library_item",
+    "reports": "library_item",
 }
 
 

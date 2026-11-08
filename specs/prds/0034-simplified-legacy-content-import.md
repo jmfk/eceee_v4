@@ -5,6 +5,7 @@ status: in-progress
 locked: true
 created: 2026-10-22
 related_adrs:
+  - ADR-0067
   - ADR-0056
   - ADR-0049
   - ADR-0047
@@ -107,7 +108,8 @@ ECEEE behöver föra över sitt redaktionella innehåll utan att återskapa alla
 
 ## Linked ADRs
 
-- [ADR-0056](../adrs/active/0056-exclude-legacy-publications-from-editorial-import.md)
+- [ADR-0067](../adrs/active/0067-include-legacy-publications-and-reports-in-local-import.md)
+- [ADR-0056](../adrs/archive/0056-exclude-legacy-publications-from-editorial-import.md)
 - [ADR-0046](../adrs/active/0046-unified-articles-and-bounded-legacy-import.md)
 - [ADR-0043](../adrs/active/0043-classification-governance.md)
 - [ADR-0025](../adrs/active/0025-authenticated-legacy-migration-api.md)
@@ -121,6 +123,10 @@ ECEEE behöver föra över sitt redaktionella innehåll utan att återskapa alla
 ## Scope note — 2026-10-27
 
 Ägaren har valt att ignorera `EceeeLibraryItem`, dess filposter och `ReportPage` i den aktuella importen efter att källresursen `publications` gav noll poster för site 2. Den befintliga tekniska måltypen `library_item` behålls. Se ADR-0056 och PLAN-0005. Detta är ett urvalsbeslut för importen, inte ett påstående att alla framtida publikationer saknas.
+
+## Scope note — 2026-11-07
+
+Ägaren ändrade urvalet för det kommande lokala helprovet: både `EceeeLibraryItem` och `ReportPage` ska ingå. ADR-0067 ersätter det tidigare urvalsbeslutet i ADR-0056. Källantal, kategorier och potentiella dubbletter behöver fortfarande inventeras innan provet kan köras.
 
 ## Implementation notes — 2026-10-22
 

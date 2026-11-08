@@ -1,6 +1,8 @@
 """Stage immutable manifests and import only drafts; no implicit production publication."""
 
 import json
+import os
+import tempfile
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -8,10 +10,13 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
+from rest_framework.exceptions import PermissionDenied
 
 from content.models import Namespace
+from content_migration.legacy_content.report import build_report
 from content_migration.legacy_content.service import apply_run, preflight, stage
 from content_migration.legacy_content.source import DEFAULT_RESOURCES, DEV_LIMITS, EditorialSource
+from content_migration.legacy_content.term_plan import identity as term_identity
 from content_migration.legacy_content.transform import checksum
 from content_migration.legacy_news.api import LegacyMigrationApiError, LegacyNewsApi
 from content_migration.management.commands.migrate_legacy_news import Command as NewsCommand
@@ -35,6 +40,9 @@ class Command(BaseCommand):
         parser.add_argument("--accepted-sample-run")
         parser.add_argument("--inventory", action="store_true", help="Include read-only source counts in preflight")
         parser.add_argument(
+            "--term-inventory", action="store_true", help="Inventory publication and report category identities"
+        )
+        parser.add_argument(
             "--mapping", type=Path, help="Reviewed term mappings and explicit source exclusions; no credentials"
         )
         parser.add_argument(
@@ -43,6 +51,27 @@ class Command(BaseCommand):
             help="Dev-only old News API subset; never a full production manifest",
         )
         parser.add_argument("--confirm-manifest", help="Exact run hash for accepting a visually reviewed sample")
+        parser.add_argument("--report-file", type=Path, help="Save the apply/report JSON to a local file")
+        parser.add_argument("--include-items", action="store_true", help="Include every manifest item in the report")
+
+    @staticmethod
+    def _write_report(path, payload):
+        path = path.expanduser()
+        serialized = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", dir=path.parent, prefix=f".{path.name}.", delete=False
+            ) as output:
+                temporary = Path(output.name)
+                os.chmod(temporary, 0o600)
+                output.write(serialized)
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temporary, path)
+        finally:
+            if temporary:
+                temporary.unlink(missing_ok=True)
 
     def handle(self, *args, **options):
         try:
@@ -60,13 +89,17 @@ class Command(BaseCommand):
         tenant = Tenant.objects.get(identifier=o["tenant"], is_active=True)
         namespace = Namespace.objects.get(tenant=tenant, slug=o["namespace"], is_active=True)
         user = get_user_model().objects.get(username=o["user"], is_active=True)
-        definitions, facets, fingerprint = preflight(tenant, namespace, user)
+        if namespace.tenant_id != tenant.pk or not tenant.user_has_access(user):
+            raise PermissionDenied("Import scope is not authorized")
+        if o["action"] != "report":
+            _, _, fingerprint = preflight(tenant, namespace, user)
         if o["action"] in {"apply", "report", "accept-sample"}:
             if not o["run"]:
                 raise CommandError("--run is required")
             run = EditorialImportRun.objects.get(pk=o["run"], tenant=tenant, namespace=namespace)
             if o["action"] == "apply":
-                report = apply_run(run, user)
+                apply_run(run, user)
+                report = build_report(run, include_items=o["include_items"])
             elif o["action"] == "accept-sample":
                 if run.preset != "dev" or run.status != "complete" or not run.items.exists():
                     raise CommandError("Only a completed non-empty dev sample can be accepted")
@@ -79,16 +112,11 @@ class Command(BaseCommand):
                 run.save(update_fields=["reviewed_at", "reviewed_by", "updated_at"])
                 report = {"sample": "accepted"}
             else:
-                report = {
-                    "items": list(
-                        run.items.values("resource", "source_id", "status", "error_category", "object_instance_id")
-                    )
-                }
-            self.stdout.write(
-                json.dumps(
-                    {"runId": str(run.pk), "status": run.status, "manifestHash": run.manifest_hash, "report": report}
-                )
-            )
+                report = build_report(run, include_items=o["include_items"])
+            result = {"runId": str(run.pk), "status": run.status, "manifestHash": run.manifest_hash, "report": report}
+            if o["report_file"]:
+                self._write_report(o["report_file"], result)
+            self.stdout.write(json.dumps(result))
             return
         config = NewsCommand._legacy_api_config(o["source_env"])
         source = EditorialSource(**config)
@@ -102,6 +130,42 @@ class Command(BaseCommand):
             )
             if inventory and len({row["sourceSite"] for row in inventory.values()}) > 1:
                 raise CommandError("Editorial inventory has mixed source site scopes")
+            term_inventory = None
+            if o["term_inventory"]:
+                if {"publications", "reports"} - available:
+                    raise CommandError("Publication and report resources are required for term inventory")
+                term_inventory = {}
+                for resource in ("publications", "reports"):
+                    for row in source.iter_content(resource):
+                        for dimension, terms in row.get("taxonomy", {}).items():
+                            if not isinstance(terms, list):
+                                raise CommandError("Source term inventory is invalid")
+                            for term in terms:
+                                if (
+                                    not isinstance(term, dict)
+                                    or not term.get("model")
+                                    or not term.get("id")
+                                    or not isinstance(term.get("name"), str)
+                                ):
+                                    raise CommandError("Source term inventory is invalid")
+                                key = term_identity(row["sourceSite"], dimension, term["model"], term["id"])
+                                entry = term_inventory.setdefault(
+                                    key,
+                                    {
+                                        "dimension": dimension,
+                                        "model": term["model"],
+                                        "id": term["id"],
+                                        "name": term["name"],
+                                        "parentId": term.get("parentId"),
+                                        "uses": [],
+                                        "count": 0,
+                                    },
+                                )
+                                if entry["name"] != term["name"] or entry["parentId"] != term.get("parentId"):
+                                    raise CommandError("Source term identity changed during inventory")
+                                if resource not in entry["uses"]:
+                                    entry["uses"].append(resource)
+                                entry["count"] += 1
             self.stdout.write(
                 json.dumps(
                     {
@@ -111,6 +175,11 @@ class Command(BaseCommand):
                         "missingResources": sorted(set(DEFAULT_RESOURCES) - available),
                         "legacyNewsAvailable": "news" in health.get("resources", []),
                         **({"inventory": inventory} if inventory is not None else {}),
+                        **(
+                            {"termInventory": dict(sorted(term_inventory.items()))}
+                            if term_inventory is not None
+                            else {}
+                        ),
                     }
                 )
             )
@@ -127,6 +196,13 @@ class Command(BaseCommand):
             raise CommandError("Full import requires a reviewed sample run and explicit reviewed mapping file")
         if o["preset"] == "all" and mapping.get("format") != "eceee-reviewed-legacy-term-map":
             raise CommandError("Full import requires the reviewed site-2 term plan")
+        if not o["legacy_news_compatible"] and set(resources) - available:
+            raise CommandError(
+                "Legacy API requires deployed content resources: " + ",".join(sorted(set(resources) - available))
+            )
+        inventory_before = (
+            {resource: source.content_summary(resource) for resource in resources} if o["preset"] == "all" else None
+        )
         records = []
         if o["legacy_news_compatible"]:
             if not settings.DEBUG or o["preset"] != "dev" or resources != ["news"]:
@@ -180,10 +256,6 @@ class Command(BaseCommand):
                 ],
             }
         else:
-            if set(resources) - available:
-                raise CommandError(
-                    "Legacy API requires deployed content resources: " + ",".join(sorted(set(resources) - available))
-                )
             for resource in resources:
                 limit = None if o["preset"] == "all" else o["limit"] or DEV_LIMITS[resource]
                 records.extend((resource, row) for row in source.iter_content(resource, limit=limit))
@@ -198,6 +270,13 @@ class Command(BaseCommand):
                 records.extend(
                     ("columnists", row) for row in source.iter_content("columnists", ids=missing[offset : offset + 100])
                 )
+        if inventory_before is not None:
+            inventory_after = {resource: source.content_summary(resource) for resource in resources}
+            counts = {resource: sum(name == resource for name, _ in records) for resource in resources}
+            if inventory_before != inventory_after or any(
+                counts[resource] != inventory_before[resource]["published"] for resource in resources
+            ):
+                raise CommandError("Full source inventory changed or does not match the fetched manifest")
         source_sites = {row["sourceSite"] for _, row in records}
         if len(source_sites) > 1:
             raise CommandError("Mixed legacy site scopes are not accepted")
@@ -208,6 +287,7 @@ class Command(BaseCommand):
             "resources": resources,
             "limits": None if o["preset"] == "all" else o["limit"] or DEV_LIMITS,
             "acceptedSampleRun": o["accepted_sample_run"],
+            **({"sourceInventory": inventory_before} if inventory_before is not None else {}),
         }
         if not records:
             raise CommandError("The selected source manifest is empty")

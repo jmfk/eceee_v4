@@ -16,6 +16,10 @@ related_adrs:
 
 # PLAN-0004: Import av förenklat ECEEE-innehåll från legacy
 
+> Urvalet i denna äldre genomförandeplan ändrades 2026-11-07 genom ADR-0067:
+> `publications` och `ReportPage` ingår nu i förberedelsen för ett lokalt helprov.
+> Äldre avsnitt som säger att de utesluts beskriver det tidigare urvalet.
+
 ## Mål och kunskapsläge
 
 För över det inkluderade publicerade ECEEE-innehållet till Artikel, Krönikör, Evenemang och Organisation i ett gemensamt hierarkiskt klassificeringssystem. Den femte befintliga objekttypen Publikation behålls i profilen men används inte av denna legacyimport enligt ADR-0056. Nyheter och krönikor blir Artikel och kan visas tillsammans. Proceedings och medlems-/externanvändarfunktioner ligger helt utanför arbetet.

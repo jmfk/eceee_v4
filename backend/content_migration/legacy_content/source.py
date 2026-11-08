@@ -4,17 +4,26 @@ from urllib.parse import urlsplit
 
 from content_migration.legacy_news.api import LegacyMigrationApiError, LegacyNewsApi
 
-RESOURCES = ("columnists", "organizations", "news", "columns", "events", "publications")
-DEFAULT_RESOURCES = ("columnists", "organizations", "news", "columns", "events")
+RESOURCES = ("columnists", "organizations", "news", "columns", "events", "publications", "reports")
+DEFAULT_RESOURCES = RESOURCES
 TARGETS = {
     "news": "article",
     "columns": "article",
     "columnists": "columnist",
     "events": "event",
     "publications": "library_item",
+    "reports": "library_item",
     "organizations": "organization",
 }
-DEV_LIMITS = {"news": 100, "columns": 40, "columnists": 40, "events": 30, "publications": 25, "organizations": 25}
+DEV_LIMITS = {
+    "news": 100,
+    "columns": 40,
+    "columnists": 40,
+    "events": 30,
+    "publications": 25,
+    "reports": 25,
+    "organizations": 25,
+}
 
 
 class EditorialSource(LegacyNewsApi):
@@ -132,6 +141,7 @@ def validate_record(row, resource):
         "columnists": "eceeecolumnists.eceeecolumnist",
         "events": "eceeecalendar.eceeecalenderevent",
         "publications": "eceeelibrary.eceeelibraryitem",
+        "reports": "eceeebase.reportpage",
         "organizations": "eceeememberforum.eceeememberorganization",
     }
     if row["sourceModel"].lower() != expected[resource]:
