@@ -32,7 +32,7 @@ export async function GET(request: Request) {
       if (!version) return null;
       const items = await editorialItems(reader, kind as EditorialKind, root.tenant_id, at,
         { limit: detail ? 1 : limit, offset: detail ? 0 : offset, eventGroup: detail ? 'all' : group as EventGroup, slug, detail });
-      const preparedBody = detail && items[0] ? await prepareEditorialWidgets(reader, root, version, items[0].widgets, at) : undefined;
+      const preparedBody = detail && items[0] ? await prepareEditorialWidgets(reader, root, version, items[0].widgets, at, request.headers.get('host') || '') : undefined;
       return { items: items.map(({ id, slug, title, objectType, data, publishDate }) => ({
         id, slug, title, objectType, data, publishDate, ...(detail ? preparedBody : {}),
       })) };

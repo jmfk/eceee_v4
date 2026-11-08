@@ -316,6 +316,19 @@ describe('PageRenderer', () => {
         expect(screen.queryByText('Other site')).toBeNull()
     })
 
+    it('renders an absolute published subsite link from the publisher model', () => {
+        const model = createPageRenderModel({
+            widgets: { navbar: [{ id: 'navbar', type: 'easy_widgets.NavbarWidget', config: { menuItems: [
+                { linkData: { type: 'internal', label: 'Summer Study', pageId: 40, siteId: 86, resolvedUrl: 'https://summerstudy.eceee.org/', isPublished: true, publisherResolved: true } },
+                { linkData: { type: 'internal', label: 'Draft', isPublished: false } },
+            ] } }] },
+            context: { mode: 'public', siteId: 85, siteHostnames: ['eceee.org'] },
+        })
+        render(<PageRenderer model={model} />)
+        expect(screen.getByRole('link', { name: 'Summer Study' })).toHaveAttribute('href', 'https://summerstudy.eceee.org/')
+        expect(screen.queryByText('Draft')).toBeNull()
+    })
+
     it('filters unpublished and cross-site navigation children', () => {
         const model = createPageRenderModel({
             widgets: { main: [{ id: 'nav', type: 'easy_widgets.NavigationWidget', config: { menuItems: [{

@@ -359,6 +359,7 @@ const filterNavigationItems = (items: any[], context: WidgetRenderProps['context
     items.filter((item) => {
         if (!item.isActive || item.isPublished === false) return false
         if (item.type !== 'internal') return true
+        if (context.mode === 'public' && item.publisherResolved === true && item.isPublished === true) return true
         if (context.siteId && item.siteId) return String(item.siteId) === String(context.siteId)
         const itemHostnames = asArray<string>(item.cachedRootHostnames || item.cached_root_hostnames)
         if (context.siteHostnames?.length && itemHostnames.length) {

@@ -142,6 +142,45 @@ describe('public resolution', () => {
     expect(model?.slots.sidebar[0]).toMatchObject({ id: 'parent-side' });
   });
 
+  it('renders published sibling subsites as absolute navbar links on their first registered hostname', async () => {
+    const navbarReader: PageReader = {
+      ...reader,
+      root: async hostname => hostname === 'example.localhost' ? { ...root, hostnames: ['example.localhost'] } : null,
+      version: async (id, at) => id === root.id ? version({
+        ...versions[root.id],
+        widgets: { navbar: [{ id: 'nav', type: 'easy_widgets.NavbarWidget', config: { menuItems: [
+          { linkData: { type: 'internal', pageId: '40', label: 'Summer Study', anchor: 'programme' } },
+          { linkData: { type: 'internal', pageId: '41', label: 'Industry' } },
+          { linkData: { type: 'internal', pageId: child.id, label: 'Local' } },
+          { linkData: { type: 'internal', pageId: '42', label: 'Draft', publisherResolved: true } },
+          { linkData: { type: 'internal', pageId: '43', label: 'Unhosted' } },
+          { linkData: { type: 'internal', pageId: '44', label: 'Public subsite' } },
+        ] } }] },
+      }) : reader.version(id, at),
+      publishedPageReferences: async () => [
+        { id: '40', cached_path: '/', root_id: '40', root_hostnames: ['summerstudy.localhost', 'alias.localhost'] },
+        { id: '41', cached_path: '/news/', root_id: '50', root_hostnames: ['industry.localhost'] },
+        { id: child.id, cached_path: '/news/', root_id: root.id, root_hostnames: root.hostnames },
+        { id: '43', cached_path: '/', root_id: '43', root_hostnames: ['default'] },
+        { id: '44', cached_path: '/', root_id: '44', root_hostnames: ['summerstudy.eceee.org'] },
+      ],
+    };
+
+    const model = await buildPublishedPageModel({ withSnapshot: async read => read(navbarReader) },
+      'example.localhost:10115', '/', new Date('2026-06-01'));
+    const links = (model?.slots.navbar[0].config.menuItems as { linkData: Record<string, unknown> }[])
+      .map(item => item.linkData);
+    expect(links).toMatchObject([
+      { resolvedUrl: 'http://summerstudy.localhost:10115/#programme', isPublished: true, publisherResolved: true },
+      { resolvedUrl: 'http://industry.localhost:10115/news/', isPublished: true },
+      { resolvedUrl: '/news/', isPublished: true },
+      { isActive: false, isPublished: false },
+      { isActive: false, isPublished: false },
+      { resolvedUrl: 'https://summerstudy.eceee.org/', isPublished: true },
+    ]);
+    expect(links[3]).not.toHaveProperty('publisherResolved');
+  });
+
   it('renders an exact theme special route before a CMS page at the same path', async () => {
     const specialTheme: Theme = {
       ...theme,
@@ -661,7 +700,8 @@ describe('public resolution', () => {
 
   it('resolves same-site page links and public media collections inside one snapshot', async () => {
     const inlineMediaId = '411f8c75-c95a-429b-a485-65839b868795';
-    const publishedPageReferences = vi.fn(async (ids: string[], tenant: string, site: string) => ids.includes(child.id) && tenant === root.tenant_id && site === root.id ? [{ id: child.id, cached_path: '/news/' }] : []);
+    const publishedPageReferences = vi.fn(async (ids: string[], tenant: string) => ids.includes(child.id) && tenant === root.tenant_id
+      ? [{ id: child.id, cached_path: '/news/', root_id: root.id, root_hostnames: root.hostnames }] : []);
     const publicMedia = vi.fn(async () => ({ files: [{ id: inlineMediaId, url: '/inline.png', type: 'image' as const, altText: 'Inline', caption: '', annotation: '', title: 'Inline', width: 1600, height: 900, thumbnailUrl: '/inline.png' }], collections: { '67d9020f-1d73-47be-bd24-1fe52d2dbef8': [{ id: 'a', url: '/logo.png', type: 'image' as const, altText: 'Partner', caption: '', annotation: '', title: 'Partner', width: 100, height: 50, thumbnailUrl: '/logo.png' }] } }));
     const enrichedReader: PageReader = {
       ...reader,
@@ -753,7 +793,7 @@ describe('public resolution', () => {
         displayWidth: 60,
         displayHeight: 40,
       })]);
-      expect(publishedPageReferences).toHaveBeenCalledWith([child.id, '999'], root.tenant_id, root.id, expect.any(Date));
+      expect(publishedPageReferences).toHaveBeenCalledWith([child.id, '999'], root.tenant_id, expect.any(Date));
       expect(publicMedia).toHaveBeenCalledWith([inlineMediaId], ['67d9020f-1d73-47be-bd24-1fe52d2dbef8'], root.tenant_id);
     } finally {
       if (previousKey === undefined) delete process.env.PUBLISHER_IMGPROXY_KEY;

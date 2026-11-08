@@ -74,26 +74,29 @@ function reader(client: PoolClient): PageReader {
       const result = await client.query<Theme>('SELECT id, tenant_id, name, fonts, colors, css_variables, design_groups, html_elements, component_styles, text_outline_styles, image_styles, gallery_styles, carousel_styles, breakpoints, layouts, widget_types, custom_css, sync_version, updated_at FROM webpages_pagetheme WHERE tenant_id = $1 AND is_default = true AND is_active = true ORDER BY created_at, id LIMIT 1', [tenantId]);
       return result.rows[0] ?? null;
     },
-    async publishedPageReferences(pageIds, tenantId, rootId, at) {
+    async publishedPageReferences(pageIds, tenantId, at) {
       if (!pageIds.length) return [];
-      const result = await client.query<{ id: string; cached_path: string }>(`
-        SELECT page.id::text, CASE WHEN page.id = $3 THEN '/' ELSE page.cached_path END AS cached_path
+      const result = await client.query<{ id: string; cached_path: string; root_id: string; root_hostnames: string[] }>(`
+        SELECT page.id::text, CASE WHEN page.id = site.id THEN '/' ELSE page.cached_path END AS cached_path,
+          site.id::text AS root_id, site.hostnames AS root_hostnames
         FROM webpages_webpage AS page
+        JOIN webpages_webpage AS site
+          ON site.id = CASE WHEN page.parent_id IS NULL THEN page.id ELSE page.cached_root_id END
+          AND site.tenant_id = $2 AND site.parent_id IS NULL AND site.is_deleted = false
         JOIN LATERAL (
           SELECT 1
           FROM webpages_pageversion AS version
           WHERE version.page_id = page.id
-            AND version.effective_date <= $4
-            AND (version.expiry_date IS NULL OR version.expiry_date > $4)
+            AND version.effective_date <= $3
+            AND (version.expiry_date IS NULL OR version.expiry_date > $3)
           ORDER BY version.effective_date DESC, version.version_number DESC
           LIMIT 1
         ) AS published ON true
         WHERE page.id = ANY($1::bigint[])
           AND page.tenant_id = $2
-          AND (page.id = $3 OR page.cached_root_id = $3)
           AND page.is_deleted = false
-          AND (page.id = $3 OR page.cached_path <> '')
-          AND NOT (page.cached_path ~ $5)`, [pageIds, tenantId, rootId, at, '^/(403|404|500|503)(/|$)']);
+          AND (page.id = site.id OR page.cached_path <> '')
+          AND NOT (page.cached_path ~ $4)`, [pageIds, tenantId, at, '^/(403|404|500|503)(/|$)']);
       return result.rows;
     },
     async publishedNavigationPages(parentIds, tenantId, rootId, at) {

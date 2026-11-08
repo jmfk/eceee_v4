@@ -159,9 +159,9 @@ describe('database snapshot', () => {
     expect(defaultParameters).toEqual(['7']);
   });
 
-  it('keeps page references and public collection media tenant and site scoped', async () => {
+  it('resolves same-tenant page references with their site roots and keeps navigation site scoped', async () => {
     await database.withSnapshot(async reader => {
-      await reader.publishedPageReferences(['10'], '7', '1', new Date('2026-06-01'));
+      await reader.publishedPageReferences(['10'], '7', new Date('2026-06-01'));
       await reader.publishedNavigationPages(['10'], '7', '1', new Date('2026-06-01'));
       await reader.publicMedia(['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], ['bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'], '7');
     });
@@ -171,10 +171,13 @@ describe('database snapshot', () => {
     const fileSql = mocks.query.mock.calls[3][0];
     const collectionSql = mocks.query.mock.calls[4][0];
     expect(pageSql).toContain('page.tenant_id = $2');
-    expect(pageSql).toContain('page.cached_root_id = $3');
-    expect(pageSql).toContain('version.effective_date <= $4');
-    expect(pageSql).toContain('NOT (page.cached_path ~ $5)');
-    expect(mocks.query.mock.calls[1][1][4]).toBe('^/(403|404|500|503)(/|$)');
+    expect(pageSql).toContain('site.tenant_id = $2');
+    expect(pageSql).toContain('site.hostnames AS root_hostnames');
+    expect(pageSql).toContain('site.id = CASE WHEN page.parent_id IS NULL THEN page.id ELSE page.cached_root_id END');
+    expect(pageSql).not.toContain('page.cached_root_id = $3');
+    expect(pageSql).toContain('version.effective_date <= $3');
+    expect(pageSql).toContain('NOT (page.cached_path ~ $4)');
+    expect(mocks.query.mock.calls[1][1][3]).toBe('^/(403|404|500|503)(/|$)');
     expect(navigationSql).toContain('page.parent_id = ANY($1::bigint[])');
     expect(navigationSql).toContain('page.tenant_id = $2');
     expect(navigationSql).toContain('page.cached_root_id = $3');
