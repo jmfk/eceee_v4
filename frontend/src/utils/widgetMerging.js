@@ -272,7 +272,13 @@ export function getSlotInheritanceSummary(slotName, localWidgets = [], inherited
  * @returns {Object} Transformed data with inheritedWidgets and slotRules
  */
 export function transformInheritanceData(inheritanceData) {
-    if (!inheritanceData || !inheritanceData.slots) {
+    // The tree endpoint nests the slot-shaped editor data under `legacy`.
+    // The fallback endpoint still returns that data at the top level.
+    const slotData = inheritanceData?.version === 'tree'
+        ? inheritanceData.legacy
+        : inheritanceData
+
+    if (!slotData?.slots) {
         return {
             inheritedWidgets: {},
             slotInheritanceRules: {},
@@ -284,7 +290,7 @@ export function transformInheritanceData(inheritanceData) {
     const slotInheritanceRules = {}
     let hasInheritedContent = false
 
-    Object.entries(inheritanceData.slots).forEach(([slotName, slotData]) => {
+    Object.entries(slotData.slots).forEach(([slotName, slotData]) => {
         // Extract inherited widgets and filter out invalid ones
         inheritedWidgets[slotName] = filterValidWidgets(slotData.inheritedWidgets || [])
 
@@ -317,8 +323,8 @@ export function transformInheritanceData(inheritanceData) {
         inheritedWidgets,
         slotInheritanceRules,
         hasInheritedContent,
-        parentId: inheritanceData.parentId,
-        hasParent: inheritanceData.hasParent
+        parentId: slotData.parentId,
+        hasParent: slotData.hasParent
     }
 }
 
