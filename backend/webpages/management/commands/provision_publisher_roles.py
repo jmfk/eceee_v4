@@ -296,9 +296,12 @@ class Command(BaseCommand):
                 (
                     "object_storage_objectinstance",
                     "id, tenant_id, object_type_id, current_version_id, title, slug, metadata, created_at, "
-                    "updated_at, level, parent_id, tree_id, lft, rght, status",
+                    "updated_at, level, parent_id, tree_id, lft, rght, status, is_deleted",
                 ),
-                ("object_storage_objecttypedefinition", "id, name, label, plural_label, is_active, namespace_id"),
+                (
+                    "object_storage_objecttypedefinition",
+                    "id, name, label, plural_label, is_active, namespace_id, is_deleted",
+                ),
             ):
                 cursor.execute(
                     sql.SQL("GRANT SELECT ({}) ON {} TO {}").format(
