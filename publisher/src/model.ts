@@ -66,6 +66,8 @@ export interface Theme {
 export interface PublishedPageReference {
   id: DbId;
   cached_path: string;
+  root_id: DbId;
+  root_hostnames: string[];
 }
 
 export interface PublishedNavigationPage {
@@ -156,7 +158,7 @@ export interface PageReader {
   version(pageId: DbId, at: Date): Promise<Version | null>;
   theme(themeId: DbId, tenantId: DbId): Promise<Theme | null>;
   defaultTheme(tenantId: DbId): Promise<Theme | null>;
-  publishedPageReferences(pageIds: DbId[], tenantId: DbId, rootId: DbId, at: Date): Promise<PublishedPageReference[]>;
+  publishedPageReferences(pageIds: DbId[], tenantId: DbId, at: Date): Promise<PublishedPageReference[]>;
   publishedNavigationPages(parentIds: DbId[], tenantId: DbId, rootId: DbId, at: Date): Promise<PublishedNavigationPage[]>;
   publicMedia(mediaIds: DbId[], collectionIds: DbId[], tenantId: DbId): Promise<{
     files: PublicMediaItem[];
@@ -513,6 +515,21 @@ function pageHref(path: string, anchor: unknown): string {
   return fragment ? `${path}#${fragment}` : path;
 }
 
+function publishedReferencePaths(references: PublishedPageReference[], rootId: DbId, requestHost: string): Map<DbId, string> {
+  const localPort = /^.+\.localhost:(\d{1,5})$/i.exec(requestHost.trim())?.[1];
+  return new Map(references.flatMap((reference): [DbId, string][] => {
+    const path = reference.cached_path;
+    if (!path.startsWith('/') || path.startsWith('//')) return [];
+    if (reference.root_id === rootId) return [[String(reference.id), path]];
+    const registeredHost = reference.root_hostnames?.[0];
+    const host = registeredHost && normalizeHostname(registeredHost);
+    if (!host || host.includes('*') || host === 'default') return [];
+    const local = host.endsWith('.localhost');
+    const origin = `${local ? 'http' : 'https'}://${host}${local && localPort ? `:${localPort}` : ''}`;
+    return [[String(reference.id), `${origin}${path}`]];
+  }));
+}
+
 function replaceHtmlPageLinks(html: string, paths: Map<DbId, string>): string {
   const structured = html.replace(/\bhref=(['"])(.*?)\1/gi, (attribute, quote: string, rawValue: string) => {
     const decoded = rawValue.replaceAll('&quot;', '"').replaceAll('&#34;', '"').replaceAll('&#39;', "'").replaceAll('&amp;', '&');
@@ -550,6 +567,7 @@ function enrichValue(value: unknown, pagePaths: Map<DbId, string>, media: Map<Db
   if (!value || typeof value !== 'object') return value;
   const input = value as Record<string, unknown>;
   const result = Object.fromEntries(Object.entries(input).map(([key, child]) => [key, enrichValue(child, pagePaths, media)]));
+  delete result.publisherResolved;
   const pageId = input.pageId ?? input.page_id;
   if (pageId !== undefined && pageId !== null) {
     const resolved = pagePaths.get(String(pageId));
@@ -557,6 +575,7 @@ function enrichValue(value: unknown, pagePaths: Map<DbId, string>, media: Map<Db
       result.resolvedUrl = pageHref(resolved, input.anchor);
       result.url = result.resolvedUrl;
       result.isPublished = true;
+      result.publisherResolved = true;
     } else {
       delete result.resolvedUrl;
       delete result.resolved_url;
@@ -993,6 +1012,7 @@ async function buildSpecialPageModel(
   specialPage: ThemeSpecialPage,
   path: string,
   at: Date,
+  requestHost: string,
 ): Promise<PublishedPageModel | null> {
   const { root, rootVersion, theme } = context;
   const layoutKey = canonicalLayoutKey(specialPage.layout_key || theme?.layouts?.default_layout_key || 'mainLayout');
@@ -1014,10 +1034,10 @@ async function buildSpecialPageModel(
   const mediaIds = new Set<DbId>();
   const collectionIds = new Set<DbId>();
   collectReferences(slots, pageIds, mediaIds, collectionIds);
-  const references = await reader.publishedPageReferences([...pageIds], root.tenant_id, root.id, at);
+  const references = await reader.publishedPageReferences([...pageIds], root.tenant_id, at);
   const navigationPages = await reader.publishedNavigationPages([root.id], root.tenant_id, root.id, at);
   const publicMedia = await reader.publicMedia([...mediaIds], [...collectionIds], root.tenant_id);
-  const pagePaths = new Map(references.map(reference => [String(reference.id), reference.cached_path]));
+  const pagePaths = publishedReferencePaths(references, root.id, requestHost);
   slots = prepareWidgets(slots, pagePaths, publicMedia.files, publicMedia.collections, theme, [root], navigationPages);
 
   const themeOnlyPage = { ...root, enable_css_injection: false };
@@ -1056,18 +1076,18 @@ async function buildSpecialPageModel(
 }
 
 /** Prepare published directory bodies with the same links and public-media rules as pages. */
-export async function prepareEditorialWidgets(reader: PageReader, root: Page, version: Version, widgets: unknown, at: Date) {
+export async function prepareEditorialWidgets(reader: PageReader, root: Page, version: Version, widgets: unknown, at: Date, requestHost: string) {
   const slots = publishedObjectWidgets(widgets, at);
   const pageIds = new Set<DbId>();
   const mediaIds = new Set<DbId>();
   const collectionIds = new Set<DbId>();
   collectReferences(slots, pageIds, mediaIds, collectionIds);
-  const references = await reader.publishedPageReferences([...pageIds], root.tenant_id, root.id, at);
+  const references = await reader.publishedPageReferences([...pageIds], root.tenant_id, at);
   const media = await reader.publicMedia([...mediaIds], [...collectionIds], root.tenant_id);
   const defaultTheme = await reader.defaultTheme(root.tenant_id);
   const theme = version.theme_id ? await reader.theme(version.theme_id, root.tenant_id) : defaultTheme;
   return {
-    widgets: prepareWidgets(slots, new Map(references.map(reference => [String(reference.id), reference.cached_path])),
+    widgets: prepareWidgets(slots, publishedReferencePaths(references, root.id, requestHost),
       media.files, media.collections, theme, [root], []),
     themeWidgetTypes: defaultTheme?.widget_types ?? { version: 1 as const, items: [] },
   };
@@ -1086,7 +1106,7 @@ export async function buildThemeErrorPageModel(
     if (!context) return null;
     const specialPage = specialError(context.theme, statusCode);
     return specialPage
-      ? buildSpecialPageModel(reader, context, specialPage, `/${statusCode}`, at)
+      ? buildSpecialPageModel(reader, context, specialPage, `/${statusCode}`, at, hostname)
       : null;
   });
 }
@@ -1106,7 +1126,7 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
       : rootVersion ? await reader.defaultTheme(root.tenant_id) : null;
     const routePage = rootVersion ? specialRoute(rootTheme, path) : null;
     if (rootVersion && routePage) {
-      return buildSpecialPageModel(reader, { root, rootVersion, theme: rootTheme }, routePage, path, at);
+      return buildSpecialPageModel(reader, { root, rootVersion, theme: rootTheme }, routePage, path, at, hostname);
     }
     if (segments.length && LEGACY_ERROR_ROUTES.has(segments[0])) return null;
     const pages = [root];
@@ -1158,10 +1178,10 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
     const mediaIds = new Set<DbId>();
     const collectionIds = new Set<DbId>();
     collectReferences(slots, pageIds, mediaIds, collectionIds);
-    const references = await reader.publishedPageReferences([...pageIds], root.tenant_id, root.id, at);
+    const references = await reader.publishedPageReferences([...pageIds], root.tenant_id, at);
     const navigationPages = await reader.publishedNavigationPages(pages.map(page => page.id), root.tenant_id, root.id, at);
     const publicMedia = await reader.publicMedia([...mediaIds], [...collectionIds], root.tenant_id);
-    const pagePaths = new Map(references.map(reference => [String(reference.id), reference.cached_path]));
+    const pagePaths = publishedReferencePaths(references, root.id, hostname);
     slots = prepareWidgets(slots, pagePaths, publicMedia.files, publicMedia.collections, theme, pages, navigationPages);
     const compiledStyles = compilePublisherStyles(theme, current, currentVersion);
 
