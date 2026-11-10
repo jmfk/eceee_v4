@@ -1,5 +1,5 @@
 import React from 'react'
-import { render } from '@testing-library/react'
+import { fireEvent, render } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../../widgets', () => ({
@@ -66,5 +66,28 @@ describe('PageWidgetFactory preview markup', () => {
             'editor-overlay-toolbar',
             'editor-widget-toolbar',
         )
+    })
+
+    it('does not add a widget to multi-selection when its body is clicked', () => {
+        const onToggleWidgetSelection = vi.fn()
+        const { container } = render(
+            <PageWidgetFactory
+                widget={{
+                    id: 'banner-1',
+                    type: 'easy_widgets.BannerWidget',
+                    config: { textContent: 'Editable banner' },
+                }}
+                slotName="main"
+                index={0}
+                mode="editor"
+                showControls={true}
+                onToggleWidgetSelection={onToggleWidgetSelection}
+                isWidgetSelected={() => false}
+            />
+        )
+
+        fireEvent.click(container.querySelector('.widget-item .banner-widget'))
+
+        expect(onToggleWidgetSelection).not.toHaveBeenCalled()
     })
 })
