@@ -36,12 +36,21 @@ The team needs a repeatable workflow that turns each approved script into a fait
 
 ## Users and Use Cases
 
+- **Documentation author:** invokes the repository skill from Codex to draft or revise a Swedish video script and a traceable capture checklist for an ECEEE workflow.
 - **Documentation producer:** selects a Markdown script, reviews its scene plan, generates a preview, approves it, and exports the final video.
 - **CMS subject-matter reviewer:** checks that each UI action and explanation matches current product behavior.
 - **Accessibility reviewer:** checks subtitle readability, language, and timing.
 - **Maintainer:** updates a scene when the UI changes and regenerates only the affected preview and final video.
 
 ## Requirements
+
+### Codex manuscript generation skill
+
+- The repository provides an auto-discoverable Codex skill named `eceee-instructional-video-scripts`, invokable as `$eceee-instructional-video-scripts` while the project is open.
+- Given a workflow or feature, the skill inspects current ECEEE implementation and project docs, then creates or revises one Swedish Markdown script folder per video.
+- Each scene carries narration that is also the authoritative subtitle text and maps to a real screenshot or an explicit missing/blocked capture requirement.
+- The skill records unavailable views and state-changing capture needs in the shared capture checklist; it must not invent UI states or mutate production data.
+- The skill generates documentation only. Audio generation, browser animation, preview approval, and final video rendering remain in the production pipeline.
 
 ### Scene source and traceability
 
@@ -89,6 +98,9 @@ The team needs a repeatable workflow that turns each approved script into a fait
 
 ## Acceptance Criteria
 
+- [ ] A user can invoke `$eceee-instructional-video-scripts` from Codex in this repository and receive a per-video Markdown script and scene-to-capture register.
+- [ ] Generated scene narration and subtitle text match, and unavailable views are marked missing or blocked with a concrete capture request.
+- [ ] The skill does not claim to render audio/video or perform state-changing site actions.
 - [ ] A pilot Publisher video can be built from its Markdown script and scene manifest without manually clicking through each scene.
 - [ ] The preview shows the actual ECEEE UI, animated pointer/clicks, and the requested menus/dialogs for every unblocked scene.
 - [ ] Each scene verifies its expected route and UI state before capture; a failed assertion prevents that scene from being marked ready.
@@ -109,6 +121,7 @@ The team needs a repeatable workflow that turns each approved script into a fait
 
 ## Implementation Notes
 
+- Script generation is delivered as the project skill at `.agents/skills/eceee-instructional-video-scripts/`; keep its generation rules aligned with the formats under `docs/manus/instruktionsvideos/`.
 - Initial implementation recommendation: TypeScript with Playwright browser automation and browser-viewport screencast, using small, scene-oriented manifests. A macOS full-desktop screen recording is not required for normal CMS UI captures.
 - Generate or align voice-over per scene, derive phrase-level WebVTT captions, and mux the browser recording and audio into MP4 after approval.
 - Start with the Publisher walkthrough as the end-to-end pilot because its current production UI states are available read-only. Use staging for all mutations.
@@ -120,6 +133,7 @@ The team needs a repeatable workflow that turns each approved script into a fait
 
 ## Related Materials
 
+- [Codex script-generation skill](../../.agents/skills/eceee-instructional-video-scripts/SKILL.md)
 - [Instructional video scripts and screenshots](../../docs/manus/instruktionsvideos/README.md)
 - [Supplemental screenshot capture list](../../docs/manus/instruktionsvideos/shot-list-for-nattcapture.md)
 

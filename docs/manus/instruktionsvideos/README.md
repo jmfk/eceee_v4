@@ -2,6 +2,10 @@
 
 Varje videomapp innehåller `manus.md` och `screenshots/README.md`. Registret knyter varje bildfil till den synliga vyn och den exakta berättarrösten/undertexten för scenen.
 
+## Skapa manus i Codex
+
+Öppna ECEEE-projektet i Codex och aktivera `$eceee-instructional-video-scripts`. Ange ämne eller arbetsflöde, målgrupp och önskad längd om du har preferenser. Skillen granskar aktuell implementation och tar fram ett svenskt manus med scenvis berättarröst/undertext och en lista över skärmbilder som finns eller saknas. Den skapar manus- och fångstunderlag; den spelar inte in sajten och genererar inte ljud eller video.
+
 ## Status för skärmbilder
 
 20 faktiska Chrome-skärmbilder från `app.eceee.org` är sparade i respektive videomapp. De täcker Publisher, taggstrukturen, filtrering, mediafält, rättigheter och Designer-temalistan. Det betyder inte att alla scener är bildsatta: Proposals var tom i prod och Designer-arbetsytan fastnade vid “Loading Designer workspace…”. Därför saknas verkliga exempel på förslagsgranskning och bilder på marginal-, padding- och fontkontrollerna. Register markerar saknade eller blockerade scener uttryckligen; använd inte laddningsläget som färdig instruktionsbild.
