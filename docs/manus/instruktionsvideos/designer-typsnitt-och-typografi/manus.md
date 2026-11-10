@@ -1,5 +1,9 @@
 # Designer: ändra typsnitt och typografi
 
+> **Skärmbilder:** Faktiska bilder från Chrome ska läggas i `screenshots/` i denna mapp. Scenregistret i `screenshots/README.md` kopplar filnamn, synlig vy och berättarröst.
+> **Produktionsnot:** Designer-temalistan laddade, men den öppnade produktionsarbetsytan stannade på «Loading Designer workspace…». Bekräfta att arbetsytan fungerar innan detaljbilder spelas in.
+
+
 **Längd:** cirka 4 minuter
 **Målgrupp:** designers som justerar textens utseende i ett tema
 **Syfte:** visa hur typsnitt och typografivärden undersöks och finjusteras med förhandsvisning.
@@ -14,11 +18,13 @@
 
 ### 1. Börja med textens roll
 
+
 **Bild:** Visa exempel på rubrik och brödtext i förhandsvisningen.
 
 **Berättarröst:** «Börja med att avgöra vilken text du vill förbättra. En rubrik och en längre brödtext har olika behov. Kontrollera läsbarhet, hierarki och kontrast innan du ändrar värden.»
 
 ### 2. Undersök befintliga typsnitt
+
 
 **Bild:** Öppna typografi- eller fontinställningarna. Visa aktuella familjer och tillgängliga varianter.
 
@@ -26,17 +32,20 @@
 
 ### 3. Ändra en egenskap åt gången
 
+
 **Bild:** Välj en typografisk egenskap som UI:t erbjuder, exempelvis familj, storlek, vikt eller radavstånd. Ändra en sak och visa resultatet.
 
 **Berättarröst:** «Justera en egenskap i taget. Byt till exempel först familj eller vikt, jämför, och ändra sedan storlek eller radavstånd om det behövs. Se till att rubriker fortfarande känns tydliga och att längre text är bekväm att läsa.»
 
 ### 4. Kontrollera olika textlängder och vyer
 
+
 **Bild:** Växla mellan kort exempeltext och längre förhandsvisning. Kontrollera bred och smal vy om tillgängligt.
 
 **Berättarröst:** «Ett typsnitt kan fungera bra i en kort rubrik men sämre i ett längre stycke. Granska flera textlängder och vybredder. Använd förhandsvisningen som stöd och kontrollera gärna den riktiga sidan innan publicering.»
 
 ### 5. Spara utkastet
+
 
 **Bild:** Spara utkast. Visa att publiceringssteget är separat.
 

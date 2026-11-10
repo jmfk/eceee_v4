@@ -1,5 +1,8 @@
 # Taggar: förslag och godkännande
 
+> **Skärmbilder:** Faktiska bilder från Chrome ska läggas i `screenshots/` i denna mapp. Scenregistret i `screenshots/README.md` kopplar filnamn, synlig vy och berättarröst.
+
+
 **Längd:** cirka 3 minuter
 **Målgrupp:** redaktörer som föreslår taggar och användare som granskar förslag
 **Syfte:** visa hur ett taggförslag lämnas in och granskas, samt vad som händer innan det godkänts.
@@ -18,11 +21,13 @@ Videon handlar om förslagsflödet i det gemensamma taggregistret. Skilj detta f
 
 ### 1. När ska man föreslå en tagg?
 
+
 **Bild:** Visa Tags och sök efter en term som inte finns. Visa typen där termen skulle höra hemma.
 
 **Berättarröst:** «Om den gemensamma vokabulären saknar en term ska du inte skapa en konkurrerande fritexttagg. Kontrollera först att termen inte redan finns under ett annat namn eller i en annan typ. Skicka sedan in ett förslag.»
 
 ### 2. Skicka in förslaget
+
 
 **Bild:** Välj New tag. Fyll i namn, kort beskrivning och eventuella alternativa namn. Visa knappen Submit proposal. Stanna innan slutlig inlämning om miljön är skarp.
 
@@ -30,17 +35,20 @@ Videon handlar om förslagsflödet i det gemensamma taggregistret. Skilj detta f
 
 ### 3. Följ statusen
 
+
 **Bild:** Öppna fliken Proposals och visa status för ett förberett testförslag.
 
 **Berättarröst:** «I Proposals ser du inlämnade ändringar och deras beslutsstatus. En granskare behöver både rätt att fatta beslut och behörighet för den föreslagna åtgärden. Ett förslag blir inte godkänt bara för att det har skickats in.»
 
 ### 4. Granska och fatta beslut
 
+
 **Bild:** Som granskningskonto öppnar du förslaget. Läs namn, beskrivning och typ. Visa beslutsalternativen; genomför endast ett kontrollerat testbeslut i testmiljö.
 
 **Berättarröst:** «Granska att termen passar rätt typ, inte duplicerar en befintlig term och har tillräcklig kontext. Följ de beslutsalternativ som visas och organisationens ansvarsfördelning. Vid godkännande blir termen tillgänglig enligt registret och dess tillåtna användning.»
 
 ### 5. Vad gäller innan godkännande?
+
 
 **Bild:** Visa ett utkast med föreslagen tagg och därefter mediaflödet där endast godkända termer kan användas för godkännande.
 

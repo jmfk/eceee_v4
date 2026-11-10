@@ -1,5 +1,9 @@
 # Designer: hitta rätt tema och förstå arbetsytan
 
+> **Skärmbilder:** Faktiska bilder från Chrome ska läggas i `screenshots/` i denna mapp. Scenregistret i `screenshots/README.md` kopplar filnamn, synlig vy och berättarröst.
+> **Produktionsnot:** Designer-temalistan laddade, men den öppnade produktionsarbetsytan stannade på «Loading Designer workspace…». Bekräfta att arbetsytan fungerar innan detaljbilder spelas in.
+
+
 **Längd:** cirka 2,5 minuter
 **Målgrupp:** användare med Designer-åtkomst
 **Syfte:** introducera Designer och förklara skillnaden mellan utkast och live-tema.
@@ -13,23 +17,27 @@
 
 ### 1. Öppna temat
 
+
 **Bild:** Öppna Designer och välj tema från temalistan.
 
 **Berättarröst:** «Designer är en avgränsad arbetsyta för att justera ett temas visuella egenskaper. Öppna det tema du har fått åtkomst till. Vilka delar du kan redigera styrs av tilldelad behörighet.»
 
 ### 2. Orientera dig
 
-**Bild:** Visa temats navigation och förhandsvisning. Peka ut områden för färg/palett, typografi, marginaler och padding samt temaassets, utan att gå in på alla detaljer.
+
+**Bild:** **Saknas.** Visa temats navigation och förhandsvisning och peka ut områden för färg/palett, typografi, marginaler och padding samt temaassets. Den befintliga fångsten visar endast laddningsläget och ska inte användas som färdig instruktionsbild.
 
 **Berättarröst:** «Arbetsytan samlar inställningar för bland annat färger, typsnitt, marginaler, padding och assets. Förhandsvisningen hjälper dig att bedöma hur ändringen påverkar temat. Börja med en egenskap i taget och kontrollera resultatet.»
 
 ### 3. Förstå utkastet
+
 
 **Bild:** Ändra en ofarlig egenskap och visa uppdaterad förhandsvisning. Visa Save draft och Publish changes, men publicera inte.
 
 **Berättarröst:** «Ändringar visas i arbetsytans utkast. Save draft sparar utkastet, men ändrar inte den live-publicerade designen. Publish changes är det separata steget som gör de verifierade ändringarna live.»
 
 ### 4. Håll koll på delat arbete
+
 
 **Bild:** Visa statusmeddelande eller versionsinformation när den finns.
 

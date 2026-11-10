@@ -1,5 +1,8 @@
 # Taggar: den gemensamma taggstrukturen
 
+> **Skärmbilder:** Faktiska bilder från Chrome ska läggas i `screenshots/` i denna mapp. Scenregistret i `screenshots/README.md` kopplar filnamn, synlig vy och berättarröst.
+
+
 **Längd:** cirka 2,5 minuter
 **Målgrupp:** redaktörer och taggadministratörer
 **Syfte:** förklara hur taggar organiseras och hur rätt term väljs.
@@ -13,11 +16,13 @@
 
 ### 1. Öppna taggregistret
 
+
 **Bild:** Öppna Tags. Visa sökfält, typfilter och träd/lista.
 
 **Berättarröst:** «Taggregistret samlar vokabulären som kan användas på sidor, objekt och media. Taggar tillhör en typ och ett namespace. Börja med att söka eller välj ett typfilter så att du arbetar i rätt sammanhang.»
 
 ### 2. Förstå typ och plats
+
 
 **Bild:** Välj en tagg och visa Details och Location. Visa typ och sökväg i hierarkin.
 
@@ -25,11 +30,13 @@
 
 ### 3. Använd taggar på innehåll
 
+
 **Bild:** Öppna ett ofarligt utkast i en sida eller ett objekt och visa taggväljaren. Sök fram en godkänd term och lägg till den utan att publicera.
 
 **Berättarröst:** «När du taggar innehåll väljer du en befintlig godkänd term. Förslag är inte samma sak som godkända taggar. För media är klassificering obligatorisk före godkännande; en fritextetikett eller AI-rekommendation räcker inte.»
 
 ### 4. Visa sökfilter
+
 
 **Bild:** Lägg till ett typfilter via ikonen i sökfältet. Visa filtret som en borttagbar pill och rensa det.
 
