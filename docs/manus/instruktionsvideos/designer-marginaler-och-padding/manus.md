@@ -1,5 +1,9 @@
 # Designer: undersöka och ändra marginaler och padding
 
+> **Skärmbilder:** Faktiska bilder från Chrome ska läggas i `screenshots/` i denna mapp. Scenregistret i `screenshots/README.md` kopplar filnamn, synlig vy och berättarröst.
+> **Produktionsnot:** Designer-temalistan laddade, men den öppnade produktionsarbetsytan stannade på «Loading Designer workspace…». Bekräfta att arbetsytan fungerar innan detaljbilder spelas in.
+
+
 **Längd:** cirka 4 minuter
 **Målgrupp:** designers som finjusterar avstånd i temat
 **Syfte:** lära ut ett säkert arbetssätt för att förstå vilket avstånd som skapar problemet och justera rätt värde.
@@ -14,11 +18,13 @@
 
 ### 1. Skilj marginal från padding
 
+
 **Bild:** Visa en komponent med tydlig yttre och inre luft. Lägg gärna en enkel grafisk markering ovanpå videon: marginal utanför komponenten, padding mellan kanten och innehållet.
 
 **Berättarröst:** «När ett element ligger för nära något annat handlar det ofta om marginal. När text eller bild ligger för nära elementets egen kant handlar det ofta om padding. Börja med att avgöra vilken av de två situationerna du ser.»
 
 ### 2. Hitta rätt inställning
+
 
 **Bild:** Öppna Designer-sektionen för marginaler och padding. Visa grupperna eller kontrollernas namn och koppla en kontroll till komponenten i förhandsvisningen.
 
@@ -26,11 +32,13 @@
 
 ### 3. Ändra stegvis och jämför
 
+
 **Bild:** Ändra ett värde i liten omfattning. Vänta på att förhandsvisningen uppdateras. Visa före/efter och prova vid behov ett andra breakpoint eller en annan vy.
 
 **Berättarröst:** «Gör en liten justering och kontrollera förhandsvisningen. Se om avståndet blev bättre utan att texten blir trång eller att layouten tappar balans. Kontrollera gärna en smal vy också, eftersom samma ändring kan upplevas olika vid olika bredder.»
 
 ### 4. Spara som utkast
+
 
 **Bild:** Visa den slutliga förhandsvisningen och välj Save draft. Visa bekräftelsen/statusen. Låt Publish changes vara orörd.
 
