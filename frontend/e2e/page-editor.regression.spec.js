@@ -49,6 +49,100 @@ const saveCurrentVersion = async page => {
 
 const getSavedVersion = editorState => editorState.savedVersions.at(-1)
 
+test('content lists inside block containers survive saving and reload', async ({ page }) => {
+  const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })
+  await openEditor(page, state)
+  await setEditorHtml(page, 'content-intro', '<div><ul><li>Alpha</li><li>Beta</li></ul></div>')
+  await saveCurrentVersion(page)
+  expect(getSavedVersion(state).widgets.main.find(widget => widget.id === 'content-intro').config.content)
+    .toContain('<ul><li>Alpha</li><li>Beta</li></ul>')
+  await reloadCmsPage(page)
+  await expect(contentEditor(page).locator('ul > li')).toHaveText(['Alpha', 'Beta'])
+})
+
+for (const listTag of ['ul', 'ol']) {
+  test(`removing a ${listTag} list creates paragraphs that survive saving and reload`, async ({ page }) => {
+    const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })
+    state.version.widgets.main.find(widget => widget.id === 'content-intro').config.content =
+      `<${listTag}><li>Alpha</li><li>Beta</li></${listTag}>`
+    await openEditor(page, state)
+    const editor = contentEditor(page)
+    await editor.evaluate(element => {
+      element.focus()
+      const range = document.createRange()
+      const items = element.querySelectorAll('li')
+      range.setStart(items[0].firstChild, 0)
+      range.setEnd(items[items.length - 1].firstChild, items[items.length - 1].firstChild.length)
+      const selection = window.getSelection()
+      selection.removeAllRanges()
+      selection.addRange(range)
+    })
+    await page.locator('.global-wysiwyg-toolbar').getByRole('button', {
+      name: listTag === 'ul' ? 'Bullet List' : 'Numbered List', exact: true,
+    }).click()
+    await expect(editor.locator('li')).toHaveCount(0)
+    await page.locator('.global-wysiwyg-toolbar').getByRole('button', { name: 'Undo', exact: true }).click()
+    await expect(editor.locator(`${listTag} > li`)).toHaveText(['Alpha', 'Beta'])
+    await page.locator('.global-wysiwyg-toolbar').getByRole('button', { name: 'Redo', exact: true }).click()
+    await expect(editor.locator('li')).toHaveCount(0)
+    await saveCurrentVersion(page)
+    const saved = getSavedVersion(state).widgets.main.find(widget => widget.id === 'content-intro').config.content
+    expect(saved).toMatch(/^<p>.*Alpha.*<\/p><p>.*Beta.*<\/p>$/)
+    expect(saved).not.toMatch(/<(ul|ol|li)[\s>]/)
+    await reloadCmsPage(page)
+    await expect(contentEditor(page).locator(':scope > p')).toHaveText(['Alpha', 'Beta'])
+  })
+}
+
+test('unlisting one item preserves inline formatting and the remaining list', async ({ page }) => {
+  const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })
+  state.version.widgets.main.find(widget => widget.id === 'content-intro').config.content =
+    '<ul><li><strong>Alpha</strong></li><li>Beta</li></ul>'
+  await openEditor(page, state)
+  const editor = contentEditor(page)
+  await editor.evaluate(element => {
+    element.focus()
+    const range = document.createRange()
+    range.setStart(element.querySelector('strong').firstChild, 2)
+    range.collapse(true)
+    const selection = window.getSelection()
+    selection.removeAllRanges()
+    selection.addRange(range)
+  })
+  await page.locator('.global-wysiwyg-toolbar').getByRole('button', { name: 'Bullet List', exact: true }).click()
+  await expect(editor.locator('strong')).toHaveText('Alpha')
+  await expect(editor.locator('ul > li')).toHaveText(['Beta'])
+  await saveCurrentVersion(page)
+  await reloadCmsPage(page)
+  await expect(contentEditor(page).locator(':scope > p > strong')).toHaveText('Alpha')
+  await expect(contentEditor(page).locator('ul > li')).toHaveText(['Beta'])
+})
+
+test('outdenting a nested list saves valid list structure and supports one-step undo', async ({ page }) => {
+  const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })
+  state.version.widgets.main.find(widget => widget.id === 'content-intro').config.content =
+    '<ul><li>Parent<ul><li>Child</li></ul></li><li>Other</li></ul>'
+  await openEditor(page, state)
+  const editor = contentEditor(page)
+  await editor.evaluate(element => {
+    element.focus()
+    const range = document.createRange()
+    range.setStart(element.querySelector('li li').firstChild, 2)
+    range.collapse(true)
+    const selection = window.getSelection()
+    selection.removeAllRanges()
+    selection.addRange(range)
+  })
+  await page.locator('.global-wysiwyg-toolbar').getByRole('button', { name: 'Bullet List', exact: true }).click()
+  await page.locator('.global-wysiwyg-toolbar').getByRole('button', { name: 'Undo', exact: true }).click()
+  await expect(editor.locator('li > ul > li')).toHaveText('Child')
+  await page.locator('.global-wysiwyg-toolbar').getByRole('button', { name: 'Redo', exact: true }).click()
+  await saveCurrentVersion(page)
+  await reloadCmsPage(page)
+  await expect(contentEditor(page).locator(':scope > ul > li')).toHaveText(['Parent', 'Child', 'Other'])
+  await expect(contentEditor(page).locator('li > li')).toHaveCount(0)
+})
+
 test.describe('page editor regressions', () => {
   test.beforeEach(async ({ page }) => {
     installErrorGuards(page)

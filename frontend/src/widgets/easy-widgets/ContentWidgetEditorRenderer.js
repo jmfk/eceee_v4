@@ -11,6 +11,57 @@ import { inlineFieldHtml } from '../../utils/richTextFieldHtml'
 import { WysiwygContextMenu } from '../../components/wysiwyg/WysiwygContextMenu.js'
 import { LinkPickerModal } from '../../components/special-editors/LinkPickerModal.js'
 
+// Serialize native unlisting as paragraphs without mutating the live editor:
+// DOM rewrites or a second execCommand would break the native Undo transaction.
+const normalizeUnlistedHTML = html => {
+    const container = document.createElement('div')
+    container.innerHTML = html
+    // Chromium can outdent by placing li directly inside li. Promote those
+    // siblings together so their order survives serialization and reloading.
+    let nestedItem
+    while ((nestedItem = container.querySelector('li > li'))) {
+        const parent = nestedItem.parentElement
+        parent.after(...Array.from(parent.children).filter(child => child.tagName === 'LI'))
+    }
+    container.querySelectorAll('ul, ol').forEach(list => {
+        if (!list.querySelector('li') && !list.textContent.trim()) list.remove()
+    })
+    Array.from(container.querySelectorAll('div')).reverse().forEach(div => {
+        if (div.closest('[data-media-insert]')) return
+        if (div.querySelector('p, ul, ol, div, blockquote, pre, h1, h2, h3, h4, h5, h6, table')) {
+            div.replaceWith(...div.childNodes)
+        } else {
+            const p = document.createElement('p')
+            Array.from(div.attributes).forEach(attr => p.setAttribute(attr.name, attr.value))
+            p.append(...div.childNodes)
+            div.replaceWith(p)
+        }
+    })
+    const inlineTags = ['SPAN', 'STRONG', 'B', 'EM', 'I', 'A', 'CODE', 'U', 'S', 'SUB', 'SUP']
+    let paragraph = null
+    Array.from(container.childNodes).forEach(node => {
+        if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR') {
+            if (!paragraph) {
+                const emptyParagraph = document.createElement('p')
+                emptyParagraph.appendChild(document.createElement('br'))
+                container.insertBefore(emptyParagraph, node)
+            }
+            node.remove()
+            paragraph = null
+        } else if (node.nodeType === Node.TEXT_NODE || inlineTags.includes(node.nodeName)) {
+            if (!paragraph && !node.textContent.trim()) return
+            if (!paragraph) {
+                paragraph = document.createElement('p')
+                container.insertBefore(paragraph, node)
+            }
+            paragraph.appendChild(node)
+        } else {
+            paragraph = null
+        }
+    })
+    return container.innerHTML
+}
+
 /**
  * Clean up HTML content by only allowing basic HTML elements and attributes
  * Converts complex structures like tables to simple paragraphs
@@ -56,6 +107,13 @@ const cleanHTML = (html) => {
         }
 
         if (!allowedTags.includes(tagName)) {
+            // Unwrap containers around existing blocks. Turning them into paragraphs
+            // would create invalid p > ul/ol nesting, which later cleanup flattens.
+            if (['div', 'section', 'article', 'header', 'footer', 'main', 'aside'].includes(tagName) &&
+                el.querySelector(blockTags.join(','))) {
+                el.replaceWith(...el.childNodes)
+                return
+            }
             // Special handling for div - only allowed if it's a media insert
             if (tagName === 'div') {
                 // Already handled above - this branch won't be reached for media inserts
@@ -1019,7 +1077,9 @@ class ContentWidgetEditorRenderer {
     handleContentChange() {
         if (this.disabled) return
         if (this.editorElement) {
-            const currentContent = this.inlineOnly ? inlineFieldHtml(this.editorElement.innerHTML) : this.editorElement.innerHTML
+            const html = this.editorElement.innerHTML
+            const currentContent = this.inlineOnly ? inlineFieldHtml(html)
+                : this.normalizeUnlistedContent ? normalizeUnlistedHTML(html) : html
             // Only call onChange if content actually changed
             if (currentContent !== this.content) {
                 this.content = currentContent
@@ -2548,6 +2608,10 @@ class ContentWidgetEditorRenderer {
         }
 
         // Handle standard document commands
+        const isListCommand = ['insertUnorderedList', 'insertOrderedList'].includes(command)
+        if (isListCommand) {
+            this.normalizeUnlistedContent = true
+        }
         document.execCommand(command, false, value)
 
         // Apply strict cleanup after formatBlock to fix nesting
