@@ -81,7 +81,7 @@ export const PageRenderer = ({ model }: { model: RenderPageModel }) => {
         {model.context.mode !== 'public' && <main className="layout-safe-fallback">{Object.entries(model.slots).filter(([, widgets]) => widgets?.length).map(([name, widgets]) => <section key={name} data-slot-name={name}>{renderWidgets(widgets)}</section>)}</main>}
     </div>
     }
-    return <div className="site-renderer cms-content" data-render-layout={model.layout}>
+    return <div className="site-renderer cms-content legacy-layout" data-render-layout={model.layout}>
         <Layout model={model} renderSlot={renderSlot} />
     </div>
 }
