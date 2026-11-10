@@ -22,6 +22,28 @@ class ECEEEAPIClientTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "endpoint=machine_denied"):
             eceee_api.build_url("https://dev.example/api/v1/", "core/machine-api-keys/")
 
+    def test_collaboration_routes_reuse_the_supported_client(self):
+        for endpoint in ["support/instructions/", "support/inbox/", "support/threads/", "kanban/boards/", "utils/current-user/", "utils/profile-photos/2/"]:
+            self.assertEqual(eceee_api.build_url("http://localhost:11601/api/v1/", endpoint), "http://localhost:11601/api/v1/" + endpoint)
+        with self.assertRaisesRegex(ValueError, "endpoint=machine_denied"):
+            eceee_api.build_url("http://localhost:11601/api/v1/", "utils/users/2/")
+        with self.assertRaisesRegex(ValueError, "profile=theme_only"):
+            eceee_api.validate_profile_endpoint("production-themes", "support/instructions/")
+
+    def test_saved_private_responses_are_mode_0600_and_do_not_follow_symlinks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "response.json"
+            output.write_bytes(b"old")
+            output.chmod(0o644)
+            eceee_api.write_private_output(output, b"private-response")
+            self.assertEqual(stat.S_IMODE(output.stat().st_mode), 0o600)
+            self.assertEqual(output.read_bytes(), b"private-response")
+            link = Path(directory) / "link"
+            link.symlink_to(output)
+            with self.assertRaisesRegex(ValueError, "output=symlink_denied"):
+                eceee_api.write_private_output(link, b"overwrite")
+            self.assertEqual(output.read_bytes(), b"private-response")
+
     def test_env_file_requires_private_mode(self):
         with tempfile.TemporaryDirectory() as directory:
             env_file = Path(directory) / ".env.local"

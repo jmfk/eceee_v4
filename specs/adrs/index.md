@@ -4,6 +4,7 @@
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
+| ADR-0070 | [Machine collaboration and private learning boundaries](active/0070-machine-collaboration-and-private-learning-boundaries.md) | accepted | PRD-0051 |
 | ADR-0069 | [Columnist card metadata and profile reading columns](active/0069-columnist-card-metadata-and-profile-columns.md) | accepted | PRD-0048 |
 | ADR-0068 | [Editorial directory templates on existing object widgets](active/0068-editorial-directory-templates.md) | accepted | PRD-0048 |
 | ADR-0067 | [Source-shaped focal crops for news images](active/0067-source-shaped-focal-news-images.md) | accepted | PRD-0045, PRD-0047 |

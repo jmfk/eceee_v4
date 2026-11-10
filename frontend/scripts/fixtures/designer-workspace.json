@@ -1,0 +1,461 @@
+{
+  "id": 7,
+  "name": "Editorial",
+  "description": "Theme for editorial sites",
+  "syncVersion": 4,
+  "liveSyncVersion": 4,
+  "draftVersion": 2,
+  "hasDraftChanges": false,
+  "mediaNamespace": "theme-tenant",
+  "themeConfig": {
+    "colors": {
+      "brand": "#000000"
+    },
+    "fonts": {
+      "googleFonts": [
+        {
+          "family": "Roboto",
+          "variants": [
+            "400"
+          ]
+        }
+      ]
+    },
+    "designGroups": {
+      "groups": [
+        {
+          "name": "Article",
+          "widgetTypes": [
+            "easy_widgets.ContentWidget"
+          ],
+          "elements": {
+            "h1": {}
+          },
+          "layoutProperties": {
+            "content-widget": {
+              "md": {}
+            }
+          }
+        }
+      ]
+    }
+  },
+  "colors": [
+    {
+      "name": "brand",
+      "value": "#123456",
+      "usage": [
+        "Article / h1"
+      ]
+    }
+  ],
+  "fonts": [
+    {
+      "family": "Inter",
+      "variants": [
+        "400",
+        "700"
+      ],
+      "display": "swap",
+      "usage": [
+        "Article / h1"
+      ],
+      "references": [
+        {
+          "definition": "Article",
+          "classes": []
+        }
+      ]
+    }
+  ],
+  "typography": [
+    {
+      "targetId": "group:0:element:h1",
+      "groupIndex": 0,
+      "groupName": "Article",
+      "element": "h1",
+      "values": {
+        "fontFamily": "Inter",
+        "fontSize": "32px"
+      }
+    }
+  ],
+  "spacing": [
+    {
+      "targetId": "group:0:element:h1",
+      "scope": "element",
+      "groupIndex": 0,
+      "groupName": "Article",
+      "element": "h1",
+      "values": {
+        "marginBottom": "16px",
+        "paddingTop": "8px"
+      }
+    },
+    {
+      "targetId": "group:0:part:content-widget",
+      "scope": "layout",
+      "groupIndex": 0,
+      "groupName": "Article",
+      "part": "content-widget",
+      "breakpoint": "md",
+      "values": {
+        "padding": "24px"
+      }
+    }
+  ],
+  "assets": [
+    {
+      "assetKey": "preview",
+      "displayName": "Theme preview image",
+      "filename": "theme-preview.png",
+      "url": "https://storage.test/theme-preview.png",
+      "kind": "preview",
+      "usage": [
+        "Theme listing preview"
+      ],
+      "isPlaceholder": false,
+      "replaceable": true
+    },
+    {
+      "assetKey": "site-icon",
+      "displayName": "Site icon (favicon)",
+      "filename": null,
+      "url": null,
+      "kind": "site-icon",
+      "usage": [
+        "Browser and application icon"
+      ],
+      "isPlaceholder": true,
+      "replaceable": true
+    },
+    {
+      "assetKey": "design:0:hero:md:background",
+      "displayName": "Article hero",
+      "kind": "design-group",
+      "usage": [
+        "Article / hero / md / background"
+      ],
+      "requiredWidth": 1600,
+      "requiredHeight": 900,
+      "requirementSource": "explicit",
+      "dpr": 2,
+      "isPlaceholder": true,
+      "replaceable": true,
+      "validation": {
+        "status": "ok",
+        "message": "Explicit dimensions configured."
+      },
+      "groupIndex": 0,
+      "part": "content-widget",
+      "breakpoint": "md"
+    },
+    {
+      "assetKey": "design:0:hero:sm:background",
+      "displayName": "Article hero mobile",
+      "kind": "design-group",
+      "usage": [
+        "Article / hero / sm / background"
+      ],
+      "requiredWidth": 800,
+      "requiredHeight": 600,
+      "requirementSource": "explicit",
+      "dpr": 2,
+      "isPlaceholder": false,
+      "replaceable": true,
+      "filename": "article-hero-mobile.png",
+      "url": "https://storage.test/article-hero-mobile.png",
+      "validation": {
+        "status": "ok",
+        "message": "Explicit dimensions configured."
+      },
+      "groupIndex": 0,
+      "part": "content-widget",
+      "breakpoint": "sm"
+    },
+    {
+      "assetKey": "design:1:menu:xs:background",
+      "displayName": "Callout background",
+      "kind": "design-group",
+      "usage": [
+        "Callout / menu / xs / background"
+      ],
+      "requiredWidth": 800,
+      "requiredHeight": 300,
+      "requirementSource": "explicit",
+      "dpr": 2,
+      "isPlaceholder": false,
+      "replaceable": true,
+      "filename": "callout-background.png",
+      "url": "https://storage.test/callout-background.png",
+      "groupIndex": 1,
+      "part": "menu",
+      "breakpoint": "xs",
+      "property": "background"
+    },
+    {
+      "assetKey": "library:imported-example.jpg",
+      "displayName": "imported-example.jpg",
+      "filename": "imported-example.jpg",
+      "url": "https://storage.test/theme_images/7/library/imported-example.jpg",
+      "kind": "library",
+      "usage": [
+        "Unused theme library asset"
+      ],
+      "width": 1200,
+      "height": 630,
+      "size": 24576,
+      "isPlaceholder": false,
+      "replaceable": false
+    }
+  ],
+  "canUndo": true,
+  "breakpoints": {
+    "xs": 0,
+    "sm": 640,
+    "md": 768,
+    "lg": 1024,
+    "xl": 1280
+  },
+  "contentSources": [
+    {
+      "id": 12,
+      "label": "conference.example",
+      "hostname": "conference.example"
+    },
+    {
+      "id": 13,
+      "label": "Draft site",
+      "hostname": ""
+    }
+  ],
+  "contentPages": [
+    {
+      "id": 42,
+      "pageId": 42,
+      "pageTitle": "Programme",
+      "label": "conference.example — Programme",
+      "siteId": 12,
+      "siteLabel": "conference.example",
+      "tenantIdentifier": "theme-tenant",
+      "slugPath": "programme",
+      "versionId": 9,
+      "versionStatus": "published",
+      "layout": "main_layout"
+    },
+    {
+      "id": 43,
+      "pageId": 43,
+      "pageTitle": "Draft programme",
+      "label": "Draft site — Draft programme",
+      "siteId": 13,
+      "siteLabel": "Draft site",
+      "tenantIdentifier": "theme-tenant",
+      "slugPath": "draft-programme",
+      "versionId": 10,
+      "versionStatus": "draft",
+      "layout": "main_layout"
+    },
+    {
+      "id": 44,
+      "pageId": 44,
+      "pageTitle": "Empty page",
+      "label": "Draft site — Empty page",
+      "siteId": 13,
+      "siteLabel": "Draft site",
+      "tenantIdentifier": "theme-tenant",
+      "slugPath": "empty",
+      "versionId": null,
+      "versionStatus": "empty",
+      "layout": "main_layout"
+    }
+  ],
+  "contentObjects": [
+    {
+      "id": 55,
+      "objectId": 55,
+      "objectTitle": "Welcome article",
+      "label": "Article — Welcome article",
+      "objectType": "article",
+      "objectTypeLabel": "Article",
+      "versionId": 15
+    }
+  ],
+  "previewContent": {
+    "views": [
+      {
+        "id": "page-main",
+        "label": "Article page",
+        "kind": "page",
+        "layout": "main_layout",
+        "texts": {},
+        "images": {}
+      },
+      {
+        "id": "object-card",
+        "label": "Article card",
+        "kind": "object",
+        "layout": "main_layout",
+        "texts": {},
+        "images": {}
+      }
+    ]
+  },
+  "catalog": {
+    "designGroups": [
+      {
+        "id": "group:0",
+        "groupIndex": 0,
+        "label": "Article",
+        "description": "Editorial content",
+        "slots": [
+          "main"
+        ],
+        "widgetTypes": [
+          "easy_widgets.ContentWidget"
+        ],
+        "elements": [
+          {
+            "id": "group:0:element:h1",
+            "element": "h1",
+            "label": "Heading 1"
+          }
+        ],
+        "parts": [
+          {
+            "id": "group:0:part:content-widget",
+            "part": "content-widget",
+            "label": "Content",
+            "breakpoints": [
+              "md"
+            ]
+          }
+        ],
+        "assetKeys": [
+          "design:0:hero:md:background",
+          "design:0:hero:sm:background"
+        ],
+        "colorNames": [
+          "brand"
+        ]
+      },
+      {
+        "id": "group:1",
+        "groupIndex": 1,
+        "label": "Callout",
+        "description": "Short highlighted content",
+        "slots": [
+          "main"
+        ],
+        "widgetTypes": [
+          "easy_widgets.ContentWidget"
+        ],
+        "elements": [
+          {
+            "id": "group:1:element:p",
+            "element": "p",
+            "label": "Paragraph"
+          }
+        ],
+        "parts": [
+          {
+            "id": "group:1:part:content-widget",
+            "part": "content-widget",
+            "label": "Content",
+            "breakpoints": [
+              "md"
+            ]
+          }
+        ],
+        "assetKeys": [],
+        "colorNames": []
+      }
+    ],
+    "componentStyles": [
+      {
+        "key": "feature-card",
+        "label": "Feature card",
+        "description": "Highlighted card",
+        "template": "<article class=\"feature-card\">{{{content}}}</article>"
+      },
+      {
+        "key": "sub-navigation",
+        "label": "Sub navigation",
+        "description": "",
+        "template": "{{#isInherited}}{{#hasCurrentChildren}}<nav>{{#currentChildren}}<a href=\"{{path}}\">{{title}}</a>{{/currentChildren}}</nav>{{/hasCurrentChildren}}{{/isInherited}}"
+      }
+    ],
+    "layouts": [
+      {
+        "key": "main_layout",
+        "label": "Main layout",
+        "description": "Content and sidebar",
+        "slots": [
+          {
+            "name": "hero",
+            "label": "Hero"
+          },
+          {
+            "name": "main",
+            "label": "Main content"
+          }
+        ],
+        "parts": [],
+        "layoutCss": ".main-layout{display:block}",
+        "previewTemplate": "<div class=\"main-layout\"><div class=\"slot-hero\">__DESIGNER_SLOT_hero__</div><main class=\"slot-main\">__DESIGNER_SLOT_main__</main></div>"
+      }
+    ],
+    "widgetSlots": [
+      {
+        "widgetType": "easy_widgets.TwoColumnsWidget",
+        "label": "Two Columns",
+        "slots": [
+          {
+            "name": "left",
+            "label": "Left Column"
+          },
+          {
+            "name": "right",
+            "label": "Right Column"
+          }
+        ]
+      }
+    ],
+    "previewViews": [
+      {
+        "id": "page-main",
+        "label": "Article page",
+        "kind": "page",
+        "layout": "main_layout",
+        "texts": {},
+        "images": {}
+      },
+      {
+        "id": "object-card",
+        "label": "Article card",
+        "kind": "object",
+        "layout": "main_layout",
+        "texts": {},
+        "images": {}
+      }
+    ]
+  },
+  "constraints": {
+    "editableTypographyProperties": [
+      "fontFamily",
+      "fontSize",
+      "fontWeight",
+      "fontStyle",
+      "lineHeight",
+      "letterSpacing"
+    ],
+    "editableSpacingProperties": [
+      "marginBottom",
+      "paddingTop",
+      "paddingRight",
+      "paddingBottom",
+      "paddingLeft"
+    ],
+    "maxImageBytes": 10485760
+  }
+}

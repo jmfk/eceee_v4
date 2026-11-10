@@ -1,4 +1,4 @@
 interface:
-  display_name: "ECEEE Video Scripts"
-  short_description: "Draft Swedish ECEEE tutorial scripts and shot lists"
-  default_prompt: "Use $eceee-instructional-video-scripts to draft a Swedish tutorial for [feature]."
+  display_name: "ECEEE Instructional Videos"
+  short_description: "Script, simulate, voice, and record ECEEE tutorials"
+  default_prompt: "Use $eceee-instructional-video-scripts to script and record a localized ECEEE tutorial for [feature]."

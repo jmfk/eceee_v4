@@ -1,59 +1,162 @@
-# Taggar: förslag och godkännande
+---
+id: taggar-forslag-och-godkannande
+helpGuideId: tags-manage
+title: "Taggar: lämna och granska ett förslag"
+summary: "Lämna ett förslag och granska det med lokala demoroller."
+sectionId: tags
+sectionTitle: Tags
+language: sv
+sourceLanguage: sv
+---
 
-> **Skärmbilder:** Faktiska bilder från Chrome ska läggas i `screenshots/` i denna mapp. Scenregistret i `screenshots/README.md` kopplar filnamn, synlig vy och berättarröst.
+# Taggar: lämna och granska ett förslag
 
+**Miljö:** Lokalt CMS med `--mock-api`. Förslagsställare, granskare och termen Energy transition finns bara i den lokala inspelningssessionen.
 
-**Längd:** cirka 3 minuter
-**Målgrupp:** redaktörer som föreslår taggar och användare som granskar förslag
-**Syfte:** visa hur ett taggförslag lämnas in och granskas, samt vad som händer innan det godkänts.
+**Mål:** Sök först, skicka ett motiverat förslag och visa hur beslutet syns i Proposals. Detta är registrets förslagsflöde; AI-rekommendationer för media är ett separat hjälpmedel.
 
-## Viktig skillnad
+## Scener
 
-Videon handlar om förslagsflödet i det gemensamma taggregistret. Skilj detta från AI-förslag på mediefiler: AI-resultat är rekommendationer som användaren själv granskar och de skapar inte automatiskt en godkänd tagg.
+### 1. goto
 
-## Förbered inspelningen
+**Berättarröst och undertext:** Vi börjar i Tags med en lokal förslagsställare. Sök efter termen innan du föreslår en ny.
 
-- Använd ett testkonto som får lämna förslag och ett granskningskonto med rätt att godkänna.
-- Förbered ett ofarligt exempel på en ny tagg eller ändring. Skicka inte in testförslag i produktionsmiljö.
-- Bekräfta aktuella knappnamn och behörigheter i miljön före inspelning.
+### 2. click
 
-## Manus
+**Berättarröst och undertext:** Öppna New tag och välj typen Topics för en ny term.
 
-### 1. När ska man föreslå en tagg?
+### 3. fill
 
+**Berättarröst och undertext:** Skriv ett tydligt namn på den föreslagna termen.
 
-**Bild:** Visa Tags och sök efter en term som inte finns. Visa typen där termen skulle höra hemma.
+### 4. fill
 
-**Berättarröst:** «Om den gemensamma vokabulären saknar en term ska du inte skapa en konkurrerande fritexttagg. Kontrollera först att termen inte redan finns under ett annat namn eller i en annan typ. Skicka sedan in ett förslag.»
+**Berättarröst och undertext:** Beskriv termen så att granskaren förstår hur den ska användas.
 
-### 2. Skicka in förslaget
+### 5. click
 
+**Berättarröst och undertext:** Välj Submit proposal. Förslaget sparas lokalt och väntar på granskning.
 
-**Bild:** Välj New tag. Fyll i namn, kort beskrivning och eventuella alternativa namn. Visa knappen Submit proposal. Stanna innan slutlig inlämning om miljön är skarp.
+### 6. click
 
-**Berättarröst:** «Ange ett tydligt namn och en beskrivning som hjälper andra att använda termen konsekvent. Lägg till alternativa namn om de faktiskt används. Beroende på din behörighet sparas ändringen direkt eller skickas som ett förslag för granskning.»
+**Berättarröst och undertext:** Öppna Proposals för att följa förslagets status.
 
-### 3. Följ statusen
+### 7. assertVisible
 
+**Berättarröst och undertext:** Status pending visar att förslaget ännu inte är godkänt.
 
-**Bild:** Öppna fliken Proposals och visa status för ett förberett testförslag.
+### 8. goto
 
-**Berättarröst:** «I Proposals ser du inlämnade ändringar och deras beslutsstatus. En granskare behöver både rätt att fatta beslut och behörighet för den föreslagna åtgärden. Ett förslag blir inte godkänt bara för att det har skickats in.»
+**Berättarröst och undertext:** Nu byter vi till en lokal granskare med rätt att fatta beslut.
 
-### 4. Granska och fatta beslut
+### 9. click
 
+**Berättarröst och undertext:** Granskaren öppnar samma förslag och läser den föreslagna ändringen.
 
-**Bild:** Som granskningskonto öppnar du förslaget. Läs namn, beskrivning och typ. Visa beslutsalternativen; genomför endast ett kontrollerat testbeslut i testmiljö.
+### 10. click
 
-**Berättarröst:** «Granska att termen passar rätt typ, inte duplicerar en befintlig term och har tillräcklig kontext. Följ de beslutsalternativ som visas och organisationens ansvarsfördelning. Vid godkännande blir termen tillgänglig enligt registret och dess tillåtna användning.»
+**Berättarröst och undertext:** Efter kontroll väljer granskaren Approve för det lokala demoförslaget.
 
-### 5. Vad gäller innan godkännande?
+### 11. assertVisible
 
+**Berättarröst och undertext:** Status approved visar att beslutet är registrerat i demomiljön.
 
-**Bild:** Visa ett utkast med föreslagen tagg och därefter mediaflödet där endast godkända termer kan användas för godkännande.
-
-**Berättarröst:** «En föreslagen term är inte en godkänd tagg. Förslag på en sida eller ett objekt måste godkännas eller tas bort innan publicering. Media måste ha godkända termer innan filen kan godkännas. AI-förslag på media är ett separat hjälpmedel och kräver också ett aktivt val.»
-
-## Avslutning
-
-**Berättarröst:** «Förslagsflödet håller taggregistret gemensamt och granskningsbart. Sök först, föreslå med tydlig kontext och invänta beslut innan du använder termen som godkänd klassificering.»
+```video-script
+[
+  {
+    "type": "goto",
+    "path": "/tags?demoRole=proposer",
+    "captionSv": "Vi börjar i Tags med en lokal förslagsställare. Sök efter termen innan du föreslår en ny.",
+    "scene": 1,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "New tag",
+    "captionSv": "Öppna New tag och välj typen Topics för en ny term.",
+    "scene": 2,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "fill",
+    "label": "Name",
+    "value": "Energy transition",
+    "captionSv": "Skriv ett tydligt namn på den föreslagna termen.",
+    "scene": 3,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "fill",
+    "label": "Description",
+    "value": "A local tutorial example.",
+    "captionSv": "Beskriv termen så att granskaren förstår hur den ska användas.",
+    "scene": 4,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Submit proposal",
+    "captionSv": "Välj Submit proposal. Förslaget sparas lokalt och väntar på granskning.",
+    "scene": 5,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Proposals",
+    "captionSv": "Öppna Proposals för att följa förslagets status.",
+    "scene": 6,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "assertVisible",
+    "text": "Energy transition · create · pending",
+    "captionSv": "Status pending visar att förslaget ännu inte är godkänt.",
+    "scene": 7,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "goto",
+    "path": "/tags?demoRole=reviewer",
+    "captionSv": "Nu byter vi till en lokal granskare med rätt att fatta beslut.",
+    "scene": 8,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Proposals",
+    "captionSv": "Granskaren öppnar samma förslag och läser den föreslagna ändringen.",
+    "scene": 9,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Approve",
+    "captionSv": "Efter kontroll väljer granskaren Approve för det lokala demoförslaget.",
+    "scene": 10,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "assertVisible",
+    "text": "Energy transition · create · approved",
+    "captionSv": "Status approved visar att beslutet är registrerat i demomiljön.",
+    "scene": 11,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  }
+]
+```

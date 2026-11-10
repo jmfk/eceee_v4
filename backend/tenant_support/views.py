@@ -80,8 +80,17 @@ class SupportView(APIView):
 
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
-        if isinstance(request.auth, MachineAPIKey) or not request.user.is_active or not request.tenant.is_active:
-            raise PermissionDenied("Inboxen kräver ett personligt användarkonto.")
+        if not request.user.is_active or not request.tenant.is_active:
+            raise PermissionDenied("Kontot och arbetsytan måste vara aktiva.")
+        if isinstance(request.auth, MachineAPIKey):
+            from core.machine_api_keys import SERVER_FULL_ACCESS, _required_scope
+
+            required = _required_scope(request)
+            if required is None or not ({required, SERVER_FULL_ACCESS} & set(request.auth.scopes)):
+                raise PermissionDenied("API-nyckeln saknar behörighet för den här åtgärden.")
+            # The principal remains the sender/owner. Never impersonate a tenant member.
+            if not request.auth.tenants.filter(pk=request.tenant.pk).exists():
+                raise PermissionDenied("API-nyckeln saknar åtkomst till arbetsytan.")
 
     def page(self, queryset, request, serialize):
         paginator = PageNumberPagination()
@@ -524,6 +533,11 @@ class VideoUploadView(SupportView):
         if purpose not in {"bug", "instruction"}:
             raise ValidationError({"purpose": "Välj bug eller instruction."})
         if purpose == "instruction":
+            if isinstance(request.auth, MachineAPIKey):
+                from core.machine_api_keys import SERVER_FULL_ACCESS, SUPPORT_PUBLISH
+
+                if not ({SUPPORT_PUBLISH, SERVER_FULL_ACCESS} & set(request.auth.scopes)):
+                    raise PermissionDenied("API-nyckeln saknar behörighet att ladda upp instruktionsfilmer.")
             require_role(request.user, request.tenant, "can_publish")
         upload = request.FILES.get("file")
         limit = settings.SUPPORT_BUG_MAX_BYTES if purpose == "bug" else settings.SUPPORT_INSTRUCTION_MAX_BYTES

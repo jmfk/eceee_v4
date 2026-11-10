@@ -90,6 +90,24 @@ class MachineAPIKeyViewSet(viewsets.GenericViewSet):
         self.check_object_permissions(self.request, api_key)
         return api_key
 
+    @action(detail=True, methods=["post"], url_path="grant-scopes")
+    @transaction.atomic
+    def grant_scopes(self, request, pk=None):
+        """Add capabilities without rotating the key or changing its identity/tenants."""
+        from .machine_api_keys import ALLOWED_SCOPES
+
+        class GrantInput(serializers.Serializer):
+            scopes = serializers.ListField(
+                child=serializers.ChoiceField(choices=sorted(ALLOWED_SCOPES)), allow_empty=False
+            )
+
+        data = GrantInput(data=request.data)
+        data.is_valid(raise_exception=True)
+        api_key = self._get_object_for_update()
+        api_key.scopes = sorted(set(api_key.scopes) | set(data.validated_data["scopes"]))
+        api_key.save(update_fields=["scopes"])
+        return Response(self.get_serializer(api_key).data)
+
     @action(detail=True, methods=["post"])
     @transaction.atomic
     def revoke(self, request, pk=None):

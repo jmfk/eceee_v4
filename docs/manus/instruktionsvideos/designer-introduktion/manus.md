@@ -1,48 +1,86 @@
-# Designer: hitta rätt tema och förstå arbetsytan
+---
+id: designer-introduktion
+helpGuideId: settings-themes
+title: "Designer: hitta temat och förstå arbetsytan"
+summary: "Öppna ett lokalt demotema och hitta utkastets kontroller."
+sectionId: designer
+sectionTitle: Designer
+language: sv
+sourceLanguage: sv
+---
 
-> **Skärmbilder:** Faktiska bilder från Chrome ska läggas i `screenshots/` i denna mapp. Scenregistret i `screenshots/README.md` kopplar filnamn, synlig vy och berättarröst.
-> **Produktionsnot:** Designer-temalistan laddade, men den öppnade produktionsarbetsytan stannade på «Loading Designer workspace…». Bekräfta att arbetsytan fungerar innan detaljbilder spelas in.
+# Designer: hitta temat och förstå arbetsytan
 
+**Miljö:** Lokalt CMS med `--mock-api` och ett isolerat Demo Theme. Filmen ändrar inte ett skarpt tema.
 
-**Längd:** cirka 2,5 minuter
-**Målgrupp:** användare med Designer-åtkomst
-**Syfte:** introducera Designer och förklara skillnaden mellan utkast och live-tema.
+**Mål:** Hitta ett tema, öppna arbetsytan och skilja utkast från publicering.
 
-## Förbered inspelningen
+## Scener
 
-- Använd ett tema i testmiljö där inspelaren har Designer-åtkomst.
-- Kontrollera att förhandsvisning och tema är laddade innan inspelningen börjar.
+### 1. goto
 
-## Manus
+**Berättarröst och undertext:** Öppna Designer themes. I den lokala demon finns temat Demo Theme.
 
-### 1. Öppna temat
+### 2. assertVisible
 
+**Berättarröst och undertext:** Temalistan visar de teman som är tillgängliga för ditt konto.
 
-**Bild:** Öppna Designer och välj tema från temalistan.
+### 3. click
 
-**Berättarröst:** «Designer är en avgränsad arbetsyta för att justera ett temas visuella egenskaper. Öppna det tema du har fått åtkomst till. Vilka delar du kan redigera styrs av tilldelad behörighet.»
+**Berättarröst och undertext:** Öppna Demo Theme för att se Designer-arbetsytan.
 
-### 2. Orientera dig
+### 4. assertVisible
 
+**Berättarröst och undertext:** I arbetsytan ser du temat och dess aktuella utkastsversion.
 
-**Bild:** **Saknas.** Visa temats navigation och förhandsvisning och peka ut områden för färg/palett, typografi, marginaler och padding samt temaassets. Den befintliga fångsten visar endast laddningsläget och ska inte användas som färdig instruktionsbild.
+### 5. assertVisible
 
-**Berättarröst:** «Arbetsytan samlar inställningar för bland annat färger, typsnitt, marginaler, padding och assets. Förhandsvisningen hjälper dig att bedöma hur ändringen påverkar temat. Börja med en egenskap i taget och kontrollera resultatet.»
+**Berättarröst och undertext:** Save draft sparar utkastet. Publicering är ett separat steg som du gör efter granskning.
 
-### 3. Förstå utkastet
-
-
-**Bild:** Ändra en ofarlig egenskap och visa uppdaterad förhandsvisning. Visa Save draft och Publish changes, men publicera inte.
-
-**Berättarröst:** «Ändringar visas i arbetsytans utkast. Save draft sparar utkastet, men ändrar inte den live-publicerade designen. Publish changes är det separata steget som gör de verifierade ändringarna live.»
-
-### 4. Håll koll på delat arbete
-
-
-**Bild:** Visa statusmeddelande eller versionsinformation när den finns.
-
-**Berättarröst:** «Utkastet delas av dem som har Designer-åtkomst till samma tema. Om någon annan har ändrat temat kan en äldre vy behöva uppdateras innan du fortsätter. Läs statusmeddelanden och spara ditt arbete innan du lämnar arbetsytan.»
-
-## Avslutning
-
-**Berättarröst:** «I nästa video går vi igenom hur du undersöker och ändrar marginaler och padding med hjälp av förhandsvisningen.»
+```video-script
+[
+  {
+    "type": "goto",
+    "path": "/designer/themes",
+    "captionSv": "Öppna Designer themes. I den lokala demon finns temat Demo Theme.",
+    "scene": 1,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "assertVisible",
+    "role": "heading",
+    "name": "Designer themes",
+    "captionSv": "Temalistan visar de teman som är tillgängliga för ditt konto.",
+    "scene": 2,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "click",
+    "role": "link",
+    "name": "Open Demo Theme",
+    "captionSv": "Öppna Demo Theme för att se Designer-arbetsytan.",
+    "scene": 3,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "assertVisible",
+    "captionSv": "I arbetsytan ser du temat och dess aktuella utkastsversion.",
+    "scene": 4,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500,
+    "text": "Designer draft"
+  },
+  {
+    "type": "assertVisible",
+    "role": "button",
+    "name": "Save draft",
+    "captionSv": "Save draft sparar utkastet. Publicering är ett separat steg som du gör efter granskning.",
+    "scene": 5,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  }
+]
+```

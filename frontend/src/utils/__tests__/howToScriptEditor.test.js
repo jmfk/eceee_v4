@@ -103,6 +103,44 @@ describe('howToScriptEditor', () => {
         ])
     })
 
+    it('round trips rendered manuscript assertions, Swedish edits and renderer metadata without converting them into clicks', () => {
+        const action = { type: 'assertVisible', role: 'heading', name: 'Designer', frameSelector: 'iframe', scene: 2,
+            captureStatus: 'ready', captionSv: 'Svensk berättarröst.', captionEn: 'English narration.',
+            actionAtFraction: 0.7, postNarrationPauseMs: 1500, forceClick: false, acceptDialog: true,
+            atomicFill: true, positionFractionX: 0.2, positionFractionY: 0.6 }
+        const draft = guideToScriptDraft({ id: 'demo', language: 'sv', title: 'Demo', script: [action] }, { id: 'designer' })
+        expect(draft.script[0].caption).toBe(action.captionSv)
+        expect(draft.script[0].action.type).toBe('assertVisible')
+        draft.script[0].caption = 'Uppdaterad svensk berättarröst.'
+        const parsed = parseHowToMarkdown(createMarkdownFromDraft(draft))
+        expect(parsed.guide.actions[0]).toMatchObject({ ...action, captionSv: 'Uppdaterad svensk berättarröst.' })
+        expect(parsed.guide.actions[0].captionEn).toBe('English narration.')
+    })
+
+    it('gives newly added manuscript actions the selected language caption', () => {
+        const draft = guideToScriptDraft({ id: 'demo', sourcePath: '/docs/manus/instruktionsvideos/demo/manus.md',
+            language: 'sv', title: 'Demo', script: [] }, { id: 'designer' })
+        draft.script = [{ caption: 'Öppna Pages.', action: { type: 'goto', path: '/pages', captureStatus: 'ready' } }]
+        const parsed = parseHowToMarkdown(createMarkdownFromDraft(draft))
+        expect(parsed.guide.actions[0]).toMatchObject({ type: 'goto', path: '/pages', captionSv: 'Öppna Pages.', captureStatus: 'ready' })
+    })
+
+    it('keeps a manuscript voiceover-only beat localized and ready without inventing a click', () => {
+        const draft = guideToScriptDraft({ id: 'demo', sourcePath: '/demo/manus.md', language: 'sv', title: 'Demo',
+            script: [{ captionSv: 'Paus för förklaring.', captionEn: 'Explanation.', action: null, captureStatus: 'ready', scene: 3 }] }, { id: 'designer' })
+        draft.script[0].caption = 'Uppdaterad förklaring.'
+        const parsed = parseHowToMarkdown(createMarkdownFromDraft(draft))
+        expect(parsed.guide.actions[0]).toMatchObject({ type: 'caption', captionSv: 'Uppdaterad förklaring.', captionEn: 'Explanation.', captureStatus: 'ready', scene: 3 })
+        expect(parsed.guide.actions[0]).not.toHaveProperty('action')
+    })
+
+    it('preserves the canonical help article when editing a separate video manuscript', () => {
+        const draft = guideToScriptDraft({ id: 'designer-introduktion', helpGuideId: 'settings-themes', title: 'Designer', actions: [] }, { id: 'designer' })
+        const parsed = parseHowToMarkdown(createMarkdownFromDraft(draft))
+        expect(parsed.guide.id).toBe('designer-introduktion')
+        expect(parsed.guide.helpGuideId).toBe('settings-themes')
+    })
+
     it('preserves selected languages and language-specific video links', () => {
         const draft = guideToScriptDraft({
             id: 'pages-demo',

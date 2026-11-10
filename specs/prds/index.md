@@ -2,6 +2,8 @@
 
 | ID | Title | Status | Related ADRs |
 | --- | --- | --- | --- |
+| PRD-0051 | [CMS collaboration and learning operations](0051-cms-collaboration-and-learning-operations.md) | completed | ADR-0070 |
+| PRD-0050 | [CMS release Change Notes with visual evidence](0050-cms-release-change-notes.md) | draft | - |
 | PRD-0049 | [Instructional video production pipeline](0049-instructional-video-production.md) | draft | - |
 | PRD-0048 | [Columnist and event directory pages](0048-columnist-and-event-pages.md) | completed | ADR-0068, ADR-0069 |
 | PRD-0047 | [News page composition and related stories](0047-news-page-and-related-stories.md) | started | ADR-0066, ADR-0067 |

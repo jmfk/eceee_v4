@@ -1,0 +1,4 @@
+interface:
+  display_name: "ECEEE Instruction Library"
+  short_description: "Publish approved videos to the private Inbox library"
+  default_prompt: "Use $eceee-instructional-video-publisher to prepare this approved tutorial for the private instruction library and its help article."

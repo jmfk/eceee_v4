@@ -101,4 +101,37 @@ Move pages.
         })
         expect(docs[0].guides.map(guide => guide.id)).toEqual(['pages-create', 'pages-organize'])
     })
+
+    it('keeps bilingual video-script action fields available to the renderer', () => {
+        const doc = parseHowToMarkdown(`---
+id: demo-video
+title: Demo video
+summary: A scripted walkthrough.
+sectionId: demos
+---
+
+# Demo video
+
+\`\`\`video-script
+[
+  {
+    "scene": 1,
+    "captureStatus": "ready",
+    "type": "goto",
+    "path": "/demo",
+    "captionSv": "Öppna demosidan.",
+    "captionEn": "Open the demo page."
+  }
+]\`\`\`
+`)
+
+        expect(doc.guide.actions).toEqual([{
+            scene: 1,
+            captureStatus: 'ready',
+            type: 'goto',
+            path: '/demo',
+            captionSv: 'Öppna demosidan.',
+            captionEn: 'Open the demo page.'
+        }])
+    })
 })

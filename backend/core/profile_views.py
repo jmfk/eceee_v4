@@ -19,7 +19,20 @@ class ProfilePhotoView(APIView):
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         if isinstance(request.auth, MachineAPIKey):
-            raise PermissionDenied("Profilbilder kräver ett personligt användarkonto.")
+            from core.machine_api_keys import PROFILE_READ, PROFILE_WRITE, SERVER_FULL_ACCESS
+
+            tenant = getattr(request, "tenant", None)
+            if (
+                not tenant
+                or not tenant.user_has_access(request.user)
+                or not request.auth.tenants.filter(pk=tenant.pk).exists()
+            ):
+                raise PermissionDenied("API-nyckeln saknar åtkomst till arbetsytan.")
+            scope = PROFILE_READ if request.method in {"GET", "HEAD", "OPTIONS"} else PROFILE_WRITE
+            if not ({scope, SERVER_FULL_ACCESS} & set(request.auth.scopes)):
+                raise PermissionDenied("API-nyckeln saknar profilbehörighet.")
+            if kwargs.get("user_id") != request.user.pk:
+                raise PermissionDenied("API-nycklar kan bara hantera sin egen profilbild.")
 
     def get(self, request, user_id):
         if user_id != request.user.pk:
