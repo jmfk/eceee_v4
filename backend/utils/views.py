@@ -9,6 +9,7 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
+from djangorestframework_camel_case.parser import CamelCaseFormParser, CamelCaseJSONParser, CamelCaseMultiPartParser
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -513,8 +514,45 @@ class CurrentUserView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
+    # Keep JSON and legacy form submissions on the same camelCase wire contract.
+    parser_classes = [CamelCaseJSONParser, CamelCaseFormParser, CamelCaseMultiPartParser]
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        from rest_framework.exceptions import PermissionDenied
+
+        from core.models import MachineAPIKey
+
+        if isinstance(request.auth, MachineAPIKey):
+            tenant = getattr(request, "tenant", None)
+            if (
+                not tenant
+                or not tenant.user_has_access(request.user)
+                or not request.auth.tenants.filter(pk=tenant.pk).exists()
+            ):
+                raise PermissionDenied("API-nyckeln saknar åtkomst till arbetsytan.")
 
     def get(self, request):
+        from core.models import MachineAPIKey
+
+        if isinstance(request.auth, MachineAPIKey):
+            from cms_auth.models import UserLanguagePreference
+
+            tenant = request.tenant
+            # Do not expose other workspaces/roles through a tenant-bound profile read.
+            return Response(
+                {
+                    "id": request.user.pk,
+                    "username": request.user.username,
+                    "first_name": request.user.first_name,
+                    "last_name": request.user.last_name,
+                    "preferredLanguage": UserLanguagePreference.objects.filter(user=request.user)
+                    .values_list("language", flat=True)
+                    .first()
+                    or "",
+                    "current_workspace": {"id": str(tenant.pk), "identifier": tenant.identifier, "name": tenant.name},
+                }
+            )
         administrative_tenants = Tenant.objects.filter(is_active=True)
         if not user_can_switch_tenant(request.user):
             administrative_tenants = administrative_tenants.filter(
@@ -571,13 +609,13 @@ class CurrentUserView(APIView):
         serializer = LanguagePreferenceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         preference, _ = UserLanguagePreference.objects.update_or_create(
-            user=request.user, defaults={"language": serializer.validated_data["preferredLanguage"]}
+            user=request.user, defaults={"language": serializer.validated_data["preferred_language"]}
         )
         return Response({"preferredLanguage": preference.language})
 
 
 class LanguagePreferenceSerializer(serializers.Serializer):
-    preferredLanguage = serializers.ChoiceField(choices=["", "en-us", "sv-se"])
+    preferred_language = serializers.ChoiceField(choices=["", "en-us", "sv-se"])
 
 
 class WorkspaceSelectionSerializer(serializers.Serializer):

@@ -1,0 +1,4 @@
+interface:
+  display_name: "ECEEE Workspace Operations"
+  short_description: "Manage scoped workspace APIs without impersonation"
+  default_prompt: "Use $eceee-workspace-operations to inspect the requested tenant workflow and carry out only the authorized changes."

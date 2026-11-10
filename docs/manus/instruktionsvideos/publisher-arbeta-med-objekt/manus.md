@@ -1,55 +1,162 @@
+---
+id: publisher-arbeta-med-objekt
+helpGuideId: objects-manage
+title: "Publisher: arbeta med objekt"
+summary: "Hitta ett objekt, öppna det och spara en lokal arbetskopia."
+sectionId: publisher
+sectionTitle: Publisher
+language: sv
+sourceLanguage: sv
+---
+
 # Publisher: arbeta med objekt
 
-> **Skärmbilder:** Faktiska bilder från Chrome ska läggas i `screenshots/` i denna mapp. Scenregistret i `screenshots/README.md` kopplar filnamn, synlig vy och berättarröst.
+**Miljö:** Lokalt CMS med `--mock-api`. News och Opening keynote är isolerade demodata.
 
+**Mål:** Hitta rätt objekttyp, sök fram ett befintligt objekt, ändra titeln och spara arbetskopian.
 
-**Längd:** cirka 3 minuter
-**Målgrupp:** redaktörer som skapar eller uppdaterar återanvändbart innehåll
-**Syfte:** hitta rätt objekttyp, skapa eller redigera ett objekt och förstå hur ändringar sparas och publiceras.
+## Scener
 
-## Förbered inspelningen
+### 1. goto
 
-- Använd en testmiljö och ett objekt som går att redigera utan att påverka publicerat innehåll.
-- Välj en objekttyp som visar vanliga fält och gärna relaterade objekt eller underobjekt.
-- Dölj personuppgifter och undvik att publicera under inspelningen.
+**Berättarröst och undertext:** Öppna Publisher. I den lokala demon finns objekttyperna News och Speaker.
 
-## Manus
+### 2. assertVisible
 
-### 1. Hitta objekttypen
+**Berättarröst och undertext:** Välj först rätt objekttyp. Här använder vi News.
 
+### 3. click
 
-**Bild:** Öppna Publisher från huvudnavigeringen. Visa listan över huvudobjekttyper och därefter Supporting objects.
+**Berättarröst och undertext:** Klicka på News för att se objekten av den typen.
 
-**Berättarröst:** «Publisher är platsen där vi hanterar återanvändbart, strukturerat innehåll, till exempel artiklar, personer och evenemang. Börja med att välja vilken objekttyp du vill arbeta med. Under Supporting objects hittar du kompletterande typer grupperade efter sin huvudtyp.»
+### 4. assertVisible
 
-### 2. Hitta eller skapa ett objekt
+**Berättarröst och undertext:** Sök innan du skapar något nytt, så undviker du dubbletter.
 
+### 5. fill
 
-**Bild:** Öppna en objekttyp, sök efter ett befintligt objekt och visa dess rad. Gå tillbaka och visa knappen för att skapa nytt.
+**Berättarröst och undertext:** Skriv Opening keynote i sökfältet. Detta är ett lokalt demoobjekt.
 
-**Berättarröst:** «Sök först efter objektet så att du inte skapar en dubblett. Öppna ett befintligt objekt för att ändra det, eller välj New när du behöver lägga till ett nytt. Vilka fält du ser beror på objekttypens datamodell.»
+### 6. assertVisible
 
-### 3. Navigera objektets innehåll
+**Berättarröst och undertext:** Träffen visar att objektet redan finns. Öppna det befintliga objektet när du vill granska eller ändra innehållet.
 
+### 7. click
 
-**Bild:** Öppna objektet. Visa huvudobjektet, vänsterkolumnens träd för underobjekt och relaterade objekt samt formuläret. Ändra storlek på en kolumn och fäll ihop/ut den.
+**Berättarröst och undertext:** Öppna det befintliga objektet i redigeraren.
 
-**Berättarröst:** «I redigeringsvyn kan du navigera mellan rotobjektet, underobjekt och relaterade objekt. Dra avdelaren för att ge formuläret mer plats, eller fäll ihop en kolumn. Kolumnens formulärinnehåll finns kvar när du fäller ihop den.»
+### 8. assertVisible
 
-### 4. Spara innan du byter
+**Berättarröst och undertext:** Objektets titel och innehåll kan nu granskas i arbetsytan.
 
+### 9. fill
 
-**Bild:** Gör en ofarlig ändring. Visa sparknapp och byte till ett annat objekt utan att faktiskt förlora ändringen. Visa eventuellt varning/dialog om den finns i miljön.
+**Berättarröst och undertext:** Ändra titeln i den lokala arbetskopian.
 
-**Berättarröst:** «Spara dina ändringar innan du byter objekt eller lämnar en widgetredigerare. När du navigerar i objektträdet sparar Publisher en arbetskopia innan nästa objekt öppnas. Om sparningen misslyckas stannar du kvar i det aktuella objektet.»
+### 10. click
 
-### 5. Kontrollera version och publiceringsstatus
+**Berättarröst och undertext:** Välj Save för att spara arbetskopian innan du lämnar objektet.
 
+### 11. assertVisible
 
-**Bild:** Visa status- och versionsinformationen för objektet, utan att trycka på publicera.
+**Berättarröst och undertext:** Bekräftelsen visar att den lokala arbetskopian är sparad. Publicering görs separat.
 
-**Berättarröst:** «Innan innehåll blir live ska du kontrollera versionen och publiceringsstatusen. Att spara en arbetskopia och att publicera är olika steg. Följ behörigheterna och publiceringsflödet som gäller för just den här objekttypen.»
-
-## Avslutning
-
-**Berättarröst:** «Sammanfattning: välj rätt typ, sök innan du skapar, navigera objektets relationer och spara innan du byter. Kontrollera alltid status innan innehållet görs live.»
+```video-script
+[
+  {
+    "type": "goto",
+    "path": "/objects",
+    "captionSv": "Öppna Publisher. I den lokala demon finns objekttyperna News och Speaker.",
+    "scene": 1,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "assertVisible",
+    "selector": "[data-testid='object-type-card-news']",
+    "captionSv": "Välj först rätt objekttyp. Här använder vi News.",
+    "scene": 2,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "click",
+    "selector": "[data-testid='object-type-card-news']",
+    "captionSv": "Klicka på News för att se objekten av den typen.",
+    "scene": 3,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "assertVisible",
+    "captionSv": "Sök innan du skapar något nytt, så undviker du dubbletter.",
+    "scene": 4,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500,
+    "role": "searchbox",
+    "name": "Search News"
+  },
+  {
+    "type": "fill",
+    "value": "Opening keynote",
+    "captionSv": "Skriv Opening keynote i sökfältet. Detta är ett lokalt demoobjekt.",
+    "scene": 5,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500,
+    "role": "searchbox",
+    "name": "Search News"
+  },
+  {
+    "type": "assertVisible",
+    "text": "Opening keynote",
+    "captionSv": "Träffen visar att objektet redan finns. Öppna det befintliga objektet när du vill granska eller ändra innehållet.",
+    "scene": 6,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "click",
+    "text": "Opening keynote",
+    "captionSv": "Öppna det befintliga objektet i redigeraren.",
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500,
+    "scene": 7
+  },
+  {
+    "type": "assertVisible",
+    "role": "textbox",
+    "name": "Object title",
+    "captionSv": "Objektets titel och innehåll kan nu granskas i arbetsytan.",
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500,
+    "scene": 8
+  },
+  {
+    "type": "fill",
+    "role": "textbox",
+    "name": "Object title",
+    "value": "Opening keynote — demo",
+    "captionSv": "Ändra titeln i den lokala arbetskopian.",
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500,
+    "scene": 9
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Save",
+    "captionSv": "Välj Save för att spara arbetskopian innan du lämnar objektet.",
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500,
+    "scene": 10
+  },
+  {
+    "type": "assertVisible",
+    "text": "Working copy saved",
+    "captionSv": "Bekräftelsen visar att den lokala arbetskopian är sparad. Publicering görs separat.",
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500,
+    "scene": 11
+  }
+]
+```

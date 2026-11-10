@@ -4,6 +4,8 @@
 import argparse
 from io import BytesIO
 import mimetypes
+import os
+import tempfile
 import json
 from pathlib import Path
 import secrets
@@ -17,7 +19,8 @@ import urllib.request
 DEFAULT_SECRET_NAME = "ECEEE_API_KEY"
 DEFAULT_BASE_URL = "http://localhost:10101/api/v1/"
 DEFAULT_TENANT = "default"
-ALLOWED_PREFIXES = ("webpages/", "content/", "taxonomy/", "media/", "objects/", "utils/value-lists/")
+ALLOWED_PREFIXES = ("webpages/", "content/", "taxonomy/", "media/", "objects/", "utils/value-lists/",
+                    "support/", "kanban/", "utils/current-user/", "utils/profile-photos/")
 DENIED_PREFIXES = (
     "auth/",
     "core/machine-api-keys/",
@@ -143,6 +146,21 @@ def encode_multipart(upload_file: Path, file_field: str, form_values: list[tuple
     return body.getvalue(), f"multipart/form-data; boundary={boundary}"
 
 
+def write_private_output(path: Path, body: bytes):
+    """Protect private messages and signed playback links in saved API responses."""
+    if path.is_symlink():
+        raise ValueError("output=symlink_denied")
+    descriptor, temporary = tempfile.mkstemp(prefix=".eceee-response-", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            os.fchmod(handle.fileno(), 0o600)
+            handle.write(body)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("endpoint", nargs="?", help="Endpoint below /api/v1/, optionally with a query string")
@@ -215,7 +233,7 @@ def main() -> int:
         return 1
 
     if args.output:
-        args.output.write_bytes(response_body)
+        write_private_output(args.output, response_body)
     elif not args.status_only:
         sys.stdout.buffer.write(response_body)
         if response_body and not response_body.endswith(b"\n"):

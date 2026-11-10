@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#a9d7e9"/><stop offset="1" stop-color="#f4e0bb"/></linearGradient></defs>
+  <path fill="url(#sky)" d="M0 0h1200v800H0z"/>
+  <path fill="#5d8a76" d="M0 570q260-190 550-40t650-75v345H0z"/>
+  <path fill="#345f54" d="M0 700q400-140 800-40t400-20v160H0z"/>
+  <circle cx="900" cy="300" r="110" fill="#c67842"/>
+  <path fill="#60432c" d="M790 300a110 110 0 0 1 220 0v-40a110 110 0 0 0-220 0z"/>
+  <path fill="#e4b286" d="M810 320a90 95 0 0 0 180 0v-36a90 95 0 0 0-180 0z"/>
+  <path fill="#fff" d="M730 800q20-300 170-300t170 300z"/>
+  <text x="45" y="70" font-family="sans-serif" font-size="28" fill="#285167">Local demo image · focus the subject on the right</text>
+</svg>

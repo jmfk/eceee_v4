@@ -1,49 +1,114 @@
+---
+id: designer-utkast-publicera-och-angra
+helpGuideId: settings-themes
+title: "Designer: spara utkast, publicera och ångra"
+summary: "Visa utkast, publicering och ångra i ett isolerat lokalt tema."
+sectionId: designer
+sectionTitle: Designer
+language: sv
+sourceLanguage: sv
+---
+
 # Designer: spara utkast, publicera och ångra
 
-> **Skärmbilder:** Faktiska bilder från Chrome ska läggas i `screenshots/` i denna mapp. Scenregistret i `screenshots/README.md` kopplar filnamn, synlig vy och berättarröst.
-> **Produktionsnot:** Designer-temalistan laddade, men den öppnade produktionsarbetsytan stannade på «Loading Designer workspace…». Bekräfta att arbetsytan fungerar innan detaljbilder spelas in.
+**Miljö:** Lokalt CMS med `--mock-api`. Demotemat och dess revisioner finns bara i inspelningssessionens minne.
 
+**Mål:** Visa att sparat utkast, publicering och återställning är skilda steg.
 
-**Längd:** cirka 3 minuter
-**Målgrupp:** alla som ändrar ett tema i Designer
-**Syfte:** förklara skillnaden mellan autosynlig förhandsvisning, sparat utkast och live-publicering.
+## Scener
 
-## Förbered inspelningen
+### 1. goto
 
-- Använd ett testtema och en testmiljö där publicering och undo kan demonstreras.
-- Säkerställ att utkastet inte innehåller andra personers arbete som ska bevaras.
-- Genomför publicering och ångra endast i testmiljö.
+**Berättarröst och undertext:** Öppna demotemat. Ändringar görs först i ett utkast.
 
-## Manus
+### 2. click
 
-### 1. Ändra och granska
+**Berättarröst och undertext:** Öppna Theme palette och välj en tydlig liten demoändring.
 
+### 3. fill
 
-**Bild:** Gör en liten, lätt igenkännbar ändring och visa hur förhandsvisningen uppdateras.
+**Berättarröst och undertext:** Ändra färgvärdet i den lokala demon och granska resultatet innan du sparar.
 
-**Berättarröst:** «När du ändrar en inställning arbetar du först i Designer-utkastet. Förhandsvisningen hjälper dig att bedöma resultatet, men den betyder inte att ändringen redan är live.»
+### 4. click
 
-### 2. Spara utkastet
+**Berättarröst och undertext:** Save draft bevarar ändringen i utkastet. Live-temat påverkas inte.
 
+### 5. assertVisible
 
-**Bild:** Välj Save draft och visa bekräftelse/status.
+**Berättarröst och undertext:** Bekräftelsen visar att utkastet är sparat. Publicering görs i nästa steg.
 
-**Berättarröst:** «Save draft sparar de godkända värdena i det delade utkastet. Live-temat påverkas inte. Andra designers med åtkomst kan arbeta vidare i samma utkast.»
+### 6. click
 
-### 3. Publicera ändringarna
+**Berättarröst och undertext:** Efter granskning väljer du Publish changes och bekräftar den lokala publiceringen.
 
+### 7. click
 
-**Bild:** Kontrollera den samlade ändringen. Välj Publish changes i testmiljön och visa resultatet.
+**Berättarröst och undertext:** Undo publish återställer den senaste publiceringen i demotemat.
 
-**Berättarröst:** «När ändringarna är granskade väljer du Publish changes. Systemet kontrollerar att utkastet fortfarande bygger på aktuell version och publicerar de förberedda ändringarna tillsammans.»
-
-### 4. Ångra senaste publicering
-
-
-**Bild:** Visa Undo publish i testmiljön. Aktivera och visa att tidigare version återställs.
-
-**Berättarröst:** «Om den senaste publiceringen behöver återtas kan Undo publish återställa den senaste revisionen, förutsatt att det delade utkastet inte har nya ändringar som gör återställningen osäker. Kontrollera alltid status och koordinera med andra som arbetar i temat.»
-
-## Avslutning
-
-**Berättarröst:** «Spara utkast för att bevara arbetet, publicera först efter granskning och använd ångra-funktionen med koll på delat arbete.»
+```video-script
+[
+  {
+    "type": "goto",
+    "path": "/designer/themes/1",
+    "captionSv": "Öppna demotemat. Ändringar görs först i ett utkast.",
+    "scene": 1,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Theme palette",
+    "captionSv": "Öppna Theme palette och välj en tydlig liten demoändring.",
+    "scene": 2,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "fill",
+    "label": "brand palette value",
+    "value": "#345678",
+    "captionSv": "Ändra färgvärdet i den lokala demon och granska resultatet innan du sparar.",
+    "scene": 3,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Save draft",
+    "captionSv": "Save draft bevarar ändringen i utkastet. Live-temat påverkas inte.",
+    "scene": 4,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "assertVisible",
+    "text": "Draft saved",
+    "captionSv": "Bekräftelsen visar att utkastet är sparat. Publicering görs i nästa steg.",
+    "scene": 5,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Publish changes",
+    "acceptDialog": true,
+    "captionSv": "Efter granskning väljer du Publish changes och bekräftar den lokala publiceringen.",
+    "scene": 6,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Undo publish",
+    "acceptDialog": true,
+    "captionSv": "Undo publish återställer den senaste publiceringen i demotemat.",
+    "scene": 7,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  }
+]
+```

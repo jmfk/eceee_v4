@@ -117,11 +117,13 @@ const scriptAction = (item = {}) => {
             : item
     const caption = item.caption || action.caption || ''
 
+    const metadata = { ...item }
+    delete metadata.action
     if (!action.type && caption) {
-        return { type: 'caption', caption, ...(item.audio ? { audio: item.audio } : {}) }
+        return { ...metadata, type: 'caption', caption, ...(item.audio ? { audio: item.audio } : {}) }
     }
-
     return {
+        ...metadata,
         ...action,
         ...(item.audio ? { audio: item.audio } : {}),
         ...(caption ? { caption } : {})
@@ -192,6 +194,7 @@ export const parseHowToMarkdown = (source, fallbackId = '') => {
             sectionOrder: Number(frontmatter.sectionOrder || 999),
             guide: {
                 id,
+                helpGuideId: frontmatter.helpGuideId || id,
                 uuid: frontmatter.uuid || frontmatter.guideUuid || '',
                 title,
                 summary,
@@ -274,6 +277,7 @@ export const parseHowToMarkdown = (source, fallbackId = '') => {
         return {
             id: guideId,
             uuid,
+            helpGuideId: extractCommentValue(guideBody, 'helpGuideId') || guideId,
             title: guide.title,
             summary: parseGuideSummary(guideBody),
             videoUrl,

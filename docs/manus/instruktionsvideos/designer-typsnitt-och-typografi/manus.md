@@ -1,56 +1,138 @@
-# Designer: ändra typsnitt och typografi
+---
+id: designer-typsnitt-och-typografi
+helpGuideId: settings-themes
+title: "Designer: typsnitt och typografi"
+summary: "Undersök installerade typsnitt och rubrikens typografivärden."
+sectionId: designer
+sectionTitle: Designer
+language: sv
+sourceLanguage: sv
+---
 
-> **Skärmbilder:** Faktiska bilder från Chrome ska läggas i `screenshots/` i denna mapp. Scenregistret i `screenshots/README.md` kopplar filnamn, synlig vy och berättarröst.
-> **Produktionsnot:** Designer-temalistan laddade, men den öppnade produktionsarbetsytan stannade på «Loading Designer workspace…». Bekräfta att arbetsytan fungerar innan detaljbilder spelas in.
+# Designer: typsnitt och typografi
 
+**Miljö:** Lokalt CMS med `--mock-api` och ett isolerat demotema.
 
-**Längd:** cirka 4 minuter
-**Målgrupp:** designers som justerar textens utseende i ett tema
-**Syfte:** visa hur typsnitt och typografivärden undersöks och finjusteras med förhandsvisning.
+**Mål:** Hitta installerade typsnitt och undersök rubrikens typografivärden i förhandsvisningen.
 
-## Förbered inspelningen
+## Scener
 
-- Använd ett testtema och en textförhandsvisning med rubrik, brödtext och gärna en länk.
-- Kontrollera vilka familjer och varianter som redan är tillgängliga i temat.
-- Undvik att ange typografivärden som saknar motsvarighet i aktuell UI-version.
+### 1. goto
 
-## Manus
+**Berättarröst och undertext:** Öppna demotemat och börja med att se vilka typsnitt som redan finns.
 
-### 1. Börja med textens roll
+### 2. click
 
+**Berättarröst och undertext:** Theme fonts visar de installerade familjer som kan användas i typografin.
 
-**Bild:** Visa exempel på rubrik och brödtext i förhandsvisningen.
+### 3. assertVisible
 
-**Berättarröst:** «Börja med att avgöra vilken text du vill förbättra. En rubrik och en längre brödtext har olika behov. Kontrollera läsbarhet, hierarki och kontrast innan du ändrar värden.»
+**Berättarröst och undertext:** Här är Inter installerat. Använd en tillgänglig familj när du ändrar textegenskaper.
 
-### 2. Undersök befintliga typsnitt
+### 4. click
 
+**Berättarröst och undertext:** Gå tillbaka till sidans förhandsvisning för att välja en text.
 
-**Bild:** Öppna typografi- eller fontinställningarna. Visa aktuella familjer och tillgängliga varianter.
+### 5. click
 
-**Berättarröst:** «Kontrollera först vilka typsnitt och varianter temat redan har. En variant behöver vara tillgänglig för att den ska visas som avsett. Förhandsvisningen visar hur kombinationen fungerar i den här miljön.»
+**Berättarröst och undertext:** Dölj inspektören tillfälligt så att förhandsvisningen får mer plats.
 
-### 3. Ändra en egenskap åt gången
+### 6. click
 
+**Berättarröst och undertext:** Klicka i förhandsvisningen för att markera innehållswidgeten innan du väljer ett textelement.
 
-**Bild:** Välj en typografisk egenskap som UI:t erbjuder, exempelvis familj, storlek, vikt eller radavstånd. Ändra en sak och visa resultatet.
+### 7. click
 
-**Berättarröst:** «Justera en egenskap i taget. Byt till exempel först familj eller vikt, jämför, och ändra sedan storlek eller radavstånd om det behövs. Se till att rubriker fortfarande känns tydliga och att längre text är bekväm att läsa.»
+**Berättarröst och undertext:** Öppna inspektören igen för att se inställningarna för den valda textytan.
 
-### 4. Kontrollera olika textlängder och vyer
+### 8. click
 
+**Berättarröst och undertext:** Välj Heading 1 i elementlistan för att se rubrikens egna typografivärden.
 
-**Bild:** Växla mellan kort exempeltext och längre förhandsvisning. Kontrollera bred och smal vy om tillgängligt.
+### 9. assertVisible
 
-**Berättarröst:** «Ett typsnitt kan fungera bra i en kort rubrik men sämre i ett längre stycke. Granska flera textlängder och vybredder. Använd förhandsvisningen som stöd och kontrollera gärna den riktiga sidan innan publicering.»
+**Berättarröst och undertext:** Ändra en typografisk egenskap i taget och kontrollera resultatet i förhandsvisningen.
 
-### 5. Spara utkastet
-
-
-**Bild:** Spara utkast. Visa att publiceringssteget är separat.
-
-**Berättarröst:** «Spara utkastet när du är nöjd. Ändringen ligger då kvar i Designer utan att påverka live-temat. Publicera först när helheten är granskad.»
-
-## Avslutning
-
-**Berättarröst:** «Välj typografi utifrån textens uppgift, ändra stegvis och granska både kort och lång text innan du går vidare.»
+```video-script
+[
+  {
+    "type": "goto",
+    "path": "/designer/themes/1",
+    "captionSv": "Öppna demotemat och börja med att se vilka typsnitt som redan finns.",
+    "scene": 1,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Theme fonts",
+    "captionSv": "Theme fonts visar de installerade familjer som kan användas i typografin.",
+    "scene": 2,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "assertVisible",
+    "text": "Installed font families",
+    "captionSv": "Här är Inter installerat. Använd en tillgänglig familj när du ändrar textegenskaper.",
+    "scene": 3,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Article page",
+    "captionSv": "Gå tillbaka till sidans förhandsvisning för att välja en text.",
+    "scene": 4,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Collapse theme inspector",
+    "captionSv": "Dölj inspektören tillfälligt så att förhandsvisningen får mer plats.",
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500,
+    "scene": 5
+  },
+  {
+    "type": "click",
+    "frameSelector": "iframe[title=\"Live theme preview\"]",
+    "selector": "h1",
+    "captionSv": "Klicka i förhandsvisningen för att markera innehållswidgeten innan du väljer ett textelement.",
+    "scene": 6,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500,
+    "forceClick": true
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Expand theme inspector",
+    "captionSv": "Öppna inspektören igen för att se inställningarna för den valda textytan.",
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500,
+    "scene": 7
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Edit Heading 1",
+    "captionSv": "Välj Heading 1 i elementlistan för att se rubrikens egna typografivärden.",
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500,
+    "scene": 8
+  },
+  {
+    "type": "assertVisible",
+    "text": "Size",
+    "captionSv": "Ändra en typografisk egenskap i taget och kontrollera resultatet i förhandsvisningen.",
+    "scene": 9,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  }
+]
+```

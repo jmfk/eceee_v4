@@ -23,6 +23,11 @@ PAGE_WRITE = "page.write"
 PAGE_PUBLISH = "page.publish"
 KANBAN_READ = "kanban.read"
 KANBAN_WRITE = "kanban.write"
+SUPPORT_READ = "support.read"
+SUPPORT_WRITE = "support.write"
+SUPPORT_PUBLISH = "support.publish"
+PROFILE_READ = "profile.read"
+PROFILE_WRITE = "profile.write"
 MEDIA_READ = "media.read"
 MEDIA_WRITE = "media.write"
 OBJECT_WRITE = "object.write"
@@ -39,6 +44,11 @@ ALLOWED_SCOPES = {
     *DIAGNOSTICS_SCOPES,
     KANBAN_READ,
     KANBAN_WRITE,
+    SUPPORT_READ,
+    SUPPORT_WRITE,
+    SUPPORT_PUBLISH,
+    PROFILE_READ,
+    PROFILE_WRITE,
     SERVER_FULL_ACCESS,
     THEME_READ,
     THEME_WRITE,
@@ -116,6 +126,19 @@ def _required_scope(request):
         return DIAGNOSTICS_DATA_READ if request.path.startswith("/api/v1/diagnostics/data/") else DIAGNOSTICS_LOGS_READ
     if request.path.startswith(MACHINE_DENIED_PREFIXES):
         return None
+    if request.path.startswith("/api/v1/support/"):
+        # Keep role grants and unknown support actions outside machine access.
+        parts = request.path.removeprefix("/api/v1/support/").strip("/").split("/")
+        resource = parts[0]
+        if resource not in {"context", "inbox", "instructions", "threads", "videos", "attachments", "deliveries"}:
+            return None
+        if resource == "context" and request.method not in SAFE_METHODS:
+            return None
+        if resource == "instructions" and request.method not in SAFE_METHODS:
+            return SUPPORT_PUBLISH
+        return _read_or_write_scope(request, SUPPORT_READ, SUPPORT_WRITE)
+    if request.path == "/api/v1/utils/current-user/" or request.path.startswith("/api/v1/utils/profile-photos/"):
+        return _read_or_write_scope(request, PROFILE_READ, PROFILE_WRITE)
     if request.path.startswith("/api/v1/webpages/themes/sync/") or request.path.startswith(
         "/api/v1/webpages/designer/themes/remote/"
     ):

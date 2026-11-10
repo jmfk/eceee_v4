@@ -1,4 +1,5 @@
 import { chromium } from 'playwright'
+import { howToSourceFingerprint } from './howto-source.mjs'
 import { mkdir, readdir, readFile, copyFile, writeFile, rm } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
@@ -16,6 +17,27 @@ const defaultAnthropicTranslationFallbackModels = [
   'claude-3-5-haiku-latest',
   'claude-3-haiku-20240307'
 ]
+
+const loadProjectEnv = async () => {
+  const envPath = resolve(frontendRoot, '../.env')
+  if (!existsSync(envPath)) return
+
+  const contents = await readFile(envPath, 'utf8')
+  for (const line of contents.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const separator = trimmed.indexOf('=')
+    if (separator < 1) continue
+
+    const key = trimmed.slice(0, separator).trim()
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || process.env[key] !== undefined) continue
+    let value = trimmed.slice(separator + 1).trim()
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1)
+    }
+    process.env[key] = value
+  }
+}
 
 const getEnvVoiceIdForLanguage = (language = '') => {
   const normalized = language.toLowerCase()
@@ -85,6 +107,13 @@ const parseArgs = (argv) => {
     minActionableSteps: Number(process.env.HOWTO_MIN_ACTIONABLE_STEPS || 1),
     narrationActionLeadMs: Number(process.env.HOWTO_NARRATION_ACTION_LEAD_MS || 300),
     postActionHoldMs: Number(process.env.HOWTO_POST_ACTION_HOLD_MS || 250),
+    postNarrationPauseMs: Number(process.env.HOWTO_POST_NARRATION_PAUSE_MS || 0),
+    languageSuffix: false,
+    preview: false,
+    simulateOnly: false,
+    requireVoice: false,
+    finalApproved: false,
+    replaceFinal: false,
     actionTimeoutMs: Number(process.env.HOWTO_ACTION_TIMEOUT_MS || 10000),
     globalHoldMs: Number(process.env.HOWTO_GLOBAL_HOLD_MS || 0),
     noVoicePreHoldMs: Number(process.env.HOWTO_NO_VOICE_PRE_HOLD_MS || 250),
@@ -151,6 +180,13 @@ const parseArgs = (argv) => {
     if (arg === '--min-actionable-steps') args.minActionableSteps = Number(next)
     if (arg === '--narration-action-lead-ms') args.narrationActionLeadMs = Number(next)
     if (arg === '--post-action-hold-ms') args.postActionHoldMs = Number(next)
+    if (arg === '--post-narration-pause-ms') args.postNarrationPauseMs = Number(next)
+    if (arg === '--language-suffix') args.languageSuffix = true
+    if (arg === '--preview') args.preview = true
+    if (arg === '--simulate-only') args.simulateOnly = true
+    if (arg === '--require-voice') args.requireVoice = true
+    if (arg === '--final-approved') args.finalApproved = true
+    if (arg === '--replace-final') args.replaceFinal = true
     if (arg === '--action-timeout-ms') args.actionTimeoutMs = Number(next)
     if (arg === '--global-hold-ms') args.globalHoldMs = Number(next)
     if (arg === '--no-voice-pre-hold-ms') args.noVoicePreHoldMs = Number(next)
@@ -245,7 +281,15 @@ Options:
                             Delay after voice starts before running the action. Defaults to 300.
   --post-action-hold-ms <ms>
                             Minimum pause after an action when narration timing already covers it. Defaults to 250.
-  --action-timeout-ms <ms>  Max time to wait for click/fill/select targets before skipping that action. Defaults to 10000.
+  --post-narration-pause-ms <ms>
+                            Silent pause after spoken text before the next narration. Use 1000-3000 for tutorial beats.
+  --language-suffix        Add -sv or -en to each output filename.
+  --preview                Add -preview to the output name before its optional language suffix.
+  --simulate-only          Play through browser actions and assertions without recording or generating voice.
+  --require-voice           Fail unless every narrated action has generated narration audio.
+  --final-approved          Required for non-preview output when --language-suffix is used.
+  --replace-final           Allow replacing an existing final locale video after explicit approval.
+  --action-timeout-ms <ms>  Max time to wait for a Playwright locator before stopping the run. Defaults to 10000.
   --global-hold-ms <ms>     Extra pause added to every block holdMs. Defaults to 0.
   --no-voice-pre-hold-ms <ms>
                             Caption-only delay before running an action. Defaults to 250.
@@ -294,6 +338,18 @@ const validateArgs = (args) => {
     throw new Error('Set --voice-id or ELEVENLABS_VOICE_ID when using --voice elevenlabs. Use --list-voices to browse options.')
   }
 
+  if (args.requireVoice && args.voiceProvider !== 'elevenlabs') {
+    throw new Error('--require-voice must be combined with --voice elevenlabs.')
+  }
+
+  if (args.languageSuffix && !args.preview && !args.simulateOnly && !args.finalApproved) {
+    throw new Error('Final locale videos require --final-approved after a human has reviewed the preview.')
+  }
+
+  if (args.replaceFinal && !args.finalApproved) {
+    throw new Error('--replace-final requires --final-approved.')
+  }
+
   if (args.translationProvider && !['anthropic', 'openai'].includes(args.translationProvider)) {
     throw new Error(`Unsupported --translate "${args.translationProvider}". Use "anthropic" or "openai".`)
   }
@@ -312,6 +368,11 @@ const validateArgs = (args) => {
 
   if (!Number.isFinite(args.narrationPaddingMs) || args.narrationPaddingMs < 0) {
     throw new Error('--narration-padding-ms must be a non-negative number.')
+  }
+
+  if (!Number.isFinite(args.postNarrationPauseMs)
+    || (args.postNarrationPauseMs !== 0 && (args.postNarrationPauseMs < 1000 || args.postNarrationPauseMs > 3000))) {
+    throw new Error('--post-narration-pause-ms must be 0 or between 1000 and 3000.')
   }
 
   if (!Number.isFinite(args.elevenLabsMaxRetries) || args.elevenLabsMaxRetries < 0) {
@@ -399,6 +460,45 @@ const findGuides = (docs, args) => {
 }
 
 const actionableActionTypes = new Set(['click', 'hoverClick', 'fill', 'select'])
+
+const validateManuscriptTargets = (targets, language) => {
+  const captionField = isEnglishLanguage(language) ? 'captionEn' : 'captionSv'
+
+  for (const { guide } of targets) {
+    if (guide.sourcePath?.split(/[\\/]/).at(-1) !== 'manus.md') continue
+
+    if (guide.actions.length === 0) {
+      throw new Error(`Manuscript "${guide.id}" has no executable video-script scenes.`)
+    }
+
+    const invalidSceneOrder = guide.actions.some((action, index) => action.scene !== index + 1)
+    if (invalidSceneOrder || guide.actions[0].type !== 'goto') {
+      throw new Error(`Manuscript "${guide.id}" must number video-script scenes from 1 and start with a goto action.`)
+    }
+
+    const invalidScenes = guide.actions
+      .map((action, index) => ({ action, index }))
+      .filter(({ action }) => action.captureStatus !== 'ready'
+        || !(action[captionField] || action[captionField.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)]))
+
+    if (invalidScenes.length > 0) {
+      const issues = invalidScenes.map(({ action, index }) => {
+        const scene = action.scene || index + 1
+        const reasons = [
+          action.captureStatus !== 'ready' ? `captureStatus=${action.captureStatus || 'unset'}` : '',
+          !(action[captionField] || action[captionField.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)]) ? `missing ${language} caption` : '',
+          action.captureNote || ''
+        ].filter(Boolean)
+        return `scene ${scene} (${reasons.join('; ')})`
+      })
+      throw new Error(`Manuscript "${guide.id}" has unready video-script scenes: ${issues.join(' | ')}`)
+    }
+
+    if (!guide.actions.some(action => actionableActionTypes.has(action.type))) {
+      throw new Error(`Manuscript "${guide.id}" has no actionable Playwright scenes (click, hoverClick, fill, or select).`)
+    }
+  }
+}
 
 const countActionableSteps = (guide) => (
   (guide.actions || []).filter(action => actionableActionTypes.has(action.type)).length
@@ -1131,8 +1231,8 @@ const createTimelineAudioTrack = async (events, outputPath, args, label = 'timel
   return outputPath
 }
 
-const setCaptionOverlay = async (page, text) => {
-  await page.evaluate((caption) => {
+const setCaptionOverlay = async (page, text, hideAfterMs = 0) => {
+  await page.evaluate(({ caption, duration }) => {
     let overlay = document.querySelector('[data-howto-caption-overlay]')
 
     if (!overlay) {
@@ -1156,7 +1256,11 @@ const setCaptionOverlay = async (page, text) => {
 
     overlay.textContent = caption
     overlay.style.display = caption ? 'block' : 'none'
-  }, text)
+    if (overlay.__hideTimer) window.clearTimeout(overlay.__hideTimer)
+    overlay.__hideTimer = caption && duration > 0
+      ? window.setTimeout(() => { overlay.style.display = 'none' }, duration)
+      : null
+  }, { caption: text, duration: hideAfterMs })
 }
 
 const ensureCursorOverlay = async (page, args) => {
@@ -1436,6 +1540,9 @@ const looseFieldByLabel = (page, label, exact = false) => {
 }
 
 const resolveLocator = (page, action) => {
+  if (action.frameSelector) {
+    return resolveLocator(page.frameLocator(action.frameSelector), { ...action, frameSelector: undefined })
+  }
   if (action.rowText && action.rowActionSelector) {
     const rowLocator = action.rowSelector
       ? page.locator(action.rowSelector).filter({ hasText: action.rowText })
@@ -1690,9 +1797,85 @@ const mockCmsApi = async (page) => {
     previous: null,
     results
   })
+  const designerFixture = JSON.parse(await readFile(new URL('./fixtures/designer-workspace.json', import.meta.url), 'utf8'))
+  let designerWorkspace = structuredClone(designerFixture)
+  const tagType = { id: 'topic', name: 'Topics', key: 'topics', namespace: 'default', revision: 1,
+    permissions: ['use', 'propose', 'create', 'approve', 'administer'] }
+  const approvedTerms = [
+    { id: 'conference', name: 'Conference', description: 'Events and meetings.', classificationType: 'topic', parent: null, status: 'approved', path: 'Topics / Conference', alternativeNames: [], revision: 1 },
+    { id: 'venue', name: 'Venue', description: 'Meeting locations.', classificationType: 'topic', parent: null, status: 'approved', path: 'Topics / Venue', alternativeNames: [], revision: 1 }
+  ]
+  let proposals = []
+  let demoImage = {
+    id: 1, title: 'Demo portrait', originalFilename: 'howto-focal-demo.svg',
+    filename: 'howto-focal-demo.svg', fileType: 'image', fileSize: 2711,
+    width: 1200, height: 800, namespace: 'default', tags: [], collections: [],
+    fileUrl: '/howto-focal-demo.svg', focalPoint: { x: 0.5, y: 0.5 },
+    accessLevel: 'public', isDeleted: false
+  }
+  let demoObject = {
+    id: 11, title: 'Opening keynote', status: 'draft', objectType: objectTypes[0],
+    versionId: 111, editRevision: 1, isWorkingCopy: true, parent: null,
+    data: {}, widgets: {}, metadata: {}
+  }
 
   await page.route('**/api/v1/**', async (route, request) => {
     const url = new URL(request.url())
+
+    if (url.pathname.includes('/webpages/designer/remote-connections/')) return json(route, { results: [], canManage: false })
+    if (url.pathname.match(/\/webpages\/designer\/themes\/?$/)) return json(route, paginated([{ ...theme, updatedAt: '2026-05-25T12:00:00Z', versionCount: 1 }]))
+    if (url.pathname.match(/\/webpages\/designer\/themes\/\d+\/workspace\/?$/)) {
+      if (request.method() === 'PATCH') {
+        const patch = request.postDataJSON() || {}
+        designerWorkspace = {
+          ...designerWorkspace,
+          ...patch,
+          colors: patch.colors ? Object.entries(patch.colors).map(([name, value]) => ({
+            ...(designerWorkspace.colors.find((color) => color.name === name) || {}), name, value
+          })) : designerWorkspace.colors,
+          draftVersion: designerWorkspace.draftVersion + 1,
+          hasDraftChanges: true
+        }
+      }
+      return json(route, designerWorkspace)
+    }
+    if (url.pathname.match(/\/webpages\/designer\/themes\/\d+\/publish\/?$/)) {
+      designerWorkspace = { ...designerWorkspace, draftVersion: designerWorkspace.draftVersion + 1,
+        liveSyncVersion: designerWorkspace.liveSyncVersion + 1, hasDraftChanges: false, canUndo: true }
+      return json(route, designerWorkspace)
+    }
+    if (url.pathname.match(/\/webpages\/designer\/themes\/\d+\/undo\/?$/)) {
+      designerWorkspace = { ...designerWorkspace, draftVersion: designerWorkspace.draftVersion + 1,
+        liveSyncVersion: designerWorkspace.liveSyncVersion + 1, hasDraftChanges: false, canUndo: false }
+      return json(route, designerWorkspace)
+    }
+    if (url.pathname.match(/\/taxonomy\/types\/?$/)) return json(route, paginated([{
+      ...tagType,
+      permissions: page.url().includes('demoRole=proposer') ? ['use', 'propose'] : tagType.permissions
+    }]))
+    if (url.pathname.match(/\/taxonomy\/terms\/?$/)) {
+      const search = (url.searchParams.get('search') || '').toLowerCase()
+      return json(route, paginated(approvedTerms.filter(term => term.name.toLowerCase().includes(search))))
+    }
+    if (url.pathname.match(/\/taxonomy\/terms\/[^/]+\/usage\/?$/)) return json(route, { pages: { count: 0, results: [] } })
+    if (url.pathname.match(/\/taxonomy\/proposals\/?$/)) {
+      if (request.method() === 'POST') {
+        const input = request.postDataJSON() || {}
+        const name = input.payload?.name || 'Energy transition'
+        const proposal = { id: 'proposal-demo', classificationType: input.classification_type || 'topic',
+          action: input.action || 'create', status: 'pending',
+          term: { id: 'energy-transition', name, parent: null, status: 'pending' },
+          payload: input.payload || { name }, proposedBy: 1, createdAt: '2026-05-25T12:00:00Z' }
+        proposals = [proposal]
+        return json(route, proposal, 201)
+      }
+      return json(route, paginated(proposals))
+    }
+    if (url.pathname.match(/\/taxonomy\/proposals\/[^/]+\/decide\/?$/)) {
+      const decision = request.postDataJSON()?.decision || 'approved'
+      proposals = proposals.map(proposal => ({ ...proposal, status: decision }))
+      return json(route, proposals[0])
+    }
 
     if (url.pathname.endsWith('/current-user/')) {
       return json(route, {
@@ -1814,14 +1997,27 @@ const mockCmsApi = async (page) => {
       return json(route, objectTypes)
     }
 
+    if (url.pathname.match(/\/objects\/object-types\/1\/?$/)) {
+      return json(route, { ...objectTypes[0], schema: { properties: {} }, allowedChildTypes: [], slotConfiguration: { slots: [] } })
+    }
+
     if (url.pathname.includes('/objects/object-types/')) {
       return json(route, paginated(objectTypes))
     }
 
     if (url.pathname.includes('/objects/objects/')) {
-      return json(route, paginated([
-        { id: 11, title: 'Opening keynote', status: 'draft', objectType: objectTypes[0], parent: null }
-      ]))
+      if (url.pathname.match(/\/objects\/objects\/11\/save_working_copy\/?$/)) {
+        const input = request.postDataJSON() || {}
+        demoObject = { ...demoObject, title: input.title || demoObject.title,
+          data: input.data || demoObject.data, widgets: input.widgets || demoObject.widgets,
+          editRevision: demoObject.editRevision + 1 }
+        return json(route, { object: demoObject, version: { id: demoObject.versionId, editRevision: demoObject.editRevision } })
+      }
+      if (url.pathname.match(/\/objects\/objects\/11\/path_to_root\/?$/)) return json(route, [])
+      if (url.pathname.match(/\/objects\/objects\/11\/workflow\/?$/)) return json(route, { state: 'draft', editableVersion: { id: demoObject.versionId, editRevision: demoObject.editRevision }, liveVersion: null })
+      if (url.pathname.match(/\/objects\/objects\/11\/(versions|children|tree)\/?$/)) return json(route, [])
+      if (url.pathname.match(/\/objects\/objects\/11\/?$/)) return json(route, demoObject)
+      return json(route, paginated([demoObject]))
     }
 
     if (url.pathname.includes('/tags/')) {
@@ -1832,9 +2028,14 @@ const mockCmsApi = async (page) => {
     }
 
     if (url.pathname.includes('/media/')) {
-      return json(route, paginated([
-        { id: 1, title: 'Venue logo', filename: 'venue-logo.png', fileType: 'image', tags: [], namespace: 'default' }
-      ]))
+      if (url.pathname.match(/\/media\/files\/1\/?$/)) {
+        if (request.method() === 'PATCH') {
+          const patch = request.postDataJSON() || {}
+          demoImage = { ...demoImage, ...patch, focalPoint: patch.focal_point || demoImage.focalPoint }
+        }
+        return json(route, demoImage)
+      }
+      return json(route, paginated([demoImage]))
     }
 
     if (url.pathname.match(/\/webpages\/pages\/?$/) && request.method() === 'POST') {
@@ -1921,12 +2122,28 @@ const runAction = async (page, action, baseUrl, args) => {
     }
 
     const locator = resolveLocator(page, action)
-    const point = await locatorCenter(locator, actionTimeout)
+    const point = action.positionFractionX === undefined && action.positionFractionY === undefined
+      ? await locatorCenter(locator, actionTimeout)
+      : await (async () => {
+        const box = await locator.first().boundingBox({ timeout: actionTimeout })
+        if (!box) throw new Error(`Click target has no bounding box: ${describeActionTarget(action)}`)
+        return {
+          x: box.x + box.width * (action.positionFractionX ?? 0.5),
+          y: box.y + box.height * (action.positionFractionY ?? 0.5)
+        }
+      })()
 
     await moveTutorialCursor(page, args, point.x, point.y)
     await flashClickPulse(page, args, point.x, point.y)
     if (action.mockOnly && !args.mockApi) return
-    await locator.first().click()
+    if (action.acceptDialog) page.once('dialog', dialog => dialog.accept())
+    if (action.positionFractionX !== undefined || action.positionFractionY !== undefined) {
+      const box = await locator.first().boundingBox({ timeout: actionTimeout })
+      await locator.first().click({ position: {
+        x: box.width * (action.positionFractionX ?? 0.5),
+        y: box.height * (action.positionFractionY ?? 0.5)
+      } })
+    } else await locator.first().click({ force: Boolean(action.forceClick) })
     return
   }
 
@@ -1954,6 +2171,10 @@ const runAction = async (page, action, baseUrl, args) => {
 
     await moveTutorialCursor(page, args, point.x, point.y)
     await flashClickPulse(page, args, point.x, point.y)
+    if (action.atomicFill) {
+      await locator.first().fill(action.value || '')
+      return
+    }
     await locator.first().click()
     await locator.first().fill('')
     await showTypingBadge(page, args, point.x, point.y, action.typingLabel || 'Typing')
@@ -1974,6 +2195,16 @@ const runAction = async (page, action, baseUrl, args) => {
 
   if (action.type === 'waitForText') {
     await page.getByText(action.text, { exact: Boolean(action.exact) }).first().waitFor({ timeout: action.timeout || 10000 })
+    return
+  }
+
+  if (action.type === 'assertVisible') {
+    await resolveLocator(page, action).first().waitFor({ state: 'visible', timeout: action.timeout || actionTimeout })
+    return
+  }
+
+  if (action.type === 'assertHidden') {
+    await resolveLocator(page, action).first().waitFor({ state: 'hidden', timeout: action.timeout || actionTimeout })
     return
   }
 
@@ -2014,16 +2245,15 @@ const actionErrorMessage = (error) => {
   return String(error)
 }
 
-const runActionBestEffort = async (page, action, baseUrl, args, segment) => {
+const runActionChecked = async (page, action, baseUrl, args, segment) => {
   try {
+    const currentUrl = page.url()
     await runAction(page, action, baseUrl, args)
-    return { ok: true }
+    return { ok: true, pageChanged: page.url() !== currentUrl || action.type === 'reload' }
   } catch (error) {
     await hideTypingBadge(page, args).catch(() => {})
     const target = describeActionTarget(action)
-    console.warn(`    ! Part ${segment.partIndex}: ${action.type || 'unknown'} action failed (${target}); continuing without this action.`)
-    console.warn(`      ${actionErrorMessage(error)}`)
-    return { ok: false, error }
+    throw new Error(`Part ${segment.partIndex}: ${action.type || 'unknown'} action failed (${target}): ${actionErrorMessage(error)}`, { cause: error })
   }
 }
 
@@ -2044,12 +2274,15 @@ const addSfxEventsForAction = (sfxEvents, action, actionStart) => {
   }
 }
 
-const createContextOptions = (args) => {
+const createContextOptions = (args, recordVideo = true) => {
   const contextOptions = {
     baseURL: args.baseUrl,
     viewport: { width: args.width, height: args.height },
-    serviceWorkers: 'block',
-    recordVideo: {
+    serviceWorkers: 'block'
+  }
+
+  if (recordVideo) {
+    contextOptions.recordVideo = {
       dir: args.recordingTempDir,
       size: { width: args.width, height: args.height }
     }
@@ -2081,7 +2314,12 @@ const installRecordingStateReset = async (page, args) => {
 
 const guideLabel = ({ doc, guide }) => `${doc.title || doc.id} / ${guide.title || guide.id}`
 
-const safeGuideName = (doc, guide) => `${doc.id}-${guide.id}`.replace(/[^a-z0-9_-]+/gi, '-')
+const safeGuideName = (doc, guide, args) => {
+  const preview = args.preview ? '-preview' : ''
+  const language = args.languageSuffix ? `-${args.language.toLowerCase()}` : ''
+  const identity = args.languageSuffix ? guide.id : `${doc.id}-${guide.id}`
+  return `${identity}${preview}${language}`.replace(/[^a-z0-9_-]+/gi, '-')
+}
 
 const ensureSentence = (value = '') => {
   const trimmed = value.toString().trim()
@@ -2235,7 +2473,20 @@ const prepareActionSegments = async (args, guide, actions, safeName) => {
 
   for (const [index, action] of actions.entries()) {
     const sourceCaption = getActionCaption(action, guide, args.language)
-    const caption = await translateText(sourceCaption, args)
+    if (action.actionAtFraction !== undefined
+      && (!Number.isFinite(Number(action.actionAtFraction)) || Number(action.actionAtFraction) < 0 || Number(action.actionAtFraction) > 1)) {
+      throw new Error(`Invalid actionAtFraction in part ${index + 1}; use a value between 0 and 1.`)
+    }
+    if (action.postNarrationPauseMs !== undefined
+      && (!Number.isFinite(Number(action.postNarrationPauseMs))
+        || (Number(action.postNarrationPauseMs) !== 0 && (Number(action.postNarrationPauseMs) < 1000 || Number(action.postNarrationPauseMs) > 3000)))) {
+      throw new Error(`Invalid postNarrationPauseMs in part ${index + 1}; use 1000–3000 ms or 0.`)
+    }
+    if (args.requireVoice && !sourceCaption.trim()) {
+      throw new Error(`Missing ${args.language} narration for part ${index + 1}. Add localized caption text before recording.`)
+    }
+    const localizedCaption = getLocalizedValue(action, 'caption', args.language)
+    const caption = localizedCaption || await translateText(sourceCaption, args)
     const segment = {
       action,
       caption,
@@ -2278,6 +2529,9 @@ const prepareActionSegments = async (args, guide, actions, safeName) => {
     }
 
     segments.push(segment)
+    if (args.requireVoice && segment.caption && !segment.audioPath) {
+      throw new Error(`Voice generation did not produce audio for part ${index + 1}. Stopping instead of rendering a silent tutorial.`)
+    }
   }
 
   return segments
@@ -2303,6 +2557,53 @@ const loadInitialFrame = async (page, args, initialPath = '/') => {
   await page.waitForTimeout(300)
 }
 
+const simulateGuide = async (browser, args, target) => {
+  const actions = guideActions(target.guide, args)
+  const blockedParts = actions
+    .map((action, index) => ({ action, index }))
+    .filter(({ action }) => ['blocked', 'missing'].includes(action.captureStatus))
+
+  if (blockedParts.length > 0) {
+    const scenes = blockedParts.map(({ action, index }) => action.scene || index + 1)
+    const status = blockedParts.some(({ action }) => action.captureStatus === 'blocked') ? 'blocked' : 'missing'
+    throw new Error(`Guide "${target.guide.id}" is not recordable: scene${scenes.length === 1 ? '' : 's'} ${scenes.join(', ')} have ${status} capture prerequisites.`)
+  }
+
+  const context = await browser.newContext(createContextOptions(args, false))
+  const page = await context.newPage()
+
+  try {
+    await installRecordingStateReset(page, args)
+
+    if (args.mockApi) {
+      await mockCmsApi(page)
+      await page.addInitScript(() => {
+        window.localStorage.setItem('access_token', 'howto-video-token')
+        window.localStorage.setItem('refresh_token', 'howto-video-refresh-token')
+      })
+    }
+
+    await loadInitialFrame(page, args, getInitialFramePath(target.guide))
+
+    for (const [index, action] of actions.entries()) {
+      try {
+        await runAction(page, action, args.baseUrl, args)
+      } catch (error) {
+        if (args.mockApi) {
+          const visibleText = await page.locator('body').innerText().catch(() => '')
+          console.error(`Local demo view at failed step: ${visibleText.slice(0, 1200)}`)
+        }
+        throw new Error(`Simulation failed for ${guideLabel(target)}, step ${index + 1} (${describeActionTarget(action)}): ${actionErrorMessage(error)}`, { cause: error })
+      }
+    }
+
+    console.log(`  - Simulation passed: ${actions.length} steps`)
+  } finally {
+    await page.close().catch(() => {})
+    await context.close().catch(() => {})
+  }
+}
+
 const publishHelpVideoArtifacts = async (args, safeName, videoPath, subtitlesPath) => {
   await mkdir(args.publicDir, { recursive: true })
 
@@ -2325,10 +2626,15 @@ const publishHelpVideoArtifacts = async (args, safeName, videoPath, subtitlesPat
 
 const recordGuide = async (browser, args, { doc, guide }) => {
   const actions = guideActions(guide, args)
-  const safeName = safeGuideName(doc, guide)
+  const safeName = safeGuideName(doc, guide, args)
   const webmPath = join(args.outputDir, `${safeName}.webm`)
   const mp4Path = join(args.outputDir, `${safeName}.mp4`)
   const subtitlesPath = join(args.outputDir, `${safeName}.vtt`)
+
+  if (args.languageSuffix && !args.preview && existsSync(mp4Path) && !args.replaceFinal) {
+    throw new Error(`Refusing to overwrite the existing final video: ${mp4Path}. Review it and use --replace-final only when replacement is approved.`)
+  }
+
   const segments = await prepareActionSegments(args, guide, actions, safeName)
 
   console.log('  - Capturing browser actions')
@@ -2373,7 +2679,7 @@ const recordGuide = async (browser, args, { doc, guide }) => {
     }
 
     if (args.overlayCaptions && caption) {
-      await setCaptionOverlay(page, caption)
+      await setCaptionOverlay(page, caption, segment.audioPath ? segment.audioDurationMs : 0)
     }
 
     if (segment.audioPath) {
@@ -2385,7 +2691,11 @@ const recordGuide = async (browser, args, { doc, guide }) => {
         partIndex: segment.partIndex,
         recorded: Boolean(segment.recorded)
       })
-      await page.waitForTimeout(action.narrationLeadMs ?? args.narrationActionLeadMs)
+      const actionAtFraction = Number(action.actionAtFraction)
+      const narrationLeadMs = Number.isFinite(actionAtFraction) && actionAtFraction >= 0 && actionAtFraction <= 1
+        ? Math.round(segment.audioDurationMs * actionAtFraction)
+        : action.narrationLeadMs ?? args.narrationActionLeadMs
+      await page.waitForTimeout(narrationLeadMs)
     } else if (caption) {
       await page.waitForTimeout(action.preHoldMs ?? args.noVoicePreHoldMs)
     }
@@ -2393,8 +2703,13 @@ const recordGuide = async (browser, args, { doc, guide }) => {
     const actionStart = Date.now() - startedAt
 
     console.log(`    Part ${segment.partIndex}: running ${action.type}`)
-    const actionResult = await runActionBestEffort(page, action, args.baseUrl, args, segment)
+    const actionResult = await runActionChecked(page, action, args.baseUrl, args, segment)
     const actionEnd = Date.now() - startedAt
+
+    if (actionResult.pageChanged && args.overlayCaptions && caption && segment.audioPath) {
+      const remainingSpeechMs = Math.max(0, narrationStart + segment.audioDurationMs - (Date.now() - startedAt))
+      await setCaptionOverlay(page, caption, remainingSpeechMs)
+    }
 
     if (actionResult.ok && args.sfx) {
       addSfxEventsForAction(sfxEvents, action, actionStart)
@@ -2411,8 +2726,12 @@ const recordGuide = async (browser, args, { doc, guide }) => {
     const elapsedSegmentMs = Date.now() - startedAt - narrationStart
     const actionHoldMs = Number.isFinite(Number(action.holdMs)) ? Number(action.holdMs) : null
     const targetHoldMs = (actionHoldMs ?? (segment.audioPath ? 0 : args.noVoiceHoldMs)) + args.globalHoldMs
+    const pauseAfterNarrationMs = Number.isFinite(Number(action.postNarrationPauseMs))
+      ? Number(action.postNarrationPauseMs)
+      : args.postNarrationPauseMs
+    const endOfSpeechOrActionMs = Math.max(segment.audioDurationMs, elapsedSegmentMs)
     const targetSegmentMs = segment.audioPath
-      ? Math.max(segment.audioDurationMs + 120, targetHoldMs)
+      ? Math.max(endOfSpeechOrActionMs + pauseAfterNarrationMs, targetHoldMs)
       : targetHoldMs
     const remainingSegmentMs = targetSegmentMs - elapsedSegmentMs
     const postActionHoldMs = action.postHoldMs ?? args.postActionHoldMs
@@ -2422,7 +2741,7 @@ const recordGuide = async (browser, args, { doc, guide }) => {
     if (caption) {
       cues.push({
         start: narrationStart,
-        end: Date.now() - startedAt,
+        end: segment.audioPath ? narrationStart + segment.audioDurationMs : Date.now() - startedAt,
         text: caption
       })
     }
@@ -2543,10 +2862,14 @@ const recordGuide = async (browser, args, { doc, guide }) => {
   const videoPath = args.format === 'webm' ? webmPath : mp4Path
   const published = await publishHelpVideoArtifacts(args, safeName, videoPath, subtitlesPath)
 
-  const manifestPath = join(args.workDir, `${safeName}.json`)
+  const manifestPath = join(args.outputDir, `${safeName}.json`)
   const manifest = {
     topicId: doc.id,
     guideId: guide.id,
+    helpGuideId: guide.helpGuideId || guide.id,
+    sourceFingerprint: howToSourceFingerprint(guide, args.language),
+    language: args.language,
+    preview: args.preview,
     title: guide.title,
     format: args.format,
     video: videoPath,
@@ -2591,12 +2914,14 @@ const recordGuide = async (browser, args, { doc, guide }) => {
 }
 
 const main = async () => {
-  const args = parseArgs(process.argv.slice(2))
-
-  if (args.help) {
+  const argv = process.argv.slice(2)
+  if (argv.includes('--help') || argv.includes('-h')) {
     printUsage()
     return
   }
+
+  await loadProjectEnv()
+  const args = parseArgs(argv)
 
   validateArgs(args)
 
@@ -2610,6 +2935,14 @@ const main = async () => {
 
   if (targets.length === 0) {
     console.error('No matching how-to guide found.')
+    process.exitCode = 1
+    return
+  }
+
+  try {
+    validateManuscriptTargets(targets, args.language)
+  } catch (error) {
+    console.error(error.message)
     process.exitCode = 1
     return
   }
@@ -2632,20 +2965,31 @@ const main = async () => {
     return
   }
 
-  await mkdir(args.outputDir, { recursive: true })
-  await mkdir(args.workDir, { recursive: true })
   console.log(`Preparing ${recordableTargets.length} how-to guide${recordableTargets.length === 1 ? '' : 's'}.`)
   console.log(`Base URL: ${args.baseUrl}`)
   console.log(`Docs: ${args.docsDir}`)
-  console.log(`Output: ${args.outputDir}`)
-  console.log(`Public output: ${args.publicDir}`)
-  console.log(`Work dir: ${args.workDir}`)
   console.log(`Language: ${args.language}`)
 
   const browser = await chromium.launch({ headless: args.headless })
   const recordings = []
 
   try {
+    for (const [index, target] of recordableTargets.entries()) {
+      console.log(`[${index + 1}/${recordableTargets.length}] Simulating ${guideLabel(target)}`)
+      await simulateGuide(browser, args, target)
+    }
+
+    if (args.simulateOnly) {
+      console.log(`Simulation passed for ${recordableTargets.length} guide${recordableTargets.length === 1 ? '' : 's'}. No video or voice files were generated.`)
+      return
+    }
+
+    await mkdir(args.outputDir, { recursive: true })
+    await mkdir(args.workDir, { recursive: true })
+    console.log(`Output: ${args.outputDir}`)
+    console.log(`Public output: ${args.publicDir}`)
+    console.log(`Work dir: ${args.workDir}`)
+
     for (const [index, target] of recordableTargets.entries()) {
       const label = guideLabel(target)
       console.log(`[${index + 1}/${recordableTargets.length}] Recording ${label}`)

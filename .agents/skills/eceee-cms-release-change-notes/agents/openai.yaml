@@ -1,0 +1,4 @@
+interface:
+  display_name: "ECEEE Release Change Notes"
+  short_description: "Prepare CMS release notes with screenshots and videos"
+  default_prompt: "Use $eceee-cms-release-change-notes to prepare Change Notes for [release tag] with its screenshots and videos."

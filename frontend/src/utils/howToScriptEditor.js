@@ -36,6 +36,18 @@ export const ACTION_DEFINITIONS = [
         fields: ['text', 'exact', 'timeout', 'cutFromVideo', 'holdMs']
     },
     {
+        type: 'assertVisible',
+        label: 'Check visible element',
+        hint: 'Verify that the expected screen or control is visible.',
+        fields: ['targetMode', 'selector', 'text', 'label', 'placeholder', 'role', 'name', 'exact', 'timeout', 'holdMs']
+    },
+    {
+        type: 'assertHidden',
+        label: 'Check hidden element',
+        hint: 'Verify that the previous screen or control is no longer visible.',
+        fields: ['targetMode', 'selector', 'text', 'label', 'placeholder', 'role', 'name', 'exact', 'timeout', 'holdMs']
+    },
+    {
         type: 'caption',
         label: 'Caption only',
         hint: 'Use a short pause for orientation or a transition.',
@@ -77,6 +89,10 @@ export const DEFAULT_VIDEO_LANGUAGES = ['sv']
 
 const NUMBER_FIELDS = new Set(['holdMs', 'ms', 'timeout', 'cursorX', 'cursorY', 'delayMs', 'hoverHoldMs'])
 const BOOLEAN_FIELDS = new Set(['exact', 'mockOnly', 'cutFromVideo'])
+const RENDER_ACTION_METADATA = [
+    'scene', 'captureStatus', 'captionSv', 'captionEn', 'actionAtFraction', 'postNarrationPauseMs',
+    'atomicFill', 'forceClick', 'acceptDialog', 'frameSelector', 'positionFractionX', 'positionFractionY'
+]
 const TARGET_FIELDS = new Set(['selector', 'text', 'label', 'placeholder', 'role', 'name'])
 const ADVANCED_ACTION_FIELDS = new Set([
     'pageTreeAddChildForText',
@@ -263,6 +279,10 @@ export const normalizeAction = (action = {}) => {
         normalized[field] = action[field]
     })
 
+    RENDER_ACTION_METADATA.forEach(field => {
+        if (Object.prototype.hasOwnProperty.call(action, field)) normalized[field] = action[field]
+    })
+
     if (targetMode === 'advanced') {
         ADVANCED_ACTION_FIELDS.forEach(field => {
             const value = action[field]
@@ -341,13 +361,18 @@ export const normalizeScriptBlock = (block = {}, fallbackCaption = '') => {
         : block.action && typeof block.action === 'object'
         ? block.action
         : block
-    const caption = textValue(block.caption ?? actionSource?.caption ?? fallbackCaption ?? '')
+    const caption = textValue(block.caption ?? actionSource?.caption ?? block.captionSv ?? actionSource?.captionSv ?? block.captionEn ?? actionSource?.captionEn ?? fallbackCaption ?? '')
 
     const normalized = {
         caption,
         action: actionSource?.type ? normalizeAction(actionWithoutCaption(actionSource)) : null
     }
 
+    if (!normalized.action) {
+        RENDER_ACTION_METADATA.forEach(field => {
+            if (Object.prototype.hasOwnProperty.call(block, field)) normalized[field] = block[field]
+        })
+    }
     const audio = normalizeBlockAudio(block.audio ?? actionSource?.audio)
     if (audio) normalized.audio = audio
 
@@ -380,6 +405,7 @@ export const guideToScriptDraft = (guide, section) => {
 
     return {
         id: guide?.id || '',
+        helpGuideId: guide?.helpGuideId || guide?.id || '',
         uuid: guide?.uuid || guide?.guideUuid || stableUuidFromSeed(guide?.id || guide?.title || ''),
         sourcePath: guide?.sourcePath || '',
         title: guide?.title || '',
@@ -402,7 +428,10 @@ export const guideToScriptDraft = (guide, section) => {
         youtubeId: guide?.youtubeId || '',
         youtubeUrl: guide?.youtubeUrl || '',
         script: Array.isArray(guide?.script) && guide.script.length > 0
-            ? guide.script.map(normalizeScriptBlock)
+            ? guide.script.map(block => {
+                const field = (guide.language || 'en').startsWith('sv') ? 'captionSv' : 'captionEn'
+                return normalizeScriptBlock({ ...block, caption: block.caption ?? block[field] ?? block.action?.[field] })
+            })
             : legacyActionsToScript(guide)
     }
 }
@@ -445,6 +474,7 @@ export const createMarkdownFromDraft = (draft) => {
         frontmatterLine('language', draft.language || 'en'),
         frontmatterLine('sourceLanguage', draft.sourceLanguage),
         frontmatterLine('translationOf', draft.translationOf),
+        frontmatterLine('helpGuideId', draft.helpGuideId || draft.id),
         frontmatterLine('sectionId', draft.sectionId),
         frontmatterLine('sectionTitle', draft.sectionTitle),
         frontmatterLine('sectionSummary', draft.sectionSummary),
@@ -462,6 +492,8 @@ export const createMarkdownFromDraft = (draft) => {
     ].filter(Boolean)
 
     const script = (draft.script || []).map(normalizeScriptBlock)
+    const isManuscript = /(?:^|[\\/])manus\.md$/.test(draft.sourcePath || '')
+        || script.some(block => block.action && ('captionSv' in block.action || 'captionEn' in block.action))
     const steps = script
         .map(block => trimString(block.caption))
         .filter(Boolean)
@@ -471,6 +503,16 @@ export const createMarkdownFromDraft = (draft) => {
             const serialized = {
                 caption: trimString(block.caption),
                 action: block.action ? serializeAction(block.action) : null
+            }
+            const captionField = (draft.language || 'en').startsWith('sv') ? 'captionSv' : 'captionEn'
+            if (!serialized.action && isManuscript) {
+                RENDER_ACTION_METADATA.forEach(field => {
+                    if (Object.prototype.hasOwnProperty.call(block, field)) serialized[field] = block[field]
+                })
+                serialized[captionField] = serialized.caption
+            }
+            if (serialized.action && (isManuscript || Object.prototype.hasOwnProperty.call(serialized.action, captionField))) {
+                serialized.action[captionField] = serialized.caption
             }
             if (block.audio) serialized.audio = normalizeBlockAudio(block.audio)
             return serialized
@@ -521,7 +563,7 @@ export const validateScriptDraft = (draft) => {
             issues.push({ level: 'error', message: `Block ${number}: path is missing.` })
         }
 
-        if (['click', 'hoverClick', 'fill', 'select'].includes(normalized.type)) {
+        if (['click', 'hoverClick', 'fill', 'select', 'assertVisible', 'assertHidden'].includes(normalized.type)) {
             const targetMode = normalized.targetMode || inferTargetMode(normalized)
             const hasTarget = targetMode === 'advanced'
                 ? [...ADVANCED_ACTION_FIELDS].some(field => hasActionValue(normalized[field]))

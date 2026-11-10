@@ -1,47 +1,129 @@
+---
+id: taggar-gemensam-taggstruktur
+helpGuideId: tags-manage
+title: "Taggar: den gemensamma taggstrukturen"
+summary: "Sök, granska och filtrera godkända taggar."
+sectionId: tags
+sectionTitle: Tags
+language: sv
+sourceLanguage: sv
+---
+
 # Taggar: den gemensamma taggstrukturen
 
-> **Skärmbilder:** Faktiska bilder från Chrome ska läggas i `screenshots/` i denna mapp. Scenregistret i `screenshots/README.md` kopplar filnamn, synlig vy och berättarröst.
+**Miljö:** Lokalt CMS med `--mock-api`. Demot visar godkända termer och typen Topics. Inga produktionsdata används.
 
+**Mål:** Hitta en term, kontrollera dess plats och se hur typfiltret fungerar.
 
-**Längd:** cirka 2,5 minuter
-**Målgrupp:** redaktörer och taggadministratörer
-**Syfte:** förklara hur taggar organiseras och hur rätt term väljs.
+## Scener
 
-## Förbered inspelningen
+### 1. goto
 
-- Använd en testmiljö med godkända taggar av minst två typer och gärna en hierarki.
-- Välj exempel som tydligt visar att samma ord kan ha olika betydelse beroende på typ.
+**Berättarröst och undertext:** Öppna Tags för att se den gemensamma taggstrukturen i vår lokala demo.
 
-## Manus
+### 2. assertVisible
 
-### 1. Öppna taggregistret
+**Berättarröst och undertext:** Här finns sökfältet och de godkända termerna.
 
+### 3. click
 
-**Bild:** Öppna Tags. Visa sökfält, typfilter och träd/lista.
+**Berättarröst och undertext:** Öppna termen Conference och läs dess detaljer.
 
-**Berättarröst:** «Taggregistret samlar vokabulären som kan användas på sidor, objekt och media. Taggar tillhör en typ och ett namespace. Börja med att söka eller välj ett typfilter så att du arbetar i rätt sammanhang.»
+### 4. click
 
-### 2. Förstå typ och plats
+**Berättarröst och undertext:** Växla till Details för att läsa termens godkända information.
 
+### 5. assertVisible
 
-**Bild:** Välj en tagg och visa Details och Location. Visa typ och sökväg i hierarkin.
+**Berättarröst och undertext:** Location visar termens plats i hierarkin. Kontrollera också typ och beskrivning innan du använder termen.
 
-**Berättarröst:** «En tagg är mer än ett namn. Typen beskriver vilken sorts klassificering den tillhör, och platsen visar var den ligger i hierarkin. Kontrollera båda innan du väljer en term. Termer kan också ha alternativa namn och en beskrivning.»
+### 6. click
 
-### 3. Använd taggar på innehåll
+**Berättarröst och undertext:** Öppna typfiltret för att avgränsa listan.
 
+### 7. assertVisible
 
-**Bild:** Öppna ett ofarligt utkast i en sida eller ett objekt och visa taggväljaren. Sök fram en godkänd term och lägg till den utan att publicera.
+**Berättarröst och undertext:** I filtret kan du välja en taggtyp. Här använder demot typen Topics.
 
-**Berättarröst:** «När du taggar innehåll väljer du en befintlig godkänd term. Förslag är inte samma sak som godkända taggar. För media är klassificering obligatorisk före godkännande; en fritextetikett eller AI-rekommendation räcker inte.»
+### 8. click
 
-### 4. Visa sökfilter
+**Berättarröst och undertext:** Fliken Types visar vilka taggtyper som finns. Välj alltid rätt typ innan du klassificerar innehåll.
 
-
-**Bild:** Lägg till ett typfilter via ikonen i sökfältet. Visa filtret som en borttagbar pill och rensa det.
-
-**Berättarröst:** «Använd filtret för att begränsa sökningen till en typ. Du kan kombinera typ och söktext och ta bort filtret när du vill se hela registret.»
-
-## Avslutning
-
-**Berättarröst:** «Välj alltid term utifrån både namn och typ. Om termen saknas kan du skicka in ett förslag enligt organisationens granskningsflöde.»
+```video-script
+[
+  {
+    "type": "goto",
+    "path": "/tags",
+    "captionSv": "Öppna Tags för att se den gemensamma taggstrukturen i vår lokala demo.",
+    "postNarrationPauseMs": 1500,
+    "scene": 1,
+    "captureStatus": "ready"
+  },
+  {
+    "type": "assertVisible",
+    "role": "searchbox",
+    "name": "Search tags",
+    "captionSv": "Här finns sökfältet och de godkända termerna.",
+    "postNarrationPauseMs": 1200,
+    "scene": 2,
+    "captureStatus": "ready"
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Conference",
+    "captionSv": "Öppna termen Conference och läs dess detaljer.",
+    "actionAtFraction": 0.7,
+    "postNarrationPauseMs": 1500,
+    "scene": 3,
+    "captureStatus": "ready"
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Details",
+    "captionSv": "Växla till Details för att läsa termens godkända information.",
+    "actionAtFraction": 0.7,
+    "postNarrationPauseMs": 1200,
+    "captureStatus": "ready",
+    "scene": 4
+  },
+  {
+    "type": "assertVisible",
+    "text": "Location",
+    "captionSv": "Location visar termens plats i hierarkin. Kontrollera också typ och beskrivning innan du använder termen.",
+    "postNarrationPauseMs": 1500,
+    "scene": 5,
+    "captureStatus": "ready"
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Add filter",
+    "captionSv": "Öppna typfiltret för att avgränsa listan.",
+    "actionAtFraction": 0.7,
+    "postNarrationPauseMs": 1200,
+    "scene": 6,
+    "captureStatus": "ready"
+  },
+  {
+    "type": "assertVisible",
+    "role": "dialog",
+    "name": "Add tag filter",
+    "captionSv": "I filtret kan du välja en taggtyp. Här använder demot typen Topics.",
+    "postNarrationPauseMs": 1500,
+    "scene": 7,
+    "captureStatus": "ready"
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Types",
+    "captionSv": "Fliken Types visar vilka taggtyper som finns. Välj alltid rätt typ innan du klassificerar innehåll.",
+    "actionAtFraction": 0.7,
+    "postNarrationPauseMs": 1500,
+    "scene": 8,
+    "captureStatus": "ready"
+  }
+]
+```

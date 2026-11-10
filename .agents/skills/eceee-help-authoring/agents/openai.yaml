@@ -1,0 +1,4 @@
+interface:
+  display_name: "ECEEE Help Authoring"
+  short_description: "Connect help, scripts, videos and release notes"
+  default_prompt: "Use $eceee-help-authoring to update this workflow's help article and keep its instructional video association consistent."

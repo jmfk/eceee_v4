@@ -1,6 +1,6 @@
 ---
 name: eceee-api-operations
-description: Operate ECEEE v4 development, staging, or production CMS environments through tenant-scoped machine APIs. Use for inspecting and changing pages, content, themes, media, objects, publishing, and supported transfers; not deployments or database administration.
+description: Operate ECEEE v4 development, staging, or production CMS environments through tenant-scoped machine APIs. Use for inspecting and changing pages, content, themes, media, objects, publishing, collaboration APIs and supported transfers; not deployments or database administration.
 ---
 
 # ECEEE API Operations
@@ -47,7 +47,18 @@ deletion remains a server-wide operation.
   These resources are global; mutations require a deliberately granted
   `server.full_access` credential.
 
-Runtime configuration, secrets, users, remote credentials, deployments, SSH,
+The repository's `eceee-workspace-operations` skill covers `/support/`, `/kanban/`,
+and the principal's own `/utils/current-user/` and `/utils/profile-photos/` routes.
+Use `support.read`, `support.write`, `support.publish`, `kanban.read`,
+`kanban.write`, `profile.read`, `profile.write` only when explicitly granted.
+Existing membership, board access, support/publisher roles and ownership still apply.
+Instruction uploads target private `/support/videos/` then authorized
+`/support/instructions/` publication, not `/media/upload/`. Use the repository's
+`eceee-instructional-video-publisher` for that workflow. Source changes need deployment
+before production can use these capabilities; never rotate a working key to check access.
+
+Runtime configuration, secrets, global user/account-security administration,
+other people's private profiles/Inbox, remote credentials, deployments, SSH,
 backups, and database administration are outside this skill.
 
 Use `inspect-secrets-safely` before checking or changing credentials. Reuse a
@@ -72,6 +83,10 @@ whether it succeeded, particularly for publishing, imports, and credential rotat
 Send bodies through `--data-file`. Use `--upload-file` for one multipart file and
 repeat `--form NAME=VALUE` for its accompanying public metadata. Re-read the saved
 resource and verify the relevant render or workflow surface after mutation.
+For private message content, attachments and signed playback/download responses,
+use `--status-only` or a protected `--output` file; the helper saves output as mode
+0600 and refuses output symlinks. Do not expose private response bodies or expiring
+bearer URLs in tool/chat logs.
 
 Production reads and writes still require the repository's fresh production gate.
 Technical possession of a key is not production authorization.

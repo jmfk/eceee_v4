@@ -1,49 +1,165 @@
-# Designer: undersöka och ändra marginaler och padding
+---
+id: designer-marginaler-och-padding
+helpGuideId: settings-themes
+title: "Designer: marginaler och padding"
+summary: "Undersök och ändra ett avstånd i ett lokalt demotema."
+sectionId: designer
+sectionTitle: Designer
+language: sv
+sourceLanguage: sv
+---
 
-> **Skärmbilder:** Faktiska bilder från Chrome ska läggas i `screenshots/` i denna mapp. Scenregistret i `screenshots/README.md` kopplar filnamn, synlig vy och berättarröst.
-> **Produktionsnot:** Designer-temalistan laddade, men den öppnade produktionsarbetsytan stannade på «Loading Designer workspace…». Bekräfta att arbetsytan fungerar innan detaljbilder spelas in.
+# Designer: marginaler och padding
 
+**Miljö:** Lokalt CMS med `--mock-api`. Alla ändringar stannar i demotemats minne.
 
-**Längd:** cirka 4 minuter
-**Målgrupp:** designers som finjusterar avstånd i temat
-**Syfte:** lära ut ett säkert arbetssätt för att förstå vilket avstånd som skapar problemet och justera rätt värde.
+**Mål:** Skilj yttre marginal från inre padding, välj rätt element och ändra ett värde åt gången.
 
-## Förbered inspelningen
+## Scener
 
-- Välj en sida/komponent i förhandsvisningen där problemet med avstånd är tydligt.
-- Använd en testmiljö och notera ursprungsvärdena så att ändringen enkelt kan återställas.
-- Bekräfta vad de aktuella fälten och enheterna heter i Designer-versionen som spelas in.
+### 1. goto
 
-## Manus
+**Berättarröst och undertext:** Öppna det lokala demotemat och välj en textyta i förhandsvisningen.
 
-### 1. Skilj marginal från padding
+### 2. assertVisible
 
+**Berättarröst och undertext:** Förhandsvisningen visar hur temat ser ut innan du ändrar ett avstånd.
 
-**Bild:** Visa en komponent med tydlig yttre och inre luft. Lägg gärna en enkel grafisk markering ovanpå videon: marginal utanför komponenten, padding mellan kanten och innehållet.
+### 3. click
 
-**Berättarröst:** «När ett element ligger för nära något annat handlar det ofta om marginal. När text eller bild ligger för nära elementets egen kant handlar det ofta om padding. Börja med att avgöra vilken av de två situationerna du ser.»
+**Berättarröst och undertext:** Dölj inspektören tillfälligt så att förhandsvisningen får mer plats.
 
-### 2. Hitta rätt inställning
+### 4. click
 
+**Berättarröst och undertext:** Klicka i förhandsvisningen för att markera innehållswidgeten.
 
-**Bild:** Öppna Designer-sektionen för marginaler och padding. Visa grupperna eller kontrollernas namn och koppla en kontroll till komponenten i förhandsvisningen.
+### 5. click
 
-**Berättarröst:** «Leta upp inställningen som hör till rätt del av temat. Ändra inte flera relaterade värden samtidigt; då blir det svårt att förstå vilken ändring som gav resultatet. Notera först nuvarande värde och enhet.»
+**Berättarröst och undertext:** Öppna inspektören igen för att se inställningarna för den valda textytan.
 
-### 3. Ändra stegvis och jämför
+### 6. click
 
+**Berättarröst och undertext:** Välj Heading 1 i elementlistan så att inspektören visar rubrikens egna avstånd.
 
-**Bild:** Ändra ett värde i liten omfattning. Vänta på att förhandsvisningen uppdateras. Visa före/efter och prova vid behov ett andra breakpoint eller en annan vy.
+### 7. assertVisible
 
-**Berättarröst:** «Gör en liten justering och kontrollera förhandsvisningen. Se om avståndet blev bättre utan att texten blir trång eller att layouten tappar balans. Kontrollera gärna en smal vy också, eftersom samma ändring kan upplevas olika vid olika bredder.»
+**Berättarröst och undertext:** Margin bottom är yttre avstånd under textytan. Padding är inre avstånd mellan innehåll och kant.
 
-### 4. Spara som utkast
+### 8. fill
 
+**Berättarröst och undertext:** Ändra ett värde i taget och jämför förhandsvisningen. Här ökar vi textytans nedre marginal till 20 pixlar.
 
-**Bild:** Visa den slutliga förhandsvisningen och välj Save draft. Visa bekräftelsen/statusen. Låt Publish changes vara orörd.
+### 9. assertVisible
 
-**Berättarröst:** «När resultatet ser bra ut sparar du utkastet. Det gör inte ändringen live. Publicering görs separat när ändringarna är granskade och redo.»
+**Berättarröst och undertext:** Rubrikens padding är ett inre avstånd. Ändra det separat från den yttre marginalen.
 
-## Avslutning
+### 10. fill
 
-**Berättarröst:** «Tänk: identifiera marginal eller padding, hitta rätt kontroll, ändra ett värde i taget och kontrollera resultatet i flera vyer.»
+**Berättarröst och undertext:** Öka rubrikens övre padding till tolv pixlar och jämför utrymmet innanför kanten.
+
+### 11. click
+
+**Berättarröst och undertext:** Spara ändringen i demotemats utkast. Publicering är ett separat beslut.
+
+```video-script
+[
+  {
+    "type": "goto",
+    "path": "/designer/themes/1",
+    "captionSv": "Öppna det lokala demotemat och välj en textyta i förhandsvisningen.",
+    "scene": 1,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "assertVisible",
+    "selector": "iframe[title=\"Live theme preview\"]",
+    "captionSv": "Förhandsvisningen visar hur temat ser ut innan du ändrar ett avstånd.",
+    "scene": 2,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Collapse theme inspector",
+    "captionSv": "Dölj inspektören tillfälligt så att förhandsvisningen får mer plats.",
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500,
+    "scene": 3
+  },
+  {
+    "type": "click",
+    "frameSelector": "iframe[title=\"Live theme preview\"]",
+    "selector": "h1",
+    "captionSv": "Klicka i förhandsvisningen för att markera innehållswidgeten.",
+    "scene": 4,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500,
+    "forceClick": true
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Expand theme inspector",
+    "captionSv": "Öppna inspektören igen för att se inställningarna för den valda textytan.",
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500,
+    "scene": 5
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Edit Heading 1",
+    "captionSv": "Välj Heading 1 i elementlistan så att inspektören visar rubrikens egna avstånd.",
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500,
+    "scene": 6
+  },
+  {
+    "type": "assertVisible",
+    "text": "Margin bottom",
+    "captionSv": "Margin bottom är yttre avstånd under textytan. Padding är inre avstånd mellan innehåll och kant.",
+    "scene": 7,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  },
+  {
+    "type": "fill",
+    "value": "20px",
+    "captionSv": "Ändra ett värde i taget och jämför förhandsvisningen. Här ökar vi textytans nedre marginal till 20 pixlar.",
+    "scene": 8,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500,
+    "atomicFill": true,
+    "selector": "input[aria-label=\"element Margin bottom\"]"
+  },
+  {
+    "type": "assertVisible",
+    "text": "Padding",
+    "captionSv": "Rubrikens padding är ett inre avstånd. Ändra det separat från den yttre marginalen.",
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500,
+    "scene": 9
+  },
+  {
+    "type": "fill",
+    "selector": "input[aria-label=\"element Padding top\"]",
+    "value": "12px",
+    "atomicFill": true,
+    "captionSv": "Öka rubrikens övre padding till tolv pixlar och jämför utrymmet innanför kanten.",
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500,
+    "scene": 10
+  },
+  {
+    "type": "click",
+    "role": "button",
+    "name": "Save draft",
+    "captionSv": "Spara ändringen i demotemats utkast. Publicering är ett separat beslut.",
+    "scene": 11,
+    "captureStatus": "ready",
+    "postNarrationPauseMs": 1500
+  }
+]
+```
