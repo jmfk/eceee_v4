@@ -7,7 +7,7 @@ import ipaddress
 import socket
 import ssl
 from dataclasses import dataclass
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import quote, urlsplit, urlunsplit
 
 from .fetcher import USER_AGENT
 
@@ -115,7 +115,9 @@ def get_public_url(url: str, *, timeout: float = 20.0, max_bytes: int) -> GetRes
     port = parsed.port or (443 if parsed.scheme == "https" else 80)
     authority_host = f"[{hostname}]" if ":" in hostname else hostname
     authority = f"{authority_host}:{parsed.port}" if parsed.port else authority_host
-    target = urlunsplit(("", "", parsed.path or "/", parsed.query, ""))
+    # Preserve existing escapes and the filename's Unicode normalization. Legacy
+    # files include decomposed accents as well as spaces and non-ASCII letters.
+    target = quote(urlunsplit(("", "", parsed.path or "/", parsed.query, "")), safe="/?:@!$&'()*+,;=-._~%")
     last_error: Exception | None = None
 
     for address in addresses:

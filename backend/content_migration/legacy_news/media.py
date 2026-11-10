@@ -144,6 +144,8 @@ class LegacyMediaImporter:
             existing.file_hash = result["file_hash"]
             existing.width = result.get("width")
             existing.height = result.get("height")
+            if existing.description == f"Legacy image unavailable: {existing.metadata.get('legacy_media_failure', '')}":
+                existing.description = ""
             existing.metadata = {
                 **existing.metadata,
                 "migration_placeholder": False,
@@ -180,7 +182,7 @@ class LegacyMediaImporter:
             media = MediaFile.objects.create(
                 title=alt.strip() or filename,
                 slug=self._unique_slug(filename),
-                description=(f"Legacy image unavailable: {failure}" if placeholder else "Imported legacy News image"),
+                description=(f"Legacy image unavailable: {failure}" if placeholder else ""),
                 original_filename=filename,
                 file_path=result["file_path"],
                 file_url=storage.get_public_url(result["file_path"]),
