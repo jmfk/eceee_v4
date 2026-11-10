@@ -67,6 +67,7 @@ class LegacyNewsMediaImporterTests(TestCase):
         self.assertEqual(first.id, second.id)
         self.assertEqual(first.id, third.id)
         self.assertEqual(MediaFile.objects.count(), 1)
+        self.assertEqual(first.description, "")
         mocked_storage.overwrite_file.assert_called_once()
         first.refresh_from_db()
         self.assertEqual(first.metadata["legacy_news_articles"], ["article-1", "article-2"])
@@ -85,12 +86,15 @@ class LegacyNewsMediaImporterTests(TestCase):
         mocked_storage.get_public_url.return_value = "https://media.example/recovered.jpg"
         with patch.object(self.importer, "_read_image", side_effect=ValueError("http-404")):
             placeholder = self.importer.import_image(source_url)
+        placeholder.description = "Caption written by an editor"
+        placeholder.save(update_fields=["description"])
         self.assertTrue(placeholder.delete(user=self.user))
         with patch.object(self.importer, "_read_image", return_value=(b"recovered", "image/jpeg")):
             restored = self.importer.import_image(source_url, resume=True, omit_unavailable=True)
         self.assertEqual(restored.pk, placeholder.pk)
         self.assertFalse(restored.is_deleted)
         self.assertFalse(restored.metadata["migration_placeholder"])
+        self.assertEqual(restored.description, "Caption written by an editor")
 
     @patch("content_migration.legacy_news.media.storage")
     def test_deleted_placeholder_recovery_removes_marker_with_explicit_classifications(self, mocked_storage):
@@ -143,6 +147,7 @@ class LegacyNewsMediaImporterTests(TestCase):
         resumed.refresh_from_db()
         self.assertFalse(resumed.metadata["migration_placeholder"])
         self.assertEqual(resumed.metadata["legacy_media_failure"], "")
+        self.assertEqual(resumed.description, "")
         self.assertEqual(mocked_storage.overwrite_file.call_count, 2)
         first_path = mocked_storage.overwrite_file.call_args_list[0].args[0]
         second_path = mocked_storage.overwrite_file.call_args_list[1].args[0]
