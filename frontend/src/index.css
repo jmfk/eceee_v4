@@ -75,8 +75,7 @@
   .editor-controls-always .widget-slot.editor-overlay-region,
   .editor-controls-always .page-editor-widget.editor-overlay-region,
   .editor-controls-always .slot-editor.editor-overlay-region,
-  .editor-controls-on-demand .editor-overlay-region:focus-within,
-  .editor-controls-on-demand .editor-overlay-region.editor-controls-selected {
+  .editor-controls-on-demand .editor-overlay-region:focus-within {
     --editor-frame-offset: var(--editor-toolbar-row-height);
   }
 
@@ -97,8 +96,7 @@
   .editor-controls-always .widget-slot.editor-overlay-region::after,
   .editor-controls-always .page-editor-widget.editor-overlay-region::after,
   .editor-controls-always .slot-editor.editor-overlay-region::after,
-  .editor-controls-on-demand .editor-overlay-region:focus-within::after,
-  .editor-controls-on-demand .editor-overlay-region.editor-controls-selected::after {
+  .editor-controls-on-demand .editor-overlay-region:focus-within::after {
     border-color: rgb(59 130 246 / 70%);
   }
 
@@ -167,8 +165,7 @@
     scroll-padding-inline: 0.25rem;
   }
 
-  .editor-controls-on-demand .editor-overlay-region:focus-within > .editor-overlay-toolbar,
-  .editor-controls-on-demand .editor-overlay-region.editor-controls-selected > .editor-overlay-toolbar {
+  .editor-controls-on-demand .editor-overlay-region:focus-within > .editor-overlay-toolbar {
     display: flex !important;
   }
 
@@ -177,13 +174,11 @@
     opacity: 1 !important;
   }
 
-  .editor-controls-on-demand .editor-overlay-region:focus-within > .editor-slot-toolbar,
-  .editor-controls-on-demand .editor-overlay-region.editor-controls-selected > .editor-slot-toolbar {
+  .editor-controls-on-demand .editor-overlay-region:focus-within > .editor-slot-toolbar {
     display: block !important;
   }
 
-  .editor-controls-on-demand .editor-overlay-region:focus-within > .widget-header.editor-slot-toolbar,
-  .editor-controls-on-demand .editor-overlay-region.editor-controls-selected > .widget-header.editor-slot-toolbar {
+  .editor-controls-on-demand .editor-overlay-region:focus-within > .widget-header.editor-slot-toolbar {
     display: flex !important;
   }
 
