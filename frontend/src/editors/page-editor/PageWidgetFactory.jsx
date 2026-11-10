@@ -348,7 +348,7 @@ const PageWidgetFactory = ({
         return (
             <div
                 ref={widgetRef}
-                className={`widget-item widget-type-${normalizeForCSS(widget.type)} page-editor-widget editor-overlay-region relative group ${className} ${isPublished ? 'published-widget' : ''} ${pasteModeActive && showPasteMarkers ? 'paste-mode-active' : ''}`}
+                className={`widget-item widget-type-${normalizeForCSS(widget.type)} page-editor-widget editor-overlay-region relative group ${className} ${isWidgetSelected?.(actualSlotName, actualWidgetId) ? 'editor-controls-selected' : ''} ${isPublished ? 'published-widget' : ''} ${pasteModeActive && showPasteMarkers ? 'paste-mode-active' : ''}`}
                 tabIndex={0}
                 role="group"
                 aria-label={`${getWidgetDisplayName(widget.type)} widget`}
@@ -374,6 +374,11 @@ const PageWidgetFactory = ({
                         e.target.tagName === 'INPUT' ||
                         e.target.tagName === 'TEXTAREA' ||
                         e.target.closest('[contenteditable="true"]');
+
+                    if (!e.target.closest('.widget-header') && !e.target.closest('button') &&
+                        onToggleWidgetSelection && !isWidgetSelected?.(actualSlotName, actualWidgetId)) {
+                        onToggleWidgetSelection(actualSlotName, actualWidgetId);
+                    }
 
                     if (isEditableField) {
                         // Update panel content if already open, but don't auto-open
