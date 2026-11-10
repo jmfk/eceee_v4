@@ -154,6 +154,7 @@ describe('theme layout rendering', () => {
         const css = Array.from(container.querySelectorAll('style')).map((style) => style.textContent).join('\n')
 
         expect(css).not.toContain('.main-layout-container,.landing-page-container')
+        expect(container.querySelector('.site-renderer')).not.toHaveClass('legacy-layout')
         expect(css).toContain('[data-layout-node-id="14a715dd-567c-42dc-8340-7bfe59037d36"]')
     })
 
@@ -166,6 +167,9 @@ describe('theme layout rendering', () => {
         const css = Array.from(container.querySelectorAll('style')).map((style) => style.textContent).join('\n')
 
         expect(css).not.toContain('.main-layout-container,.landing-page-container')
+        expect(container.querySelector('.site-renderer')).toHaveClass('legacy-layout')
+        expect(PUBLIC_RENDER_CSS).toContain('.site-renderer.legacy-layout .main-layout-wrapper')
+        expect(PUBLIC_RENDER_CSS).not.toContain('.site-renderer .main-layout-wrapper')
     })
 
     it('compiles theme color tokens using the theme variable contract', () => {

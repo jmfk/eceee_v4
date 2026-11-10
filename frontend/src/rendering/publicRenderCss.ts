@@ -8,6 +8,19 @@ blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0;pa
 /* Backwards-compatible public defaults formerly supplied by Tailwind's project base layer. Theme rules compile later and override them. */
 img,video{max-width:unset;height:unset}h1{font-size:41px;line-height:44px;font-weight:600;margin-bottom:11px}h2{font-size:36px;line-height:43px;font-weight:500;margin-bottom:11px}h3{font-size:22px;line-height:26px;font-weight:600;margin-top:22px;margin-bottom:11px}p{font-size:16px;line-height:22px;font-weight:300;margin-bottom:11px}ul{list-style-type:disc}ol,ul{margin-top:11px;margin-bottom:11px;padding-left:1.5em}ol{list-style-type:decimal}li{font-size:16px;line-height:22px;font-weight:300}a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
 .site-renderer{min-height:100vh}.widget-item{position:relative}
+/* Structural defaults for legacy code layouts. Theme layout definitions carry
+   their own styles; these keep the legacy layout renderer at its documented
+   1280px centered canvas when no definition is available. */
+.site-renderer.legacy-layout .main-layout-container,.site-renderer.legacy-layout .landing-page-container{min-height:100vh;display:flex;flex-direction:column}
+.site-renderer.legacy-layout .main-layout-wrapper,.site-renderer.legacy-layout .landing-page-wrapper{width:100%;max-width:1280px;margin-inline:auto;flex:1 1 auto;display:flex;flex-direction:column;background:#fff}
+.site-renderer.legacy-layout .main-layout-grid{display:grid;grid-template-columns:1fr;gap:30px;padding:30px 40px;flex:1;min-height:300px}
+.site-renderer.legacy-layout .main-layout-main{max-width:650px;margin:0 auto}
+.site-renderer.legacy-layout .main-layout-aside{display:grid;grid-template-columns:1fr;gap:30px;min-height:310px}
+.site-renderer.legacy-layout .main-layout-footer,.site-renderer.legacy-layout .main-layout-footer .slot-footer,.site-renderer.legacy-layout .landing-page-footer,.site-renderer.legacy-layout .landing-page-footer .slot-footer{min-height:310px;display:flex;flex:1 0 auto;flex-direction:column}
+.site-renderer.legacy-layout .landing-page-main{min-height:310px;padding:30px;background:#fff}
+@media(min-width:768px){.site-renderer.legacy-layout .main-layout-aside{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(min-width:1024px){.site-renderer.legacy-layout .main-layout-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.site-renderer.legacy-layout .main-layout-main{grid-column:span 2}.site-renderer.legacy-layout .main-layout-aside{grid-column:span 1;grid-template-columns:1fr}}
+@media(min-width:1280px){.site-renderer.legacy-layout .main-layout-main{max-width:790px;margin-inline:0}}
 .render-status{min-height:100vh;padding:1.5rem;background:#fff}.render-status-error{color:#b91c1c}.render-status-pending{color:#6b7280}.render-empty-state,.render-error-state{padding:1rem;text-align:center}.render-empty-state{color:#6b7280}.render-error-state{color:#dc2626}
 .site-renderer .layout-slot{position:relative;display:flex;flex-direction:column;gap:0;min-height:0}
 .site-renderer .layout-slot>.layout-preview-placeholder-item{display:flex;flex:1 1 auto;flex-direction:column;min-height:0}
