@@ -34,7 +34,7 @@ def backfill_layout_keys(apps, schema_editor):
             for key, slots in sorted(referenced_slots.items())
             if key not in existing
         ]
-        if additions:
+        if additions or not theme.layouts:
             document = {**document, "items": [*document.get("items", []), *additions]}
             PageTheme.objects.filter(pk=theme.pk).update(layouts=document)
 
@@ -48,7 +48,9 @@ class Migration(migrations.Migration):
             name="layouts",
             field=models.JSONField(
                 blank=True,
-                default=webpages.theme_layouts.default_theme_layouts,
+                # PostgreSQL stores fast column defaults inline in its catalog.
+                # Seed the full document as row data below, not as a large SQL default.
+                default=dict,
                 help_text="Versioned, validated React layout definitions owned by this theme",
             ),
         ),
@@ -71,6 +73,15 @@ class Migration(migrations.Migration):
             ),
         ),
         migrations.RunPython(backfill_layout_keys, migrations.RunPython.noop),
+        migrations.AlterField(
+            model_name="pagetheme",
+            name="layouts",
+            field=models.JSONField(
+                blank=True,
+                default=webpages.theme_layouts.default_theme_layouts,
+                help_text="Versioned, validated React layout definitions owned by this theme",
+            ),
+        ),
         migrations.AddIndex(
             model_name="pagedataschema",
             index=models.Index(fields=["scope", "layout_key", "is_active"], name="pds_scope_key_active_idx"),
