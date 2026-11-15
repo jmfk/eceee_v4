@@ -61,6 +61,36 @@ test('content lists inside block containers survive saving and reload', async ({
 })
 
 for (const listTag of ['ul', 'ol']) {
+  test(`a new ${listTag} list remains visible after blur and survives save/reload`, async ({ page }) => {
+    const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })
+    state.version.widgets.main.find(widget => widget.id === 'content-intro').config.content = '<p>Alpha</p>'
+    await openEditor(page, state)
+    const editor = contentEditor(page)
+    await editor.evaluate(element => {
+      element.focus()
+      const range = document.createRange()
+      range.selectNodeContents(element.querySelector('p'))
+      window.getSelection().removeAllRanges()
+      window.getSelection().addRange(range)
+    })
+    await page.locator('.global-wysiwyg-toolbar').getByRole('button', {
+      name: listTag === 'ul' ? 'Bullet List' : 'Numbered List', exact: true,
+    }).click()
+    await expect(editor.locator(`${listTag} > li`)).toHaveText('Alpha')
+    // Let the old 100 ms blur cleanup run before saving, independent of API speed.
+    const unchanged = await editor.evaluate(async element => {
+      const before = element.innerHTML
+      element.blur()
+      await new Promise(resolve => setTimeout(resolve, 200))
+      return element.innerHTML === before
+    })
+    expect(unchanged).toBe(true)
+    await expect(editor.locator(`${listTag} > li`)).toHaveText('Alpha')
+    await saveCurrentVersion(page)
+    await reloadCmsPage(page)
+    await expect(contentEditor(page).locator(`${listTag} > li`)).toHaveText('Alpha')
+  })
+
   test(`removing a ${listTag} list creates paragraphs that survive saving and reload`, async ({ page }) => {
     const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })
     state.version.widgets.main.find(widget => widget.id === 'content-intro').config.content =
@@ -81,10 +111,16 @@ for (const listTag of ['ul', 'ol']) {
       name: listTag === 'ul' ? 'Bullet List' : 'Numbered List', exact: true,
     }).click()
     await expect(editor.locator('li')).toHaveCount(0)
+    await expect(editor.locator(':scope > p')).toHaveText(['Alpha', 'Beta'])
     await page.locator('.global-wysiwyg-toolbar').getByRole('button', { name: 'Undo', exact: true }).click()
     await expect(editor.locator(`${listTag} > li`)).toHaveText(['Alpha', 'Beta'])
     await page.locator('.global-wysiwyg-toolbar').getByRole('button', { name: 'Redo', exact: true }).click()
     await expect(editor.locator('li')).toHaveCount(0)
+    await expect(editor.locator(':scope > p')).toHaveText(['Alpha', 'Beta'])
+    await editor.press('ControlOrMeta+z')
+    await expect(editor.locator(`${listTag} > li`)).toHaveText(['Alpha', 'Beta'])
+    await editor.press('ControlOrMeta+Shift+z')
+    await expect(editor.locator(':scope > p')).toHaveText(['Alpha', 'Beta'])
     await saveCurrentVersion(page)
     const saved = getSavedVersion(state).widgets.main.find(widget => widget.id === 'content-intro').config.content
     expect(saved).toMatch(/^<p>.*Alpha.*<\/p><p>.*Beta.*<\/p>$/)
@@ -111,7 +147,16 @@ test('unlisting one item preserves inline formatting and the remaining list', as
   })
   await page.locator('.global-wysiwyg-toolbar').getByRole('button', { name: 'Bullet List', exact: true }).click()
   await expect(editor.locator('strong')).toHaveText('Alpha')
+  await expect(editor.locator(':scope > p > strong')).toHaveText('Alpha')
   await expect(editor.locator('ul > li')).toHaveText(['Beta'])
+  await editor.pressSequentially('!')
+  await expect(editor.locator(':scope > p > strong')).toHaveText('Al!pha')
+  await editor.press('ControlOrMeta+z')
+  await expect(editor.locator(':scope > p > strong')).toHaveText('Alpha')
+  await editor.press('ControlOrMeta+z')
+  await expect(editor.locator('ul > li')).toHaveText(['Alpha', 'Beta'])
+  await editor.press('ControlOrMeta+Shift+z')
+  await expect(editor.locator(':scope > p > strong')).toHaveText('Alpha')
   await saveCurrentVersion(page)
   await reloadCmsPage(page)
   await expect(contentEditor(page).locator(':scope > p > strong')).toHaveText('Alpha')

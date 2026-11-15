@@ -12,6 +12,24 @@ const serializeListEdit = editor => {
 }
 
 describe('canonical list edit HTML', () => {
+    it('keeps only changed DOM parents and discards abandoned redo snapshots', () => {
+        const editor = document.createElement('div')
+        editor.innerHTML = '<section><strong>Untouched</strong></section>Alpha<br>Beta'
+        const original = editor.innerHTML
+        const renderer = new ContentWidgetEditorRenderer(document.createElement('div'))
+        renderer.editorElement = editor
+        renderer.updateButtonStates = vi.fn()
+        renderer.normalizeLiveListParagraphs()
+        const entry = renderer.listParagraphHistory.get(editor.innerHTML)
+        expect(entry.originals.map(([node]) => node)).toEqual([editor])
+        expect(editor.querySelectorAll(':scope > p')).toHaveLength(2)
+        renderer.prepareListUndo({ inputType: 'historyUndo' })
+        expect(editor.innerHTML).toBe(original)
+        expect(entry.pendingRedo).toBe(true)
+        renderer.handleContentChange({ inputType: 'insertText' })
+        expect(renderer.listParagraphHistory.size).toBe(0)
+    })
+
     it('promotes malformed nested items in order without changing the live editor', () => {
         const editor = document.createElement('div')
         editor.innerHTML = '<ul><li>Parent</li><li>Other</li></ul>'
