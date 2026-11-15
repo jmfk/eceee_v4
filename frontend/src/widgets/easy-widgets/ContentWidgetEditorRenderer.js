@@ -11,11 +11,7 @@ import { inlineFieldHtml } from '../../utils/richTextFieldHtml'
 import { WysiwygContextMenu } from '../../components/wysiwyg/WysiwygContextMenu.js'
 import { LinkPickerModal } from '../../components/special-editors/LinkPickerModal.js'
 
-// Serialize native unlisting as paragraphs without mutating the live editor:
-// DOM rewrites or a second execCommand would break the native Undo transaction.
-const normalizeUnlistedHTML = html => {
-    const container = document.createElement('div')
-    container.innerHTML = html
+const normalizeUnlistedContainer = container => {
     // Chromium can outdent by placing li directly inside li. Promote those
     // siblings together so their order survives serialization and reloading.
     let nestedItem
@@ -59,6 +55,12 @@ const normalizeUnlistedHTML = html => {
             paragraph = null
         }
     })
+}
+
+const normalizeUnlistedHTML = html => {
+    const container = document.createElement('div')
+    container.innerHTML = html
+    normalizeUnlistedContainer(container)
     return container.innerHTML
 }
 
@@ -647,6 +649,8 @@ class ContentWidgetEditorRenderer {
 
         // Bind methods to maintain 'this' context
         this.handleContentChange = this.handleContentChange.bind(this)
+        this.prepareListUndo = this.prepareListUndo.bind(this)
+        this.listParagraphHistory = new Map()
         this.handlePaste = this.handlePaste.bind(this)
         this.handleKeyDown = this.handleKeyDown.bind(this)
         this.execCommand = this.execCommand.bind(this)
@@ -1016,6 +1020,7 @@ class ContentWidgetEditorRenderer {
 
         // Add event listeners
         this.editorElement.addEventListener('input', this.handleContentChange)
+        this.editorElement.addEventListener('beforeinput', this.prepareListUndo)
         this.editorElement.addEventListener('paste', this.handlePaste)
         this.editorElement.addEventListener('keydown', this.handleKeyDown)
         this.editorElement.addEventListener('mouseup', this.updateButtonStates.bind(this))
@@ -1032,23 +1037,19 @@ class ContentWidgetEditorRenderer {
         const linkClickHandler = this.handleLinkClick.bind(this)
         this.editorElement.addEventListener('click', linkClickHandler)
 
-        // Add blur listener for cleanup
+        // Commit through the detached serializer. Native list commands can leave
+        // p > ul/ol in the live DOM; blur cleanup must not flatten those lists or
+        // disturb selection/Undo while a Save request is in flight.
         const blurHandler = () => {
             if (this.fieldMode) return
-            // Clean up on blur
-            setTimeout(() => {
-                if (this.editorElement) {
-                    fixInvalidNesting(this.editorElement)
-                    this.removeDisallowedTags()
-                    this.handleContentChange()
-                }
-            }, 100)
+            this.handleContentChange()
         }
         this.editorElement.addEventListener('blur', blurHandler)
 
         // Track event listeners for cleanup
         this.eventListeners.set(this.editorElement, () => {
             this.editorElement.removeEventListener('input', this.handleContentChange)
+            this.editorElement.removeEventListener('beforeinput', this.prepareListUndo)
             this.editorElement.removeEventListener('paste', this.handlePaste)
             this.editorElement.removeEventListener('keydown', this.handleKeyDown)
             this.editorElement.removeEventListener('mouseup', this.updateButtonStates.bind(this))
@@ -1074,8 +1075,19 @@ class ContentWidgetEditorRenderer {
     /**
      * Handle content changes
      */
-    handleContentChange() {
+    handleContentChange(event) {
         if (this.disabled) return
+        if (event && !['historyUndo', 'historyRedo'].includes(event.inputType)) {
+            // A new native edit abandons Redo, so its detached nodes are no
+            // longer needed by either our normalization or browser history.
+            this.listParagraphHistory.forEach((entry, html) => {
+                if (entry.pendingRedo) this.listParagraphHistory.delete(html)
+            })
+        }
+        if (event?.inputType === 'historyRedo' &&
+            Array.from(this.listParagraphHistory.values()).some(entry => entry.raw === this.editorElement?.innerHTML)) {
+            this.normalizeLiveListParagraphs()
+        }
         if (this.editorElement) {
             const html = this.editorElement.innerHTML
             const currentContent = this.inlineOnly ? inlineFieldHtml(html)
@@ -1092,6 +1104,44 @@ class ContentWidgetEditorRenderer {
 
         // Update button states after content change
         setTimeout(() => this.updateButtonStates(), 0)
+    }
+
+    normalizeLiveListParagraphs() {
+        const editor = this.editorElement
+        const raw = editor.innerHTML
+        if (normalizeUnlistedHTML(raw) === raw) return
+        // Keep the native nodes, including detached BRs, so Undo can reverse the
+        // list command against the exact DOM on which Chromium recorded it.
+        const originals = [editor, ...editor.querySelectorAll('*')]
+            .map(node => [node, Array.from(node.childNodes)])
+        const selection = window.getSelection()
+        const anchor = selection?.anchorNode
+        const focus = selection?.focusNode
+        const anchorOffset = selection?.anchorOffset
+        const focusOffset = selection?.focusOffset
+        const observer = new MutationObserver(() => {})
+        observer.observe(editor, { childList: true, subtree: true })
+        normalizeUnlistedContainer(editor)
+        const changedParents = new Set(observer.takeRecords().map(record => record.target))
+        observer.disconnect()
+        if (editor.contains(anchor) && editor.contains(focus) &&
+            anchorOffset <= (anchor.nodeType === Node.TEXT_NODE ? anchor.length : anchor.childNodes.length) &&
+            focusOffset <= (focus.nodeType === Node.TEXT_NODE ? focus.length : focus.childNodes.length)) {
+            selection.setBaseAndExtent(anchor, anchorOffset, focus, focusOffset)
+        }
+        this.listParagraphHistory.set(editor.innerHTML, {
+            raw,
+            originals: originals.filter(([node]) => changedParents.has(node)),
+            pendingRedo: false,
+        })
+    }
+
+    prepareListUndo(event) {
+        if (event.inputType !== 'historyUndo') return
+        const entry = this.listParagraphHistory.get(this.editorElement?.innerHTML)
+        if (!entry) return
+        entry.originals.forEach(([node, children]) => node.replaceChildren(...children))
+        entry.pendingRedo = true
     }
 
     /**
@@ -2519,6 +2569,7 @@ class ContentWidgetEditorRenderer {
         } else {
             // Clean entire content
             const cleaned = this.cleanHTMLStrict(this.editorElement.innerHTML)
+            this.listParagraphHistory.clear()
             this.editorElement.innerHTML = cleaned
             this.handleContentChange()
         }
@@ -2609,10 +2660,13 @@ class ContentWidgetEditorRenderer {
 
         // Handle standard document commands
         const isListCommand = ['insertUnorderedList', 'insertOrderedList'].includes(command)
+        const isUnlisting = isListCommand && document.queryCommandState(command)
         if (isListCommand) {
             this.normalizeUnlistedContent = true
         }
+        if (command === 'undo') this.prepareListUndo({ inputType: 'historyUndo' })
         document.execCommand(command, false, value)
+        if (isUnlisting) this.normalizeLiveListParagraphs()
 
         // Apply strict cleanup after formatBlock to fix nesting
         if (command === 'formatBlock' && !this.fieldMode) {
@@ -2637,13 +2691,17 @@ class ContentWidgetEditorRenderer {
 
         // Field hydration is silent. Untouched HTML and local undo/selection must survive prop echoes.
         if (this.fieldMode) {
-            if (content !== this.editorElement.innerHTML) this.editorElement.innerHTML = content || ''
+            if (content !== this.editorElement.innerHTML) {
+                this.listParagraphHistory.clear()
+                this.editorElement.innerHTML = content || ''
+            }
             this.content = content || ''
             return
         }
 
         // First set the raw content to ensure editor is usable
         if (content !== this.editorElement.innerHTML) {
+            this.listParagraphHistory.clear()
             this.content = content;
             this.editorElement.innerHTML = content;
         }
@@ -2663,6 +2721,7 @@ class ContentWidgetEditorRenderer {
             // Clean the HTML
             const cleanedContent = cleanHTML(this.editorElement.innerHTML);
             if (cleanedContent !== this.editorElement.innerHTML) {
+                this.listParagraphHistory.clear()
                 this.content = cleanedContent;
                 this.editorElement.innerHTML = cleanedContent;
 
@@ -2746,6 +2805,7 @@ class ContentWidgetEditorRenderer {
      * Clean up event listeners and DOM elements
      */
     cleanup() {
+        this.listParagraphHistory.clear()
         // Remove all event listeners
         this.eventListeners.forEach((cleanup, element) => {
             if (typeof cleanup === 'function') {
