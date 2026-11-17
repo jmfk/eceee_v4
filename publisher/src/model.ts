@@ -1,4 +1,4 @@
-import { editorialItems, editorialKind, columnistId, editorialPublicData, withLatestColumn } from './editorial';
+import { editorialItems, editorialKind, isEventCalendar, eventCalendarResponse, columnistId, editorialPublicData, withLatestColumn } from './editorial';
 import { newsFlashPage, withNewsImages } from './news-flash';
 import { newsArticleKind, relatedNewsItems, selectedNewsArticle } from './related-news';
 import { newsFlashLayout, NEWS_FLASH_BATCH } from '../../frontend/src/rendering/newsFlashLayout';
@@ -90,6 +90,7 @@ export interface PublishedObject {
   themeWidgetTypes?: import("../../frontend/src/rendering/themeWidgets").ThemeWidgetDocument;
   metadata: Record<string, unknown>;
   relatedTagIds?: string[];
+  calendarOptions?: EventCalendarOption[];
   publishDate: string;
   isFeatured: boolean;
   createdAt?: string;
@@ -109,7 +110,14 @@ export interface PublishedObjectLink {
   path?: string;
 }
 
+export interface EventCalendarOption {
+  id: string;
+  name: string;
+  type: 'event_type' | 'event_category';
+}
+
 export interface PublishedObjectQuery {
+  eventCalendar?: { eventType?: string; eventCategory?: string };
   authorId?: DbId;
   eventGroup?: 'all' | 'eceee' | 'other';
   relatedTagIds?: string[];
@@ -831,9 +839,11 @@ async function resolvePublishedData(
       const kind = editorialKind(config);
       if (kind) {
         try {
-          items = await editorialItems(reader, kind, tenantId, at, { limit: Math.min(12, positiveLimit(config.limit, 50)),
+          const calendar = isEventCalendar(config);
+          items = await editorialItems(reader, kind, tenantId, at, { calendar: calendar ? {} : undefined, limit: Math.min(12, positiveLimit(config.limit, 50)),
             eventGroup: ['eceee', 'other'].includes(String(config.eventGroup ?? config.event_group))
               ? (config.eventGroup ?? config.event_group) as 'eceee' | 'other' : 'all' });
+          if (calendar) return { ...prepared, data: { status: items.length ? 'ready' : 'empty', ...eventCalendarResponse(items) } };
         } catch {
           return { ...prepared, data: { status: 'error', items: [] } };
         }

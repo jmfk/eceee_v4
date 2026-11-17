@@ -78,6 +78,24 @@ describe('database snapshot', () => {
     expect(parameters.slice(19)).toEqual(['976', 'other']);
   });
 
+  it('uses published event dates and typed classifications before limiting the calendar', async () => {
+    const eventType = '11111111-1111-4111-8111-111111111111';
+    const eventCategory = '22222222-2222-4222-8222-222222222222';
+    await database.withSnapshot(async reader => {
+      const base = { objectTypeNames: ['event'], limit: 12, sortOrder: '-publish_date' };
+      await reader.publishedObjects({ ...base, eventCalendar: {} }, '7', new Date(0));
+      await reader.publishedObjects({ ...base, eventCalendar: { eventType, eventCategory }, offset: 12 }, '7', new Date(0));
+    });
+    const [[initialSql], [filteredSql, parameters]] = mocks.query.mock.calls.filter(([sql]) => sql.includes('WITH RECURSIVE resolved'));
+    expect(initialSql).toContain('JOIN taxonomy_objectversiontag assignment ON assignment.object_version_id=event."calendarVersionId"');
+    expect(initialSql).toContain('ORDER BY event."calendarStart" DESC, event.id::bigint DESC');
+    expect(filteredSql).not.toContain('calendar_source');
+    expect(filteredSql).toContain("assignment.object_version_id=published.id AND tag.id=$22 AND tag.tag_type='event_type'");
+    expect(filteredSql).toContain("assignment.object_version_id=published.id AND tag.id=$23 AND tag.tag_type='event_category'");
+    expect(filteredSql).toContain("ORDER BY COALESCE(NULLIF(published.data->>'eventStartDate', ''), published.data->>'event_start_date') DESC, object.id DESC");
+    expect(parameters.slice(21)).toEqual([eventType, eventCategory]);
+  });
+
   it('matches related tags and Article kind on the published tenant version', async () => {
     const tag = '11111111-1111-4111-8111-111111111111';
     await database.withSnapshot(reader => reader.publishedObjects({

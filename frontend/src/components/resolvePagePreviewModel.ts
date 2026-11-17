@@ -280,7 +280,7 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
                 if (!response.ok) throw new Error('Content could not be loaded.')
                 const result = await response.json()
                 const items = Array.isArray(result.items) ? result.items : []
-                widget.data = { status: items.length ? 'ready' : 'empty', ...(detail ? { item: items[0] } : { items, feedUrl: url }) }
+                widget.data = { status: items.length ? 'ready' : 'empty', ...(detail ? { item: items[0] } : { items, feedUrl: url, calendarOptions: result.calendarOptions }) }
             } catch { widget.data = { status: 'error', items: [], feedUrl: url } }
             return
         }

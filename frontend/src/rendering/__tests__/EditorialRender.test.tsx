@@ -34,6 +34,29 @@ describe('editorial pages', () => {
         expect(screen.getByText('<p>Event description</p>')).toBeInTheDocument()
         expect(screen.queryByText('eventStartDate')).not.toBeInTheDocument()
     })
+    it('groups events by start month and applies both filters from the first result page', async () => {
+        const summit = { id: '1', title: 'Summer Study', slug: 'summer-study', data: { eventStartDate: '2027-06-11' } }
+        const webinar = { id: '2', title: 'Webinar', slug: 'webinar', data: { eventStartDate: '2027-05-01', eventEndDate: '2027-05-03' } }
+        const calendarOptions = [
+            { id: 'conference', name: 'Conference', type: 'event_type' },
+            { id: 'policy', name: 'Policy', type: 'event_category' },
+        ]
+        const fetchEvents = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ items: [summit] }) })
+            .mockResolvedValueOnce({ ok: true, json: async () => ({ items: [] }) })
+        vi.stubGlobal('fetch', fetchEvents)
+        render(<EditorialListRender widget={{ ...widget, config: { displayTemplate: 'eventCalendar' },
+            data: { status: 'ready', items: [summit, webinar], calendarOptions } }} context={context} renderWidgets={renderWidgets} />)
+        expect(screen.getAllByRole('heading', { level: 3 }).map(heading => heading.textContent)).toEqual(['June 2027', 'May 2027'])
+        expect(screen.getByRole('link', { name: 'Summer Study' })).toHaveAttribute('href', '/events/summer-study/')
+        expect(screen.getByText('May 1, 2027 – May 3, 2027')).toBeInTheDocument()
+        fireEvent.change(screen.getByLabelText('Event type'), { target: { value: 'conference' } })
+        await waitFor(() => expect(screen.getByRole('link', { name: 'Summer Study' })).toBeInTheDocument())
+        fireEvent.change(screen.getByLabelText('Event category'), { target: { value: 'policy' } })
+        expect(await screen.findByText('No events match these filters.')).toBeInTheDocument()
+        const params = new URL(fetchEvents.mock.calls[1][0]).searchParams
+        expect(Object.fromEntries(params)).toMatchObject({ kind: 'events', calendar: 'true', offset: '0', eventType: 'conference', eventCategory: 'policy' })
+        expect(screen.getByLabelText('Event category')).toHaveValue('policy')
+    })
     it('keeps the profile biography and portrait beside a separate metadata column', () => {
         const { container } = render(<EditorialDetailRender widget={{ ...widget, config: { displayTemplate: 'columnists' }, data: { status: 'ready', item: { id: 9, title: 'Jane', data: widget.data.items[0].data,
             widgets: { main: [{ id: 'bio', type: 'easy_widgets.ContentWidget', config: { content: 'Profile biography' } }] } } } }} context={{ ...context, pathVariables: { member_slug: 'jane' } }} renderWidgets={renderWidgets} />)

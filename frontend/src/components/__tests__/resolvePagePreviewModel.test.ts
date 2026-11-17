@@ -20,6 +20,21 @@ describe('page preview model resolution', () => {
     })
     afterEach(() => vi.unstubAllGlobals())
 
+    it('keeps public calendar classification options and the feed URL in editor preview', async () => {
+        const items = [{ id: '1', title: 'Conference', slug: 'conference', data: { eventStartDate: '2027-06-01' } }]
+        const calendarOptions = [{ id: 'conference', name: 'Conference', type: 'event_type' }]
+        const fetchCalendar = vi.fn(async (_url: URL) => ({ ok: true, json: async () => ({ items, calendarOptions }) }))
+        vi.stubGlobal('fetch', fetchCalendar)
+        const model = createPageRenderModel({ widgets: { main: [
+            { id: 'calendar', type: 'object_storage.ObjectListWidget', config: { displayTemplate: 'eventCalendar', limit: 50 } },
+        ] }, context: { siteId: 249, siteHostnames: ['eceee.localhost'] } })
+        const resolved = await resolvePagePreviewModel(model)
+        const request = fetchCalendar.mock.calls[0][0]
+        expect(request.searchParams.get('calendar')).toBe('true')
+        expect(request.searchParams.get('limit')).toBe('12')
+        expect(resolved.slots.main[0].data).toMatchObject({ status: 'ready', items, calendarOptions })
+    })
+
     it('resolves related lists by slug and falls back to the public selected Article on the index', async () => {
         const fetchNews = vi.fn(async () => ({ ok: true, json: async () => ({ items: [{ id: '1', objectType: { id: '8' } }] }) }))
         vi.stubGlobal('fetch', fetchNews)

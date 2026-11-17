@@ -31,6 +31,15 @@ export const NEWS_HOME_CSS = `
 
 .editorial-directory,.editorial-detail{color:inherit;font-family:inherit}.editorial-directory+.editorial-directory{margin-top:60px}
 .editorial-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:30px}
+.editorial-calendar-filters{display:flex;flex-wrap:wrap;gap:12px 24px;margin-bottom:24px}
+.editorial-calendar-filters label{display:grid;gap:4px;min-width:0;max-width:100%}
+.editorial-calendar-filters select{width:100%;max-width:100%;padding:6px;font:inherit;color:inherit;background:transparent;border:1px solid currentColor}
+.editorial-calendar-month{margin-bottom:24px}
+.editorial-calendar-month h3{font:inherit;font-size:20px;margin:0 0 8px}
+.editorial-calendar-month ul{list-style:none;margin:0;padding:0}
+.editorial-calendar-month li{display:grid;grid-template-columns:minmax(10rem,1fr) 3fr;gap:8px 16px;padding:8px 0;border-top:1px solid currentColor}
+.editorial-calendar-month a{overflow-wrap:anywhere}
+@media(max-width:600px){.editorial-calendar-month li{grid-template-columns:1fr}}
 .editorial-section-title{font:inherit;font-size:22px;margin:0 0 30px}
 .editorial-card{outline:1px solid currentColor;padding:30px;min-width:0;box-sizing:border-box;height:310px;overflow:hidden;display:flex;flex-direction:column}
 .editorial-card h3{font-size:36px;font-weight:500;line-height:1.1;margin:0 0 24px;flex-shrink:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
