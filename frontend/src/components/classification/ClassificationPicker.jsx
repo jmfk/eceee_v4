@@ -1,10 +1,10 @@
 import '../user-tools.css'
 import React, { useId, useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Combobox, ComboboxInput, ComboboxOption, ComboboxOptions } from '@headlessui/react'
 import { ListFilterPlus, Search, X } from 'lucide-react'
 import { taxonomyApi, classificationError } from '../../api/taxonomy'
 import { getCurrentTenantId } from '../../utils/tenant'
-import CompactSelect from './CompactSelect'
 import './classification.css'
 
 /** Controlled IDs belong to the editor's working copy, never to the live version. */
@@ -25,6 +25,8 @@ export default function ClassificationPicker({ value = [], selectedTerms = [], o
     const [proposalMessage, setProposalMessage] = useState('')
     const queryClient = useQueryClient()
     const tenant = getCurrentTenantId()
+    const searchTerm = search.trim()
+    const hasSearch = searchTerm.length > 0
     useEffect(() => { setSearch(''); setTypeFilter(''); setFilterOpen(false); setPage(1); setSuggesting(false); setProposalType(''); setProposalName(''); setProposalError(''); setProposalMessage('') }, [tenant, namespace, use])
     useEffect(() => {
         if (!filterOpen) return
@@ -39,9 +41,9 @@ export default function ClassificationPicker({ value = [], selectedTerms = [], o
     })
     const effectiveNamespace = namespace || defaultNamespace.data?.results?.[0]?.id
     const terms = useQuery({
-        queryKey: ['classification', tenant, 'picker', effectiveNamespace, use, typeFilter, search, page],
-        queryFn: async () => await taxonomyApi.terms({ namespace: effectiveNamespace, use, classification_type: typeFilter || undefined, search, page }),
-        enabled: !!effectiveNamespace,
+        queryKey: ['classification', tenant, 'picker', effectiveNamespace, use, typeFilter, searchTerm, page],
+        queryFn: async () => await taxonomyApi.terms({ namespace: effectiveNamespace, use, classification_type: typeFilter || undefined, search: searchTerm, page }),
+        enabled: !!effectiveNamespace && hasSearch && !disabled,
     })
     const selected = useQuery({
         queryKey: ['classification', tenant, 'selected', value],
@@ -86,39 +88,49 @@ export default function ClassificationPicker({ value = [], selectedTerms = [], o
                 </li>
             })}
         </ul>
-        <div ref={filterRef} className="classification-search-wrap" onKeyDown={event => {
-            if (event.key === 'Escape' && filterOpen) { event.stopPropagation(); setFilterOpen(false); filterButtonRef.current?.focus() }
+        <Combobox value={null} disabled={disabled} onChange={term => {
+            if (!term) return
+            if (term.page) { setPage(term.page); return }
+            onChange([...value, term.id])
+            setSearch(''); setPage(1)
         }}>
-            <div className="classification-search" data-filled={Boolean(search || activeType)}>
-                <label htmlFor={id} className="classification-search-label">Find a tag</label>
-                <div className="classification-search-content">
-                    <Search size={16} aria-hidden="true" className="shrink-0 text-gray-400" />
-                    {activeType && <button type="button" className="classification-filter-pill inline-flex items-center" aria-label={`Remove type filter: ${activeType.name}`}
-                        onClick={() => chooseType('')}>{activeType.name}<X size={12} aria-hidden="true" /></button>}
-                    <input id={id} value={search} onChange={event => { setSearch(event.target.value); setPage(1) }} type="search" placeholder=" " />
-                    {availableTypes.length > 1 && <button ref={filterButtonRef} type="button" className="classification-icon" title="Add filter" aria-label="Add filter"
-                        aria-expanded={filterOpen} aria-controls={filterId} onClick={() => setFilterOpen(open => !open)}>
-                        <ListFilterPlus size={18} aria-hidden="true" />
-                    </button>}
+            <div ref={filterRef} className="classification-search-wrap" onKeyDown={event => {
+                if (event.key === 'Escape' && filterOpen) { event.stopPropagation(); setFilterOpen(false); filterButtonRef.current?.focus() }
+            }}>
+                <div className="classification-search" data-filled={Boolean(search || activeType)}>
+                    <label htmlFor={id} className="classification-search-label">Find a tag</label>
+                    <div className="classification-search-content">
+                        <Search size={16} aria-hidden="true" className="shrink-0 text-gray-400" />
+                        {activeType && <button type="button" className="classification-filter-pill inline-flex items-center" aria-label={`Remove type filter: ${activeType.name}`}
+                            onClick={() => chooseType('')}>{activeType.name}<X size={12} aria-hidden="true" /></button>}
+                        <ComboboxInput id={id} value={search} displayValue={() => search} onChange={event => { setSearch(event.target.value); setPage(1) }} type="search" placeholder=" " />
+                        {availableTypes.length > 1 && <button ref={filterButtonRef} type="button" className="classification-icon" title="Add filter" aria-label="Add filter"
+                            aria-expanded={filterOpen} aria-controls={filterId} onClick={() => setFilterOpen(open => !open)}>
+                            <ListFilterPlus size={18} aria-hidden="true" />
+                        </button>}
+                    </div>
                 </div>
+                {filterOpen && availableTypes.length > 1 && <div id={filterId} role="dialog" aria-label="Filter tag type" className="classification-filter-menu">
+                    <div className="max-h-56 overflow-y-auto">
+                        <button type="button" aria-pressed={!typeFilter} onClick={() => chooseType('')} className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-gray-100">All tag types</button>
+                        {availableTypes.map(type => <button key={type.id} type="button" aria-pressed={String(type.id) === String(typeFilter)} onClick={() => chooseType(type.id)}
+                            className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-gray-100">{type.name}</button>)}
+                    </div>
+                </div>}
             </div>
-            {filterOpen && availableTypes.length > 1 && <div id={filterId} role="dialog" aria-label="Filter tag type" className="classification-filter-menu">
-                <div className="max-h-56 overflow-y-auto">
-                    <button type="button" aria-pressed={!typeFilter} onClick={() => chooseType('')} className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-gray-100">All tag types</button>
-                    {availableTypes.map(type => <button key={type.id} type="button" aria-pressed={String(type.id) === String(typeFilter)} onClick={() => chooseType(type.id)}
-                        className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-gray-100">{type.name}</button>)}
-                </div>
-            </div>}
-        </div>
+            {hasSearch && <ComboboxOptions anchor={{ to: 'bottom start', gap: 8, padding: 8 }} modal={false} aria-label="Matching tags" className="classification-picker-options">
+                {terms.isPending && <p role="status" className="classification-picker-message">Loading tags…</p>}
+                {terms.error && <p role="alert" className="classification-picker-message">{classificationError(terms.error)}</p>}
+                {!terms.isPending && !terms.error && choices.length === 0 && <p className="classification-picker-message">No matching tags.</p>}
+                {choices.map(term => <ComboboxOption key={term.id} value={term} className="classification-picker-option">
+                    {term.path || term.name}{term.status === 'proposed' ? ' (pending approval)' : ''}
+                </ComboboxOption>)}
+                {page > 1 && <ComboboxOption value={{ page: page - 1 }} className="classification-picker-option">Previous page</ComboboxOption>}
+                {terms.data?.next && <ComboboxOption value={{ page: page + 1 }} className="classification-picker-option">Next page</ComboboxOption>}
+            </ComboboxOptions>}
+        </Combobox>
         {definitions.error && <p role="alert">{classificationError(definitions.error)}</p>}
-        {terms.isPending && <p role="status">Loading tags…</p>}
-        {(terms.error || (selected.error && value.some(termId => !selectedTerms.some(item => String(item.classificationId || item.id) === String(termId)))) || defaultNamespace.error) && <p role="alert">{classificationError(terms.error || selected.error || defaultNamespace.error)}</p>}
-        {!terms.isPending && !terms.error && choices.length === 0 && <p className="text-sm">No matching tags.</p>}
-        <ul className="classification-results max-h-56 overflow-auto space-y-1">
-            {choices.map(term => <li key={term.id}><button type="button" className="w-full justify-start px-2 py-2 text-left hover:bg-gray-100 focus-visible:outline" onClick={() => onChange([...value, term.id])}>
-                {term.path}{term.status === 'proposed' ? ' (pending approval)' : ''}
-            </button></li>)}
-        </ul>
+        {((selected.error && value.some(termId => !selectedTerms.some(item => String(item.classificationId || item.id) === String(termId)))) || defaultNamespace.error) && <p role="alert">{classificationError(selected.error || defaultNamespace.error)}</p>}
         {!suggesting && <button type="button" className="underline text-sm" onClick={() => { setSuggesting(true); setProposalName(search) }}>Suggest a tag</button>}
         {suggesting && <div className="space-y-2 rounded border p-3">
             <label htmlFor={`${id}-type`} className="block text-sm">Tag type</label>
@@ -134,9 +146,5 @@ export default function ClassificationPicker({ value = [], selectedTerms = [], o
         </div>}
         {proposalError && <p role="alert">{proposalError}</p>}
         {proposalMessage && <p role="status">{proposalMessage}</p>}
-        <div className="flex gap-4 text-sm">
-            {page > 1 && <button type="button" onClick={() => setPage(page - 1)}>Previous</button>}
-            {terms.data?.next && <button type="button" onClick={() => setPage(page + 1)}>Next</button>}
-        </div>
     </fieldset>
 }
