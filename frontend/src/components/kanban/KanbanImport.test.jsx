@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
@@ -22,6 +23,7 @@ vi.mock('../../api/kanban', () => ({
 
 vi.mock('../../api/taxonomy', () => ({
     taxonomyApi: {
+        types: vi.fn().mockResolvedValue({ results: [] }),
         terms: vi.fn().mockResolvedValue({ results: [{ id: 'term-id', name: 'Approved', path: 'Approved', status: 'approved' }] }),
         term: vi.fn().mockResolvedValue({ id: 'term-id', name: 'Approved', path: 'Approved', status: 'approved' }),
     },
@@ -70,7 +72,9 @@ it('shows provenance and only imports approved attachments with current revision
     await screen.findByText('hero.png · Godkänd')
     expect(screen.getByText('Importerad till media: Hero')).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Importera kopia' })[0]).toBeDisabled()
-    fireEvent.click(await screen.findByRole('button', { name: 'Approved', exact: true }))
+    const user = userEvent.setup()
+    await user.type(screen.getByRole('combobox'), 'Approved')
+    await user.click(await screen.findByRole('option', { name: 'Approved', exact: true }))
     const buttons = screen.getAllByRole('button', { name: 'Importera kopia' })
     expect(buttons[1]).toBeDisabled()
     fireEvent.click(buttons[0])
