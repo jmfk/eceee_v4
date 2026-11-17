@@ -89,9 +89,13 @@ describe('database snapshot', () => {
     const [[initialSql], [filteredSql, parameters]] = mocks.query.mock.calls.filter(([sql]) => sql.includes('WITH RECURSIVE resolved'));
     expect(initialSql).toContain('JOIN taxonomy_objectversiontag assignment ON assignment.object_version_id=event."calendarVersionId"');
     expect(initialSql).toContain('ORDER BY event."calendarStart" DESC, event.id::bigint DESC');
+    expect(initialSql).toContain('SELECT DISTINCT term.id, term.name, term.type');
+    expect(initialSql).toContain('tag.merged_into_id=term.original_id');
+    expect(initialSql).toContain("tag.tenant_id=$1 AND tag.status='merged'");
+    expect(initialSql).toContain('tag.namespace_id=term.namespace_id AND tag.tag_type=term.type');
     expect(filteredSql).not.toContain('calendar_source');
-    expect(filteredSql).toContain("assignment.object_version_id=published.id AND tag.id=$22 AND tag.tag_type='event_type'");
-    expect(filteredSql).toContain("assignment.object_version_id=published.id AND tag.id=$23 AND tag.tag_type='event_category'");
+    expect(filteredSql).toContain("assignment.object_version_id=published.id AND term.id=$22 AND term.type='event_type'");
+    expect(filteredSql).toContain("assignment.object_version_id=published.id AND term.id=$23 AND term.type='event_category'");
     expect(filteredSql).toContain("ORDER BY COALESCE(NULLIF(published.data->>'eventStartDate', ''), published.data->>'event_start_date') DESC, object.id DESC");
     expect(parameters.slice(21)).toEqual([eventType, eventCategory]);
   });
