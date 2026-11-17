@@ -28,3 +28,18 @@ Migration `object_storage.0028_object_version_workflow` adds title snapshots, re
 Public content selection, titles, featured status, and publication order use the live version. The existing publication-cache worker also refreshes scheduled Object title/relationship projections using a retryable pending marker. Public version selection does not wait for that worker; derived relationship projections follow its normal cycle. Ordinary draft saves do not update these projections.
 
 Production deployment requires the repository's separate owner gate. If recovery is needed, preserve the added columns and content; prefer a forward fix. Do not reverse the migration to discard title or revision metadata.
+
+## Publish events to the calendar
+
+Create or edit an **Event** object. Set its start date and, for a multi-day event,
+its end date. Assign **Event type** and **Event category** classifications, then
+publish the event version. The calendar uses the dates and classifications from
+that published version. Events without a start date are omitted. Multi-day
+events appear once, under their start month.
+
+To add the calendar to an Events page, add an **Object List** with object type
+`event`, display template **Event calendar**, and event group **All events**.
+Set the detail page path to `/events/` (or the existing event detail base path).
+Keep the **Object Detail** widget and its event slug route. Preview the index to
+verify that recent event dates appear first, filters combine by type and category,
+and links open the existing detail pages.

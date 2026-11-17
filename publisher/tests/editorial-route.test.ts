@@ -20,6 +20,23 @@ describe('public editorial endpoint', () => {
     const item = (await response.json()).items[0];
     expect(item).not.toHaveProperty('widgets'); expect(item).not.toHaveProperty('metadata');
   });
+  it('passes typed calendar filters through and returns only public calendar fields', async () => {
+    const eventType = '11111111-1111-4111-8111-111111111111';
+    const eventCategory = '22222222-2222-4222-8222-222222222222';
+    mocks.publishedObjects.mockResolvedValue([{
+      id: '9', title: 'Event', slug: 'event', data: { event_start_date: '2027-06-01', internalNotes: 'Private' },
+      calendarVersionId: '10', widgets: {}, metadata: {},
+    }]);
+    const response = await GET(request(`siteId=249&kind=events&calendar=true&eventType=${eventType}&eventCategory=${eventCategory}&offset=12`));
+    expect(response.status).toBe(200);
+    expect(mocks.publishedObjects).toHaveBeenCalledWith(expect.objectContaining({
+      objectTypeNames: ['event'], offset: 12, eventCalendar: { eventType, eventCategory },
+    }), 'tenant', expect.any(Date));
+    expect(await response.json()).toEqual({ calendarOptions: [], items: [
+      { id: '9', title: 'Event', slug: 'event', data: { eventStartDate: '2027-06-01' } },
+    ] });
+    expect((await GET(request('siteId=249&kind=events&calendar=true&eventType=invalid'))).status).toBe(400);
+  });
   it('returns a selected event published body on detail requests', async () => {
     const response = await GET(request('siteId=249&kind=events&slug=event&detail=true'));
     expect((await response.json()).items[0].widgets).toEqual({ main: [] });

@@ -4,8 +4,19 @@ import { withNewsImages } from './news-flash';
 
 export type EditorialKind = 'columnists' | 'events';
 export type EventGroup = 'all' | 'eceee' | 'other';
+export const isEventCalendar = (config: Record<string, unknown>) =>
+  (config.displayTemplate ?? config.display_template) === 'eventCalendar';
+
+export function eventCalendarResponse(items: PublishedObject[]) {
+  return {
+    calendarOptions: items[0]?.calendarOptions ?? [],
+    items: items.map(({ id, slug, title, data }) => ({ id, slug, title, data })),
+  };
+}
+
 export const editorialKind = (config: Record<string, unknown>): EditorialKind | null => {
   const template = config.displayTemplate ?? config.display_template;
+  if (isEventCalendar(config)) return 'events';
   return template === 'columnists' || template === 'events' ? template : null;
 };
 
@@ -21,7 +32,8 @@ export function editorialPublicData(item: PublishedObject, kind: EditorialKind, 
     : [['eventStartDate', 'event_start_date'], ['eventEndDate', 'event_end_date'],
       ...(detail ? [['eventTime', 'event_time'], ['organiser'], ['venue'], ['focusAreas', 'focus_areas'], ['externalUrl', 'external_url']] : [])];
   for (const [key, alias] of fields) {
-    const candidate = data[key] ?? (alias ? data[alias] : undefined);
+    const stored = data[key];
+    const candidate = (stored === '' && key === 'eventStartDate' ? undefined : stored) ?? (alias ? data[alias] : undefined);
     if (typeof candidate === 'string') result[key] = candidate;
   }
   if (kind === 'columnists' && data.latestColumn && typeof data.latestColumn === 'object') {
@@ -43,14 +55,17 @@ export async function withLatestColumn(item: PublishedObject, reader: PageReader
 }
 
 export async function editorialItems(reader: PageReader, kind: EditorialKind, tenantId: DbId, at: Date,
-  options: { limit: number; offset?: number; eventGroup?: EventGroup; slug?: string; detail?: boolean } ): Promise<PublishedObject[]> {
+  options: { limit: number; offset?: number; eventGroup?: EventGroup; slug?: string; detail?: boolean; calendar?: PublishedObjectQuery['eventCalendar'] } ): Promise<PublishedObject[]> {
   const query: PublishedObjectQuery = { objectTypeNames: [kind === 'columnists' ? 'columnist' : 'event'],
     activeTypeOnly: true, limit: options.limit, offset: options.offset, slug: options.slug,
     sortOrder: kind === 'columnists' ? 'title' : '-publish_date',
-    ...(kind === 'events' ? { eventGroup: options.eventGroup ?? 'all' } : {}) };
-  const items = (await reader.publishedObjects(query, tenantId, at)).map(item => ({
-    ...item, widgets: publishedObjectWidgets(item.widgets, at),
-  }));
+    ...(kind === 'events' ? { eventGroup: options.eventGroup ?? 'all', eventCalendar: options.calendar } : {}) };
+  const published = await reader.publishedObjects(query, tenantId, at);
+  if (options.calendar) return published.map(item => {
+    const { eventStartDate, eventEndDate } = editorialPublicData(item, 'events');
+    return { ...item, data: { eventStartDate, ...(eventEndDate ? { eventEndDate } : {}) } };
+  });
+  const items = published.map(item => ({ ...item, widgets: publishedObjectWidgets(item.widgets, at) }));
   const images = await withNewsImages(items.map(item => kind === 'columnists'
     ? { ...item, data: { ...item.data, featuredImage: item.data.photo || item.data.photoUrl || item.data.photo_url } } : item), reader, tenantId);
   const enriched = kind === 'columnists' ? await Promise.all(images.map(item => withLatestColumn(item, reader, tenantId, at))) : images;

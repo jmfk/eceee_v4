@@ -177,6 +177,11 @@ function reader(client: PoolClient): PageReader {
       if (query.articleKind && !['all', 'news', 'column'].includes(query.articleKind)) return [];
       if (query.authorId !== undefined && (!/^\d{1,19}$/.test(query.authorId) || BigInt(query.authorId) > 9_223_372_036_854_775_807n)) return [];
       if (query.eventGroup && !['all', 'eceee', 'other'].includes(query.eventGroup)) return [];
+      const calendar = query.eventCalendar;
+      const calendarFilters = [calendar?.eventType, calendar?.eventCategory];
+      if (calendarFilters.some(id => id !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))) return [];
+      const calendarOptions = calendar && !query.offset && calendarFilters.every(id => !id);
+      const eventStart = "COALESCE(NULLIF(published.data->>'eventStartDate', ''), published.data->>'event_start_date')";
       const status = query.status === 'draft' || query.status === 'archived' ? query.status : null;
       if (!objectIds.length && !typeIds.length && !typeNames.length && !query.allActiveTypes) return [];
       const sortOrders: Record<string, string> = {
@@ -213,10 +218,11 @@ function reader(client: PoolClient): PageReader {
           SELECT t.id,t.parent_id,t.merged_into_id,t.tenant_id,t.namespace_id,t.tag_type,t.status
           FROM taxonomy_tag t JOIN matching s ON t.merged_into_id=s.id
           WHERE t.tenant_id=$1 AND t.namespace_id=s.namespace_id AND t.tag_type=s.tag_type
-        )
+        )${calendarOptions ? ', calendar_source AS (' : ''}
         SELECT object.id::text, COALESCE(NULLIF(published.title, ''), object.title) AS title, object.slug,
           jsonb_build_object('id', type.id::text, 'name', type.name, 'label', type.label, 'pluralLabel', type.plural_label) AS "objectType",
           published.data, published.widgets, object.metadata,
+          ${calendarOptions ? `published.id AS "calendarVersionId", ${eventStart} AS "calendarStart",` : ''}
           ARRAY(SELECT tag.id::text FROM taxonomy_objectversiontag assignment
             JOIN taxonomy_tag tag ON tag.id=assignment.tag_id AND tag.tenant_id=$1
             WHERE assignment.object_version_id=published.id AND tag.status='approved'
@@ -344,7 +350,32 @@ function reader(client: PoolClient): PageReader {
             SELECT 1 FROM taxonomy_objectversiontag a WHERE a.object_version_id=published.id
               AND a.tag_id IN (SELECT id FROM matching)
           ))
-        ORDER BY ${priority}${order}
+          ${calendar ? `
+          AND ${eventStart} ~ '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'
+          AND ($22::uuid IS NULL OR EXISTS (
+            SELECT 1 FROM taxonomy_objectversiontag assignment
+            JOIN taxonomy_tag tag ON tag.id=assignment.tag_id AND tag.tenant_id=$1 AND tag.status='approved'
+            WHERE assignment.object_version_id=published.id AND tag.id=$22 AND tag.tag_type='event_type'
+          ))
+          AND ($23::uuid IS NULL OR EXISTS (
+            SELECT 1 FROM taxonomy_objectversiontag assignment
+            JOIN taxonomy_tag tag ON tag.id=assignment.tag_id AND tag.tenant_id=$1 AND tag.status='approved'
+            WHERE assignment.object_version_id=published.id AND tag.id=$23 AND tag.tag_type='event_category'
+          ))` : ''}
+        ${calendarOptions ? `), options AS (
+          SELECT COALESCE(jsonb_agg(terms ORDER BY terms.name, terms.id), '[]'::jsonb) AS "calendarOptions"
+          FROM (
+            SELECT DISTINCT tag.id, tag.name, tag.tag_type AS type
+            FROM calendar_source event
+            JOIN taxonomy_objectversiontag assignment ON assignment.object_version_id=event."calendarVersionId"
+            JOIN taxonomy_tag tag ON tag.id=assignment.tag_id AND tag.tenant_id=$1 AND tag.status='approved'
+            WHERE tag.tag_type IN ('event_type', 'event_category')
+          ) terms
+        )
+        SELECT event.*, options."calendarOptions" FROM calendar_source event CROSS JOIN options
+        ORDER BY event."calendarStart" DESC, event.id::bigint DESC`
+          : calendar ? `ORDER BY ${eventStart} DESC, object.id DESC`
+          : `ORDER BY ${priority}${order}`}
         LIMIT $6 OFFSET $16`, [
           tenantId,
           typeIds,
@@ -367,6 +398,7 @@ function reader(client: PoolClient): PageReader {
           query.articleKind && query.articleKind !== 'all' ? query.articleKind : null,
           query.authorId ?? null,
           query.eventGroup && query.eventGroup !== 'all' ? query.eventGroup : null,
+          ...(calendar ? calendarFilters.map(id => id ?? null) : []),
         ]);
       return result.rows;
     },

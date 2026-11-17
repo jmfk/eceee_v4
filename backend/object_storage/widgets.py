@@ -99,6 +99,7 @@ class ObjectListConfig(BaseModel):
                     ("minimal", "Minimal"),
                     ("columnists", "Columnists"),
                     ("events", "Events"),
+                    ("eventCalendar", "Event calendar"),
                 ]
             ],
         },

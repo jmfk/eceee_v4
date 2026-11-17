@@ -2,8 +2,9 @@ import React from 'react'
 import { List, FileText } from 'lucide-react'
 
 // Editors describe dynamic content; Preview resolves the published URL selection.
+const directoryLabels = { columnists: 'Columnists', events: 'Events', eventCalendar: 'Event calendar' }
 const ObjectListWidget = ({ config = {} }) => <div className="p-6 text-sm text-gray-600">
-    <strong>{config.displayTemplate === 'columnists' ? 'Columnists' : config.displayTemplate === 'events' ? 'Events' : 'Object list'}</strong>
+    <strong>{directoryLabels[config.displayTemplate ?? config.display_template] || 'Object list'}</strong>
     <p>Published content. Open Preview to see the list and its links.</p>
 </div>
 ObjectListWidget.displayName = 'Object List'
