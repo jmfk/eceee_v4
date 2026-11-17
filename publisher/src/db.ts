@@ -218,7 +218,18 @@ function reader(client: PoolClient): PageReader {
           SELECT t.id,t.parent_id,t.merged_into_id,t.tenant_id,t.namespace_id,t.tag_type,t.status
           FROM taxonomy_tag t JOIN matching s ON t.merged_into_id=s.id
           WHERE t.tenant_id=$1 AND t.namespace_id=s.namespace_id AND t.tag_type=s.tag_type
-        )${calendarOptions ? ', calendar_source AS (' : ''}
+        )
+        ${calendar ? `, calendar_terms AS (
+          SELECT id AS original_id, id, name, tag_type AS type, namespace_id
+          FROM taxonomy_tag
+          WHERE tenant_id=$1 AND status='approved' AND tag_type IN ('event_type', 'event_category')
+          UNION
+          SELECT tag.id, term.id, term.name, term.type, term.namespace_id
+          FROM taxonomy_tag tag JOIN calendar_terms term ON tag.merged_into_id=term.original_id
+          WHERE tag.tenant_id=$1 AND tag.status='merged'
+            AND tag.namespace_id=term.namespace_id AND tag.tag_type=term.type
+        )` : ''}
+        ${calendarOptions ? ', calendar_source AS (' : ''}
         SELECT object.id::text, COALESCE(NULLIF(published.title, ''), object.title) AS title, object.slug,
           jsonb_build_object('id', type.id::text, 'name', type.name, 'label', type.label, 'pluralLabel', type.plural_label) AS "objectType",
           published.data, published.widgets, object.metadata,
@@ -354,22 +365,21 @@ function reader(client: PoolClient): PageReader {
           AND ${eventStart} ~ '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'
           AND ($22::uuid IS NULL OR EXISTS (
             SELECT 1 FROM taxonomy_objectversiontag assignment
-            JOIN taxonomy_tag tag ON tag.id=assignment.tag_id AND tag.tenant_id=$1 AND tag.status='approved'
-            WHERE assignment.object_version_id=published.id AND tag.id=$22 AND tag.tag_type='event_type'
+            JOIN calendar_terms term ON term.original_id=assignment.tag_id
+            WHERE assignment.object_version_id=published.id AND term.id=$22 AND term.type='event_type'
           ))
           AND ($23::uuid IS NULL OR EXISTS (
             SELECT 1 FROM taxonomy_objectversiontag assignment
-            JOIN taxonomy_tag tag ON tag.id=assignment.tag_id AND tag.tenant_id=$1 AND tag.status='approved'
-            WHERE assignment.object_version_id=published.id AND tag.id=$23 AND tag.tag_type='event_category'
+            JOIN calendar_terms term ON term.original_id=assignment.tag_id
+            WHERE assignment.object_version_id=published.id AND term.id=$23 AND term.type='event_category'
           ))` : ''}
         ${calendarOptions ? `), options AS (
           SELECT COALESCE(jsonb_agg(terms ORDER BY terms.name, terms.id), '[]'::jsonb) AS "calendarOptions"
           FROM (
-            SELECT DISTINCT tag.id, tag.name, tag.tag_type AS type
+            SELECT DISTINCT term.id, term.name, term.type
             FROM calendar_source event
             JOIN taxonomy_objectversiontag assignment ON assignment.object_version_id=event."calendarVersionId"
-            JOIN taxonomy_tag tag ON tag.id=assignment.tag_id AND tag.tenant_id=$1 AND tag.status='approved'
-            WHERE tag.tag_type IN ('event_type', 'event_category')
+            JOIN calendar_terms term ON term.original_id=assignment.tag_id
           ) terms
         )
         SELECT event.*, options."calendarOptions" FROM calendar_source event CROSS JOIN options
