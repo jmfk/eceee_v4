@@ -2,6 +2,13 @@
 
 | ID | Title | Status | Related ADRs |
 | --- | --- | --- | --- |
+| PRD-0058 | [Sömlös automatisk laddning av publika listor](0058-seamless-public-lists.md) | started | [ADR-0075](../adrs/active/0075-prefetch-public-list-batches.md) |
+| PRD-0057 | [Bildguide och verifiering med hela arkivet](0057-eceee-launch-verification.md) | draft | [ADR-0074](../adrs/active/0074-full-archive-verification.md) |
+| PRD-0056 | [Medlemsåtkomst, externa granskare och integrationer](0056-eceee-access-and-integrations.md) | draft | – |
+| PRD-0055 | [Nyhetsplacering och redaktionella widgetar](0055-eceee-editorial-widgets.md) | draft | [ADR-0071](../adrs/active/0071-reuse-published-editorial-objects.md) |
+| PRD-0054 | [Bibliotek för proceedings och rapporter](0054-eceee-publication-library.md) | draft | [ADR-0073](../adrs/active/0073-library-source-boundary.md) |
+| PRD-0053 | [Externa evenemangsförslag](0053-eceee-external-event-submissions.md) | draft | [ADR-0072](../adrs/active/0072-moderate-event-versions.md) |
+| PRD-0052 | [Seminarier, workshops och kommande evenemang](0052-eceee-seminars.md) | draft | [ADR-0071](../adrs/active/0071-reuse-published-editorial-objects.md) |
 | PRD-0051 | [CMS collaboration and learning operations](0051-cms-collaboration-and-learning-operations.md) | completed | ADR-0070 |
 | PRD-0050 | [CMS release Change Notes with visual evidence](0050-cms-release-change-notes.md) | draft | - |
 | PRD-0049 | [Instructional video production pipeline](0049-instructional-video-production.md) | draft | - |

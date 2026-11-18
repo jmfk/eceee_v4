@@ -1,5 +1,5 @@
 import React from 'react'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EditorialListRender, EditorialDetailRender, editorialFeedUrl } from '../EditorialRender'
 const context = { preview: false, siteId: '249' }
@@ -56,6 +56,44 @@ describe('editorial pages', () => {
         const params = new URL(fetchEvents.mock.calls[1][0]).searchParams
         expect(Object.fromEntries(params)).toMatchObject({ kind: 'events', calendar: 'true', offset: '0', eventType: 'conference', eventCategory: 'policy' })
         expect(screen.getByLabelText('Event category')).toHaveValue('policy')
+    })
+    it('prefetches calendar results early, keeps one month heading, and pauses for Tab navigation', async () => {
+        const callbacks: IntersectionObserverCallback[] = []
+        const margins: string[] = []
+        vi.stubGlobal('IntersectionObserver', class {
+            constructor(callback: IntersectionObserverCallback, options: IntersectionObserverInit) {
+                callbacks.push(callback)
+                margins.push(options.rootMargin!)
+            }
+            observe() {}
+            disconnect() {}
+        })
+        const event = (id: number) => ({ id, title: `Event ${id}`, slug: `event-${id}`, data: { eventStartDate: '2027-06-01' } })
+        const fetchEvents = vi.fn(async () => ({ ok: true, json: async () => ({ items: [event(12)] }) }))
+        vi.stubGlobal('fetch', fetchEvents)
+        render(<EditorialListRender widget={{ ...widget, config: { displayTemplate: 'eventCalendar' },
+            data: { status: 'ready', items: Array.from({ length: 12 }, (_, id) => event(id)) } }} context={context} renderWidgets={renderWidgets} />)
+        expect(margins[0]).toBe(`0px 0px ${window.innerHeight * 2}px 0px`)
+        const intersect = (callback: IntersectionObserverCallback) =>
+            callback([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver)
+        fireEvent.keyDown(window, { key: 'Tab' })
+        await act(async () => intersect(callbacks[0]))
+        expect(fetchEvents).not.toHaveBeenCalled()
+        fireEvent.wheel(window)
+        const button = screen.getByRole('button', { name: 'Load more' })
+        await act(async () => {
+            intersect(callbacks[1])
+            intersect(callbacks[1])
+            fireEvent.keyDown(window, { key: 'Tab' })
+            button.focus()
+        })
+        expect(await screen.findByRole('link', { name: 'Event 12' })).toBeInTheDocument()
+        expect(screen.getAllByRole('heading', { name: 'June 2027' })).toHaveLength(1)
+        expect(fetchEvents).toHaveBeenCalledTimes(1)
+        expect(screen.getByRole('button', { name: 'All results loaded' })).toHaveFocus()
+        expect(button).toHaveAttribute('aria-disabled', 'true')
+        act(() => button.blur())
+        expect(button).not.toBeInTheDocument()
     })
     it('keeps the profile biography and portrait beside a separate metadata column', () => {
         const { container } = render(<EditorialDetailRender widget={{ ...widget, config: { displayTemplate: 'columnists' }, data: { status: 'ready', item: { id: 9, title: 'Jane', data: widget.data.items[0].data,

@@ -25,8 +25,9 @@ const NewsFlashContent: WidgetRenderComponent = ({ widget, context }) => {
                 : <NewsFlashPlaceholder key={index} index={index} size={layout.size(index)} imageShape={newsFlashImageShape(widget.config)} loading={loading} />)}
         </div>
         {feed.error && <p role="status">News could not be loaded.</p>}
-        {feed.canLoad && <div ref={feed.sentinel} className="news-flash-more">
-            <button type="button" onClick={() => void feed.load()} disabled={feed.busy}>{feed.busy ? 'Loading news…' : feed.error ? 'Retry loading news' : 'Load more news'}</button>
+        {(feed.canLoad || feed.pagination.buttonFocused) && <div ref={feed.pagination.marker} className="news-flash-more">
+            <button type="button" onClick={() => void feed.load()} onFocus={feed.pagination.onButtonFocus} onBlur={feed.pagination.onButtonBlur}
+                aria-disabled={feed.busy || !feed.canLoad}>{feed.busy ? 'Loading news…' : feed.error ? 'Retry loading news' : feed.canLoad ? 'Load more news' : 'All news loaded'}</button>
         </div>}
     </section>
 }

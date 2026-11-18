@@ -4,6 +4,11 @@
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
+| ADR-0075 | [Förhämta nästa omgång i publika listor](active/0075-prefetch-public-list-batches.md) | accepted | [PRD-0058](../prds/0058-seamless-public-lists.md) |
+| ADR-0074 | [Verifiera sajten mot det importerade devarkivet](active/0074-full-archive-verification.md) | accepted | [PRD-0057](../prds/0057-eceee-launch-verification.md) |
+| ADR-0073 | [Håll det lokala biblioteket oberoende av framtida källval](active/0073-library-source-boundary.md) | accepted | [PRD-0054](../prds/0054-eceee-publication-library.md) |
+| ADR-0072 | [Granska evenemang per version](active/0072-moderate-event-versions.md) | accepted | [PRD-0053](../prds/0053-eceee-external-event-submissions.md) |
+| ADR-0071 | [Återanvänd publicerade redaktionella objekt](active/0071-reuse-published-editorial-objects.md) | accepted | [PRD-0052](../prds/0052-eceee-seminars.md), [PRD-0055](../prds/0055-eceee-editorial-widgets.md) |
 | ADR-0070 | [Machine collaboration and private learning boundaries](active/0070-machine-collaboration-and-private-learning-boundaries.md) | accepted | PRD-0051 |
 | ADR-0069 | [Columnist card metadata and profile reading columns](active/0069-columnist-card-metadata-and-profile-columns.md) | accepted | PRD-0048 |
 | ADR-0068 | [Editorial directory templates on existing object widgets](active/0068-editorial-directory-templates.md) | accepted | PRD-0048 |
