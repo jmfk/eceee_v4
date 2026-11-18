@@ -41,6 +41,7 @@ app.conf.task_routes = {
     "webpages.tasks.import_site_package": {"queue": "default"},
     "webpages.tasks.refresh_scheduled_publication_caches": {"queue": "maintenance"},
     "object_storage.tasks.cleanup_expired_object_packages": {"queue": "maintenance"},
+    "object_storage.tasks.cleanup_expired_article_images": {"queue": "maintenance"},
     # Default queue for other tasks
     "*": {"queue": "default"},
 }
@@ -83,6 +84,10 @@ app.conf.beat_schedule = {
     "cleanup-expired-object-packages": {
         "task": "object_storage.tasks.cleanup_expired_object_packages",
         "schedule": crontab(hour=3, minute=20),
+    },
+    "cleanup-expired-article-images": {
+        "task": "object_storage.tasks.cleanup_expired_article_images",
+        "schedule": crontab(hour=3, minute=25),
     },
     # Cancel stuck tasks every 30 minutes
     "cancel-stuck-tasks": {

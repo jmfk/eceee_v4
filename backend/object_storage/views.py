@@ -24,6 +24,7 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 
 from core.models import MachineAPIKey
 from core.permissions import HasTenantAccess
@@ -610,6 +611,16 @@ def object_workflow_required():
     )
 
 
+class ArticleImageThrottle(UserRateThrottle):
+    scope = "article_image"
+
+    def get_rate(self):
+        return "10/day"
+
+    def allow_request(self, request, view):
+        return request.method in permissions.SAFE_METHODS or super().allow_request(request, view)
+
+
 class ObjectInstanceViewSet(viewsets.ModelViewSet):
     """ViewSet for managing Object Instances"""
 
@@ -751,6 +762,12 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         }.intersection(request.data):
             return object_workflow_required()
         return super().update(request, *args, **kwargs)
+
+    @action(detail=True, methods=["get", "post"], url_path="image-candidates", throttle_classes=[ArticleImageThrottle])
+    def image_candidates(self, request, pk=None):
+        from .services.article_image_candidates import image_candidates_response
+
+        return image_candidates_response(request, self.get_object())
 
     @action(detail=True, methods=["get"])
     def workflow(self, request, pk=None):

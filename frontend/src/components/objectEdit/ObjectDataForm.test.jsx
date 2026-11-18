@@ -7,6 +7,8 @@ import { renderWithStateProviders } from '../../test/testUtils'
 import { createAppState } from '../../test/unifiedDataTestUtils'
 import ObjectDataForm from './ObjectDataForm'
 
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: null }) }))
+
 vi.mock('../../api', () => ({
     namespacesApi: {
         getDefault: vi.fn().mockResolvedValue({ slug: 'default' }),

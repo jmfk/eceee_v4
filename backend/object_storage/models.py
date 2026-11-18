@@ -2007,3 +2007,18 @@ class TransferCheckpoint(models.Model):
         self.status = self.STATUS_FAILED
         self.errors = [*(self.errors or []), str(error)]
         self.save(update_fields=["status", "errors", "updated_at"])
+
+
+class ArticleImageCandidate(models.Model):
+    """Private generated image retained while the editor compares candidates."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    article = models.ForeignKey(ObjectInstance, null=True, on_delete=models.SET_NULL, related_name="image_candidates")
+    source_version_id = models.PositiveBigIntegerField()
+    source_revision = models.PositiveBigIntegerField()
+    file_path = models.CharField(max_length=500)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(db_index=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
