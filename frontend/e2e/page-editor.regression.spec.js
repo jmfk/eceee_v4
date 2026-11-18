@@ -49,6 +49,35 @@ const saveCurrentVersion = async page => {
 
 const getSavedVersion = editorState => editorState.savedVersions.at(-1)
 
+test('reopening a page uses its latest saved working revision instead of cached content', async ({ page }, testInfo) => {
+  const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })
+  await page.clock.install()
+  await openEditor(page, state)
+  await expect(contentEditor(page)).toHaveText('Initial editor copy')
+  await page.getByRole('button', { name: 'Back to Pages', exact: true }).click()
+  await expect(page).toHaveURL(/\/pages$/)
+
+  // Another editor saves the same working version while this editor is away.
+  state.version.editRevision += 1
+  state.version.updatedAt = '2026-01-02T00:00:00.000Z'
+  state.version.pageData = { pageAttributes: { title: 'Latest saved page title' } }
+  state.version.widgets.main.find(widget => widget.id === 'content-intro').config.content = '<p>Latest saved page content</p>'
+  await page.clock.fastForward(11_000)
+  await page.getByRole('button', { name: 'Edit Summer Study', exact: true }).first().click()
+
+  await expect(contentEditor(page)).toHaveText('Latest saved page content')
+  await expect(page.getByRole('heading', { name: 'Latest saved page title', exact: true })).toBeVisible()
+  expect(await page.evaluate(() => window.__UNIFIED_DATA__.getState().versions['201'].editRevision)).toBe(2)
+
+  await setEditorHtml(page, 'content-intro', '<p>Edited from the latest saved version</p>')
+  await saveCurrentVersion(page)
+  expect(getSavedVersion(state).widgets.main.find(widget => widget.id === 'content-intro').config.content)
+    .toContain('Edited from the latest saved version')
+  expect(state.version.editRevision).toBe(3)
+  await contentEditor(page).scrollIntoViewIfNeeded()
+  await page.screenshot({ path: testInfo.outputPath('task24-latest-working-version.png'), fullPage: true })
+})
+
 test('content lists inside block containers survive saving and reload', async ({ page }) => {
   const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })
   await openEditor(page, state)
@@ -347,7 +376,7 @@ test.describe('page editor regressions', () => {
     await page.getByPlaceholder('Page Title').fill('Unpublished draft title')
     await page.getByPlaceholder('page-url-slug').fill('unpublished-draft-slug')
     await page.getByLabel('Find a tag').fill('Energy')
-    await page.getByRole('button', { name: 'Energy efficiency', exact: true }).click()
+    await page.getByRole('option', { name: 'Energy efficiency', exact: true }).click()
     await saveCurrentVersion(page)
 
     expect(editorState.savedPages).toHaveLength(0)

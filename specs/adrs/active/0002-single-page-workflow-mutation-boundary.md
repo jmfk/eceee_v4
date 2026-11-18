@@ -34,6 +34,12 @@ One boundary makes optimistic locking, schema validation, authorization, and pub
 
 ## Consequences
 
+Reopening a page must reconcile its cached working version with the server's
+`editRevision`. A newer server revision replaces a clean cached snapshot of the
+same version; equal or newer cached data may retain websocket updates. Query
+refreshes must preserve active unsaved edits and their original save baseline so
+that optimistic conflict handling remains effective.
+
 - Old web clients must reload before they can save or publish.
 - First save for a live-only page is one atomic request and does not require pre-created working copies.
 - External legacy mutation clients must migrate to workflow endpoints.

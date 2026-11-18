@@ -95,7 +95,8 @@
 }
 /* Portalled results float over editor panels instead of expanding their layout. */
 .classification-picker-options {
-    z-index: 100;
+    /* Search results are portalled to body, above the full-screen page editor. */
+    z-index: 10050;
     width: var(--input-width);
     max-height: min(240px, var(--available-height, 240px));
     overflow-y: auto;
