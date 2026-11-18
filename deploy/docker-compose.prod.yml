@@ -71,6 +71,10 @@ services:
       dockerfile: publisher/Dockerfile
     image: eceee-publisher:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    # Dedicated module credentials only; never load the general backend env.
+    env_file:
+      - path: .env.modules
+        required: false
     environment:
       # Deliberately do not load deploy/.env into this internet-facing service.
       # Compose interpolates only the dedicated publisher credentials, the

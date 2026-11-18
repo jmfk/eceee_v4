@@ -4,6 +4,7 @@
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
+| ADR-0082 | [TypeScript-moduler för handel och kundgemenskap](active/0082-typescript-commerce-and-community.md) | accepted | PRD-0065 |
 | ADR-0081 | [Separera tillfälliga AI-bildförslag från sparade media](active/0081-track-generated-image-provenance.md) | accepted | [PRD-0064](../prds/0064-editorial-ai-images.md) |
 | ADR-0080 | [Använd befintliga AI-kopplingar för redaktionella förslag](active/0080-use-existing-ai-for-editorial-suggestions.md) | accepted | [PRD-0063](../prds/0063-editorial-ai-from-sources.md) |
 | ADR-0079 | [Lagra länkfångster som vanligt media](active/0079-store-link-captures-as-media.md) | accepted | [PRD-0062](../prds/0062-screenshots-from-links.md) |

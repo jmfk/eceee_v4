@@ -17,7 +17,13 @@ eceee-test.colliberty.com, summerstudy-test.colliberty.com, industry-test.collib
         reverse_proxy imgproxy:8080
     }
 
-    reverse_proxy publisher:3000
+    @testIdentity path /_allauth/* /accounts/* /csrf-token/*
+    handle @testIdentity {
+        reverse_proxy backend:8000
+    }
+    handle {
+        reverse_proxy publisher:3000
+    }
 }
 
 # Public Content Sites - Next publisher serving public pages. Django retains
@@ -42,12 +48,21 @@ summerstudy.{$DOMAIN}, industry.{$DOMAIN} {
         reverse_proxy publisher:3000
     }
 
+    @identity path /_allauth/* /accounts/* /csrf-token/*
+    handle @identity {
+        reverse_proxy backend:8000
+    }
+
     handle /static/* {
         reverse_proxy backend:8000
     }
 
     handle /media/* {
         reverse_proxy backend:8000
+    }
+
+    handle /api/modules/* {
+        reverse_proxy publisher:3000
     }
 
     handle /api/* {
@@ -89,6 +104,10 @@ app.{$DOMAIN} {
     }
 
     # API calls go to backend
+    handle /api/modules/* {
+        reverse_proxy publisher:3000
+    }
+
     handle /api/* {
         reverse_proxy backend:8000
     }
