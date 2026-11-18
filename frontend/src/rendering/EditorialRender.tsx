@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { PreviewLink, formatDisplayDate, value } from './primitives'
 import { NewsImageFrame } from './NewsImage'
 import { normalizeWidget } from './adapters'
 import { newsDetailPresentation } from './newsDetailPresentation'
 import { emptyThemeWidgets } from './themeWidgets'
+import { useListPrefetch } from './useListPrefetch'
 import type { RenderContext, RenderWidgetModel, WidgetRenderComponent } from './types'
 
 const displayTemplate = (widget: RenderWidgetModel) => value(widget.config, 'displayTemplate', 'display_template')
@@ -87,21 +88,24 @@ const EditorialListContent: WidgetRenderComponent = ({ widget, context }) => {
     const [state, setState] = useState({ items: initial, offset: initial.length, busy: false, error: widget.data?.status === 'error', done: initial.length < batch })
     const [filters, setFilters] = useState(emptyFilters)
     const [options, setOptions] = useState<CalendarOption[]>(() => Array.isArray(widget.data?.calendarOptions) ? widget.data.calendarOptions : [])
-    const pending = useRef(false)
+    const pending = useRef<AbortController | null>(null)
     const generation = useRef(0)
     useEffect(() => {
         generation.current++
-        pending.current = false
+        pending.current?.abort()
+        pending.current = null
         setFilters(emptyFilters)
         setOptions(Array.isArray(widget.data?.calendarOptions) ? widget.data.calendarOptions : [])
         setState({ items: initial, offset: initial.length, busy: false, error: widget.data?.status === 'error', done: initial.length < batch })
-        return () => { generation.current++ }
+        return () => { generation.current++; pending.current?.abort() }
     }, [widget.data, source, batch])
-    const load = async (selection = filters, reset = false) => {
-        if (!source || (pending.current && !reset)) return
+    const load = useCallback(async (selection = filters, reset = false) => {
+        if (!source || (pending.current && !reset) || (!reset && !state.error && (state.done || state.offset >= limit))) return
+        pending.current?.abort()
         const current = ++generation.current
         const offset = reset ? 0 : state.offset
-        pending.current = true
+        const controller = new AbortController()
+        pending.current = controller
         if (reset) setFilters(selection)
         setState(previous => reset ? { items: [], offset: 0, busy: true, error: false, done: false }
             : { ...previous, busy: true, error: false })
@@ -113,7 +117,7 @@ const EditorialListContent: WidgetRenderComponent = ({ widget, context }) => {
             for (const [key, term] of Object.entries(selection)) {
                 if (term) url.searchParams.set(key, term)
             }
-            const response = await fetch(url, { credentials: 'omit' })
+            const response = await fetch(url, { credentials: 'omit', signal: controller.signal })
             if (!response.ok) throw new Error('Unavailable')
             const result = await response.json()
             if (!Array.isArray(result.items)) throw new Error('Invalid response')
@@ -128,8 +132,10 @@ const EditorialListContent: WidgetRenderComponent = ({ widget, context }) => {
             })
         } catch {
             if (current === generation.current) setState(previous => ({ ...previous, busy: false, error: true }))
-        } finally { if (current === generation.current) pending.current = false }
-    }
+        } finally { if (current === generation.current) pending.current = null }
+    }, [source, filters, state.error, state.done, state.offset, limit, batch, widget])
+    const canLoad = Boolean(source) && !state.done && state.offset < limit
+    const pagination = useListPrefetch(canLoad && !state.busy && !state.error, load)
     const calendar = isCalendar(widget)
     const kind = calendar ? 'events' : displayTemplate(widget)
     const compact = kind === 'events' && value(widget.config, 'eventGroup', 'event_group') === 'other'
@@ -163,7 +169,10 @@ const EditorialListContent: WidgetRenderComponent = ({ widget, context }) => {
         })}</div>}
         {!state.items.length && !state.error && <p role={calendar ? 'status' : undefined}>{state.busy || widget.data?.status === 'loading' ? 'Loading…' : calendar && (filters.eventType || filters.eventCategory) ? 'No events match these filters.' : kind === 'events' ? 'No events available.' : 'No columnists available.'}</p>}
         {state.error && <p role="status">Content could not be loaded.</p>}
-        {source && (state.error || (!state.done && state.offset < limit)) && <button type="button" onClick={() => void load()} disabled={state.busy}>{state.busy ? 'Loading…' : state.error ? 'Retry' : 'Load more'}</button>}
+        {source && (state.error || canLoad || pagination.buttonFocused) && <div ref={pagination.marker}>
+            <button type="button" onClick={() => void load()} onFocus={pagination.onButtonFocus} onBlur={pagination.onButtonBlur}
+                aria-disabled={state.busy || (!canLoad && !state.error)}>{state.busy ? 'Loading…' : state.error ? 'Retry' : canLoad ? 'Load more' : 'All results loaded'}</button>
+        </div>}
     </section>
 }
 

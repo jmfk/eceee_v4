@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useListPrefetch } from './useListPrefetch'
 import { NEWS_FLASH_BATCH, newsFlashLayout } from './newsFlashLayout'
 import type { RenderContext, RenderWidgetModel } from './types'
 
@@ -70,17 +71,11 @@ export const useNewsFlashFeed = (widget: RenderWidgetModel, context: RenderConte
     useEffect(() => {
         if (!widget.data && source && !state.offset && !state.busy && !state.error && !state.exhausted) void load()
     }, [widget.data, source, state.offset, state.busy, state.error, state.exhausted, load])
-    const sentinel = useRef<HTMLDivElement>(null)
     const canLoad = Boolean(source) && !state.exhausted && state.offset < total
-    useEffect(() => {
-        if (!canLoad || state.busy || state.error || !sentinel.current || typeof IntersectionObserver === 'undefined') return
-        const observer = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) void load() }, { rootMargin: '200px' })
-        observer.observe(sentinel.current)
-        return () => observer.disconnect()
-    }, [canLoad, state.error, state.busy, load])
+    const pagination = useListPrefetch(canLoad && !state.busy && !state.error && state.offset > 0, load)
     const loading = state.busy || (!state.exhausted && !state.error && (widget.data?.status === 'loading'
         || (!widget.data && Boolean(source) && state.offset === 0)))
     // Counts cap the layout; a completed feed only renders articles that exist.
     const visible = loading || state.error ? state.visible : Math.min(state.visible, state.items.length)
-    return { ...state, visible, loading, canLoad, load, sentinel }
+    return { ...state, visible, loading, canLoad, load, pagination }
 }
