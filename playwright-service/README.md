@@ -413,3 +413,16 @@ docker buildx build --platform linux/amd64,linux/arm64 -t playwright-renderer:la
 ## License
 
 MIT License - see LICENSE file for details.
+
+
+## Editorial public screenshots
+
+`POST /public-screenshot` accepts a public HTTP(S) link and captures a 1440 × 900
+viewport. It follows bounded redirects, pins public IPv4 addresses for the
+document and its resources, and renders with page JavaScript disabled. Other
+preview and PDF routes keep their existing request contracts.
+
+Chromium's OS sandbox is mandatory for this route. The Docker Compose
+configurations use a non-root user and the
+[Playwright v1.64.1 seccomp profile](https://github.com/microsoft/playwright/blob/v1.64.1/utils/docker/seccomp_profile.json).
+The route fails closed when the container runtime cannot provide the sandbox.

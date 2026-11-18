@@ -21,6 +21,7 @@ import SimplifiedApprovalForm from './SimplifiedApprovalForm';
 import OptimizedImage from './OptimizedImage';
 import FieldHelpPopover from '../form-fields/FieldHelpPopover';
 import { mediaApi } from '../../api';
+import LinkScreenshotCapture from './LinkScreenshotCapture'
 import { DEFAULT_IMGPROXY_CONFIG } from '../../utils/mediaInsertRenderer';
 
 const MediaInsertModal = ({
@@ -426,6 +427,11 @@ const MediaInsertModal = ({
                                 >
                                     Select Image
                                 </button>
+                                <button type="button" onClick={() => setMediaSelectionType('screenshot')}
+                                    className={`px-4 py-2 text-sm font-medium border-b-2 ${mediaSelectionType === 'screenshot'
+                                        ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600'}`}>
+                                    Screenshot from link
+                                </button>
                                 <button
                                     onClick={() => setMediaSelectionType('collection')}
                                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${mediaSelectionType === 'collection'
@@ -452,7 +458,9 @@ const MediaInsertModal = ({
                             </div>
 
                             {/* Content based on selection type */}
-                            {mediaSelectionType === 'collection' ? (
+                            {mediaSelectionType === 'screenshot' ? (
+                                <LinkScreenshotCapture namespace={namespace} onSaved={handleMediaSelect} />
+                            ) : mediaSelectionType === 'collection' ? (
                                 <CollectionPicker namespace={namespace} selectedId={mediaType === 'collection' ? selectedMedia?.id : null} onSelect={handleMediaSelect} />
                             ) : mediaSelectionType === 'pending' ? (
                                 loadingPendingFiles ? (

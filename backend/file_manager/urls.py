@@ -23,6 +23,7 @@ from .views import (
 )
 from .views.image_version_cleanup import ImageVersionCleanupView
 from .views.imgproxy_sign import batch_sign_imgproxy_urls, generate_responsive_imgproxy_urls, sign_imgproxy_url
+from .views.link_screenshots import LinkScreenshotView, SaveLinkScreenshotView
 from .views.table_import import import_table_view
 
 app_name = "file_manager"
@@ -35,6 +36,8 @@ router.register(r"collections", MediaCollectionViewSet, basename="mediacollectio
 router.register(r"pending-files", PendingMediaFileViewSet, basename="pendingmediafile")
 
 urlpatterns = [
+    path("link-screenshot/", LinkScreenshotView.as_view(), name="link-screenshot"),
+    path("link-screenshot/save/", SaveLinkScreenshotView.as_view(), name="save-link-screenshot"),
     path("image-version-cleanup/", ImageVersionCleanupView.as_view(), name="image-version-cleanup"),
     # Include router URLs
     path("", include(router.urls)),

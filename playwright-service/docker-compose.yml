@@ -1,6 +1,9 @@
 services:
   playwright-renderer:
     build: .
+    init: true
+    security_opt:
+      - seccomp=./seccomp_profile.json
     ports:
       - "127.0.0.1:${ECEEE_PLAYWRIGHT_PORT:-10107}:5000"
     environment:
