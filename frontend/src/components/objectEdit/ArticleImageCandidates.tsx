@@ -1,16 +1,20 @@
 import { isAxiosError } from 'axios'
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import ClassificationPicker from '../classification/ClassificationPicker'
 import { api } from '../../api/client'
 
 type Candidate = {
     id: string
     previewUrl: string | null
     expiresAt: string
+    suggestedClassificationIds?: string[]
+    savedMediaId?: string | null
 }
 
 type CandidateCollection = {
     available: boolean
+    canSave?: boolean
     items: Candidate[]
 }
 
@@ -27,7 +31,64 @@ function generationError(error: Error | null) {
     }
 }
 
-export default function ArticleImageCandidates({ articleId }: { articleId: string }) {
+type MediaReference = { id: string, title: string, width?: number, height?: number, absoluteUrl?: string }
+
+function SaveCandidate({ candidate, endpoint, namespace, onInsert, onSaved }: {
+    candidate: Candidate
+    endpoint: string
+    namespace?: string
+    onInsert?: (media: MediaReference) => void
+    onSaved: (id: string, mediaId: string) => void
+}) {
+    const [tags, setTags] = useState(candidate.suggestedClassificationIds ?? [])
+    const [media, setMedia] = useState<MediaReference | null>(null)
+    const [notice, setNotice] = useState('')
+    const mounted = useRef(false)
+    useLayoutEffect(() => {
+        mounted.current = true
+        return () => { mounted.current = false }
+    }, [])
+    const saved = Boolean(media || candidate.savedMediaId)
+    const save = useMutation({
+        mutationFn: async () => {
+            if (media) return media
+            return (await api.post(`${endpoint}${candidate.id}/save/`, { classificationIds: tags })).data as MediaReference
+        },
+        onSuccess: (result, insert: boolean) => {
+            onSaved(candidate.id, result.id)
+            if (!mounted.current) return
+            setMedia(result)
+            if (insert && onInsert) {
+                onInsert(result)
+                setNotice('Added to the article draft.')
+            } else {
+                setNotice('Saved in Media Manager.')
+            }
+        },
+    })
+    return (
+        <div className="space-y-2">
+            {!saved && <ClassificationPicker value={tags} onChange={setTags} namespace={namespace} use="media_files"
+                disabled={save.isPending} allowProposed={false} />}
+            <p className="text-xs text-gray-600">AI tag is applied automatically.</p>
+            <div className="flex flex-wrap gap-2">
+                {!saved && <button type="button" className="btn-secondary" disabled={save.isPending}
+                    onClick={() => save.mutate(false)}>Save in Media Manager</button>}
+                {onInsert && <button type="button" className="btn-secondary" disabled={save.isPending}
+                    onClick={() => save.mutate(true)}>Use as article image</button>}
+            </div>
+            {save.isPending && <p role="status">Saving image…</p>}
+            {save.isError && <p role="alert">The image could not be saved. Review the tags and try again.</p>}
+            {notice && !save.isError && <p role="status">{notice}</p>}
+        </div>
+    )
+}
+
+export default function ArticleImageCandidates({ articleId, namespace, onInsert }: {
+    articleId: string
+    namespace?: string
+    onInsert?: (media: MediaReference) => void
+}) {
     const queryClient = useQueryClient()
     const [prompt, setPrompt] = useState('')
     const endpoint = `/api/v1/objects/objects/${articleId}/image-candidates/`
@@ -78,6 +139,12 @@ export default function ArticleImageCandidates({ articleId }: { articleId: strin
                             <p className="text-xs text-gray-600">
                                 Available until {new Date(candidate.expiresAt).toLocaleDateString()}
                             </p>
+                            {candidates.data.canSave && <SaveCandidate candidate={candidate} endpoint={endpoint}
+                                namespace={namespace} onInsert={onInsert}
+                                onSaved={(id, mediaId) => queryClient.setQueryData<CandidateCollection>(key, previous => previous && ({
+                                    ...previous,
+                                    items: previous.items.map(item => item.id === id ? { ...item, savedMediaId: mediaId } : item),
+                                }))} />}
                         </li>
                     ))}
                 </ul>

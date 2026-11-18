@@ -683,6 +683,7 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         """Update media file with tags and collections."""
         Namespace.objects.select_for_update().get(pk=instance.namespace_id)
+        instance.refresh_from_db()
         classification_ids = validated_data.pop("classification_ids", None)
         tag_ids = validated_data.pop("tag_ids", None)
         collection_ids = validated_data.pop("collection_ids", None)

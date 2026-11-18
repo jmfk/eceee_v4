@@ -6,6 +6,7 @@ from rest_framework.exceptions import ValidationError
 
 from content.models import Namespace
 
+from .media_origin import AI_SLUG, ORIGIN_TYPE
 from .models import MediaCollectionClassification, MediaFileClassification, ObjectVersionTag, Tag
 from .services import require, resolve_term
 
@@ -46,10 +47,15 @@ def replace_assignments(instance, ids, user, *, allow_empty_transition=False):
     model, field, namespace, use, versioned = assignment_context(instance)
     Namespace.objects.select_for_update().get(pk=namespace.pk)
     # Serialize assignment writes against the content's publication/copy lock.
-    type(instance)._base_manager.select_for_update().get(pk=instance.pk)
+    locked_instance = type(instance)._base_manager.select_for_update().get(pk=instance.pk)
+    previous_links = list(links_for(instance))
+    if instance._meta.label_lower == "file_manager.mediafile" and locked_instance.is_ai_generated:
+        origin_ids = [
+            str(link.tag_id) for link in previous_links if link.tag.tag_type == ORIGIN_TYPE and link.tag.slug == AI_SLUG
+        ]
+        ids = list(dict.fromkeys([*map(str, ids), *origin_ids]))
     if not versioned and not ids and not allow_empty_transition:
         raise ValidationError({"classification_ids": "At least one approved classification is required for media."})
-    previous_links = list(links_for(instance))
     try:
         terms = {
             str(term.pk): term
@@ -82,6 +88,8 @@ def replace_assignments(instance, ids, user, *, allow_empty_transition=False):
         if term is None or not term.classification_type_id:
             raise ValidationError({"classification_ids": "Term is unavailable in this namespace."})
         definition = locked[term.classification_type_id]
+        if use == "media_files" and definition.key == ORIGIN_TYPE and not locked_instance.is_ai_generated:
+            raise ValidationError({"classification_ids": "AI origin can only be assigned to generated media."})
         require(user, definition, "use")
         term.refresh_from_db()
         term = resolve_term(term)
@@ -178,6 +186,8 @@ def validate_media_selection(namespace, user, ids, *, use="media_files"):
         if term.status != "approved" or not term.classification_type_id:
             raise ValidationError({"classification_ids": "Only approved taxonomy terms can classify new media."})
         require(user, term.classification_type, "use")
+        if term.classification_type.key == ORIGIN_TYPE:
+            raise ValidationError({"classification_ids": "Media origin is managed automatically."})
         if use not in term.classification_type.allowed_uses:
             raise ValidationError({"classification_ids": f"{term.name} cannot be used for this media kind."})
     by_id = {str(term.pk): term for term in terms}
@@ -189,14 +199,25 @@ def restore_assignment_snapshot(instance, ids, user):
     """Restore reviewed historical relations, including archived references."""
     model, field, namespace, use, versioned = assignment_context(instance)
     Namespace.objects.select_for_update().get(pk=namespace.pk)
-    type(instance)._base_manager.select_for_update().get(pk=instance.pk)
+    locked_instance = type(instance)._base_manager.select_for_update().get(pk=instance.pk)
     terms = {
         str(term.pk): term for term in Tag.objects.filter(pk__in=ids, namespace=namespace, tenant=namespace.tenant)
     }
     if len(terms) != len(set(map(str, ids))):
         raise ValidationError("A checkpoint classification is missing or outside the destination scope.")
     for term in terms.values():
-        if term.classification_type_id:
+        if term.tag_type == ORIGIN_TYPE:
+            if (
+                use != "media_files"
+                or not locked_instance.is_ai_generated
+                or term.slug != AI_SLUG
+                or term.status != "approved"
+                or not term.classification_type_id
+                or term.classification_type.key != ORIGIN_TYPE
+            ):
+                raise ValidationError("Checkpoint media origin does not match the recorded image.")
+            require(user, term.classification_type, "use")
+        elif term.classification_type_id:
             require(user, term.classification_type, "restore")
         else:
             from .signals import canonical_phase

@@ -57,8 +57,12 @@ def is_member(user, tenant):
 
 
 def permissions_for(user, definition):
+    from .media_origin import ORIGIN_TYPE
+
     if not is_member(user, definition.tenant):
         return set()
+    if definition.key == ORIGIN_TYPE:
+        return {"use"}
     if user.is_superuser or definition.tenant.created_by_id == user.pk:
         return set(PERMISSIONS)
     grant = ClassificationGrant.objects.filter(classification_type=definition, user=user).first()
@@ -185,6 +189,10 @@ def _validate_payload(action, payload):
 
 
 def _apply(user, definition, action, term, payload, *, proposal=None):
+    from .media_origin import ORIGIN_TYPE
+
+    if definition.key == ORIGIN_TYPE:
+        raise ValidationError("Media origin is managed automatically.")
     require(user, definition, "restore" if action == "reactivate" else action)
     _validate_payload(action, payload)
     before = {} if action == "create" else {str(term.pk): snapshot(term)}

@@ -12,6 +12,7 @@ from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
@@ -41,12 +42,18 @@ def _resolve_replaced_media_file(media_file: MediaFile, max_hops: int = 10) -> M
 
 def _store_image_version(media_file, uploaded_file, user, *, is_ai_generated=False):
     """Upload first, then atomically move the logical image to the new object."""
+    from content.models import Namespace
+    from taxonomy.assignments import links_for, replace_assignments
+    from taxonomy.media_origin import ORIGIN_TYPE, system_ai_term
+
     s3_storage = S3MediaStorage()
     folder_path = media_file.file_path.rsplit("/", 1)[0] if "/" in media_file.file_path else "uploads"
     upload_result = s3_storage.upload_file(uploaded_file, folder_path)
     try:
         with transaction.atomic():
+            Namespace.objects.select_for_update().get(pk=media_file.namespace_id)
             media_file = MediaFile.objects.select_for_update().get(pk=media_file.pk, tenant_id=media_file.tenant_id)
+            origin_changed = media_file.is_ai_generated != is_ai_generated
             now = timezone.now()
             MediaFileVersion.objects.create(
                 media_file=media_file,
@@ -78,6 +85,15 @@ def _store_image_version(media_file, uploaded_file, user, *, is_ai_generated=Fal
             media_file.version_number += 1
             media_file.version_uploaded_at = now
             media_file.save()
+            if origin_changed:
+                links = list(links_for(media_file))
+                tags = [str(link.tag_id) for link in links if link.tag.tag_type != ORIGIN_TYPE]
+                if is_ai_generated:
+                    tags.append(str(system_ai_term(media_file.namespace).pk))
+                if len(tags) != len(links) or is_ai_generated:
+                    if not tags:
+                        raise ValidationError("Add a regular media tag before replacing the AI image.")
+                    replace_assignments(media_file, tags, user)
             transaction.on_commit(lambda: _safe_invalidate_tenant_theme_css(media_file.tenant_id))
     except Exception:
         s3_storage.delete(upload_result["file_path"])
@@ -600,6 +616,8 @@ class MediaFileViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(media_file)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
+        except ValidationError:
+            raise
         except Exception as e:
             logger.error(f"Failed to replace file: {e}")
             return Response(

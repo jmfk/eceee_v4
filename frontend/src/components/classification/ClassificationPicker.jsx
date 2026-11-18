@@ -54,7 +54,7 @@ export default function ClassificationPicker({ value = [], selectedTerms = [], o
         queryFn: async () => await taxonomyApi.types({ namespace: effectiveNamespace, page_size: 200, ordering: 'name' }),
         enabled: !!effectiveNamespace,
     })
-    const availableTypes = (definitions.data?.results || []).filter(type => !use || type.allowedUses?.includes(use))
+    const availableTypes = (definitions.data?.results || []).filter(type => type.key !== 'media_origin' && (!use || type.allowedUses?.includes(use)))
     const proposalTypes = (definitions.data?.results || []).filter(type => type.permissions?.includes('propose') && (!use || type.allowedUses?.includes(use)))
     const activeType = availableTypes.find(type => String(type.id) === String(typeFilter))
     const chooseType = typeId => { setTypeFilter(typeId); setPage(1); setFilterOpen(false); filterButtonRef.current?.focus() }
@@ -70,7 +70,7 @@ export default function ClassificationPicker({ value = [], selectedTerms = [], o
         finally { setProposalBusy(false) }
     }
     const choices = (terms.data?.results || []).filter(term =>
-        !value.includes(term.id) && (term.status === 'approved' || (allowProposed && term.status === 'proposed')))
+        term.tagType !== 'media_origin' && !value.includes(term.id) && (term.status === 'approved' || (allowProposed && term.status === 'proposed')))
     return <fieldset disabled={disabled} className="classification-manager classification-picker user-tools-content min-w-0 space-y-3 text-gray-900">
         <legend className="sr-only">Tags</legend>
         <ul className="space-y-2" aria-label="Selected tags">
@@ -81,10 +81,10 @@ export default function ClassificationPicker({ value = [], selectedTerms = [], o
                 const removeLabel = term?.path || term?.name || termId
                 return <li key={termId} className="flex items-center justify-between gap-2">
                     <span className="min-w-0 flex-1 break-words" title={`ID: ${termId}`}>{label}{term?.status && term.status !== 'approved' ? ` (${term.status})` : ''}</span>
-                    <button type="button" className="classification-selected-remove ml-auto shrink-0" aria-label={`Remove ${removeLabel}`}
+                    {term?.tagType !== 'media_origin' && <button type="button" className="classification-selected-remove ml-auto shrink-0" aria-label={`Remove ${removeLabel}`}
                         title={`Remove ${removeLabel}`} onClick={() => onChange(value.filter(item => item !== termId))}>
                         <X size={14} aria-hidden="true" />
-                    </button>
+                    </button>}
                 </li>
             })}
         </ul>

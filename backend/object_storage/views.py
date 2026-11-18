@@ -769,6 +769,22 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
 
         return image_candidates_response(request, self.get_object())
 
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path=r"image-candidates/(?P<candidate_id>[0-9a-f-]{36})/save",
+    )
+    def save_image_candidate(self, request, pk=None, candidate_id=None):
+        from .services.article_image_media import candidate_media_response
+
+        try:
+            candidate_id = uuid.UUID(candidate_id)
+        except ValueError:
+            from rest_framework.exceptions import NotFound
+
+            raise NotFound() from None
+        return candidate_media_response(request, self.get_object(), candidate_id)
+
     @action(detail=True, methods=["get"])
     def workflow(self, request, pk=None):
         from .services.version_workflow import ObjectVersionWorkflow

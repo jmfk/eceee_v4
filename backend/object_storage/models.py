@@ -2014,6 +2014,8 @@ class ArticleImageCandidate(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     article = models.ForeignKey(ObjectInstance, null=True, on_delete=models.SET_NULL, related_name="image_candidates")
+    saved_media = models.ForeignKey("file_manager.MediaFile", null=True, on_delete=models.SET_NULL)
+    suggested_classification_ids = models.JSONField(default=list)
     source_version_id = models.PositiveBigIntegerField()
     source_revision = models.PositiveBigIntegerField()
     file_path = models.CharField(max_length=500)
