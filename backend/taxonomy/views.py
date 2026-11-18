@@ -13,6 +13,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from . import services
+from .media_origin import ORIGIN_TYPE
 from .models import ClassificationGrant, ClassificationOperation, ClassificationProposal, ClassificationType, Tag
 from .serializers import (
     ClassificationTypeSerializer,
@@ -69,6 +70,8 @@ class ClassificationTypeViewSet(
         tenant = self.request.tenant
         if not (self.request.user.is_superuser or tenant.created_by_id == self.request.user.pk):
             raise PermissionDenied("Only tenant owners may create classification types.")
+        if serializer.validated_data.get("key") == ORIGIN_TYPE:
+            raise ValidationError("Media origin is managed automatically.")
         namespace = serializer.validated_data["namespace"]
         if namespace.tenant_id != tenant.pk:
             raise ValidationError({"namespace": "Namespace belongs to another tenant."})
@@ -90,6 +93,8 @@ class ClassificationTypeViewSet(
     @transaction.atomic
     def configure(self, request, pk=None):
         definition = services.locked_definition(self.get_object())
+        if definition.key == ORIGIN_TYPE:
+            raise ValidationError("Media origin is managed automatically.")
         services.require(request.user, definition, "administer")
         if request.data.get("revision") != definition.revision:
             raise services.ClassificationConflict()

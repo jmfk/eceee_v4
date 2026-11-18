@@ -357,6 +357,8 @@ const ObjectDataForm = forwardRef(({
     const assignedFields = new Set(editorGroups.flatMap(group => group.fields))
     const propertiesFields = schemaFields.filter(field => !assignedFields.has(field.name))
 
+    const articleImageField = schemaFields.find(field => ['featuredImage', 'featured_image'].includes(field.name))?.name
+
     return (
         <>
             <EditorAccordion title="Properties" defaultOpen>
@@ -429,7 +431,8 @@ const ObjectDataForm = forwardRef(({
             {!isThemePreview && instance?.id && objectType?.name === 'article'
                 && (user?.isSuperuser || (user?.permissions?.includes('ai.use') && user.permissions.includes('object.write'))) && (
                 <EditorAccordion title="AI images">
-                    <ArticleImageCandidates key={instance.id} articleId={String(instance.id)} />
+                    <ArticleImageCandidates key={instance.id} articleId={String(instance.id)} namespace={namespace || undefined}
+                        onInsert={articleImageField ? media => handleDataFieldChange(articleImageField, media) : undefined} />
                 </EditorAccordion>
             )}
             {editorGroups.map(group => {

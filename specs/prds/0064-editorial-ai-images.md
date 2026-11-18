@@ -43,3 +43,5 @@ Första ändringen inför registrerat AI-ursprung och filtret i Media Manager. B
 AI-ursprung följer bildens version och förs vidare när paketimport skapar ett nytt mediaobjekt. Vid återanvändning av en redan befintlig fil med samma innehåll gäller mottagarens befintliga klassning.
 
 Artikelpiloten kan generera och jämföra privata varianter från sparat utkast. Sparning i Media Manager, märkning, infogning och stöd för sidor följer separat.
+
+I nästa artikelleverans kan en kandidat sparas eller väljas som artikelbild. Taggförslagen matchar källtext och bildinstruktioner mot godkända termer i artikelns medianamnrymd. AI-taggen sätts på servern.

@@ -1,3 +1,4 @@
+from datetime import timedelta
 from unittest.mock import patch
 
 """
@@ -320,6 +321,95 @@ class ObjectStorageAPITest(APITestCase):
         self.assertIn(
             self.client.get(url, **headers).status_code, (status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND)
         )
+
+    @patch("object_storage.services.article_image_media.checkpoint_storage")
+    @patch("object_storage.services.article_image_media.storage")
+    @patch("object_storage.services.article_image_media.validate_image")
+    def test_save_article_image_preserves_suggestions_ai_tag_and_retries(self, validate, storage, checkpoint):
+        from io import BytesIO
+
+        from rest_framework.exceptions import ValidationError
+
+        from content.models import Namespace
+        from core.models import TenantRole
+        from file_manager.models import MediaFile
+        from object_storage.models import ArticleImageCandidate
+        from object_storage.services.article_image_media import suggested_media_terms
+        from taxonomy.assignments import replace_assignments, restore_assignment_snapshot
+        from taxonomy.models import ClassificationType, Tag
+        from taxonomy.services import mutate
+
+        namespace = Namespace.get_default(tenant=self.tenant)
+        obj_type = ObjectTypeDefinition.objects.create(
+            name="article", label="Article", plural_label="Articles", created_by=self.user
+        )
+        article = ObjectInstance.objects.create(
+            object_type=obj_type, title="Heat pumps", tenant=self.tenant, created_by=self.user
+        )
+        version = article.versions.create(
+            version_number=1, title="Heat pumps", created_by=self.user, effective_date=timezone.now()
+        )
+        variant = ArticleImageCandidate.objects.create(
+            article=article,
+            source_version_id=version.pk,
+            source_revision=version.edit_revision,
+            file_path="fixture.png",
+            expires_at=timezone.now() + timedelta(days=1),
+        )
+        definition = ClassificationType.objects.create(
+            tenant=self.tenant, namespace=namespace, key="topic", name="Topic", allowed_uses=["media_files"]
+        )
+        topic = Tag.objects.create(
+            tenant=self.tenant,
+            namespace=namespace,
+            classification_type=definition,
+            tag_type="topic",
+            slug="heat-pumps",
+            name="Heat pumps",
+        )
+        self.assertEqual(suggested_media_terms(article, "More efficient heat pumps."), [str(topic.pk)])
+        checkpoint._open.return_value = BytesIO(b"fixture")
+        storage.upload_file.return_value = {
+            "file_hash": "c" * 64,
+            "file_size": 7,
+            "content_type": "image/png",
+            "file_path": "approved.png",
+        }
+        storage.get_public_url.return_value = "https://example.test/approved.png"
+        url = reverse("api:object_storage:objectinstance-save-image-candidate", args=[article.pk, variant.pk])
+        headers = {"HTTP_X_TENANT_ID": str(self.tenant.id)}
+        data = {"classification_ids": [str(topic.pk)]}
+        first = self.client.post(url, data, format="json", **headers)
+        self.assertEqual(first.status_code, 200, first.data)
+        second = self.client.post(url, data, format="json", **headers)
+        self.assertEqual(second.status_code, 200, second.data)
+        self.assertEqual(first.data["id"], second.data["id"])
+        storage.upload_file.assert_called_once()
+        media = MediaFile.objects.get(pk=first.data["id"])
+        self.assertTrue(media.is_ai_generated)
+        self.assertEqual(set(media.canonical_tags.values_list("name", flat=True)), {"AI", "Heat pumps"})
+        replace_assignments(media, [str(topic.pk)], self.user)
+        self.assertEqual(set(media.canonical_tags.values_list("name", flat=True)), {"AI", "Heat pumps"})
+        version.refresh_from_db()
+        self.assertNotIn("featuredImage", version.data)
+        ai_term = media.canonical_tags.get(name="AI")
+        restore_assignment_snapshot(media, [str(topic.pk), str(ai_term.pk)], self.user)
+        with self.assertRaises(ValidationError):
+            mutate(self.user, ai_term.classification_type, "archive", term=ai_term, revision=ai_term.revision)
+
+        editor = User.objects.create_user(username="ai-image-editor")
+        self.tenant.members.add(editor)
+        role = TenantRole.objects.create(
+            tenant=self.tenant,
+            name="Image editor",
+            permissions=["ai.use", "media.write", "object.read", "object.write"],
+        )
+        role.users.add(editor)
+        self.client.force_authenticate(user=editor)
+        self.assertEqual(self.client.post(url, data, format="json", **headers).status_code, 200)
+        media.access_level = "private"
+        media.save(update_fields=["access_level"])
+        self.assertEqual(self.client.post(url, data, format="json", **headers).status_code, 404)
 
     def test_list_object_types(self):
         """Test listing object types via API"""

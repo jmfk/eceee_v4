@@ -29,6 +29,8 @@ def image_candidate_payload(candidate):
     seconds_left = int((candidate.expires_at - timezone.now()).total_seconds())
     return {
         "id": candidate.id,
+        "saved_media_id": candidate.saved_media_id,
+        "suggested_classification_ids": candidate.suggested_classification_ids,
         "preview_url": (
             checkpoint_storage.generate_signed_url(
                 candidate.file_path, expires=min(300, max(1, seconds_left)), response_cache_control="private, no-store"
@@ -42,17 +44,23 @@ def image_candidate_payload(candidate):
     }
 
 
-def image_candidates_response(request, article):
+def require_article_image_access(request, article):
     if article.object_type.name != "article":
         raise NotFound()
     scopes = permissions_for(request.user, request.tenant)
     if isinstance(request.auth, MachineAPIKey) or not {"ai.use", "object.write"}.issubset(scopes):
         raise PermissionDenied("Generating article images requires object editing and AI access.")
 
+    return scopes
+
+
+def image_candidates_response(request, article):
+    scopes = require_article_image_access(request, article)
     candidates = article.image_candidates.filter(expires_at__gt=timezone.now())
     if request.method in ("GET", "HEAD"):
         return Response(
             {
+                "can_save": "media.write" in scopes,
                 "available": bool(getattr(settings, "OPENAI_API_KEY", None)),
                 "items": [image_candidate_payload(candidate) for candidate in candidates[:20]],
             },
@@ -93,6 +101,9 @@ def image_candidates_response(request, article):
         "article-illustration.png",
     )
     validate_image(upload)
+    from .article_image_media import suggested_media_terms
+
+    suggestions = suggested_media_terms(article, f"{excerpt} {instruction}")
     candidate_id = uuid.uuid4()
     path = f"editorial-image-candidates/{article.tenant_id}/{article.pk}/{candidate_id}.png"
     checkpoint_storage.save_private(path, upload)
@@ -108,6 +119,7 @@ def image_candidates_response(request, article):
                 source_revision=version.edit_revision,
                 file_path=path,
                 expires_at=timezone.now() + timedelta(days=7),
+                suggested_classification_ids=suggestions,
             )
     except Exception:
         checkpoint_storage.delete(path)
@@ -123,8 +135,11 @@ def cleanup_expired_candidates(batch_size=100):
     cutoff = timezone.now()
     expired = ArticleImageCandidate.objects.filter(expires_at__lte=cutoff).order_by("expires_at")
     count = 0
-    for candidate in expired[:batch_size]:
-        checkpoint_storage.delete(candidate.file_path)
-        candidate.delete()
-        count += 1
+    for candidate_id in list(expired.values_list("pk", flat=True)[:batch_size]):
+        with transaction.atomic():
+            candidate = expired.select_for_update().filter(pk=candidate_id).first()
+            if candidate is not None:
+                checkpoint_storage.delete(candidate.file_path)
+                candidate.delete()
+                count += 1
     return count
