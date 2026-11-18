@@ -286,7 +286,10 @@ class Command(BaseCommand):
                 sql.SQL("GRANT SELECT (id, tenant_id) ON content_namespace TO {}").format(sql.Identifier(READ_ROLE))
             )
             for relation, columns in (
-                ("taxonomy_tag", "id, tenant_id, namespace_id, tag_type, parent_id, merged_into_id, status, slug, name"),
+                (
+                    "taxonomy_tag",
+                    "id, tenant_id, namespace_id, tag_type, parent_id, merged_into_id, status, slug, name",
+                ),
                 ("taxonomy_objectversiontag", "object_version_id, tag_id"),
                 (
                     "object_storage_objectversion",
