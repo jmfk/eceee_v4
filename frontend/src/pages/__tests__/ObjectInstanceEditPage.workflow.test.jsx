@@ -6,6 +6,8 @@ import { createAppState } from '../../test/unifiedDataTestUtils'
 import { useUnifiedData } from '../../contexts/unified-data'
 import ObjectInstanceEditPage from '../ObjectInstanceEditPage'
 
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: null }) }))
+
 vi.unmock('react-router-dom')
 
 const mocks = vi.hoisted(() => ({ get: vi.fn(), getType: vi.fn(), save: vi.fn(), workflow: vi.fn(), publish: vi.fn(), state: null }))
