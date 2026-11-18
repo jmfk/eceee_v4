@@ -2,6 +2,9 @@
 
 | ID | Title | Status | Related ADRs |
 | --- | --- | --- | --- |
+| PRD-0064 | [AI-bilder för artiklar och sidor](0064-editorial-ai-images.md) | started | [ADR-0081](../adrs/active/0081-track-generated-image-provenance.md) |
+| PRD-0063 | [AI-stöd för sammanfattningar och redaktionella texter](0063-editorial-ai-from-sources.md) | draft | [ADR-0080](../adrs/active/0080-use-existing-ai-for-editorial-suggestions.md) |
+| PRD-0062 | [Skärmbilder från länkar i artiklar och sidor](0062-screenshots-from-links.md) | draft | [ADR-0079](../adrs/active/0079-store-link-captures-as-media.md) |
 | PRD-0058 | [Sömlös automatisk laddning av publika listor](0058-seamless-public-lists.md) | started | [ADR-0075](../adrs/active/0075-prefetch-public-list-batches.md) |
 | PRD-0057 | [Bildguide och verifiering med hela arkivet](0057-eceee-launch-verification.md) | draft | [ADR-0074](../adrs/active/0074-full-archive-verification.md) |
 | PRD-0056 | [Medlemsåtkomst, externa granskare och integrationer](0056-eceee-access-and-integrations.md) | draft | – |

@@ -429,6 +429,7 @@ class MediaFileListSerializer(serializers.ModelSerializer):
             "title",
             "slug",
             "file_type",
+            "is_ai_generated",
             "content_type",
             "file_size",
             "file_size_human",
@@ -551,6 +552,7 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
             "content_type",
             "file_hash",
             "file_type",
+            "is_ai_generated",
             "width",
             "height",
             "dimensions",
@@ -852,6 +854,8 @@ class MediaSearchSerializer(serializers.Serializer):
         allow_empty=True,
         help_text="Search for tags by text, matching against tag names and slugs",
     )
+
+    image_origin = serializers.ChoiceField(choices=["ai", "not_ai"], required=False)
 
     # Existing fields
     file_type = serializers.ChoiceField(choices=MediaFile.FILE_TYPE_CHOICES, required=False, allow_blank=True)

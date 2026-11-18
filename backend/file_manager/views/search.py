@@ -110,6 +110,9 @@ class MediaSearchView(APIView):
             # Backward compatibility for single file_type
             queryset = queryset.filter(file_type=filters["file_type"])
 
+        if "image_origin" in filters:
+            queryset = queryset.filter(is_ai_generated=filters["image_origin"] == "ai")
+
         # Handle MIME type filtering
         if filters.get("mime_types"):
             queryset = queryset.filter(content_type__in=filters["mime_types"])

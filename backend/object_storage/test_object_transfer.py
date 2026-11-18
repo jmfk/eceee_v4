@@ -402,6 +402,8 @@ class ObjectTransferServiceTests(TestCase):
         for obj_type in (self.root_type, self.child_type):
             obj_type.namespace = None
             obj_type.save(update_fields=["namespace", "updated_at"])
+        self.media.is_ai_generated = True
+        self.media.save(update_fields=["is_ai_generated"])
         source_url = self.media.get_absolute_url()
         source_storage_url = self.media.get_file_url()
         external_url = "https://cdn.example/remote-only.jpg"
@@ -454,6 +456,7 @@ class ObjectTransferServiceTests(TestCase):
             slug=self.root.slug,
         )
         imported_media = MediaFile.objects.get(tenant=destination_tenant)
+        self.assertTrue(imported_media.is_ai_generated)
         self.assertEqual(imported.current_version.data["image"], imported_media.get_absolute_url())
         self.assertEqual(imported.current_version.data["download"], imported_media.get_file_url())
         self.assertEqual(

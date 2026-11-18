@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { X, Hash, Search, Loader2, Tag } from 'lucide-react'
+import { X, Hash, Search, Loader2, Tag, ListFilter } from 'lucide-react'
+import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 import { mediaApi } from '../../api'
 
 const MediaSearchWidget = ({
@@ -9,7 +10,9 @@ const MediaSearchWidget = ({
     namespace,
     placeholder = "Search by title or tags...",
     autoSearch = true, // Auto-trigger search after typing (debounced)
-    autoSearchDelay = 500 // Delay in ms for auto-search (debounce)
+    autoSearchDelay = 500, // Delay in ms for auto-search (debounce)
+    imageOrigin = null,
+    onImageOriginChange
 }) => {
     const getTextSearchValue = useCallback(
         () => searchTerms.find(term => term.type === 'text')?.value || '',
@@ -261,11 +264,20 @@ const MediaSearchWidget = ({
             {!disabled && (
                 <div className="relative">
                     <div className="flex">
-                        <div className="relative flex-1">
+                        <div className="relative flex min-w-0 flex-1 items-center rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-blue-500">
                             {isSearching ? (
                                 <Loader2 className="w-4 h-4 text-blue-500 absolute left-3 top-1/2 transform -translate-y-1/2 animate-spin" />
                             ) : (
                                 <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                            )}
+                            {onImageOriginChange && imageOrigin !== null && (
+                                <button type="button" aria-label="Clear image origin filter" onClick={() => {
+                                    onImageOriginChange(null)
+                                    inputRef.current?.focus()
+                                }}
+                                    className="ml-9 inline-flex shrink-0 items-center gap-1 rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 focus-visible:ring-2 focus-visible:ring-blue-500">
+                                    {imageOrigin ? 'AI' : 'Not AI'} <X size={12} aria-hidden="true" />
+                                </button>
                             )}
                             <input
                                 ref={inputRef}
@@ -273,10 +285,28 @@ const MediaSearchWidget = ({
                                 value={inputValue}
                                 onChange={handleInputChange}
                                 onKeyDown={handleKeyDown}
-                                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+                                className={`min-w-0 flex-1 rounded-lg border-0 bg-transparent ${imageOrigin !== null ? 'pl-2' : 'pl-9'} ${onImageOriginChange ? 'pr-10' : 'pr-3'} py-2 focus:outline-none focus:ring-0 disabled:opacity-50`}
                                 placeholder={isLoading ? "Loading tags..." : isSearching ? "Searching..." : placeholder}
                                 disabled={disabled || isLoading}
                             />
+                            {onImageOriginChange && (
+                                <Menu>
+                                    <MenuButton aria-label="Filter by image origin" className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-2 text-gray-600 hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-blue-500">
+                                        <ListFilter size={16} aria-hidden="true" />
+                                    </MenuButton>
+                                    <MenuItems className="absolute right-0 top-full z-50 mt-1 min-w-36 rounded border border-gray-200 bg-white p-1 text-xs shadow-lg">
+                                        {[[null, 'All'], [true, 'AI'], [false, 'Not AI']].map(([value, label]) => (
+                                            <MenuItem key={label}>
+                                                <button type="button" aria-current={imageOrigin === value ? 'true' : undefined}
+                                                    className="block w-full rounded px-3 py-2 text-left data-[focus]:bg-gray-100"
+                                                    onClick={() => onImageOriginChange(value)}>
+                                                    {label}
+                                                </button>
+                                            </MenuItem>
+                                        ))}
+                                    </MenuItems>
+                                </Menu>
+                            )}
                         </div>
                     </div>
 

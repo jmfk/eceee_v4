@@ -54,6 +54,44 @@ class MediaFileAPITest(APITestCase):
             content_type="image/jpeg",
         )
 
+    def test_search_filters_ai_origin_alongside_text_and_namespace(self):
+        generated = MediaFile.objects.create(
+            title="Test AI Image",
+            slug="test-ai-image",
+            file_type="image",
+            file_path="test/ai-image.png",
+            file_hash="test-ai-image",
+            file_size=1024,
+            content_type="image/png",
+            namespace=self.namespace,
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+            is_ai_generated=True,
+        )
+        search_url = reverse("api:file_manager:media-search")
+        params = {"text_search": "Test", "namespace": self.namespace.slug}
+        for origin, expected in (
+            (None, {self.media_file.id: False, generated.id: True}),
+            ("ai", {generated.id: True}),
+            ("not_ai", {self.media_file.id: False}),
+        ):
+            with self.subTest(origin=origin):
+                filters = params if origin is None else {**params, "image_origin": origin}
+                response = self.client.get(search_url, filters, HTTP_X_TENANT_ID=str(self.tenant.id))
+                self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+                self.assertEqual(
+                    {str(item["id"]): item["is_ai_generated"] for item in response.data["results"]},
+                    {str(key): value for key, value in expected.items()},
+                )
+
+    def test_media_edit_cannot_set_system_ai_origin(self):
+        url = reverse("api:file_manager:mediafile-detail", args=[self.media_file.pk])
+        response = self.client.patch(url, {"is_ai_generated": True}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.media_file.refresh_from_db()
+        self.assertFalse(self.media_file.is_ai_generated)
+
     def test_focal_point_defaults_to_center_and_preserves_other_metadata(self):
         url = reverse("api:file_manager:mediafile-detail", args=[self.media_file.pk])
         self.assertEqual(self.client.get(url).data["focal_point"], {"x": 0.5, "y": 0.5})

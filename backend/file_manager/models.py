@@ -541,6 +541,8 @@ class MediaFile(models.Model):
     width = models.PositiveIntegerField(null=True, blank=True)
     height = models.PositiveIntegerField(null=True, blank=True)
 
+    is_ai_generated = models.BooleanField(default=False, editable=False)
+
     # AI-generated metadata
     ai_generated_tags = models.JSONField(
         default=list,
@@ -1121,6 +1123,7 @@ class MediaFileVersion(models.Model):
     file_size = models.BigIntegerField()
     content_type = models.CharField(max_length=100)
     file_hash = models.CharField(max_length=64)
+    is_ai_generated = models.BooleanField(default=False, editable=False)
     width = models.PositiveIntegerField(null=True, blank=True)
     height = models.PositiveIntegerField(null=True, blank=True)
     uploaded_at = models.DateTimeField()
