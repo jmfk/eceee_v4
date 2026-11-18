@@ -47,11 +47,11 @@ class ProvisionPublisherRolesTests(SimpleTestCase):
         self.assertIn("tenant_id, page_id, widget_id, submitted_at", statements)
         self.assertIn("form_title, data, submitted_at", statements)
         self.assertIn("ALL ROUTINES IN SCHEMA", statements)
-        # Public queries filter deleted objects/types and resolve article kinds by tag slug.
+        # Public queries filter deleted objects/types and read taxonomy slugs and calendar filter labels.
         for table, required_column in (
             ("object_storage_objectinstance", "is_deleted"),
             ("object_storage_objecttypedefinition", "is_deleted"),
-            ("taxonomy_tag", "slug"),
+            ("taxonomy_tag", "slug, name"),
         ):
             grants = [
                 repr(call.args[0])
@@ -244,6 +244,14 @@ class ProvisionPublisherRolesPostgresTests(TestCase):
                 """
             )
             self.assertEqual(cursor.fetchall(), [(False,), (False,)])
+            cursor.execute(
+                """
+                SELECT has_column_privilege('eceee_publisher', 'taxonomy_tag', 'name', 'SELECT'),
+                       has_table_privilege('eceee_publisher', 'taxonomy_tag', 'SELECT'),
+                       has_column_privilege('eceee_publisher_forms', 'taxonomy_tag', 'name', 'SELECT')
+                """
+            )
+            self.assertEqual(cursor.fetchone(), (True, False, False))
             cursor.execute(
                 """
                 SELECT 1
