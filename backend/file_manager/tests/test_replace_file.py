@@ -54,6 +54,8 @@ class MediaFileReplaceFileTests(APITestCase):
     @patch("file_manager.views.media_file.S3MediaStorage.upload_file")
     @patch("file_manager.views.media_file.S3MediaStorage.get_public_url")
     def test_replace_file_creates_previous_version(self, mock_public_url, mock_upload_file):
+        self.media_file.is_ai_generated = True
+        self.media_file.save(update_fields=["is_ai_generated"])
         new_bytes = b"unique-image-bytes"
         new_hash = hashlib.sha256(new_bytes).hexdigest()
 
@@ -79,6 +81,8 @@ class MediaFileReplaceFileTests(APITestCase):
         self.assertIsNone(self.media_file.replaced_by_id)
         previous = self.media_file.image_versions.get()
         self.assertEqual(previous.file_path, "test-namespace/media/original.jpg")
+        self.assertTrue(previous.is_ai_generated)
+        self.assertFalse(self.media_file.is_ai_generated)
         mock_upload_file.assert_called_once()
 
     def test_replace_file_hash_conflict_keeps_separate_identity(self):
@@ -140,6 +144,7 @@ class MediaFileReplaceFileTests(APITestCase):
             file_size=9,
             content_type="image/jpeg",
             file_hash="1" * 64,
+            is_ai_generated=True,
             uploaded_at=timezone.now(),
             superseded_at=timezone.now(),
             uploaded_by=self.user,
@@ -163,6 +168,8 @@ class MediaFileReplaceFileTests(APITestCase):
         self.media_file.refresh_from_db()
         self.assertEqual(self.media_file.version_number, 3)
         self.assertEqual(self.media_file.file_path, "test-namespace/media/restored.jpg")
+        self.assertTrue(self.media_file.is_ai_generated)
+        self.assertFalse(self.media_file.image_versions.get(version_number=2).is_ai_generated)
         self.assertEqual(self.media_file.image_versions.count(), 2)
         mock_upload.assert_called_once()
 

@@ -39,7 +39,7 @@ def _resolve_replaced_media_file(media_file: MediaFile, max_hops: int = 10) -> M
     return current
 
 
-def _store_image_version(media_file, uploaded_file, user):
+def _store_image_version(media_file, uploaded_file, user, *, is_ai_generated=False):
     """Upload first, then atomically move the logical image to the new object."""
     s3_storage = S3MediaStorage()
     folder_path = media_file.file_path.rsplit("/", 1)[0] if "/" in media_file.file_path else "uploads"
@@ -56,6 +56,7 @@ def _store_image_version(media_file, uploaded_file, user):
                 file_size=media_file.file_size,
                 content_type=media_file.content_type,
                 file_hash=media_file.file_hash,
+                is_ai_generated=media_file.is_ai_generated,
                 width=media_file.width,
                 height=media_file.height,
                 uploaded_at=media_file.version_uploaded_at or media_file.created_at,
@@ -67,6 +68,7 @@ def _store_image_version(media_file, uploaded_file, user):
             media_file.file_size = upload_result["file_size"]
             media_file.content_type = upload_result["content_type"]
             media_file.file_hash = upload_result["file_hash"]
+            media_file.is_ai_generated = is_ai_generated
             media_file.width = upload_result.get("width")
             media_file.height = upload_result.get("height")
             media_file.original_filename = uploaded_file.name
@@ -203,7 +205,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
                 return Response({"error": "Image version no longer exists"}, status=status.HTTP_404_NOT_FOUND)
             with S3MediaStorage()._open(version.file_path) as source:
                 upload = SimpleUploadedFile(version.original_filename, source.read(), content_type=version.content_type)
-            media_file = _store_image_version(media_file, upload, request.user)
+            media_file = _store_image_version(media_file, upload, request.user, is_ai_generated=version.is_ai_generated)
         return Response(self.get_serializer(media_file).data)
 
     @action(detail=True, methods=["post"])

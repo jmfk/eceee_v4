@@ -78,7 +78,8 @@ const MediaBrowser = ({
         fileType: '',
         tags: prefilterTags,
         collections: [],
-        showDeleted: false
+        showDeleted: false,
+        imageOrigin: null
     });
     const [pagination, setPagination] = useState({
         page: 1,
@@ -124,12 +125,13 @@ const MediaBrowser = ({
     const paginationRef = useRef(pagination);
     paginationRef.current = pagination;
 
-    // Memoize filters and fileTypes to prevent unnecessary re-renders
-    const memoizedFilters = useMemo(() => filters, [filters.fileType, filters.tags, filters.collections, filters.showDeleted]);
     const memoizedFileTypes = useMemo(() => fileTypes, [fileTypes]);
 
+    const latestFileRequest = useRef(0);
+
     // Load files
-    const loadFiles = useCallback(async (resetPage = false, customPage = null, customPageSize = null) => {
+    const queryFiles = useCallback(async (resetPage = false, customPage = null, customPageSize = null) => {
+        const request = ++latestFileRequest.current;
         setLoading(true);
 
         try {
@@ -144,9 +146,10 @@ const MediaBrowser = ({
                 page: currentPage,
                 pageSize: currentPageSize,
                 namespace: namespace,
-                show_deleted: memoizedFilters.showDeleted,
-                deleted_only: memoizedFilters.showDeleted,
+                show_deleted: filters.showDeleted,
+                deleted_only: filters.showDeleted,
                 ...(requireTags ? { has_tags: true } : {}),
+                ...(filters.imageOrigin === null ? {} : { image_origin: filters.imageOrigin ? 'ai' : 'not_ai' }),
             };
 
             // Add text search (only one allowed)
@@ -160,25 +163,26 @@ const MediaBrowser = ({
             }
 
             // Apply file type filter from dropdown if specified
-            if (memoizedFilters.fileType) {
-                params.file_type = memoizedFilters.fileType;
+            if (filters.fileType) {
+                params.file_type = filters.fileType;
             }
 
             // Apply file type filter from prop if specified (and no dropdown filter)
-            if (!memoizedFilters.fileType && memoizedFileTypes.length > 0) {
+            if (!filters.fileType && memoizedFileTypes.length > 0) {
                 params.file_type = memoizedFileTypes[0]; // Simple implementation
             }
 
             // Apply tag and collection filters
-            if (memoizedFilters.tags && memoizedFilters.tags.length > 0) {
-                params.tags = memoizedFilters.tags;
+            if (filters.tags && filters.tags.length > 0) {
+                params.tags = filters.tags;
             }
 
-            if (memoizedFilters.collections && memoizedFilters.collections.length > 0) {
-                params.collections = memoizedFilters.collections;
+            if (filters.collections && filters.collections.length > 0) {
+                params.collections = filters.collections;
             }
 
             const result = await mediaApi.search.search(params);
+            if (request !== latestFileRequest.current) return;
 
             // Handle direct API response
             setFiles(result.results || []);
@@ -189,21 +193,28 @@ const MediaBrowser = ({
                 count: result.count || 0
             });
         } catch (error) {
+            if (request !== latestFileRequest.current) return;
             console.error('Error loading files:', error);
             addNotification('Failed to load media files', 'error');
             setFiles([]);
         } finally {
-            setLoading(false);
-            if (onFilesLoaded) onFilesLoaded();
+            if (request === latestFileRequest.current) {
+                setLoading(false);
+                if (onFilesLoaded) onFilesLoaded();
+            }
         }
-    }, [searchTerms, memoizedFilters, namespace, memoizedFileTypes, requireTags, addNotification]);
+    }, [searchTerms, filters, namespace, memoizedFileTypes, requireTags, addNotification]);
+
+    const queryFilesRef = useRef(queryFiles);
+    queryFilesRef.current = queryFiles;
+    const loadFiles = useCallback((...options) => queryFilesRef.current(...options), []);
 
     // Load files on mount and when dependencies change
     useEffect(() => {
         if (namespace) {
             loadFiles(true);
         }
-    }, [namespace, searchTerms, memoizedFilters]);
+    }, [namespace, searchTerms, filters]);
 
     // Reload files when refreshTrigger changes (from external source like file approval)
     useEffect(() => {
@@ -1024,6 +1035,8 @@ const MediaBrowser = ({
                             placeholder="Search media files..."
                             autoSearch={true}
                             autoSearchDelay={500}
+                            imageOrigin={filters.imageOrigin}
+                            onImageOriginChange={previewOpensEditor ? value => handleFilterChange('imageOrigin', value) : undefined}
                         />
                     </div>
 
