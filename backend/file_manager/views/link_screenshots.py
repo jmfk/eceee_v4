@@ -96,7 +96,10 @@ class LinkScreenshotView(APIView):
             "sha256": hashlib.sha256(contents).hexdigest(),
         }
         return Response(
-            {"image": base64.b64encode(contents).decode("ascii"), "token": signing.dumps(claim, salt=SALT, compress=True)},
+            {
+                "image": base64.b64encode(contents).decode("ascii"),
+                "token": signing.dumps(claim, salt=SALT, compress=True),
+            },
             headers={"Cache-Control": "private, no-store"},
         )
 
