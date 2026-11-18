@@ -173,3 +173,10 @@ def import_remote_object_package(self, job_id):
             job.mark_failed(exc)
         logger.error("Remote object import %s failed: %s", job_id, exc)
         raise
+
+
+@shared_task
+def cleanup_expired_article_images():
+    from object_storage.services.article_image_candidates import cleanup_expired_candidates
+
+    return cleanup_expired_candidates()

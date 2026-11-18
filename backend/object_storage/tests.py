@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 """
 Tests for Object Storage System
 """
@@ -277,6 +279,47 @@ class ObjectStorageAPITest(APITestCase):
         )
         self.tenant = Tenant.objects.create(name="Test Tenant API", identifier="test-tenant-api", created_by=self.user)
         self.client.force_authenticate(user=self.user)
+
+    @patch("object_storage.services.article_image_candidates.checkpoint_storage")
+    @patch("object_storage.services.article_image_candidates.validate_image")
+    @patch("object_storage.services.article_image_candidates.generate_image")
+    def test_article_image_candidates_are_private_scoped_and_retained(self, generate, validate, storage):
+        object_type = ObjectTypeDefinition.objects.create(
+            name="article", label="Article", plural_label="Articles", created_by=self.user
+        )
+        article = ObjectInstance.objects.create(
+            object_type=object_type, title="Efficiency news", tenant=self.tenant, created_by=self.user
+        )
+        version = article.versions.create(
+            version_number=1,
+            title="Efficiency news",
+            widgets={"main": [{"type": "easy_widgets.ContentWidget", "config": {"content": "<p>Heat pumps</p>"}}]},
+            created_by=self.user,
+        )
+        storage.generate_signed_url.return_value = "https://example.test/private-preview"
+        generate.return_value = object()
+        url = reverse("api:object_storage:objectinstance-image-candidates", args=[article.pk])
+        headers = {"HTTP_X_TENANT_ID": str(self.tenant.id)}
+
+        for _ in range(2):
+            response = self.client.post(url, {"prompt": "Watercolor"}, format="json", **headers)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+            self.assertEqual(response.data["source_version_id"], version.pk)
+            self.assertEqual(response["Cache-Control"], "private, no-store")
+        self.assertIn("Heat pumps", generate.call_args.args[0])
+        self.assertIn("Watercolor", generate.call_args.args[0])
+        self.assertEqual(storage.save_private.call_count, 2)
+        self.assertNotEqual(storage.save_private.call_args_list[0].args[0], storage.save_private.call_args.args[0])
+
+        response = self.client.get(url, **headers)
+        self.assertEqual(len(response.data["items"]), 2)
+        self.assertEqual(self.client.head(url, **headers).status_code, status.HTTP_200_OK)
+        self.assertEqual(generate.call_count, 2)
+        outsider = User.objects.create_user(username="image-outsider")
+        self.client.force_authenticate(user=outsider)
+        self.assertIn(
+            self.client.get(url, **headers).status_code, (status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND)
+        )
 
     def test_list_object_types(self):
         """Test listing object types via API"""

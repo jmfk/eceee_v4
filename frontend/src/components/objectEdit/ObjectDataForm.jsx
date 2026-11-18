@@ -5,6 +5,8 @@ import { namespacesApi } from '../../api'
 import { objectTypesApi } from '../../api/objectStorage'
 import ObjectSchemaForm from '../ObjectSchemaForm'
 import EditorAccordion from './EditorAccordion'
+import ArticleImageCandidates from './ArticleImageCandidates'
+import { useAuth } from '../../contexts/AuthContext'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
@@ -25,6 +27,7 @@ const ObjectDataForm = forwardRef(({
     context
 }, ref) => {
     const [namespace, setNamespace] = useState(null)
+    const { user } = useAuth()
 
     // ODC Integration
     const { useExternalChanges, publishUpdate, getState, setIsDirty: setUDCDirty } = useUnifiedData()
@@ -423,6 +426,12 @@ const ObjectDataForm = forwardRef(({
             )}
             </div>
             </EditorAccordion>
+            {!isThemePreview && instance?.id && objectType?.name === 'article'
+                && (user?.isSuperuser || (user?.permissions?.includes('ai.use') && user.permissions.includes('object.write'))) && (
+                <EditorAccordion title="AI images">
+                    <ArticleImageCandidates key={instance.id} articleId={String(instance.id)} />
+                </EditorAccordion>
+            )}
             {editorGroups.map(group => {
                 const fields = schemaFields.filter(field => group.fields.includes(field.name))
                 return fields.length > 0 && <EditorAccordion key={group.id} title={group.label}>

@@ -524,7 +524,9 @@ class S3MediaStorage(Storage):
         """
         return self.url(name)
 
-    def generate_signed_url(self, name: str, expires: int = 3600, response_filename: str = None) -> str:
+    def generate_signed_url(
+        self, name: str, expires: int = 3600, response_filename: str = None, *, response_cache_control: str = None
+    ) -> str:
         """
         Generate a pre-signed URL for a file.
 
@@ -532,12 +534,15 @@ class S3MediaStorage(Storage):
             name: File name or path
             expires: URL expiration time in seconds
             response_filename: Optional filename to suggest through Content-Disposition
+            response_cache_control: Optional Cache-Control override for the signed response
 
         Returns:
             Pre-signed URL
         """
         key = self._get_key(name)
         params = {"Bucket": self.bucket_name, "Key": key}
+        if response_cache_control:
+            params["ResponseCacheControl"] = response_cache_control
         if response_filename:
             params["ResponseContentDisposition"] = f'attachment; filename="{response_filename}"'
         try:

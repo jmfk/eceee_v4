@@ -26,3 +26,8 @@ Redaktören kan prova om utan att fylla Media Manager med varianter. AI-ursprung
 
 - [PRD-0064](../../prds/0064-editorial-ai-images.md)
 - [ADR-0080 – Använd befintliga AI-kopplingar för redaktionella förslag](0080-use-existing-ai-for-editorial-suggestions.md)
+
+
+## Godkänd avgränsning för artikelpiloten
+
+Piloten återanvänder den befintliga miljökonfigurerade bildkopplingen efter uttryckligt godkännande. Generering förutsätter AI- och objektbehörighet i artikelns arbetsyta. En framtida arbetsytespecifik koppling följer ADR-0030. Osparade artikelvarianter är tillgängliga i sju dagar och visas med utgångsdatum.

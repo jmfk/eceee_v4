@@ -41,3 +41,5 @@ Fastställ giltighetstiden för osparade varianter och vilka befintliga AI-koppl
 
 Första ändringen inför registrerat AI-ursprung och filtret i Media Manager. Bildgenerering, temporära varianter och automatisk märkning följer därefter.
 AI-ursprung följer bildens version och förs vidare när paketimport skapar ett nytt mediaobjekt. Vid återanvändning av en redan befintlig fil med samma innehåll gäller mottagarens befintliga klassning.
+
+Artikelpiloten kan generera och jämföra privata varianter från sparat utkast. Sparning i Media Manager, märkning, infogning och stöd för sidor följer separat.
