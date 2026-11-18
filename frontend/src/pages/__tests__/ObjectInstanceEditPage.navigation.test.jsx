@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
     getState: vi.fn(), publishUpdate: vi.fn(), setIsDirty: vi.fn(), notify: vi.fn(),
     widgetEditorOpen: false,
 }))
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: null }) }))
+
 vi.mock('react-router-dom', async () => ({ ...await vi.importActual('react-router-dom'), useNavigate: () => mocks.navigate }))
 vi.mock('../../api/objectStorage', () => ({
     objectInstancesApi: { get: mocks.get, getPathToRoot: mocks.getPathToRoot, saveWorkingCopy: mocks.saveWorkingCopy },
