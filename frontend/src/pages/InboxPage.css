@@ -1,6 +1,94 @@
 .support-container {
     width: 100%;
 }
+
+/* Instruction browse view: a quiet list with recognizable private video frames. */
+.instruction-library .instruction-search-wrap { margin: 1.25rem 0 0.75rem; }
+.instruction-library .instruction-search {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+    min-height: 42px; padding: 5px 12px; position: relative;
+    border: 1px solid var(--color-gray-300, #d1d5db); border-radius: 4px; background: white;
+    color: var(--color-gray-500, #6b7280);
+}
+.instruction-library .instruction-search:focus-within { border-color: var(--color-primary-500, #3b82f6); }
+.instruction-library .instruction-search-input { flex: 1; min-width: 120px; position: relative; }
+.support-content .instruction-library .instruction-search .instruction-search-input input[type='search'] {
+    width: 100%; min-height: 30px; margin: 0; padding: 4px 0;
+    border: 0; border-radius: 0; background: transparent; box-shadow: none; outline: none; font-size: 12px;
+}
+.instruction-search-input input::-webkit-search-cancel-button { appearance: none; }
+.support-content .instruction-search-input label {
+    position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+    margin: 0; padding: 0 3px; background: white; color: var(--color-gray-500, #6b7280);
+    font-size: 12px; font-weight: 400; pointer-events: none;
+    transition: top 140ms ease, font-size 140ms ease;
+}
+.instruction-search:has(input:focus) .instruction-search-input label,
+.instruction-search.is-filled .instruction-search-input label { top: -6px; font-size: 10px; }
+.instruction-search .instruction-search-icon {
+    display: grid; place-items: center; min-width: 28px; min-height: 28px; padding: 5px;
+    border: 0; border-radius: 3px; background: transparent; color: var(--color-gray-600, #4b5563);
+}
+.instruction-search .instruction-search-icon:focus-visible {
+    outline: none;
+    background: var(--color-primary-50, #eff6ff);
+    color: var(--color-primary-700, #1d4ed8);
+    box-shadow: inset 0 0 0 1px var(--color-primary-500, #3b82f6);
+}
+.instruction-search .instruction-search-icon:hover,
+.instruction-search .instruction-search-icon:focus-visible { background: var(--color-gray-100, #f3f4f6); }
+.instruction-filter { position: relative; }
+.instruction-search .instruction-filter-pill {
+    display: inline-flex; align-items: center; gap: 6px; min-height: 26px; max-width: 100%;
+    padding: 3px 7px; border: 0; border-radius: 3px; background: var(--color-gray-100, #f3f4f6);
+    color: var(--color-gray-700, #374151); font-size: 12px;
+}
+.instruction-filter-menu {
+    position: absolute; right: -12px; top: calc(100% + 12px); z-index: 20;
+    width: max-content; max-width: calc(100vw - 64px); padding: 12px;
+    border: 1px solid var(--color-gray-200, #e5e7eb); border-radius: 4px; background: white;
+    box-shadow: 0 6px 18px rgb(0 0 0 / 0.1);
+}
+.support-content .instruction-filter-menu label { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 12px; }
+.instruction-results article + article { border-top: 1px solid var(--color-gray-200, #e5e7eb); }
+.instruction-results .instruction-row {
+    display: flex; align-items: flex-start; gap: 20px; padding: 20px 0;
+    color: var(--color-gray-900, #111827); text-decoration: none;
+}
+.instruction-results .instruction-row:hover { color: var(--color-gray-900, #111827); text-decoration: none; }
+.instruction-row:hover h3 { text-decoration: underline; }
+.instruction-copy { flex: 1; min-width: 0; }
+.instruction-copy h3 { margin: 0; font-size: 15px; overflow-wrap: anywhere; color: var(--color-primary-600, #2563eb); }
+.support-content .instruction-description {
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
+    margin: 6px 0 8px; color: var(--color-gray-700, #374151); font-size: 13px;
+}
+.support-content .instruction-meta { margin: 0; font-size: 12px; color: var(--color-gray-500, #6b7280); }
+.instruction-thumbnail {
+    position: relative; display: grid; place-items: center; flex: 0 0 180px;
+    width: 180px; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 4px;
+    background: var(--color-gray-100, #f3f4f6); color: var(--color-gray-400, #9ca3af);
+}
+.support-content .instruction-thumbnail video {
+    position: absolute; inset: 0; width: 100%; height: 100%; max-height: none;
+    margin: 0; border-radius: 0; object-fit: cover; opacity: 0;
+}
+.support-content .instruction-thumbnail video.is-ready { opacity: 1; }
+.instruction-thumbnail-play {
+    position: absolute; display: grid; place-items: center; width: 34px; height: 34px;
+    border-radius: 50%; color: white; background: rgb(17 24 39 / 0.7);
+}
+@media (max-width: 640px) {
+    .instruction-library .instruction-search-input { min-width: 0; }
+    .instruction-library .instruction-search:has(.instruction-filter-pill) { padding-bottom: 38px; }
+    .instruction-search .instruction-filter-pill { position: absolute; left: 36px; bottom: 6px; }
+    .instruction-results .instruction-row { gap: 12px; padding-block: 16px; }
+    .instruction-thumbnail { flex-basis: 104px; width: 104px; }
+    .instruction-copy h3 { font-size: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .support-content .instruction-search-input label { transition: none; }
+}
 .support-workspace {
     margin-top: 0.5rem;
     color: var(--color-gray-500, #6b7280);
