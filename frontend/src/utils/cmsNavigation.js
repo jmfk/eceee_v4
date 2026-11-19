@@ -1,5 +1,6 @@
 // Mirror API capabilities for navigation; backend authorization remains authoritative.
 const routes = [
+    ['/settings/modules', ['tenant.admin']],
     ['/pages/new', ['page.write']], ['/pages', ['page.read']],
     ['/objects', ['object.read']], ['/media', ['media.read']],
     ['/trash', ['page.read', 'media.read', 'object.read', 'settings.read']],

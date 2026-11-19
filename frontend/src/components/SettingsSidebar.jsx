@@ -120,6 +120,7 @@ export default function SettingsSidebar({ onNavigate }) {
     }
 
     const navigation = [
+        { id: 'modules', label: 'Service modules', icon: Package, href: '/settings/modules' },
         {
             id: 'dashboard',
             label: 'Dashboard',

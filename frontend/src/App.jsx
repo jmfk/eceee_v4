@@ -31,6 +31,7 @@ import MediaManagerPage from '@pages/MediaManagerPage'
 import TrashPage from '@pages/TrashPage'
 import KanbanPage from './pages/KanbanPage'
 import TagsPage from '@pages/TagsPage'
+import ModulesPage from '@pages/ModulesPage'
 import ProfilePage from '@pages/ProfilePage'
 import UserManagementPage from '@pages/UserManagementPage'
 import TenantManagementPage from '@pages/TenantManagementPage'
@@ -306,6 +307,7 @@ export const AppRoutes = () => {
         } />
         <Route path="/settings/tenants" element={<PrivateRoute><SettingsLayout><TenantManagementPage /></SettingsLayout></PrivateRoute>} />
         <Route path="/settings/roles" element={<PrivateRoute><SettingsLayout><RoleSettings /></SettingsLayout></PrivateRoute>} />
+        <Route path="/settings/modules" element={<PrivateRoute><SettingsLayout><ModulesPage /></SettingsLayout></PrivateRoute>} />
         <Route path="/settings/support" element={<PrivateRoute><SettingsLayout><SupportSettingsPage /></SettingsLayout></PrivateRoute>} />
         {/* Settings dashboard */}
         <Route path="/settings" element={

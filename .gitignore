@@ -119,3 +119,7 @@ themes
 
 # Workspace-only operator and legacy-source credentials
 /backend/.env.*
+
+# Dedicated publisher module credentials
+/.env.modules
+/deploy/.env.modules

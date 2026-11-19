@@ -110,6 +110,10 @@ services:
       target: development
     image: ${PUBLISHER_IMAGE:-eceee-v4-publisher}:development
     restart: "no"
+    # Dedicated module credentials only; never load the general backend env.
+    env_file:
+      - path: .env.modules
+        required: false
     environment:
       - PUBLISHER_DATABASE_URL=${DATABASE_URL:?Run make configure-local-infra}
       - PUBLISHER_FORM_DATABASE_URL=${PUBLISHER_FORM_DATABASE_URL:-}

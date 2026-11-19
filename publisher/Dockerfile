@@ -35,6 +35,8 @@ WORKDIR /app/publisher
 COPY --from=build --chown=node:node /app/publisher/package*.json ./
 COPY --from=build --chown=node:node /app/publisher/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/publisher/.next ./.next
+COPY --from=build --chown=node:node /app/publisher/scripts/migrate-modules.mjs ./scripts/migrate-modules.mjs
+COPY --from=build --chown=node:node /app/publisher/migrations ./migrations
 
 USER node
 EXPOSE 3000
