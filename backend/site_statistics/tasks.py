@@ -2,7 +2,7 @@ import logging
 from datetime import timedelta
 
 from celery import shared_task
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
@@ -56,7 +56,10 @@ def aggregate_daily_stats():
         page_events = (
             EventRaw.objects.filter(tenant=tenant, event_time__date=yesterday, event_type="pageview")
             .values("url")
-            .annotate(pageviews=Count("id"), unique_visitors=Count("user_id", distinct=True))
+            .annotate(
+                pageviews=Count("id"),
+                unique_visitors=Count("user_id", distinct=True, filter=~Q(user_id__in=["", "anonymous"])),
+            )
         )
 
         for entry in page_events:

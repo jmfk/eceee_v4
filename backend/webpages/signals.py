@@ -8,7 +8,7 @@ from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 
 from .inheritance_cache import InheritanceTreeCache
-from .models import PageVersion, WebPage
+from .models import PagePathAlias, PageVersion, WebPage
 
 
 @receiver(post_save, sender=WebPage)
@@ -43,6 +43,21 @@ def invalidate_page_tree_on_save(sender, instance, created, **kwargs):
             old_root_hostnames is not None and old_root_hostnames != instance.cached_root_hostnames,
         )
     )
+    if (
+        not created
+        and old_path
+        and old_path != instance.cached_path
+        and old_path.startswith("/")
+        and not old_path.startswith("//")
+        and old_root_id
+        and getattr(instance, "_old_was_published", False)
+        and (kwargs.get("update_fields") is None or "cached_path" in kwargs["update_fields"])
+    ):
+        PagePathAlias.objects.update_or_create(
+            root_id=old_root_id,
+            path=old_path,
+            defaults={"tenant_id": instance.tenant_id, "page": instance},
+        )
     if cache_changed:
         for child in instance.children.all():
             child.save(update_fields=["cached_path", "cached_root_id", "cached_root_hostnames"])
@@ -77,6 +92,23 @@ def track_parent_changes(sender, instance, **kwargs):
         else:
             slug_part = (instance.slug or "").strip("/")
             instance.cached_path = f"/{slug_part}/"
+
+    prior_publication = instance.__dict__.pop("_path_public_before_publish", None)
+    instance._old_was_published = prior_publication is True
+    if (
+        prior_publication is None
+        and getattr(instance, "_old_cached_path", None)
+        and instance._old_cached_path != instance.cached_path
+    ):
+        from django.db.models import Q
+        from django.utils import timezone
+
+        now = timezone.now()
+        instance._old_was_published = (
+            instance.versions.filter(effective_date__lte=now)
+            .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+            .exists()
+        )
 
     # Calculate and update cached root information
     root_page = (

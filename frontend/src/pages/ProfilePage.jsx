@@ -1,3 +1,4 @@
+import AccountPrivacyPanel from '../components/AccountPrivacyPanel';
 import AccountSecurityPanel from '../components/auth/AccountSecurityPanel';
 import ProfilePhotoEditor from '../components/ProfilePhotoEditor';
 import { useEffect, useState } from 'react';
@@ -196,6 +197,7 @@ const ProfilePage = () => {
                 </div>
             </section>
             <AccountSecurityPanel />
+            <AccountPrivacyPanel tenant={tenant} supportAvailable={Boolean(support.data?.supportAvailable)} />
             {/* User Information */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
                 <div className="text-xl font-semibold text-gray-900 mb-4" role="heading" aria-level="2">{t('Account Information')}</div>

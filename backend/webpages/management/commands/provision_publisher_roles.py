@@ -263,9 +263,9 @@ class Command(BaseCommand):
                 cursor.execute(sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(sql.Identifier(role)))
 
             cursor.execute(
-                sql.SQL("GRANT SELECT ON webpages_webpage, webpages_pageversion, webpages_pagetheme TO {}").format(
-                    sql.Identifier(READ_ROLE)
-                )
+                sql.SQL(
+                    "GRANT SELECT ON webpages_webpage, webpages_pageversion, webpages_pagetheme, webpages_pagepathalias TO {}"
+                ).format(sql.Identifier(READ_ROLE))
             )
             cursor.execute(
                 sql.SQL("GRANT SELECT (id, is_active) ON core_tenant TO {}").format(sql.Identifier(READ_ROLE))

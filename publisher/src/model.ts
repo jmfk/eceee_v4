@@ -30,6 +30,7 @@ export interface Page {
 export interface Version {
   id: DbId;
   page_id: DbId;
+  page_data?: Record<string, unknown>;
   meta_title: string;
   meta_description: string;
   code_layout: string;
@@ -118,6 +119,13 @@ export interface EventCalendarOption {
 
 export interface PublishedObjectQuery {
   eventCalendar?: { eventType?: string; eventCategory?: string };
+  search?: string;
+  archiveTypeNames?: string[];
+  routePageId?: DbId;
+  routeDetailWinner?: boolean;
+  dateFrom?: string;
+  dateTo?: string;
+  dateField?: 'publication' | 'event';
   authorId?: DbId;
   eventGroup?: 'all' | 'eceee' | 'other';
   relatedTagIds?: string[];
@@ -160,7 +168,19 @@ export interface PublicMediaItem {
   displayHeight?: number;
 }
 
+export interface SitePage {
+  id: DbId;
+  path: string;
+  title: string;
+  description: string;
+  pathPattern: string;
+  pageData: Record<string, unknown>;
+  updatedAt: string;
+}
+
 export interface PageReader {
+  sitePages?(rootId: DbId, tenantId: DbId, at: Date): Promise<SitePage[]>;
+  pageAlias?(rootId: DbId, tenantId: DbId, path: string, at: Date): Promise<string | null>;
   root(hostname: string): Promise<Page | null>;
   child(parentId: DbId, tenantId: DbId, slug: string): Promise<Page | null>;
   version(pageId: DbId, at: Date): Promise<Version | null>;

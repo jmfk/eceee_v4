@@ -58,6 +58,10 @@ def validate_page_data_for_version(version, value, *, code_layout=None, warnings
     if not isinstance(value, dict):
         raise serializers.ValidationError("Page data must be a dictionary")
 
+    if "website" in value:
+        from webpages.website_settings import validate_website_settings
+
+        validate_website_settings(value["website"])
     validate_reserved_page_attributes(version, value)
     forbidden = {
         "meta_title",

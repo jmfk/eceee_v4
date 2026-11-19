@@ -31,6 +31,7 @@ import MediaManagerPage from '@pages/MediaManagerPage'
 import TrashPage from '@pages/TrashPage'
 import KanbanPage from './pages/KanbanPage'
 import TagsPage from '@pages/TagsPage'
+import SubmissionsPage from '@pages/SubmissionsPage'
 import ProfilePage from '@pages/ProfilePage'
 import UserManagementPage from '@pages/UserManagementPage'
 import TenantManagementPage from '@pages/TenantManagementPage'
@@ -283,6 +284,7 @@ export const AppRoutes = () => {
             </div>
           </PrivateRoute>
         } />
+        <Route path="/submissions" element={<PrivateRoute><div className="fixed inset-0 bg-gray-50 flex flex-col"><SubmissionsPage /><StatusBar customStatusContent={<span>Editorial submissions</span>} /></div></PrivateRoute>} />
         <Route path="/profile" element={
           <PrivateRoute>
             <div className="fixed inset-0 bg-gray-50 flex flex-col">

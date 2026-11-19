@@ -94,6 +94,7 @@ from .views.site_package_views import (
     SitePackageImportDetailView,
     SitePackageImportListView,
 )
+from .views.submission_views import SubmissionView
 from .views.theme_css_views import ThemeCSSView
 from .views.theme_sync_views import ThemeSyncViewSet
 from .views.widget_quick_reference_views import widget_quick_reference_detail, widget_quick_reference_list
@@ -156,6 +157,8 @@ widget_type_patterns = [
 
 # API URLs without app_name to avoid namespace conflicts when included in main API
 urlpatterns = [
+    path("pages/submissions/", SubmissionView.as_view(), name="public-submissions"),
+    path("pages/submissions/<uuid:pk>/", SubmissionView.as_view(), name="public-submission-review"),
     path("remote-sites/access-keys/", RemoteAccessKeysView.as_view(), name="remote-access-keys"),
     path(
         "remote-sites/access-keys/<uuid:access_key_id>/rotate/",

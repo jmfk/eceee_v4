@@ -1,7 +1,7 @@
 import { useAuth } from '../contexts/AuthContext'
 import { canAccessCmsPath } from '../utils/cmsNavigation'
 import { Link, useLocation } from 'react-router-dom'
-import { ArrowLeft, User, Inbox, Columns3, Flag, LogOut } from 'lucide-react'
+import { ArrowLeft, User, Inbox, Columns3, Flag, LogOut, FileCheck } from 'lucide-react'
 import { safeReportLocation } from '../api/support'
 import { useSupportContext } from './support/useSupportContext'
 import './user-tools.css'
@@ -19,6 +19,7 @@ export default function UserToolsNav({ tenant, unreadCount = 0 }) {
         (support.data?.canManage ? scopedSettingsPath : support.data?.canSupport
             ? `/settings/support${tenant ? `?tenant=${encodeURIComponent(tenant)}` : ''}` : undefined)
     const links = [
+        { title: 'Submissions', href: '/submissions', icon: FileCheck, active: location.pathname.startsWith('/submissions'), requiresWorkspaceAccess: true },
         { title: `Inbox${unreadCount ? ` (${unreadCount})` : ''}`, href: tenant ? `/inbox?tenant=${encodeURIComponent(tenant)}` : '/inbox', icon: Inbox, active: location.pathname.startsWith('/inbox') && !location.pathname.startsWith('/inbox/new'), requiresWorkspaceAccess: true },
         { title: 'Kanban', href: '/kanban', icon: Columns3, active: location.pathname.startsWith('/kanban') },
         { title: 'Profile', href: '/profile', icon: User, active: location.pathname === '/profile' },

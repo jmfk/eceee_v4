@@ -51,3 +51,5 @@ __all__ = [
     "ThemeRemoteConnection",
     "RemoteSiteBinding",
 ]
+
+from .page_path_alias import PagePathAlias

@@ -21,24 +21,27 @@
         <div class="form-fields">
             {% for field in config.fields %}
                 <div class="form-field" data-field-type="{{ field.type }}">
-                    <label for="field_{{ forloop.counter }}" class="field-label">
+                    <label id="label_{{ forloop.counter }}" for="field_{{ forloop.counter }}" class="field-label">
                         {{ field.label }}
                         {% if field.required %}
                             <span class="required-indicator" aria-label="Required">*</span>
                         {% endif %}
                     </label>
                     
+                    {% if field.help_text %}<div class="form-help" id="help_{{ forloop.counter }}">{{ field.help_text }}</div>{% endif %}
                     {% if field.type == 'text' or field.type == 'email' or field.type == 'phone' %}
                         <input type="{{ field.type }}" 
                                id="field_{{ forloop.counter }}" 
-                               name="{{ field.name }}" 
+                               name="{{ field.name }}"
+                               {% if field.help_text %}aria-describedby="help_{{ forloop.counter }}"{% endif %}
                                placeholder="{{ field.placeholder|default:'' }}"
                                {% if field.required %}required{% endif %}
                                class="form-input">
                     
                     {% elif field.type == 'textarea' %}
                         <textarea id="field_{{ forloop.counter }}" 
-                                  name="{{ field.name }}" 
+                                  name="{{ field.name }}"
+                               {% if field.help_text %}aria-describedby="help_{{ forloop.counter }}"{% endif %}
                                   placeholder="{{ field.placeholder|default:'' }}"
                                   {% if field.required %}required{% endif %}
                                   class="form-textarea" 
@@ -46,7 +49,8 @@
                     
                     {% elif field.type == 'select' %}
                         <select id="field_{{ forloop.counter }}" 
-                                name="{{ field.name }}" 
+                                name="{{ field.name }}"
+                               {% if field.help_text %}aria-describedby="help_{{ forloop.counter }}"{% endif %}
                                 {% if field.required %}required{% endif %}
                                 class="form-select">
                             <option value="">Please select...</option>
@@ -56,7 +60,7 @@
                         </select>
                     
                     {% elif field.type == 'checkbox' %}
-                        <div class="checkbox-options">
+                        <div class="checkbox-options" role="group" aria-labelledby="label_{{ forloop.counter }}">
                             {% for option in field.options %}
                                 <label class="checkbox-label">
                                     <input type="checkbox" 
@@ -69,7 +73,7 @@
                         </div>
                     
                     {% elif field.type == 'radio' %}
-                        <div class="radio-options">
+                        <div class="radio-options" role="group" aria-labelledby="label_{{ forloop.counter }}">
                             {% for option in field.options %}
                                 <label class="radio-label">
                                     <input type="radio" 
@@ -96,7 +100,7 @@
         </div>
     </form>
     
-    <div class="form-success-message" id="success-message" style="display: none;">
+    <div class="form-success-message" role="status" id="success-message" style="display: none;">
         <div class="success-content">
             <i class="icon-success" aria-hidden="true"></i>
             <span>{{ config.success_message|default:"Thank you for your submission!" }}</span>

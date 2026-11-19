@@ -1,5 +1,6 @@
 // Mirror API capabilities for navigation; backend authorization remains authoritative.
 const routes = [
+    ['/submissions', ['page.write']],
     ['/pages/new', ['page.write']], ['/pages', ['page.read']],
     ['/objects', ['object.read']], ['/media', ['media.read']],
     ['/trash', ['page.read', 'media.read', 'object.read', 'settings.read']],
@@ -17,6 +18,7 @@ const routes = [
 ]
 
 export const canAccessCmsPath = (user, path) => {
+    if (path === '/submissions') return Boolean(user?.isSuperuser || user?.permissions?.includes('tenant.admin') || ['page.read', 'page.write'].every(permission => user?.permissions?.includes(permission)))
     if (path === '/settings/users' || path === '/settings/tenants') return Boolean(user?.isSuperuser)
     if (!Array.isArray(user?.permissions) || user.isSuperuser || user.permissions.includes('tenant.admin')) return true
     const match = routes.find(([prefix]) => path === prefix || path.startsWith(prefix + '/'))

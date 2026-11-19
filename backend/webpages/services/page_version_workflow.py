@@ -524,6 +524,8 @@ class PageVersionWorkflowService:
         version.save(update_fields=["effective_date", "expiry_date", "edit_revision", "last_edited_by", "updated_at"])
         self.page.refresh_from_db()
         version.page = self.page
+        # Capture publication before activating the new version, not its newly live state.
+        self.page._path_public_before_publish = previous_live is not None
         version._apply_version_data()
         self.page.last_modified_by = self.user
         self.page.save()

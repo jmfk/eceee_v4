@@ -482,7 +482,9 @@ const FormFieldRender = ({ field, index, idPrefix, disabled }: { field: Record<s
         name: field.name || `field-${index}`,
         required: Boolean(field.required),
         disabled,
+        'aria-describedby': value(field, 'helpText', 'help_text') ? `${fieldId}_help` : undefined,
     }
+    const grouped = fieldType === 'radio' || fieldType === 'checkbox' && options.length > 0
     let control: React.ReactNode
     if (fieldType === 'textarea') {
         control = <textarea {...common} className="form-textarea" placeholder={field.placeholder || ''} defaultValue={value(field, 'defaultValue', 'default_value') || ''} rows={4} />
@@ -493,14 +495,14 @@ const FormFieldRender = ({ field, index, idPrefix, disabled }: { field: Record<s
         </select>
     } else if (fieldType === 'checkbox' && options.length) {
         control = <div className="checkbox-options">{options.map((option, optionIndex) => <label className="checkbox-label" key={option}>
-            <input id={optionIndex === 0 ? fieldId : `${fieldId}_${optionIndex}`} type="checkbox" name={`${common.name}[]`} value={option} className="form-checkbox" defaultChecked={value(field, 'defaultValue', 'default_value') === option} disabled={disabled} />
+            <input id={optionIndex === 0 ? fieldId : `${fieldId}_${optionIndex}`} type="checkbox" name={`${common.name}[]`} value={option} aria-describedby={common['aria-describedby']} className="form-checkbox" defaultChecked={value(field, 'defaultValue', 'default_value') === option} disabled={disabled} />
             <span className="checkbox-text">{option}</span>
         </label>)}</div>
     } else if (fieldType === 'checkbox') {
         control = <input {...common} type="checkbox" className="form-checkbox" defaultChecked={Boolean(value(field, 'defaultValue', 'default_value'))} />
     } else if (fieldType === 'radio') {
         control = <div className="radio-options">{options.map((option, optionIndex) => <label className="radio-label" key={option}>
-            <input type="radio" id={`${fieldId}_${optionIndex}`} name={common.name} value={option} required={common.required && optionIndex === 0} className="form-radio" defaultChecked={value(field, 'defaultValue', 'default_value') === option} disabled={disabled} />
+            <input type="radio" id={`${fieldId}_${optionIndex}`} name={common.name} value={option} required={common.required && optionIndex === 0} aria-describedby={common['aria-describedby']} className="form-radio" defaultChecked={value(field, 'defaultValue', 'default_value') === option} disabled={disabled} />
             <span className="radio-text">{option}</span>
         </label>)}</div>
     } else {
@@ -516,12 +518,14 @@ const FormFieldRender = ({ field, index, idPrefix, disabled }: { field: Record<s
             pattern={field.validation?.pattern}
         />
     }
-    return <div className={`form-field${value(field, 'cssClass', 'css_class') ? ` ${value(field, 'cssClass', 'css_class')}` : ''}`} data-field-type={fieldType}>
-        <label htmlFor={fieldId} className="field-label">{field.label || field.name}{field.required && <span className="required-indicator" aria-label="Required">*</span>}</label>
-        {value(field, 'helpText', 'help_text') && <div className="form-help">{value(field, 'helpText', 'help_text')}</div>}
+    const FieldContainer = grouped ? 'fieldset' : 'div'
+    const caption = <>{field.label || field.name}{field.required && <span className="required-indicator" aria-label="Required">*</span>}</>
+    return <FieldContainer className={`form-field${value(field, 'cssClass', 'css_class') ? ` ${value(field, 'cssClass', 'css_class')}` : ''}`} data-field-type={fieldType} style={grouped ? { border: 0, padding: 0, margin: 0, minWidth: 0 } : undefined}>
+        {grouped ? <legend className="field-label">{caption}</legend> : <label htmlFor={fieldId} className="field-label">{caption}</label>}
+        {value(field, 'helpText', 'help_text') && <div className="form-help" id={`${fieldId}_help`}>{value(field, 'helpText', 'help_text')}</div>}
         {control}
         <div className="field-error" id={`${idPrefix}_error_${index + 1}`} hidden />
-    </div>
+    </FieldContainer>
 }
 
 const FormRender: WidgetRenderComponent = ({ widget, context }) => {

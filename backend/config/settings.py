@@ -461,6 +461,8 @@ REST_FRAMEWORK = {
         # Exclude schema and pageData fields from case conversion
         # "ignore_fields": ["schema", "page_data", "pageData"],
         "ignore_fields": [
+            # BCP 47 language codes are map keys, never snake/camel-case field names.
+            "translations",
             "text_outline_styles",
             "textOutlineStyles",
             "widget_types",

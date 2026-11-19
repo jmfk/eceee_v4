@@ -75,7 +75,7 @@ describe('database snapshot', () => {
     expect(sql).toContain("published.data->'authors'");
     expect(sql).toContain('jsonb_build_array($20::bigint)');
     expect(sql).toContain("published.data->>'eventGroup'");
-    expect(parameters.slice(19)).toEqual(['976', 'other']);
+    expect(parameters.slice(19, 21)).toEqual(['976', 'other']);
   });
 
   it('uses published event dates and typed classifications before limiting the calendar', async () => {
@@ -94,10 +94,10 @@ describe('database snapshot', () => {
     expect(initialSql).toContain("tag.tenant_id=$1 AND tag.status='merged'");
     expect(initialSql).toContain('tag.namespace_id=term.namespace_id AND tag.tag_type=term.type');
     expect(filteredSql).not.toContain('calendar_source');
-    expect(filteredSql).toContain("assignment.object_version_id=published.id AND term.id=$22 AND term.type='event_type'");
-    expect(filteredSql).toContain("assignment.object_version_id=published.id AND term.id=$23 AND term.type='event_category'");
+    expect(filteredSql).toContain("assignment.object_version_id=published.id AND term.id=$29 AND term.type='event_type'");
+    expect(filteredSql).toContain("assignment.object_version_id=published.id AND term.id=$30 AND term.type='event_category'");
     expect(filteredSql).toContain("ORDER BY COALESCE(NULLIF(published.data->>'eventStartDate', ''), published.data->>'event_start_date') DESC, object.id DESC");
-    expect(parameters.slice(21)).toEqual([eventType, eventCategory]);
+    expect(parameters.slice(28)).toEqual([eventType, eventCategory]);
   });
 
   it('matches related tags and Article kind on the published tenant version', async () => {
@@ -379,5 +379,30 @@ describe('database snapshot', () => {
       'ROLLBACK',
     ]);
     expect(mocks.release).toHaveBeenCalledOnce();
+  });
+});
+
+describe('website SQL boundaries', () => {
+  it('applies literal text and dates before limiting published objects', async () => {
+    mocks.query.mockResolvedValue({ rows: [] });
+    await database.withSnapshot(reader => reader.publishedObjects({ objectTypeNames: ['event'], search: '%_needle', dateFrom: '2026-01-01', dateTo: '2027-01-01', dateField: 'event', limit: 21, offset: 20, sortOrder: '-publish_date' }, '7', new Date()));
+    const [sql, params] = mocks.query.mock.calls.findLast(([sql]) => sql.includes('WITH RECURSIVE resolved'))!;
+    expect(sql).toContain('strpos(lower(');
+    expect(sql).toContain('type.name=ANY($26::text[])');
+    expect(sql).toContain('(competing_published.effective_date, competing.id) > (published.effective_date, object.id)');
+    expect(sql).toContain('competing.object_type_id=ANY($2::bigint[])');
+    expect(sql).toContain('child.parent_id=$27 AND child.tenant_id=$1 AND child.slug=object.slug');
+    expect(sql.indexOf('$22::text')).toBeLessThan(sql.lastIndexOf('LIMIT $6'));
+    expect(params.slice(21)).toEqual(['%_needle', '2026-01-01', '2027-01-01', 'event', [], null, false]);
+  });
+  it('requires matching tenant, root and a live version for old paths', async () => {
+    await database.withSnapshot(reader => reader.pageAlias!('1', '7', '/old/', new Date()));
+    const [sql, params] = mocks.query.mock.calls.findLast(([sql]) => sql.includes('webpages_pagepathalias'))!;
+    expect(sql).toContain('alias.root_id=$1 AND alias.tenant_id=$2');
+    expect(sql).toContain("page.path_pattern <> ''");
+    expect(sql).toContain('substring($3 from char_length(alias.path)+1)');
+    expect(sql).toContain('page.cached_root_id=$1 AND page.is_deleted=false');
+    expect(sql).toContain('version.expiry_date > $4');
+    expect(params.slice(0, 3)).toEqual(['1', '7', '/old/']);
   });
 });

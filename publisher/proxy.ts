@@ -14,11 +14,12 @@ export function proxy(request: NextRequest) {
   if (path === INTERNAL_THEME_ERROR_ROUTE.slice(0, -1) || path.startsWith(INTERNAL_THEME_ERROR_ROUTE)) {
     return withBuildHeader(new NextResponse('Not Found', { status: 404 }));
   }
-  if (!THEME_ERROR_ROUTES.has(path)) return withBuildHeader(NextResponse.next());
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-eceee-path', request.nextUrl.pathname);
+  if (!THEME_ERROR_ROUTES.has(path)) return withBuildHeader(NextResponse.next({ request: { headers: requestHeaders } }));
   const status = Number(path.slice(1));
   const destination = request.nextUrl.clone();
   destination.pathname = `/theme-error-status/${status}`;
-  const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-eceee-theme-error', String(status));
   return withBuildHeader(NextResponse.rewrite(destination, { status, request: { headers: requestHeaders } }));
 }

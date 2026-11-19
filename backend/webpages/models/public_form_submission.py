@@ -23,6 +23,19 @@ class PublicFormSubmission(models.Model):
     widget_id = models.CharField(max_length=255)
     form_title = models.CharField(max_length=255, blank=True, default="")
     data = models.JSONField(default=dict)
+    status = models.CharField(
+        max_length=16,
+        choices=[
+            ("pending", "Pending"),
+            ("reviewing", "Reviewing"),
+            ("accepted", "Accepted"),
+            ("rejected", "Rejected"),
+        ],
+        default="pending",
+    )
+    review_note = models.TextField(blank=True, default="")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey("auth.User", null=True, blank=True, on_delete=models.SET_NULL)
     submitted_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
