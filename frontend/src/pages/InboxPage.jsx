@@ -13,6 +13,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react'
 import PrivatePlayer from '../components/support/PrivateVideoPlayer'
+import InstructionLibrary from '../components/support/InstructionLibrary'
 import HelpGuideSelect from '../components/help/HelpGuideSelect'
 import StatusBar from '../components/StatusBar'
 import { Inbox, Search, PenLine, Archive, RotateCw, Plus, X } from 'lucide-react'
@@ -155,65 +156,6 @@ function InboxList({ link }) {
                         Ångra
                     </button>
                 </p>
-            )}
-            <Pager result={query.data} page={page} setPage={setPage} />
-        </>
-    )
-}
-
-function Library({ link }) {
-    const tenant = useSupportTenant()
-    const identity = useSupportIdentity()
-    const [archive, setArchive] = useState(false)
-    const [page, setPage] = useState(1)
-    const query = useQuery({
-        queryKey: ['support', tenant, identity, 'library', archive, page],
-        queryFn: () =>
-            supportRequest(
-                tenant,
-                `instructions/?page=${page}&archived=${archive}`,
-            ),
-    })
-    return (
-        <>
-            <h2>Instruktionsfilmer</h2>
-            <p>
-                Senaste publiceringen först. Filmerna bevaras även när de inte
-                längre är aktuella.
-            </p>
-            <label>
-                <input
-                    type="checkbox"
-                    checked={archive}
-                    onChange={(e) => {
-                        setArchive(e.target.checked)
-                        setPage(1)
-                    }}
-                />{' '}
-                Visa även arkiverade filmer
-            </label>
-            <ErrorText error={query.error} />
-            {query.isPending && <p role="status">Hämtar instruktioner…</p>}
-            {query.data?.results.map((v) => (
-                <article className="support-row" key={v.id}>
-                    <div>
-                        <p className="support-muted">
-                            {dateText(v.publishedAt)}
-                            {' · '}{v.language === 'en' ? 'English' : 'Svenska'}
-                            {v.archived && ' · Arkiverad'}
-                            {v.withdrawn && ' · Avpublicerad'}
-                        </p>
-                        <h3>
-                            <Link to={link(`instructions/${v.id}`)}>
-                                {v.title}
-                            </Link>
-                        </h3>
-                        <p>{v.description}</p>
-                    </div>
-                </article>
-            ))}
-            {query.data?.results.length === 0 && (
-                <p>Inga publicerade instruktioner ännu.</p>
             )}
             <Pager result={query.data} page={page} setPage={setPage} />
         </>
@@ -951,7 +893,7 @@ export default function InboxPage() {
             )
         else if (section === 'threads' && id)
             content = <ThreadDetail key={id} id={id} context={context.data} />
-        else if (section === 'library') content = <Library link={link} />
+        else if (section === 'library') content = <InstructionLibrary link={link} />
         else if (
             section === 'new' ||
             (section === 'publish' && context.data.canPublish)
