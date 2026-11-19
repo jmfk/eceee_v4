@@ -12,7 +12,6 @@ Core page entity supporting hierarchical organization and inheritance.
 """
 
 import uuid
-from contextlib import nullcontext
 
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
@@ -2150,9 +2149,12 @@ class WebPage(models.Model):
 
     def save(self, *args, **kwargs):
         """Override save to clear hostname cache when hostnames change."""
+        update_fields = kwargs.get("update_fields")
+        if update_fields and {"slug", "parent", "parent_id", "hostnames"}.intersection(update_fields):
+            kwargs["update_fields"] = set(update_fields) | {"cached_path", "cached_root_id", "cached_root_hostnames"}
         # Hostname assignments and grant changes use the same tenant row lock.
         # Keep it until the page write commits so a policy change cannot race it.
-        with transaction.atomic() if self.hostnames else nullcontext():
+        with transaction.atomic():
             if self.hostnames:
                 self.hostnames = [self.normalize_hostname(h) for h in self.hostnames if h]
                 from core.hostname_policy import validate_hostnames
@@ -2166,7 +2168,7 @@ class WebPage(models.Model):
             hostname_registration_changed = False
             if self.pk:  # Only check for existing objects
                 try:
-                    old_instance = WebPage.objects.get(pk=self.pk)
+                    old_instance = WebPage.objects.select_for_update().get(pk=self.pk)
                     old_is_active = bool(
                         old_instance.hostnames and not old_instance.is_deleted and old_instance.is_currently_published
                     )

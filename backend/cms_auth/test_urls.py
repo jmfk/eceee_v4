@@ -28,7 +28,10 @@ def csrf(request):
     return JsonResponse({"csrfToken": get_token(request)})
 
 
+from cms_auth.privacy import account_export
+
 urlpatterns = [
+    path("api/v1/auth/privacy/export/", account_export, name="account-export"),
     path("api/v1/utils/user-perspective/", user_perspective),
     path("system-owner-only/", SystemOwnerOnlyView.as_view()),
     path("csrf-token/", csrf),

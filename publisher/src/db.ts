@@ -63,7 +63,7 @@ function reader(client: PoolClient): PageReader {
       return result.rows[0] ?? null;
     },
     async version(pageId, at) {
-      const result = await client.query<Version>('SELECT id, page_id, meta_title, meta_description, code_layout, layout_key, widgets, theme_id, enable_css_injection, page_css_variables, page_custom_css FROM webpages_pageversion WHERE page_id = $1 AND effective_date <= $2 AND (expiry_date IS NULL OR expiry_date > $2) ORDER BY effective_date DESC, version_number DESC LIMIT 1', [pageId, at]);
+      const result = await client.query<Version>('SELECT id, page_id, page_data, meta_title, meta_description, code_layout, layout_key, widgets, theme_id, enable_css_injection, page_css_variables, page_custom_css FROM webpages_pageversion WHERE page_id = $1 AND effective_date <= $2 AND (expiry_date IS NULL OR expiry_date > $2) ORDER BY effective_date DESC, version_number DESC LIMIT 1', [pageId, at]);
       return result.rows[0] ?? null;
     },
     async theme(themeId, tenantId) {
@@ -131,6 +131,49 @@ function reader(client: PoolClient): PageReader {
           AND NOT (page.cached_path ~ $5)
         ORDER BY page.parent_id, page.sort_order, page.id`, [parentIds, tenantId, rootId, at, '^/(403|404|500|503)(/|$)']);
       return result.rows;
+    },
+    async sitePages(rootId, tenantId, at) {
+      const result = await client.query(`
+        WITH RECURSIVE reachable AS (
+          SELECT id FROM webpages_webpage WHERE id=$1 AND tenant_id=$2 AND is_deleted=false
+          UNION ALL
+          SELECT child.id FROM webpages_webpage child JOIN reachable parent ON child.parent_id=parent.id
+          WHERE child.tenant_id=$2 AND child.is_deleted=false
+            AND EXISTS (SELECT 1 FROM webpages_pageversion version
+              WHERE version.page_id=child.id AND version.effective_date <= $3
+                AND (version.expiry_date IS NULL OR version.expiry_date > $3))
+        )
+        SELECT page.id::text, CASE WHEN page.id=$1 THEN '/' ELSE page.cached_path END AS path,
+          COALESCE(NULLIF(published.meta_title, ''), page.title) AS title,
+          published.meta_description AS description, page.path_pattern AS "pathPattern",
+          published.page_data AS "pageData", published.updated_at::text AS "updatedAt"
+        FROM webpages_webpage page
+        JOIN LATERAL (
+          SELECT version.meta_title, version.meta_description, version.page_data, version.updated_at
+          FROM webpages_pageversion version
+          WHERE version.page_id=page.id AND version.effective_date <= $3
+            AND (version.expiry_date IS NULL OR version.expiry_date > $3)
+          ORDER BY version.effective_date DESC, version.version_number DESC LIMIT 1
+        ) published ON true
+        WHERE page.tenant_id=$2 AND page.id IN (SELECT id FROM reachable) AND (page.id=$1 OR page.cached_root_id=$1)
+          AND page.is_deleted=false AND page.cached_path <> ''
+          AND NOT (page.cached_path ~ '^/(403|404|500|503)(/|$)')
+        ORDER BY page.cached_path LIMIT 50000`, [rootId, tenantId, at]);
+      return result.rows;
+    },
+    async pageAlias(rootId, tenantId, path, at) {
+      const result = await client.query(`
+        SELECT page.cached_path || substring($3 from char_length(alias.path)+1) AS path FROM webpages_pagepathalias alias
+        JOIN webpages_webpage page ON page.id=alias.page_id AND page.tenant_id=$2
+        WHERE alias.root_id=$1 AND alias.tenant_id=$2
+          AND (alias.path=$3 OR (page.path_pattern <> '' AND left($3, char_length(alias.path))=alias.path))
+          AND page.cached_root_id=$1 AND page.is_deleted=false
+          AND page.cached_path <> $3 AND page.cached_path <> ''
+          AND EXISTS (SELECT 1 FROM webpages_pageversion version
+            WHERE version.page_id=page.id AND version.effective_date <= $4
+              AND (version.expiry_date IS NULL OR version.expiry_date > $4))
+        ORDER BY char_length(alias.path) DESC LIMIT 1`, [rootId, tenantId, path, at]);
+      return result.rows[0]?.path ?? null;
     },
     async publicMedia(mediaIds, collectionIds, tenantId) {
       const mediaFields = `media.id::text, COALESCE(media.file_url, '') AS url, media.file_path,
@@ -361,17 +404,45 @@ function reader(client: PoolClient): PageReader {
             SELECT 1 FROM taxonomy_objectversiontag a WHERE a.object_version_id=published.id
               AND a.tag_id IN (SELECT id FROM matching)
           ))
+          AND ($22::text IS NULL OR strpos(lower(COALESCE(NULLIF(published.title, ''), object.title)), lower($22)) > 0
+            OR strpos(lower(COALESCE(published.data->>'description', published.data->>'summary', '')), lower($22)) > 0)
+          AND ($23::text IS NULL OR (CASE WHEN $25::text='event'
+            THEN COALESCE(NULLIF(published.data->>'eventStartDate', ''), published.data->>'event_start_date', '')
+            ELSE to_char(published.effective_date AT TIME ZONE 'UTC', 'YYYY-MM-DD') END) >= $23)
+          AND ($24::text IS NULL OR (CASE WHEN $25::text='event'
+            THEN COALESCE(NULLIF(published.data->>'eventStartDate', ''), published.data->>'event_start_date', '')
+            ELSE to_char(published.effective_date AT TIME ZONE 'UTC', 'YYYY-MM-DD') END) < $24)
+          -- Determine the same winning object as the public detail route, before archive filters.
+          AND (NOT $28::boolean OR NOT EXISTS (
+            SELECT 1 FROM object_storage_objectinstance competing
+            JOIN object_storage_objecttypedefinition competing_type ON competing_type.id=competing.object_type_id
+            LEFT JOIN content_namespace competing_namespace ON competing_namespace.id=competing_type.namespace_id
+            JOIN LATERAL (
+              SELECT version.effective_date FROM object_storage_objectversion version
+              WHERE version.object_instance_id=competing.id AND version.effective_date <= $4
+                AND (version.expiry_date IS NULL OR version.expiry_date > $4)
+              ORDER BY version.version_number DESC LIMIT 1
+            ) competing_published ON true
+            WHERE competing.tenant_id=$1 AND competing.slug=object.slug AND competing.is_deleted=false
+              AND competing.current_version_id IS NOT NULL AND competing_type.is_deleted=false AND competing_type.is_active=true
+              AND (competing_type.namespace_id IS NULL OR competing_namespace.tenant_id=$1)
+              AND (competing.object_type_id=ANY($2::bigint[]) OR competing_type.name=ANY($3::text[]))
+              AND (competing_published.effective_date, competing.id) > (published.effective_date, object.id)
+          ))
+          AND (cardinality($26::text[])=0 OR type.name=ANY($26::text[]))
+          AND ($27::bigint IS NULL OR NOT EXISTS (SELECT 1 FROM webpages_webpage child
+            WHERE child.parent_id=$27 AND child.tenant_id=$1 AND child.slug=object.slug AND child.is_deleted=false))
           ${calendar ? `
           AND ${eventStart} ~ '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'
-          AND ($22::uuid IS NULL OR EXISTS (
+          AND ($29::uuid IS NULL OR EXISTS (
             SELECT 1 FROM taxonomy_objectversiontag assignment
             JOIN calendar_terms term ON term.original_id=assignment.tag_id
-            WHERE assignment.object_version_id=published.id AND term.id=$22 AND term.type='event_type'
+            WHERE assignment.object_version_id=published.id AND term.id=$29 AND term.type='event_type'
           ))
-          AND ($23::uuid IS NULL OR EXISTS (
+          AND ($30::uuid IS NULL OR EXISTS (
             SELECT 1 FROM taxonomy_objectversiontag assignment
             JOIN calendar_terms term ON term.original_id=assignment.tag_id
-            WHERE assignment.object_version_id=published.id AND term.id=$23 AND term.type='event_category'
+            WHERE assignment.object_version_id=published.id AND term.id=$30 AND term.type='event_category'
           ))` : ''}
         ${calendarOptions ? `), options AS (
           SELECT COALESCE(jsonb_agg(terms ORDER BY terms.name, terms.id), '[]'::jsonb) AS "calendarOptions"
@@ -408,6 +479,13 @@ function reader(client: PoolClient): PageReader {
           query.articleKind && query.articleKind !== 'all' ? query.articleKind : null,
           query.authorId ?? null,
           query.eventGroup && query.eventGroup !== 'all' ? query.eventGroup : null,
+          query.search?.trim().slice(0, 200) || null,
+          query.dateFrom ?? null,
+          query.dateTo ?? null,
+          query.dateField ?? 'publication',
+          query.archiveTypeNames ?? [],
+          query.routePageId ?? null,
+          Boolean(query.routeDetailWinner),
           ...(calendar ? calendarFilters.map(id => id ?? null) : []),
         ]);
       return result.rows;

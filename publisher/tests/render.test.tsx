@@ -61,3 +61,14 @@ describe('public renderer', () => {
     expect(publicFormResult('?form_status=error')).toBeUndefined();
   });
 });
+
+
+it('associates form help with controls and labels choice groups', () => {
+  const html = renderToStaticMarkup(<PublishedPage model={{ ...model, slots: { main: [{ id: 'accessible-form', type: 'easy_widgets.FormsWidget', config: { fields: [
+    { name: 'email', label: 'Email', type: 'email', helpText: 'Use your contact address' },
+    { name: 'topic', label: 'Topic', type: 'radio', options: ['News', 'Events'] },
+  ] } }] } }} />);
+  expect(html).toContain('aria-describedby="form_accessible-form_field_email_help"');
+  expect(html).toContain('id="form_accessible-form_field_email_help"');
+  expect(html).toContain('<legend class="field-label">Topic</legend>');
+});

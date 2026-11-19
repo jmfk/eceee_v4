@@ -27,7 +27,10 @@ router.register(r"tags", TagViewSet)
 router.register(r"namespaces", NamespaceViewSet)
 router.register(r"core/machine-api-keys", MachineAPIKeyViewSet, basename="machine-api-key")
 
+from cms_auth.privacy import account_export
+
 urlpatterns = [
+    path("auth/privacy/export/", account_export, name="account-export"),
     path("trash/", TrashView.as_view(), name="trash"),
     path("trash/restore/", TrashRestoreView.as_view(), name="trash-restore"),
     path("diagnostics/", include("core.diagnostics.urls")),

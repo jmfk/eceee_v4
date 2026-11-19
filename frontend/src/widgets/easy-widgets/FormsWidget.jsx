@@ -131,6 +131,10 @@ const FormsWidget = ({ config = {}, mode = 'preview' }) => {
     const renderField = (field) => {
         const fieldId = `field_${field.name}`
         const hasError = errors[field.name]
+        const accessibility = {
+            'aria-invalid': Boolean(hasError) || undefined,
+            'aria-describedby': [field.help_text ? `${fieldId}_help` : '', hasError ? `${fieldId}_error` : ''].filter(Boolean).join(' ') || undefined,
+        }
         const fieldValue = formData[field.name] || field.default_value || ''
 
         const baseInputClass = `w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${hasError ? 'border-red-500' : 'border-gray-300'
@@ -141,6 +145,7 @@ const FormsWidget = ({ config = {}, mode = 'preview' }) => {
                 return (
                     <textarea
                         id={fieldId}
+                        {...accessibility}
                         name={field.name}
                         value={fieldValue}
                         onChange={(e) => handleInputChange(field.name, e.target.value)}
@@ -155,6 +160,7 @@ const FormsWidget = ({ config = {}, mode = 'preview' }) => {
                 return (
                     <select
                         id={fieldId}
+                        {...accessibility}
                         name={field.name}
                         value={fieldValue}
                         onChange={(e) => handleInputChange(field.name, e.target.value)}
@@ -171,12 +177,13 @@ const FormsWidget = ({ config = {}, mode = 'preview' }) => {
             case 'checkbox':
                 if (field.options) {
                     return (
-                        <div className="checkbox-group space-y-2">
+                        <div className="checkbox-group space-y-2" role="group" aria-labelledby={`${fieldId}_label`}>
                             {field.options.map((option, index) => (
                                 <div key={index} className="checkbox-item flex items-center">
                                     <input
                                         type="checkbox"
                                         id={`${fieldId}_${index}`}
+                                        {...accessibility}
                                         name={field.name}
                                         value={option}
                                         checked={Array.isArray(fieldValue) ? fieldValue.includes(option) : false}
@@ -201,6 +208,7 @@ const FormsWidget = ({ config = {}, mode = 'preview' }) => {
                             <input
                                 type="checkbox"
                                 id={fieldId}
+                        {...accessibility}
                                 name={field.name}
                                 checked={!!fieldValue}
                                 onChange={(e) => handleInputChange(field.name, e.target.checked)}
@@ -214,12 +222,13 @@ const FormsWidget = ({ config = {}, mode = 'preview' }) => {
 
             case 'radio':
                 return (
-                    <div className="radio-group space-y-2">
+                    <div className="radio-group space-y-2" role="group" aria-labelledby={`${fieldId}_label`}>
                         {field.options?.map((option, index) => (
                             <div key={index} className="radio-item flex items-center">
                                 <input
                                     type="radio"
                                     id={`${fieldId}_${index}`}
+                                        {...accessibility}
                                     name={field.name}
                                     value={option}
                                     checked={fieldValue === option}
@@ -238,6 +247,7 @@ const FormsWidget = ({ config = {}, mode = 'preview' }) => {
                     <input
                         type={field.type}
                         id={fieldId}
+                        {...accessibility}
                         name={field.name}
                         value={fieldValue}
                         onChange={(e) => handleInputChange(field.name, e.target.value)}
@@ -280,20 +290,20 @@ const FormsWidget = ({ config = {}, mode = 'preview' }) => {
                             {fields.map((field, index) => (
                                 <div key={index} className={`form-group ${field.css_class || ''}`}>
                                     {field.type !== 'checkbox' || field.options ? (
-                                        <label htmlFor={`field_${field.name}`} className="block text-sm font-medium text-gray-700 mb-1">
+                                        <label id={`field_${field.name}_label`} htmlFor={`field_${field.name}`} className="block text-sm font-medium text-gray-700 mb-1">
                                             {field.label}
                                             {field.required && <span className="text-red-500 ml-1">*</span>}
                                         </label>
                                     ) : null}
 
                                     {field.help_text && (
-                                        <div className="form-help text-sm text-gray-500 mb-2">{field.help_text}</div>
+                                        <div id={`field_${field.name}_help`} className="form-help text-sm text-gray-500 mb-2">{field.help_text}</div>
                                     )}
 
                                     {renderField(field)}
 
                                     {errors[field.name] && (
-                                        <div className="form-error text-sm text-red-600 mt-1">{errors[field.name]}</div>
+                                        <div id={`field_${field.name}_error`} role="alert" className="form-error text-sm text-red-600 mt-1">{errors[field.name]}</div>
                                     )}
                                 </div>
                             ))}
@@ -380,20 +390,20 @@ const FormsWidget = ({ config = {}, mode = 'preview' }) => {
                     {fields.map((field, index) => (
                         <div key={index} className={`form-group ${field.css_class || ''}`}>
                             {field.type !== 'checkbox' || field.options ? (
-                                <label htmlFor={`field_${field.name}`} className="block text-sm font-medium text-gray-700 mb-1">
+                                <label id={`field_${field.name}_label`} htmlFor={`field_${field.name}`} className="block text-sm font-medium text-gray-700 mb-1">
                                     {field.label}
                                     {field.required && <span className="text-red-500 ml-1">*</span>}
                                 </label>
                             ) : null}
 
                             {field.help_text && (
-                                <div className="form-help text-sm text-gray-500 mb-2">{field.help_text}</div>
+                                <div id={`field_${field.name}_help`} className="form-help text-sm text-gray-500 mb-2">{field.help_text}</div>
                             )}
 
                             {renderField(field)}
 
                             {errors[field.name] && (
-                                <div className="form-error text-sm text-red-600 mt-1">{errors[field.name]}</div>
+                                <div id={`field_${field.name}_error`} role="alert" className="form-error text-sm text-red-600 mt-1">{errors[field.name]}</div>
                             )}
                         </div>
                     ))}

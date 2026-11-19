@@ -795,6 +795,7 @@ const LinkPicker = ({
     currentPageId = null,
     currentSiteRootId = null,
     namespace = 'default',
+    allowedTypes = Object.keys(LINK_TYPES),
     showRemoveButton = false,
     onSave
 }) => {
@@ -942,7 +943,7 @@ const LinkPicker = ({
         >
             {/* Tabs */}
             <div className="flex border-b border-gray-200 px-4 bg-white sticky top-0">
-                {Object.entries(LINK_TYPES).map(([type, { label, icon: Icon }]) => (
+                {Object.entries(LINK_TYPES).filter(([type]) => allowedTypes.includes(type)).map(([type, { label, icon: Icon }]) => (
                     <button
                         key={type}
                         onClick={() => handleTabChange(type)}

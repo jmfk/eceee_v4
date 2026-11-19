@@ -23,3 +23,9 @@ describe('CMS role navigation', () => {
         expect(canAccessCmsPath({ isSuperuser: true, permissions: [] }, '/settings/users')).toBe(true)
     })
 })
+
+
+it('requires both reading and editing pages to expose private submissions', () => {
+    expect(canAccessCmsPath({ permissions: ['page.write'] }, '/submissions')).toBe(false)
+    expect(canAccessCmsPath({ permissions: ['page.read', 'page.write'] }, '/submissions')).toBe(true)
+})

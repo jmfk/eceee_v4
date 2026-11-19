@@ -119,3 +119,6 @@ themes
 
 # Workspace-only operator and legacy-source credentials
 /backend/.env.*
+
+# Standalone publisher dependencies
+publisher/node_modules

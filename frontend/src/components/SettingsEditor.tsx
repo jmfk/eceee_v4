@@ -1,4 +1,5 @@
 import React, { forwardRef, useImperativeHandle, useState, useEffect, useCallback } from 'react'
+import WebsiteSettings from './WebsiteSettings'
 import LayoutSelector from './LayoutSelector'
 import ClassificationPicker from './classification/ClassificationPicker'
 import PathPatternSelector from './PathPatternSelector'
@@ -77,6 +78,7 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
         description: webpageData?.description || '',
         pathPatternKey: webpageData?.pathPatternKey || '',
         hostnames: webpageData?.hostnames || [],
+        website: pageVersionData?.pageData?.website || {},
         shortTitle: pageVersionData?.pageData?.shortTitle || '',
         metaTitle: pageVersionData?.metaTitle || '',
         metaDescription: pageVersionData?.metaDescription || '',
@@ -102,6 +104,7 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                     hostnames: updatedPageData.hostnames || prev.hostnames,
                 }),
                 ...(updatedVersionData && {
+                    website: updatedVersionData.pageData?.website ?? prev.website,
                     shortTitle: updatedVersionData.pageData?.shortTitle || prev.shortTitle,
                     metaTitle: updatedVersionData.metaTitle || prev.metaTitle,
                     metaDescription: updatedVersionData.metaDescription || prev.metaDescription,
@@ -329,6 +332,8 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                         checkAvailability={checkHostnameAvailability}
                     />
                 </section>}
+
+                <WebsiteSettings value={localValues.website} onChange={value => handlePageDataFieldChange('website', value)} isRoot={!webpageData?.parent} pageId={context.pageId} />
 
                 {/* SEO & Metadata Section */}
                 <div className="bg-white rounded-lg shadow p-6">
