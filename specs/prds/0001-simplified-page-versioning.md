@@ -99,6 +99,19 @@ Page authors currently encounter version numbers, overlapping status badges, dir
 
 ## Completion Evidence
 
+- 2026-11-19, TASK-24: Reproduced a stale editor snapshot after reopening a page
+  whose same working-version ID had a newer saved server revision. PageEditor now
+  reconciles clean cached data by `editRevision` and preserves active unsaved edits
+  and their original save baseline. The regression is covered by component tests
+  and a browser journey that leaves the page, receives another editor's saved
+  revision, reopens it and saves a further edit. No backend or production data
+  changes are part of this fix; the wider PRD remains started.
+- The settings save walkthrough also exposed tag-search results rendering behind
+  the full-screen editor. Its portalled results now sit above that editor, and
+  the existing settings test selects the actual combobox option. Local evidence:
+  75 focused version/editor/tag-picker tests, two Chromium journeys, ESLint without errors,
+  the frontend build and specs validation pass. Production acceptance is pending.
+
 - Backend workflow implementation: `backend/webpages/services/page_version_workflow.py`, workflow endpoints in `backend/webpages/views/page_version_views.py`, shared list/detail state, aggregate filters, and tenant-scoped access.
 - Frontend workflow implementation: `PageEditor`, `PublishingEditor`, `PageVersionHistoryPanel`, `PageTreeNode`, `TreePageManager`, legacy redirects, and updated Settings navigation.
 - Backend verification: full Django suite passed (660 tests, 18 skipped) against PostgreSQL; focused workflow tests passed (20 tests).

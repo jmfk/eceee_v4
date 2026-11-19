@@ -798,9 +798,19 @@ const PageEditor = () => {
         const versionId = pageVersion?.versionId || pageVersion?.id;
         const existingPage = udcState.pages?.[pageId];
         const existingVersion = versionId ? udcState.versions?.[versionId] : null;
+        const isActiveCachedVersion = String(udcState.metadata.currentPageId) === String(pageId)
+            && String(udcState.metadata.currentVersionId) === String(versionId);
+        const hasUnsavedCachedChanges = isActiveCachedVersion
+            && (isDirtyRef.current || udcState.metadata.isDirty);
+        const serverRevisionIsNewer = Number(pageVersion?.editRevision || 0)
+            > Number(existingVersion?.editRevision || 0);
 
-        // Priority 1: Use DataManager data if available (preserves websocket updates during hot-reload)
-        if (existingPage && existingVersion) {
+        // A query refresh must not replace active edits or reset their save baseline.
+        if (existingPage && existingVersion && isActiveCachedVersion && isDirtyRef.current) return;
+
+        // Keep local edits and equally recent websocket data, but do not let an
+        // older cached revision hide a newer server snapshot when reopening a page.
+        if (existingPage && existingVersion && (!serverRevisionIsNewer || hasUnsavedCachedChanges)) {
             // Cached data still needs to become the active editing context after
             // returning from another page or an object editor.
             if (String(udcState.metadata.currentPageId) !== String(pageId)

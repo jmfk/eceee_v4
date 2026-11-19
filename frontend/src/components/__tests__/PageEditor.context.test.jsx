@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { Route, Routes } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import PageEditor from '../PageEditor'
+import { versionsApi } from '../../api'
 import { useUnifiedData } from '../../contexts/unified-data'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { createAppState, createPage, createVersion } from '../../test/unifiedDataTestUtils'
@@ -12,14 +14,20 @@ vi.mock('../../hooks/usePageWebSocket', () => ({ usePageWebSocket: () => ({ acti
 vi.mock('../../hooks/usePageInheritance', () => ({
     usePageInheritance: () => ({ widgets: { inherited: {}, rules: {} }, isLoading: false }),
 }))
-vi.mock('../PagePreview', () => ({ default: () => null }))
+vi.mock('../PagePreview', () => ({
+    default: ({ webpageData, pageVersionData }) => <div aria-label="Page preview snapshot">
+        <span>{webpageData?.title}</span>
+        <span>{pageVersionData?.widgets?.main?.[0]?.config?.content}</span>
+    </div>,
+}))
 vi.mock('../wysiwyg/GlobalWysiwygToolbar', () => ({ default: () => null }))
 vi.mock('../table-toolbar/GlobalTableToolbar', () => ({ default: () => null }))
 vi.mock('../help/ContextualHelpLink', () => ({ default: () => null }))
+vi.mock('../../utils/defaultLayout', () => ({ getDefaultLayout: vi.fn().mockResolvedValue('main_layout') }))
 vi.mock('../../api', () => ({
     pagesApi: {},
     versionsApi: { getPageVersionsList: vi.fn().mockResolvedValue({ results: [] }) },
-    layoutsApi: {}, themesApi: {},
+    layoutsApi: { getJson: vi.fn().mockResolvedValue({ slots: [] }) }, themesApi: {},
     namespacesApi: { getDefault: vi.fn().mockResolvedValue({ slug: 'default' }) },
 }))
 
@@ -33,6 +41,87 @@ function AddWidgetProbe() {
 }
 
 describe('PageEditor cached context', () => {
+    it('reopens a cached page with the newer server revision of the same working version', async () => {
+        const page = createPage()
+        const cachedVersion = createVersion({ editRevision: 1 })
+        const serverVersion = createVersion({
+            editRevision: 2,
+            updatedAt: '2026-01-02T00:00:00.000Z',
+            pageData: { pageAttributes: { title: 'Latest saved title' } },
+            widgets: { main: [{ id: 'widget-1', type: 'content.TextWidget', config: { content: 'Latest saved content' } }] },
+        })
+        const queryClient = createTestQueryClient()
+        queryClient.setQueryData(['webpage', page.id], page)
+        queryClient.setQueryData(['pageWorkflow', page.id], { editableVersion: { id: serverVersion.id } })
+        queryClient.setQueryData(['pageVersion', page.id, serverVersion.id], serverVersion)
+        versionsApi.getPageVersionsList.mockResolvedValueOnce({ results: [serverVersion] })
+        let state
+        function StateProbe() {
+            state = useUnifiedData().getState
+            return null
+        }
+        renderWithStateProviders(<>
+            <StateProbe />
+            <Routes><Route path="/pages/:pageId/edit/:tab" element={<PageEditor />} /></Routes>
+        </>, {
+            queryClient,
+            route: '/pages/page-1/edit/preview',
+            initialState: createAppState({
+                versions: { [cachedVersion.id]: cachedVersion },
+                metadata: { currentPageId: undefined, currentVersionId: undefined },
+            }),
+        })
+
+        await waitFor(() => expect(screen.getByLabelText('Page preview snapshot')).toHaveTextContent('Latest saved content'))
+        expect(screen.getByLabelText('Page preview snapshot')).toHaveTextContent('Latest saved title')
+        await waitFor(() => expect(state().versions[serverVersion.id].editRevision).toBe(2))
+        expect(state().metadata.isDirty).toBe(false)
+    })
+
+    it('preserves active unsaved edits and their save baseline when a newer server revision arrives', async () => {
+        const page = createPage()
+        const version = createVersion({ editRevision: 1 })
+        const queryClient = createTestQueryClient()
+        queryClient.setQueryData(['webpage', page.id], page)
+        queryClient.setQueryData(['pageWorkflow', page.id], { editableVersion: { id: version.id } })
+        queryClient.setQueryData(['pageVersion', page.id, version.id], version)
+        versionsApi.getPageVersionsList.mockResolvedValueOnce({ results: [version] })
+        let state
+        function EditProbe() {
+            const { getState, publishUpdate } = useUnifiedData()
+            const { data: serverSnapshot } = useQuery({
+                queryKey: ['pageVersion', page.id, version.id], queryFn: async () => version, enabled: false,
+            })
+            state = getState
+            return <>
+                <span>Server revision {serverSnapshot.editRevision}</span>
+                <button onClick={() => publishUpdate('test-local-edit', OperationTypes.UPDATE_WIDGET_CONFIG, {
+                    id: 'widget-1', slotName: 'main', pageId: page.id, versionId: version.id,
+                    config: { content: 'Unsaved local content' },
+                })}>Edit page content</button>
+            </>
+        }
+        renderWithStateProviders(<>
+            <EditProbe />
+            <Routes><Route path="/pages/:pageId/edit/:tab" element={<PageEditor />} /></Routes>
+        </>, { queryClient, route: '/pages/page-1/edit/preview', initialState: createAppState({ versions: { [version.id]: version } }) })
+
+        await waitFor(() => expect(screen.getByLabelText('Page preview snapshot')).toHaveTextContent('Initial content'))
+        fireEvent.click(screen.getByRole('button', { name: 'Edit page content' }))
+        await waitFor(() => expect(state().metadata.isDirty).toBe(true))
+        await act(async () => {
+            queryClient.setQueryData(['pageVersion', page.id, version.id], {
+                ...version, editRevision: 2,
+                widgets: { main: [{ ...version.widgets.main[0], config: { content: 'New server content' } }] },
+            })
+        })
+
+        await screen.findByText('Server revision 2')
+        await waitFor(() => expect(screen.getByLabelText('Page preview snapshot')).toHaveTextContent('Unsaved local content'))
+        expect(state().versions[version.id].editRevision).toBe(1)
+        expect(state().metadata.isDirty).toBe(true)
+    })
+
     it('reactivates a cached page after visiting an object so implicit widget edits target the page', async () => {
         const page = createPage()
         const version = createVersion()
