@@ -24,6 +24,7 @@ Varje aktiverad funktion har en ansvarig, ett konkret användarflöde och testba
 
 ECEEE:s webbplatsspecifikation från september (eceee_web_specifications_sep26.docx).
 
-## Relaterade beslut
+## Relaterade specifikationer och beslut
 
-Inga beslut fattade.
+- [PRD-0059 – Medlemskonton och Mina sidor](0059-eceee-member-accounts.md) och [PRD-0060 – Behörigheter och skyddade nedladdningar](0060-eceee-protected-downloads.md) beskriver första leveransen.
+- [ADR-0076 – Skilj konto, medlemskap och åtkomsträtt](../adrs/active/0076-separate-member-access.md) anger hur åtkomst fungerar medan valet av registerkälla, inklusive FileMaker, är öppet.

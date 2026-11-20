@@ -2,6 +2,7 @@
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
+| PLAN-0007 | [Verifiering av medlemsgrundpaketet](0007-eceee-member-foundation-verification.md) | proposed | PRD-0059, PRD-0060, PRD-0065 |
 | PLAN-0006 | [Django-fri HTTP-pilot för widgetkontrakt](0006-widget-contract-http-pilot.md) | proposed; implementation not started | PRD-0028 |
 | PLAN-0005 | [Omkartläggning av legacyinnehåll mot gemensam klassificering](0005-legacy-import-remapping.md) | draft | PRD-0034, PRD-0031, PRD-0035 |
 | PLAN-0004 | [Import av förenklat ECEEE-innehåll från legacy](0004-simplified-legacy-content-import.md) | in-progress | PRD-0034, PRD-0031, PRD-0012, PRD-0021 |

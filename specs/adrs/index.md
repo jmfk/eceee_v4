@@ -7,6 +7,8 @@
 | ADR-0081 | [Separera tillfälliga AI-bildförslag från sparade media](active/0081-track-generated-image-provenance.md) | accepted | [PRD-0064](../prds/0064-editorial-ai-images.md) |
 | ADR-0080 | [Använd befintliga AI-kopplingar för redaktionella förslag](active/0080-use-existing-ai-for-editorial-suggestions.md) | accepted | [PRD-0063](../prds/0063-editorial-ai-from-sources.md) |
 | ADR-0079 | [Lagra länkfångster som vanligt media](active/0079-store-link-captures-as-media.md) | accepted | [PRD-0062](../prds/0062-screenshots-from-links.md) |
+| ADR-0077 | [Kontrollera åtkomst före privat leverans](active/0077-authorize-private-downloads.md) | accepted | [PRD-0060](../prds/0060-eceee-protected-downloads.md) |
+| ADR-0076 | [Skilj konto, medlemskap och åtkomsträtt](active/0076-separate-member-access.md) | accepted | [PRD-0059](../prds/0059-eceee-member-accounts.md), [PRD-0060](../prds/0060-eceee-protected-downloads.md) |
 | ADR-0075 | [Förhämta nästa omgång i publika listor](active/0075-prefetch-public-list-batches.md) | accepted | [PRD-0058](../prds/0058-seamless-public-lists.md) |
 | ADR-0074 | [Verifiera sajten mot det importerade devarkivet](active/0074-full-archive-verification.md) | accepted | [PRD-0057](../prds/0057-eceee-launch-verification.md) |
 | ADR-0073 | [Håll det lokala biblioteket oberoende av framtida källval](active/0073-library-source-boundary.md) | accepted | [PRD-0054](../prds/0054-eceee-publication-library.md) |
