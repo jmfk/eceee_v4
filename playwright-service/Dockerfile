@@ -1,5 +1,5 @@
 # Use official Playwright image with Python
-FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
+FROM mcr.microsoft.com/playwright/python:v1.64.1-noble
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -14,7 +14,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY app.py .
+COPY app.py public_capture.py ./
 
 # Create non-root user for security
 RUN groupadd -r appuser && useradd -r -g appuser appuser

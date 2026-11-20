@@ -301,8 +301,11 @@ jobs:
   python-tests:
     name: Python helper tests
     runs-on: ubuntu-latest
+    needs: detect
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -314,6 +317,19 @@ jobs:
           python3 scripts/validate_ci_workflows.py
           python3 deploy/scripts/tests/test-support-credential-isolation.py
           bash deploy/scripts/tests/test-support-storage-env.sh
+      - name: Verify sandboxed public screenshot rendering
+        if: inputs.full
+        env:
+          BASE_SHA: ${{ needs.detect.outputs.base }}
+        run: |
+          if git diff --quiet "$BASE_SHA" HEAD -- playwright-service deploy/docker-compose.prod.yml; then
+            exit 0
+          fi
+          docker build --tag eceee-public-capture-check playwright-service
+          docker run --rm --init --network none \
+            --security-opt seccomp="$PWD/playwright-service/seccomp_profile.json" \
+            --volume "$PWD/playwright-service/test_public_capture.py:/app/test_public_capture.py:ro" \
+            eceee-public-capture-check python -m unittest test_public_capture
 
   publisher-unit-tests:
     name: Publisher unit tests

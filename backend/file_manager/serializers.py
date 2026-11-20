@@ -421,6 +421,13 @@ class MediaFileListSerializer(serializers.ModelSerializer):
     focal_point = FocalPointField(source="*", read_only=True)
     replaced_by = serializers.UUIDField(source="replaced_by_id", read_only=True)
 
+    screenshot_source_url = serializers.CharField(
+        source="metadata.link_screenshot.source_url", read_only=True, default=None
+    )
+    screenshot_captured_at = serializers.CharField(
+        source="metadata.link_screenshot.captured_at", read_only=True, default=None
+    )
+
     class Meta:
         model = MediaFile
         fields = [
@@ -445,6 +452,8 @@ class MediaFileListSerializer(serializers.ModelSerializer):
             "uuid_url",
             "stable_url",
             "download_url",
+            "screenshot_source_url",
+            "screenshot_captured_at",
             "annotation",
             "focal_point",
             "replaced_by",
@@ -537,6 +546,13 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
 
     classification_ids = ClassificationIdsField(required=False)
 
+    screenshot_source_url = serializers.CharField(
+        source="metadata.link_screenshot.source_url", read_only=True, default=None
+    )
+    screenshot_captured_at = serializers.CharField(
+        source="metadata.link_screenshot.captured_at", read_only=True, default=None
+    )
+
     class Meta:
         model = MediaFile
         fields = [
@@ -573,6 +589,8 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
             "stable_url",
             "imgproxy_base_url",
             "thumbnail_url",
+            "screenshot_source_url",
+            "screenshot_captured_at",
             "annotation",
             "focal_point",
             "replaced_by",

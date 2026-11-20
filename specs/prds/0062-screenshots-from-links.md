@@ -1,8 +1,8 @@
 ---
 id: PRD-0062
 title: Skärmbilder från länkar i artiklar och sidor
-status: draft
-locked: false
+status: started
+locked: true
 created: 2026-11-18
 related_adrs: [ADR-0079]
 ---
@@ -31,3 +31,7 @@ En redaktör kan klistra in en länk, förhandsgranska en skärmbild och lägga 
 
 - [ADR-0079 – Lagra länkfångster som vanligt media](../adrs/active/0079-store-link-captures-as-media.md)
 - [PRD-0035 – Klassificeringens läsbyte och obligatorisk mediataggning](0035-classification-cutover-and-required-media.md)
+
+## Implementationsnoteringar
+
+Den första fångsten använder en separat väg för publikt HTML-innehåll som går att visa utan JavaScript.

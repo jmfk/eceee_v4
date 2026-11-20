@@ -142,6 +142,9 @@ services:
       options: {max-size: "50m", max-file: "5"}
 
   playwright:
+    init: true
+    security_opt:
+      - seccomp=../playwright-service/seccomp_profile.json
     build:
       context: ../playwright-service
       dockerfile: Dockerfile

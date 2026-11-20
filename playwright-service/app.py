@@ -9,6 +9,7 @@ import asyncio
 import logging
 import os
 import time
+from threading import BoundedSemaphore
 from typing import Optional, Dict, Any
 from urllib.parse import urlparse
 import json
@@ -17,11 +18,14 @@ from flask import Flask, request, jsonify, send_file
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 import tempfile
 
+from public_capture import public_url
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+public_capture_slot = BoundedSemaphore(1)
 
 # Configuration
 DEFAULT_CONFIG = {
@@ -627,6 +631,48 @@ def health_check():
             "version": "1.0.0",
         }
     )
+
+
+@app.route("/public-screenshot", methods=["POST"])
+def public_screenshot_endpoint():
+    import signal
+    import subprocess
+    import sys
+    from io import BytesIO
+    from pathlib import Path
+
+    if not public_capture_slot.acquire(blocking=False):
+        return jsonify({"error": "The screenshot renderer is busy. Try again shortly."}), 503
+    try:
+        data = request.get_json(silent=True)
+        url = data.get("url") if isinstance(data, dict) else None
+        public_url(url)
+        worker = subprocess.Popen(
+            [sys.executable, str(Path(__file__).with_name("public_capture.py"))],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        try:
+            contents, _ = worker.communicate(input=url.encode("utf-8"), timeout=25)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(worker.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            for pipe in (worker.stdin, worker.stdout):
+                if pipe is not None:
+                    pipe.close()
+            worker.wait(timeout=2)
+            raise ValueError() from None
+        if worker.returncode or not contents.startswith(b"\x89PNG\r\n\x1a\n") or len(contents) > 5 * 1024 * 1024:
+            raise ValueError()
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return jsonify({"error": "Could not capture a public webpage."}), 400
+    finally:
+        public_capture_slot.release()
+    return send_file(BytesIO(contents), mimetype="image/png", max_age=0)
 
 
 @app.route("/render", methods=["POST"])

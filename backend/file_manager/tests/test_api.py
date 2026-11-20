@@ -54,6 +54,73 @@ class MediaFileAPITest(APITestCase):
             content_type="image/jpeg",
         )
 
+    @patch("file_manager.views.link_screenshots.storage")
+    @patch("file_manager.views.link_screenshots.requests.post")
+    def test_reviewed_link_screenshot_saves_with_tags_and_provenance(self, render_page, storage):
+        import base64
+
+        from taxonomy.models import ClassificationType, Tag
+
+        definition = ClassificationType.objects.create(
+            tenant=self.tenant, namespace=self.namespace, key="format", name="Format", allowed_uses=["media_files"]
+        )
+        term = Tag.objects.create(
+            tenant=self.tenant,
+            namespace=self.namespace,
+            classification_type=definition,
+            tag_type="format",
+            slug="screenshot",
+            name="Screenshot",
+        )
+        result = render_page.return_value.__enter__.return_value
+        result.status_code = 200
+        result.headers = {"Content-Type": "image/png"}
+        result.iter_content.return_value = [b"\x89PNG\r\n\x1a\nexample"]
+        headers = {"HTTP_X_TENANT_ID": str(self.tenant.pk)}
+        preview = self.client.post(
+            reverse("api:file_manager:link-screenshot"),
+            {"url": "https://example.com/news?ref=secret"},
+            format="json",
+            **headers,
+        )
+        self.assertEqual(preview.status_code, 200, preview.data)
+        self.assertEqual(preview["Cache-Control"], "private, no-store")
+        storage.upload_file.return_value = {
+            "file_hash": "c" * 64,
+            "file_size": 15,
+            "content_type": "image/png",
+            "file_path": "reviewed.png",
+        }
+        storage.get_public_url.return_value = "https://example.test/reviewed.png"
+        url = reverse("api:file_manager:save-link-screenshot")
+
+        def save(contents):
+            return self.client.post(
+                url,
+                {
+                    "namespace": self.namespace.slug,
+                    "title": "Example capture",
+                    "token": preview.data["token"],
+                    "classification_ids[0]": str(term.pk),
+                    "image": SimpleUploadedFile("screenshot.png", contents, content_type="image/png"),
+                },
+                format="multipart",
+                **headers,
+            )
+
+        self.assertEqual(save(b"forged").status_code, 400)
+        image = base64.b64decode(preview.data["image"])
+        saved = save(image)
+        self.assertEqual(saved.status_code, 201, saved.data)
+        media = MediaFile.objects.get(pk=saved.data["id"])
+        self.assertEqual(media.metadata["link_screenshot"]["source_url"], "https://example.com/news")
+        self.assertEqual(saved.data["screenshot_source_url"], "https://example.com/news")
+        self.assertTrue(media.metadata["link_screenshot"]["captured_at"])
+        self.assertTrue(saved.data["screenshot_captured_at"])
+        self.assertEqual(list(media.canonical_tags.values_list("pk", flat=True)), [term.pk])
+        self.assertEqual(save(image).data["id"], saved.data["id"])
+        storage.upload_file.assert_called_once()
+
     def test_search_filters_ai_origin_alongside_text_and_namespace(self):
         generated = MediaFile.objects.create(
             title="Test AI Image",

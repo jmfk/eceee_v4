@@ -332,6 +332,14 @@ const MediaEditForm = ({
                     <div className="mt-3 text-sm text-gray-600 text-center">
                         <div className="font-medium">{file.originalFilename}</div>
                         <div className="text-gray-500">{formatFileSize(file.fileSize)}</div>
+                        {file.screenshotSourceUrl && (
+                            <dl className="mt-2 space-y-1 text-xs text-gray-600">
+                                <div><dt className="font-medium">Screenshot source</dt><dd className="break-all">{file.screenshotSourceUrl}</dd></div>
+                                {file.screenshotCapturedAt && <div><dt className="font-medium">Captured</dt><dd>
+                                    {new Date(file.screenshotCapturedAt).toLocaleString()}
+                                </dd></div>}
+                            </dl>
+                        )}
                     </div>
                     
                     {isVersionedImage && <div className="mt-3 flex flex-wrap justify-center gap-2">
