@@ -10,6 +10,7 @@ import os
 
 from celery import Celery
 from celery.schedules import crontab
+from celery.signals import after_setup_logger, after_setup_task_logger
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,21 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 
 # Load task modules from all registered Django apps
 app.autodiscover_tasks()
+
+
+@after_setup_logger.connect
+@after_setup_task_logger.connect
+def attach_slack_error_handler(logger, **kwargs):
+    # Celery replaces root/task handlers during worker startup, after Django's LOGGING setup.
+    if not getattr(settings, "SLACK_SERVER_ERRORS_ENABLED", False):
+        return
+    from tenant_support.slack import SlackErrorHandler
+
+    if not any(isinstance(handler, SlackErrorHandler) for handler in logger.handlers):
+        handler = SlackErrorHandler()
+        handler.setLevel(logging.ERROR)
+        logger.addHandler(handler)
+
 
 # Configure task routes for different queues
 app.conf.task_routes = {

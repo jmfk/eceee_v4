@@ -46,6 +46,9 @@ if (bundledVersions.size !== 1) {
 const bundledVersion = [...bundledVersions][0];
 const standaloneVersions = new Set([require('react').version, require('react-dom').version]);
 const allClientSource = clientChunks.map(({ source }) => source).join('\n');
+if (/SLACK_(?:REPORTS|SERVER)_WEBHOOK_URL|hooks\.slack\.com\/services\//.test(allClientSource)) {
+  throw new Error('Publisher client bundle contains server-only Slack configuration.');
+}
 const includesExactVersion = version => new RegExp(`["']${version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']`).test(allClientSource);
 const conflictingVersions = [...standaloneVersions]
   .filter(version => version !== bundledVersion && includesExactVersion(version));

@@ -82,6 +82,9 @@ services:
       PUBLISHER_IMGPROXY_SALT: ${IMGPROXY_SALT}
       PUBLISHER_IMGPROXY_PUBLIC_URL: /imgproxy
       APP_VERSION: ${IMAGE_TAG:-unknown}
+      SLACK_SERVER_ERRORS_ENABLED: ${SLACK_SERVER_ERRORS_ENABLED:-false}
+      SLACK_SERVER_WEBHOOK_URL: ${SLACK_SERVER_WEBHOOK_URL:-}
+      SLACK_ENVIRONMENT: production
     depends_on:
       db:
         condition: service_healthy
@@ -167,6 +170,8 @@ services:
     env_file: .env
     environment:
       DEBUG: "0"
+      APP_VERSION: ${IMAGE_TAG:-unknown}
+      SLACK_SERVICE_NAME: celery-worker
       POSTGRES_HOST: db
       REDIS_URL: redis://redis:6379/0
       PLAYWRIGHT_SERVICE_URL: ${PLAYWRIGHT_SERVICE_URL:-http://playwright:5000}
@@ -191,6 +196,8 @@ services:
     env_file: .env
     environment:
       DEBUG: "0"
+      APP_VERSION: ${IMAGE_TAG:-unknown}
+      SLACK_SERVICE_NAME: celery-beat
       POSTGRES_HOST: db
       REDIS_URL: redis://redis:6379/0
     depends_on:

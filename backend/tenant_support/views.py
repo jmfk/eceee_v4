@@ -458,6 +458,9 @@ class ThreadsView(SupportView):
             event(request.tenant, request.user, card, "card.received", f"Received message in {card.short_id}")
             enqueue_index(card)
         notify_thread(thread, request.user, message)
+        from .slack import queue_report
+
+        queue_report(thread)
         return Response(ThreadSerializer(thread).data, status=status.HTTP_201_CREATED)
 
 

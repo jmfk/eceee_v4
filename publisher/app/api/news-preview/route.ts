@@ -1,5 +1,6 @@
 import { columnistId } from '../../../src/editorial';
 import { database } from '@/src/db';
+import { schedulePublisherError } from '../../../src/slack-errors';
 import { newsFlashPage, withNewsImages } from '../../../src/news-flash';
 import { newsArticleKind, relatedNewsItems, selectedNewsArticle } from '../../../src/related-news';
 import { contentHostname } from '../../../src/hostname';
@@ -76,6 +77,7 @@ export async function GET(request: Request) {
       id, slug, title, objectType, data, publishDate, isFeatured,
     })) }, { headers: responseHeaders });
   } catch (error) {
+    schedulePublisherError(error, 'news-preview');
     console.error('[news-preview] query failed', error instanceof Error ? error.name : 'UnknownError');
     return Response.json({ error: 'News are temporarily unavailable.' }, { status: 503, headers: responseHeaders });
   }

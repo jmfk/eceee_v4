@@ -308,6 +308,8 @@ jobs:
           python-version: '3.11'
       - name: Run framework-independent unit tests
         run: python3 -m unittest discover -s scripts/tests -v
+      - name: Test protected Slack configuration helpers
+        run: python3 -m unittest discover -s deploy/scripts/tests -p '*slack*.py' -v
       - name: Validate workflow syntax
         run: |
           python3 -m pip install PyYAML==6.0.3

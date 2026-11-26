@@ -208,6 +208,7 @@ help: ## Show this help message (use: make help-TARGET for one target)
 		echo "  clean             Clean Python, Node, and Docker artifacts"; \
 		echo ""; \
 		echo "Production Deployment:"; \
+		echo "  prod-configure-slack    Plan Slack settings for both v4 error streams (APPLY=yes stages locally)"; \
 		echo "  prod-configure-support  Plan support settings (APPLY=yes, optional ACTIVATE=yes)"; \
 		echo "  prod-support-recipient  Plan support-only login creation (SUPPORT_RECIPIENT=email)"; \
 		echo "  prod-deploy       Verify CI and deploy an exact release TAG"; \

@@ -2,6 +2,7 @@
 
 | ID | Title | Status | Related ADRs |
 | --- | --- | --- | --- |
+| PRD-0066 | [ECEEE error reports in Slack](0066-slack-error-reports.md) | in-progress | [ADR-0082](../adrs/active/0082-private-slack-error-notifications.md) |
 | PRD-0064 | [AI-bilder för artiklar och sidor](0064-editorial-ai-images.md) | started | [ADR-0081](../adrs/active/0081-track-generated-image-provenance.md) |
 | PRD-0063 | [AI-stöd för sammanfattningar och redaktionella texter](0063-editorial-ai-from-sources.md) | draft | [ADR-0080](../adrs/active/0080-use-existing-ai-for-editorial-suggestions.md) |
 | PRD-0062 | [Skärmbilder från länkar i artiklar och sidor](0062-screenshots-from-links.md) | draft | [ADR-0079](../adrs/active/0079-store-link-captures-as-media.md) |

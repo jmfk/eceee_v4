@@ -592,6 +592,13 @@ if DEBUG:
 
 _default_handlers = ["file", "console"] if DEBUG else ["console"]
 
+SLACK_REPORTS_ENABLED = config("SLACK_REPORTS_ENABLED", default=False, cast=bool)
+SLACK_SERVER_ERRORS_ENABLED = config("SLACK_SERVER_ERRORS_ENABLED", default=False, cast=bool)
+SLACK_REPORTS_WEBHOOK_URL = config("SLACK_REPORTS_WEBHOOK_URL", default="")
+SLACK_SERVER_WEBHOOK_URL = config("SLACK_SERVER_WEBHOOK_URL", default="")
+SLACK_ENVIRONMENT = config("SLACK_ENVIRONMENT", default="development" if DEBUG else "production")
+SLACK_SERVICE_NAME = config("SLACK_SERVICE_NAME", default="backend")
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -642,6 +649,12 @@ if DIAGNOSTICS_ENABLED:
 
 os.makedirs(BASE_DIR / "logs", exist_ok=True)
 
+if SLACK_SERVER_ERRORS_ENABLED:
+    LOGGING["handlers"]["slack_errors"] = {"class": "tenant_support.slack.SlackErrorHandler", "level": "ERROR"}
+    for logger_config in [LOGGING["root"], *LOGGING["loggers"].values()]:
+        if "slack_errors" not in logger_config["handlers"]:
+            logger_config["handlers"].append("slack_errors")
+
 # Security Settings for Production
 if not DEBUG:
     # Proxy/Reverse proxy settings (for Caddy)
@@ -675,6 +688,7 @@ CELERY_TIMEZONE = TIME_ZONE
 
 # Celery Beat Schedule for periodic tasks
 CELERY_BEAT_SCHEDULE = {
+    "deliver-slack-errors": {"task": "tenant_support.tasks.deliver_slack_pending", "schedule": 60.0},
     "deliver-support-inbox-email": {"task": "tenant_support.tasks.deliver_pending", "schedule": 60.0},
     "refresh-scheduled-publication-caches": {
         "task": "webpages.tasks.refresh_scheduled_publication_caches",

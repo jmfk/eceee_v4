@@ -16,7 +16,10 @@ THEME_WORKSPACE ?=
 THEME_ADMIN ?=
 export RUN_ID CANARY_SIZE THEME_WORKSPACE THEME_ADMIN
 
-.PHONY: prod-configure-support prod-activate-support prod-support-recipient
+.PHONY: prod-configure-support prod-activate-support prod-support-recipient prod-configure-slack
+prod-configure-slack: ## Plan local Slack deployment settings; APPLY=yes stages both streams, without contacting production.
+	python3 deploy/scripts/configure-slack.py $(if $(filter yes,$(APPLY)),--apply) $(if $(SLACK_WEBHOOKS_ENV),--webhooks-env "$(SLACK_WEBHOOKS_ENV)")
+
 prod-configure-support: ## Plan support setup; APPLY=yes stages settings, ACTIVATE=yes reloads existing images.
 	python3 deploy/scripts/configure-support.py $(if $(filter yes,$(APPLY)),--apply) --directory "$(PROD_DIR)"
 	$(if $(filter yes,$(ACTIVATE)),python3 deploy/scripts/activate-support.py $(if $(filter yes,$(APPLY)),--apply),@true)
