@@ -1,5 +1,6 @@
 import { prepareEditorialWidgets } from '../../../src/model';
 import { database } from '@/src/db';
+import { schedulePublisherError } from '../../../src/slack-errors';
 import { contentHostname } from '../../../src/hostname';
 import { editorialItems, eventCalendarResponse, type EditorialKind, type EventGroup } from '../../../src/editorial';
 
@@ -47,6 +48,7 @@ export async function GET(request: Request) {
     });
     return result ? Response.json(result, { headers }) : Response.json({ error: 'Site not found.' }, { status: 404, headers });
   } catch (error) {
+    schedulePublisherError(error, 'editorial');
     console.error('[editorial] query failed', error instanceof Error ? error.name : 'UnknownError');
     return Response.json({ error: 'Content is temporarily unavailable.' }, { status: 503, headers });
   }

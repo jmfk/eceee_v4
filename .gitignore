@@ -40,6 +40,7 @@ backend/media/*
 # Production: deploy/.env (deploy.sh, deploy/docker-compose.prod.yml) — keep only on server.
 .env
 deploy/.env
+deploy/.slack-config.lock
 deploy/.env.before-support-*
 deploy/.env.support-account
 deploy/.support-config-*

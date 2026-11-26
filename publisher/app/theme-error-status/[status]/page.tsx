@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { database } from '@/src/db';
+import { schedulePublisherError } from '../../../src/slack-errors';
 import { contentHostname } from '@/src/hostname';
 import { buildThemeErrorPageModel } from '@/src/model';
 import { PublishedPage } from '@/src/render';
@@ -13,6 +14,7 @@ export default async function ThemeErrorPage({ params }: { params: Promise<{ sta
   if (!['403', '500', '503'].includes(status) || requestHeaders.get('x-eceee-theme-error') !== status) notFound();
   const hostname = contentHostname(requestHeaders.get('host') || '');
   const model = await buildThemeErrorPageModel(database, hostname, Number(status)).catch(error => {
+    schedulePublisherError(error, 'theme-error');
     console.error(`[publisher] Could not render theme error page ${status}`, error);
     return null;
   });

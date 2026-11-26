@@ -161,3 +161,22 @@ class MessageAttachment(TenantRecord):
     content_type = models.CharField(max_length=100)
     byte_size = models.PositiveBigIntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class SlackDelivery(models.Model):
+    """Private outbox metadata only; no report text or webhook credentials."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    category = models.CharField(max_length=16, choices=[("report", "Report"), ("server", "Server error")])
+    thread = models.ForeignKey(SupportThread, null=True, blank=True, on_delete=models.PROTECT)
+    event_key = models.CharField(max_length=180, unique=True)
+    metadata = models.JSONField(default=dict)
+    state = models.CharField(max_length=16, default="pending")
+    attempts = models.PositiveSmallIntegerField(default=0)
+    next_attempt_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    error_code = models.CharField(max_length=50, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["state", "next_attempt_at"], name="support_slack_due_idx")]

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { schedulePublisherError } from '../../../../../src/slack-errors';
 import { database } from '@/src/db';
 import { formSubmissions } from '@/src/form-db';
 import { submitPublishedForm } from '@/src/forms';
@@ -78,6 +79,7 @@ export async function POST(request: Request, context: RouteContext) {
     if (result.status === 'not_found') return new Response('Published form not found.', { status: 404 });
     return redirectToPage(request, result.redirectPath, widgetId, result.status === 'success' ? 'success' : 'error');
   } catch (error) {
+    schedulePublisherError(error, 'public-form');
     console.error('[public-form] submission failed', error instanceof Error ? error.name : 'UnknownError');
     return new Response('Form submission is temporarily unavailable.', { status: 503 });
   }

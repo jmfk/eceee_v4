@@ -113,3 +113,22 @@ def deliver_pending():
     )
     for pk in ids:
         deliver_one(pk)
+
+
+@shared_task(ignore_result=True)
+def deliver_slack_pending():
+    from .slack import deliver_pending as deliver
+
+    deliver()
+
+
+@shared_task(bind=True, ignore_result=True, max_retries=3)
+def enqueue_slack_server_error(self, metadata):
+    from .slack import queue_server_error
+
+    try:
+        queue_server_error(metadata)
+    except Exception:
+        # Retry storage without logging exception text or creating recursive Slack alerts.
+        if self.request.retries < self.max_retries:
+            raise self.retry(countdown=30)
